@@ -19,22 +19,70 @@
 #include "bot_client.h"
 #include "bot_func.h"
 
-
 extern enginefuncs_t g_engfuncs;
 extern bot_t bots[32];
-extern int mod_id;
-extern int team_allies[4];
-extern char g_argv[1024];
-extern bool isFakeClientCommand;
+extern qboolean isFakeClientCommand;
 extern int fake_arg_count;
 
+char g_argv[1024*3];
+char g_arg1[1024];
+char g_arg2[1024];
+char g_arg3[1024];
+
+extern int get_cvars;
+extern int turn_method;
+extern qboolean aim_fix;
+extern float turn_skill;
 
 void (*botMsgFunction)(void *, int) = NULL;
 void (*botMsgEndFunction)(void *, int) = NULL;
 int botMsgIndex;
 
-static FILE *fp;
+void pfnSetSize(edict_t *e, const float *rgflMin, const float *rgflMax) {
+	int index = UTIL_GetBotIndex(e);
+	if(index == -1)
+		RETURN_META (MRES_IGNORED);
+		
+	bots[index].ducking = (Vector((float *)rgflMin) == VEC_DUCK_HULL_MIN && Vector((float *)rgflMax) == VEC_DUCK_HULL_MAX);
+	
+	RETURN_META (MRES_IGNORED);
+}
 
+void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 ) {
+   const float globaltime = gpGlobals->time;
+   
+   SaveSound((edict_t*)pInvoker, globaltime, pInvoker->v.origin, 1.0, ATTN_NORM, 1);
+   
+   RETURN_META (MRES_IGNORED);
+}
+
+void pfnTraceLine(const float *v1, const float *v2, int fNoMonsters, edict_t *pEdict, TraceResult *ptr)
+{
+   int index;
+   
+   if(!pEdict)
+      RETURN_META(MRES_IGNORED);
+   
+   // check to see if a bot is sending this traceline...
+   index = UTIL_GetBotIndex(pEdict);
+   if(index < 0)
+      RETURN_META(MRES_IGNORED);
+      
+   // AND it is firing 
+   if(!(pEdict->v.button & (IN_ATTACK | IN_ATTACK2)))
+      RETURN_META(MRES_IGNORED);
+   
+   BotPointGun (bots[index], FALSE); // update the bot's view angles in advance, but don't save them
+   
+   MAKE_VECTORS (pEdict->v.v_angle); // build base vectors in bot's actual view direction
+   
+   // trace the line considering the ACTUAL view angles of the bot, not the ones it claims to have
+   TRACE_LINE (pEdict->v.origin + pEdict->v.view_ofs,
+               pEdict->v.origin + pEdict->v.view_ofs + gpGlobals->v_forward * (Vector(v2) - Vector(v1)).Length(),
+               fNoMonsters, pEdict, ptr);
+   
+   RETURN_META(MRES_SUPERCEDE);
+}
 
 void pfnChangeLevel(char* s1, char* s2)
 {
@@ -45,9 +93,10 @@ void pfnChangeLevel(char* s1, char* s2)
       {
          char cmd[40];
 
-         sprintf(cmd, "kick \"%s\"\n", bots[index].name);
+         snprintf(cmd, sizeof(cmd), "kick \"%s\"\n", bots[index].name);
 
          bots[index].respawn_state = RESPAWN_NEED_TO_RESPAWN;
+         bots[index].is_used = false;
 
          SERVER_COMMAND(cmd);  // kick the bot using (kick "name")
       }
@@ -56,84 +105,11 @@ void pfnChangeLevel(char* s1, char* s2)
    RETURN_META (MRES_IGNORED);
 }
 
-
-edict_t* pfnFindEntityByString(edict_t *pEdictStartSearchAfter, const char *pszField, const char *pszValue)
-{
-   if (gpGlobals->deathmatch)
-   {
-      int bot_index;
-      bot_t *pBot;
-
-      if (mod_id == CSTRIKE_DLL)
-      {
-         // new round in CS 1.5
-         if (strcmp ("info_map_parameters", pszValue) == 0)
-         {
-            for (bot_index = 0; bot_index < 32; bot_index++)
-            {
-               pBot = &bots[bot_index];
-
-               if (pBot->is_used)
-                  BotSpawnInit (pBot); // reset bots for new round
-            }
-         }
-      }
-   }
-
-   RETURN_META_VALUE (MRES_IGNORED, NULL);
-}
-
-
 void pfnEmitSound(edict_t *entity, int channel, const char *sample, /*int*/float volume, float attenuation, int fFlags, int pitch)
 {
-   int index;
-   float distance;
-   Vector vecEnd;
-   edict_t *pEdict;
-
    if (gpGlobals->deathmatch)
    {
-      if (mod_id == TFC_DLL)
-      {
-         // is someone yelling for a medic?
-         if ((strcmp(sample, "speech/saveme1.wav") == 0) ||
-             (strcmp(sample, "speech/saveme2.wav") == 0))
-         {
-            for (index=0; index < 32; index++)
-            {
-               if (bots[index].is_used)  // is this slot used?
-               {
-                  pEdict = bots[index].pEdict;
-                  
-                  if ((pEdict->v.playerclass != TFC_CLASS_MEDIC) &&
-                      (pEdict->v.playerclass != TFC_CLASS_ENGINEER))
-                     continue;
-
-                  int player_team = UTIL_GetTeam(entity);
-                  int bot_team = UTIL_GetTeam(pEdict);
-
-                  // don't heal your enemies...
-                  if ((bot_team != player_team) &&
-                      !(team_allies[bot_team] & (1<<player_team)))
-                     continue;
-
-                  distance = (pEdict->v.origin - entity->v.origin).Length();
-
-                  vecEnd = entity->v.origin + entity->v.view_ofs;
-
-                  if ((distance < 1000) && FVisible(vecEnd, pEdict) &&
-                      (bots[index].pBotEnemy == NULL))
-                  {
-                     bots[index].pBotEnemy = entity;
-
-                     bots[index].enemy_attack_count = 3;  // hit 'em 3 times
-
-                     bots[index].pBotUser = NULL;  // don't follow user when enemy found
-                  }
-               }
-            }
-         }
-      }
+      SaveSound((edict_t*)entity, gpGlobals->time, entity->v.origin, volume, attenuation, 1);
    }
 
    RETURN_META (MRES_IGNORED);
@@ -147,24 +123,30 @@ void pfnClientCommand(edict_t* pEdict, char* szFmt, ...)
    RETURN_META (MRES_IGNORED);
 }
 
+int FAST_GET_USER_MSG_ID(plid_t plindex, int & value, const char * name, int * size) {
+   return(value ? value : (value = GET_USER_MSG_ID(plindex, name, size)));
+}
 
 void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, edict_t *ed)
-{
+{   
    if (gpGlobals->deathmatch)
    {
       int index = -1;
-
+      
+      static int WeaponList = 0;
+      static int CurWeapon = 0;
+      static int AmmoX = 0;
+      static int AmmoPickup = 0;
+      static int WeapPickup = 0;
+      static int ItemPickup = 0;
+      static int Health = 0;
+      static int Battery = 0;
+      static int Damage = 0;
+      static int ScreenFade = 0;
+      static int DeathMsg = 0;
+      
       if (ed)
       {
-         if ((mod_id == HOLYWARS_DLL) &&
-             (msg_type == GET_USER_MSG_ID (PLID, "Halo", NULL)))
-         {
-            // catch this message for ALL players, NOT just bots...
-            botMsgFunction = BotClient_HolyWars_Halo;
-
-            botMsgIndex = (int)ed;  // save the edict instead of the bot index
-         }
-         else
          {
             index = UTIL_GetBotIndex(ed);
 
@@ -175,201 +157,27 @@ void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, edict_t *
                botMsgEndFunction = NULL;  // no msg end function until known otherwise
                botMsgIndex = index;       // index of bot receiving message
 
-               if (mod_id == VALVE_DLL)
                {
-                  if (msg_type == GET_USER_MSG_ID (PLID, "WeaponList", NULL))
+                  if (msg_type == FAST_GET_USER_MSG_ID (PLID, WeaponList, "WeaponList", NULL))
                      botMsgFunction = BotClient_Valve_WeaponList;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "CurWeapon", NULL))
+                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, CurWeapon, "CurWeapon", NULL))
                      botMsgFunction = BotClient_Valve_CurrentWeapon;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "AmmoX", NULL))
+                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, AmmoX, "AmmoX", NULL))
                      botMsgFunction = BotClient_Valve_AmmoX;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "AmmoPickup", NULL))
+                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, AmmoPickup, "AmmoPickup", NULL))
                      botMsgFunction = BotClient_Valve_AmmoPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "WeapPickup", NULL))
+                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, WeapPickup, "WeapPickup", NULL))
                      botMsgFunction = BotClient_Valve_WeaponPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "ItemPickup", NULL))
+                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, ItemPickup, "ItemPickup", NULL))
                      botMsgFunction = BotClient_Valve_ItemPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Health", NULL))
+                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, Health, "Health", NULL))
                      botMsgFunction = BotClient_Valve_Health;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Battery", NULL))
+                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, Battery, "Battery", NULL))
                      botMsgFunction = BotClient_Valve_Battery;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Damage", NULL))
+                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, Damage, "Damage", NULL))
                      botMsgFunction = BotClient_Valve_Damage;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "ScreenFade", NULL))
+                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, ScreenFade, "ScreenFade", NULL))
                      botMsgFunction = BotClient_Valve_ScreenFade;
-               }
-               else if (mod_id == TFC_DLL)
-               {
-                  if (msg_type == GET_USER_MSG_ID (PLID, "VGUIMenu", NULL))
-                     botMsgFunction = BotClient_TFC_VGUI;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "WeaponList", NULL))
-                     botMsgFunction = BotClient_TFC_WeaponList;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "CurWeapon", NULL))
-                     botMsgFunction = BotClient_TFC_CurrentWeapon;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "AmmoX", NULL))
-                     botMsgFunction = BotClient_TFC_AmmoX;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "AmmoPickup", NULL))
-                     botMsgFunction = BotClient_TFC_AmmoPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "SecAmmoVal", NULL))
-                     botMsgFunction = BotClient_TFC_SecAmmoVal;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "WeapPickup", NULL))
-                     botMsgFunction = BotClient_TFC_WeaponPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "ItemPickup", NULL))
-                     botMsgFunction = BotClient_TFC_ItemPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Health", NULL))
-                     botMsgFunction = BotClient_TFC_Health;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Battery", NULL))
-                     botMsgFunction = BotClient_TFC_Battery;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Damage", NULL))
-                     botMsgFunction = BotClient_TFC_Damage;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "TextMsg", NULL))
-                  {
-                     botMsgFunction = BotClient_TFC_TextMsg;
-                     botMsgEndFunction = BotClient_TFC_TextMsg;
-                  }
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "ScreenFade", NULL))
-                     botMsgFunction = BotClient_TFC_ScreenFade;
-               }
-               else if (mod_id == CSTRIKE_DLL)
-               {
-                  if (msg_type == GET_USER_MSG_ID (PLID, "VGUIMenu", NULL))
-                     botMsgFunction = BotClient_CS_VGUI;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "ShowMenu", NULL))
-                     botMsgFunction = BotClient_CS_ShowMenu;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "WeaponList", NULL))
-                     botMsgFunction = BotClient_CS_WeaponList;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "CurWeapon", NULL))
-                     botMsgFunction = BotClient_CS_CurrentWeapon;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "AmmoX", NULL))
-                     botMsgFunction = BotClient_CS_AmmoX;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "WeapPickup", NULL))
-                     botMsgFunction = BotClient_CS_WeaponPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "AmmoPickup", NULL))
-                     botMsgFunction = BotClient_CS_AmmoPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "ItemPickup", NULL))
-                     botMsgFunction = BotClient_CS_ItemPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Health", NULL))
-                     botMsgFunction = BotClient_CS_Health;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Battery", NULL))
-                     botMsgFunction = BotClient_CS_Battery;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Damage", NULL))
-                     botMsgFunction = BotClient_CS_Damage;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Money", NULL))
-                     botMsgFunction = BotClient_CS_Money;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "ScreenFade", NULL))
-                     botMsgFunction = BotClient_CS_ScreenFade;
-               }
-               else if (mod_id == GEARBOX_DLL)
-               {
-                  if (msg_type == GET_USER_MSG_ID (PLID, "VGUIMenu", NULL))
-                     botMsgFunction = BotClient_Gearbox_VGUI;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "WeaponList", NULL))
-                     botMsgFunction = BotClient_Gearbox_WeaponList;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "CurWeapon", NULL))
-                     botMsgFunction = BotClient_Gearbox_CurrentWeapon;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "AmmoX", NULL))
-                     botMsgFunction = BotClient_Gearbox_AmmoX;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "AmmoPickup", NULL))
-                     botMsgFunction = BotClient_Gearbox_AmmoPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "WeapPickup", NULL))
-                     botMsgFunction = BotClient_Gearbox_WeaponPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "ItemPickup", NULL))
-                     botMsgFunction = BotClient_Gearbox_ItemPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Health", NULL))
-                     botMsgFunction = BotClient_Gearbox_Health;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Battery", NULL))
-                     botMsgFunction = BotClient_Gearbox_Battery;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Damage", NULL))
-                     botMsgFunction = BotClient_Gearbox_Damage;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "ScreenFade", NULL))
-                     botMsgFunction = BotClient_Gearbox_ScreenFade;
-               }
-               else if (mod_id == FRONTLINE_DLL)
-               {
-                  if (msg_type == GET_USER_MSG_ID (PLID, "VGUIMenu", NULL))
-                  {
-                     botMsgFunction = BotClient_FLF_VGUI;
-                     botMsgEndFunction = BotClient_FLF_VGUI;
-                  }
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "WeaponList", NULL))
-                     botMsgFunction = BotClient_FLF_WeaponList;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "CurWeapon", NULL))
-                     botMsgFunction = BotClient_FLF_CurrentWeapon;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "AmmoX", NULL))
-                     botMsgFunction = BotClient_FLF_AmmoX;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "AmmoPickup", NULL))
-                     botMsgFunction = BotClient_FLF_AmmoPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "WeapPickup", NULL))
-                     botMsgFunction = BotClient_FLF_WeaponPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "ItemPickup", NULL))
-                     botMsgFunction = BotClient_FLF_ItemPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Health", NULL))
-                     botMsgFunction = BotClient_FLF_Health;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Battery", NULL))
-                     botMsgFunction = BotClient_FLF_Battery;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Damage", NULL))
-                     botMsgFunction = BotClient_FLF_Damage;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "TextMsg", NULL))
-                  {
-                     botMsgFunction = BotClient_FLF_TextMsg;
-                     botMsgEndFunction = BotClient_FLF_TextMsg;
-                  }
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "WarmUp", NULL))
-                     botMsgFunction = BotClient_FLF_WarmUp;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "ScreenFade", NULL))
-                     botMsgFunction = BotClient_FLF_ScreenFade;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "HideWeapon", NULL))
-                     botMsgFunction = BotClient_FLF_HideWeapon;
-               }
-               else if (mod_id == HOLYWARS_DLL)
-               {
-                  if (msg_type == GET_USER_MSG_ID (PLID, "WeaponList", NULL))
-                     botMsgFunction = BotClient_Valve_WeaponList;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "CurWeapon", NULL))
-                     botMsgFunction = BotClient_Valve_CurrentWeapon;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "AmmoX", NULL))
-                     botMsgFunction = BotClient_Valve_AmmoX;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "AmmoPickup", NULL))
-                     botMsgFunction = BotClient_Valve_AmmoPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "WeapPickup", NULL))
-                     botMsgFunction = BotClient_Valve_WeaponPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "ItemPickup", NULL))
-                     botMsgFunction = BotClient_Valve_ItemPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Health", NULL))
-                     botMsgFunction = BotClient_Valve_Health;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Battery", NULL))
-                     botMsgFunction = BotClient_Valve_Battery;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Damage", NULL))
-                     botMsgFunction = BotClient_Valve_Damage;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "ScreenFade", NULL))
-                     botMsgFunction = BotClient_Valve_ScreenFade;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "GameMode", NULL))
-                     botMsgFunction = BotClient_HolyWars_GameMode;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "HudText", NULL))
-                     botMsgFunction = BotClient_HolyWars_HudText;
-               }
-               else if (mod_id == DMC_DLL)
-               {
-                  if (msg_type == GET_USER_MSG_ID (PLID, "WeaponList", NULL))
-                     botMsgFunction = BotClient_DMC_WeaponList;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "CurWeapon", NULL))
-                     botMsgFunction = BotClient_DMC_CurrentWeapon;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "AmmoX", NULL))
-                     botMsgFunction = BotClient_DMC_AmmoX;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "AmmoPickup", NULL))
-                     botMsgFunction = BotClient_DMC_AmmoPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "WeapPickup", NULL))
-                     botMsgFunction = BotClient_DMC_WeaponPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "ItemPickup", NULL))
-                     botMsgFunction = BotClient_DMC_ItemPickup;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Health", NULL))
-                     botMsgFunction = BotClient_DMC_Health;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Battery", NULL))
-                     botMsgFunction = BotClient_DMC_Battery;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "Damage", NULL))
-                     botMsgFunction = BotClient_DMC_Damage;
-                  else if (msg_type == GET_USER_MSG_ID (PLID, "QItems", NULL))
-                     botMsgFunction = BotClient_DMC_QItems;
                }
             }
          }
@@ -379,44 +187,9 @@ void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, edict_t *
          botMsgFunction = NULL;  // no msg function until known otherwise
          botMsgIndex = -1;       // index of bot receiving message (none)
 
-         if (mod_id == VALVE_DLL)
          {
-            if (msg_type == GET_USER_MSG_ID (PLID, "DeathMsg", NULL))
+            if (msg_type == FAST_GET_USER_MSG_ID (PLID, DeathMsg, "DeathMsg", NULL))
                botMsgFunction = BotClient_Valve_DeathMsg;
-         }
-         else if (mod_id == TFC_DLL)
-         {
-            if (msg_type == GET_USER_MSG_ID (PLID, "DeathMsg", NULL))
-               botMsgFunction = BotClient_TFC_DeathMsg;
-         }
-         else if (mod_id == CSTRIKE_DLL)
-         {
-            if (msg_type == GET_USER_MSG_ID (PLID, "DeathMsg", NULL))
-               botMsgFunction = BotClient_CS_DeathMsg;
-         }
-         else if (mod_id == GEARBOX_DLL)
-         {
-            if (msg_type == GET_USER_MSG_ID (PLID, "DeathMsg", NULL))
-               botMsgFunction = BotClient_Gearbox_DeathMsg;
-         }
-         else if (mod_id == FRONTLINE_DLL)
-         {
-            if (msg_type == GET_USER_MSG_ID (PLID, "DeathMsg", NULL))
-               botMsgFunction = BotClient_FLF_DeathMsg;
-            else if (msg_type == GET_USER_MSG_ID (PLID, "WarmUp", NULL))
-               botMsgFunction = BotClient_FLF_WarmUpAll;
-            else if (msg_type == GET_USER_MSG_ID (PLID, "WinMessage", NULL))
-               botMsgFunction = BotClient_FLF_WinMessage;
-         }
-         else if (mod_id == HOLYWARS_DLL)
-         {
-            if (msg_type == GET_USER_MSG_ID (PLID, "DeathMsg", NULL))
-               botMsgFunction = BotClient_Valve_DeathMsg;
-         }
-         else if (mod_id == DMC_DLL)
-         {
-            if (msg_type == GET_USER_MSG_ID (PLID, "DeathMsg", NULL))
-               botMsgFunction = BotClient_DMC_DeathMsg;
          }
       }
       else
@@ -426,32 +199,9 @@ void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, edict_t *
          botMsgFunction = NULL;  // no msg function until known otherwise
          botMsgIndex = -1;       // index of bot receiving message (none)
 
-         if (mod_id == VALVE_DLL)
          {
-            if (msg_type == GET_USER_MSG_ID (PLID, "WeaponList", NULL))
+            if (msg_type == FAST_GET_USER_MSG_ID (PLID, WeaponList, "WeaponList", NULL))
                botMsgFunction = BotClient_Valve_WeaponList;
-         }
-         else if (mod_id == TFC_DLL)
-         {
-            if (msg_type == GET_USER_MSG_ID (PLID, "WeaponList", NULL))
-               botMsgFunction = BotClient_TFC_WeaponList;
-         }
-         else if (mod_id == CSTRIKE_DLL)
-         {
-            if (msg_type == GET_USER_MSG_ID (PLID, "WeaponList", NULL))
-               botMsgFunction = BotClient_CS_WeaponList;
-            else if (msg_type == GET_USER_MSG_ID (PLID, "HLTV", NULL))
-               botMsgFunction = BotClient_CS_HLTV;
-         }
-         else if (mod_id == GEARBOX_DLL)
-         {
-            if (msg_type == GET_USER_MSG_ID (PLID, "WeaponList", NULL))
-               botMsgFunction = BotClient_Gearbox_WeaponList;
-         }
-         else if (mod_id == FRONTLINE_DLL)
-         {
-            if (msg_type == GET_USER_MSG_ID (PLID, "WeaponList", NULL))
-               botMsgFunction = BotClient_FLF_WeaponList;
          }
       }
    }
@@ -602,11 +352,11 @@ const char *pfnCmd_Argv( int argc )
    if (isFakeClientCommand)
    {
       if (argc == 0)
-         RETURN_META_VALUE (MRES_SUPERCEDE, &g_argv[64]);
+         RETURN_META_VALUE (MRES_SUPERCEDE, g_arg1);
       else if (argc == 1)
-         RETURN_META_VALUE (MRES_SUPERCEDE, &g_argv[128]);
+         RETURN_META_VALUE (MRES_SUPERCEDE, g_arg2);
       else if (argc == 2)
-         RETURN_META_VALUE (MRES_SUPERCEDE, &g_argv[192]);
+         RETURN_META_VALUE (MRES_SUPERCEDE, g_arg3);
       else
          RETURN_META_VALUE (MRES_SUPERCEDE, NULL);
    }
@@ -638,35 +388,10 @@ void pfnSetClientMaxspeed(const edict_t *pEdict, float fNewMaxspeed)
 }
 
 
-int pfnGetPlayerUserId(edict_t *e )
-{
-   if (gpGlobals->deathmatch)
-   {
-      if (mod_id == GEARBOX_DLL)
-      {
-         // is this edict a bot?
-         if (UTIL_GetBotPointer( e ))
-            RETURN_META_VALUE (MRES_SUPERCEDE, 0);  // don't return a valid index (so bot won't get kicked)
-      }
-   }
-
-   RETURN_META_VALUE (MRES_IGNORED, 0);
-}
-
-
-const char *pfnGetPlayerAuthId (edict_t *e)
-{
-   if ((e->v.flags & FL_FAKECLIENT) || (e->v.flags & FL_THIRDPARTYBOT))
-      RETURN_META_VALUE (MRES_SUPERCEDE, "0");
-
-   RETURN_META_VALUE (MRES_IGNORED, NULL);
-}
-
-
 C_DLLEXPORT int GetEngineFunctions (enginefuncs_t *pengfuncsFromEngine, int *interfaceVersion)
 {
+   meta_engfuncs.pfnPlaybackEvent = pfnPlaybackEvent;
    meta_engfuncs.pfnChangeLevel = pfnChangeLevel;
-   meta_engfuncs.pfnFindEntityByString = pfnFindEntityByString;
    meta_engfuncs.pfnEmitSound = pfnEmitSound;
    meta_engfuncs.pfnClientCommand = pfnClientCommand;
    meta_engfuncs.pfnMessageBegin = pfnMessageBegin;
@@ -684,8 +409,8 @@ C_DLLEXPORT int GetEngineFunctions (enginefuncs_t *pengfuncsFromEngine, int *int
    meta_engfuncs.pfnCmd_Argv = pfnCmd_Argv;
    meta_engfuncs.pfnCmd_Argc = pfnCmd_Argc;
    meta_engfuncs.pfnSetClientMaxspeed = pfnSetClientMaxspeed;
-   meta_engfuncs.pfnGetPlayerUserId = pfnGetPlayerUserId;
-   meta_engfuncs.pfnGetPlayerAuthId = pfnGetPlayerAuthId;
+   meta_engfuncs.pfnSetSize = pfnSetSize;
+   meta_engfuncs.pfnTraceLine = pfnTraceLine;
 
    memcpy (pengfuncsFromEngine, &meta_engfuncs, sizeof (enginefuncs_t));
    return TRUE;

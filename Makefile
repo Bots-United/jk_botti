@@ -1,39 +1,50 @@
-CPP = gcc-2.95.3
-TARGET = hpb_bot_mm
-ARCHFLAG = i586
-BASEFLAGS = -Dstricmp=strcasecmp -Dstrcmpi=strcasecmp
-OPTFLAGS = 
-CPPFLAGS = ${BASEFLAGS} ${OPTFLAGS} -march=${ARCHFLAG} -O2 -w -I"../metamod" -I"../../devtools/hlsdk-2.3/multiplayer/common" -I"../../devtools/hlsdk-2.3/multiplayer/dlls" -I"../../devtools/hlsdk-2.3/multiplayer/engine" -I"../../devtools/hlsdk-2.3/multiplayer/pm_shared"
+CPP = gcc-linux
+TARGET = jk_botti_mm
+ARCHFLAG = i686
+BASEFLAGS = 
+OPTFLAGS = -O3 -ffast-math -fno-rtti -fno-exceptions
+INCLUDES = -I"./metamod" \
+	-I"./common" \
+	-I"./dlls" \
+	-I"./engine" \
+	-I"./pm_shared"
+CPPFLAGS = -Wall ${BASEFLAGS} ${OPTFLAGS} -march=${ARCHFLAG} ${INCLUDES}
 
-OBJ = 	bot.o \
-	bot_chat.o \
-	bot_client.o \
-	bot_combat.o \
-	bot_models.o \
-	bot_navigate.o \
-	bot_start.o \
-	dll.o \
-	engine.o \
-	h_export.o \
-	util.o \
-	waypoint.o
+SRC = 	bot.cpp \
+	bot_chat.cpp \
+	bot_client.cpp \
+	bot_combat.cpp \
+	bot_models.cpp \
+	bot_navigate.cpp \
+	bot_start.cpp \
+	dll.cpp \
+	engine.cpp \
+	h_export.cpp \
+	util.cpp \
+	waypoint.cpp
+
+OBJ = $(SRC:%.cpp=%.o)
 
 ${TARGET}_i386.so: ${OBJ}
-	${CPP} -fPIC -shared -o $@ ${OBJ} -Xlinker -Map -Xlinker ${TARGET}.map -ldl
-	mv *.o Release
-	mv *.map Release
-	mv $@ Release
+	${CPP} -fPIC -shared -o $@ ${OBJ} -ldl -s
+	cp $@ Release
 
 clean:
-	rm -f Release/*.o
-	rm -f Release/*.map
+	rm -f *.o
 
 distclean:
 	rm -rf Release
 	mkdir Release	
 
-%.o:	%.cpp
+%.o: %.cpp
 	${CPP} ${CPPFLAGS} -c $< -o $@
 
-%.o:	%.c
+%.o: %.c
 	${CPP} ${CPPFLAGS} -c $< -o $@
+
+depend: Rules.depend
+
+Rules.depend: Makefile $(SRC)
+	$(CPP) -MM ${INCLUDES} $(SRC) > $@
+
+include Rules.depend

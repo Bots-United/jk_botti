@@ -1,0 +1,30 @@
+JK_botti
+
+[0.17]
+ - Config-files come with binary packages
+ - Dropped Opposing Force support
+ - Tweaked down gauss/tau settings
+ - Bots run away from RPG laser spot (like they do for grenades, satchels, snarks and rockets)
+
+[0.16]
+ - Lost all records on what has changed since HPB-bot :P
+   - Basicly changes where (this is written over 1,5 years after 0.16 release):
+     - Bot keeps firing-button down when having good aim until runs out of ammo, 
+       HPB_bot kept clicking fire button with extreme delays between 
+       shots (even with machine guns)
+     - Human players jump and duck around, so do JK_botti.
+     - Merged BotAim plugin into JK_botti, for more realistic aim.
+     - Some time handling code changes to handle better low running server 
+       cpu (missing frames), I used to run JK_botti on Athlon 800mhz
+     - Stripped all mods except HLDM(valve) and OP4DM/CTF(gearbox)
+     - Remove bot_strafe_percent setting, strafe percent is now linked to
+       bot skillz.
+     - Added randomize_bots_on_mapchange setting, create bots with new
+       values for next map, default value: 0.
+     - Added turn_method setting, for selecting BotAim plugin aim code,
+       1 = old RACC code, 2 = new RACC code, default value: 2.
+     - Added botthinkfps setting, to limit reaction rate of bots to human
+       levels and reduce CPU usage, default value: 30.
+     - Added bot_add_level_tag setting, enable [lvlX] tag to bot name,
+       default value: 0.
+ - Based on HPB-bot by botman and BotAim plugin by Pierre-Marie Baty

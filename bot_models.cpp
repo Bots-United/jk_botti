@@ -31,36 +31,17 @@ skin_t bot_skins[MAX_SKINS];
 int number_skins;
 
 #define VALVE_MAX_SKINS     10
-#define GEARBOX_MAX_SKINS   20
-#define HOLYWARS_MAX_SKINS   5
 
-extern int mod_id;
 
 // default player models for various MODs...
 char *valve_bot_models[VALVE_MAX_SKINS] = {
    "barney", "gina", "gman", "gordon", "helmet",
    "hgrunt", "recon", "robo", "scientist", "zombie"};
 
-char *gearbox_bot_models[GEARBOX_MAX_SKINS] = {
-   "barney", "beret", "cl_suit", "drill", "fassn", "gina", "gman",
-   "gordon", "grunt", "helmet", "hgrunt", "massn", "otis", "recon",
-   "recruit", "robo", "scientist", "shephard", "tower", "zombie"};
-
-char *holywars_bot_models[HOLYWARS_MAX_SKINS] = {
-   "akedo", "bad", "barney", "gordon", "helmet"};
-
 // default names for each of the above player models...
 char *valve_bot_names[VALVE_MAX_SKINS] = {
    "Barney", "Gina", "G-Man", "Gordon", "Helmet",
    "H-Grunt", "Recon", "Robo", "Scientist", "Zombie"};
-
-char *gearbox_bot_names[GEARBOX_MAX_SKINS] = {
-   "Barney", "Beret", "Cl_suit", "Drill", "Fassn", "Gina", "G-Man",
-   "Gordon", "Grunt", "Helmet", "H-Grunt", "Massn", "Otis", "Recon",
-   "Recruit", "Robo", "Scientist", "Shephard", "Tower", "Zombie"};
-
-char *holywars_bot_names[HOLYWARS_MAX_SKINS] = {
-   "Akedo", "B.A.D.", "Barney", "Gordon", "Helmet"};
 
 
 #ifndef __linux__
@@ -184,35 +165,12 @@ void LoadBotModels(void)
    for (index=0; index < MAX_SKINS; index++)
       bot_skins[index].skin_used = FALSE;
 
-   if ((mod_id == VALVE_DLL) || (mod_id == DMC_DLL))
-   {
-	   number_skins = VALVE_MAX_SKINS;
+   number_skins = VALVE_MAX_SKINS;
 
-      for (index=0; index < VALVE_MAX_SKINS; index++)
-      {
-         strcpy(bot_skins[index].model_name, valve_bot_models[index]);
-         strcpy(bot_skins[index].bot_name, valve_bot_names[index]);
-      }
-   }
-   else if (mod_id == GEARBOX_DLL)
+   for (index=0; index < VALVE_MAX_SKINS; index++)
    {
-	   number_skins = GEARBOX_MAX_SKINS;
-
-      for (index=0; index < GEARBOX_MAX_SKINS; index++)
-      {
-         strcpy(bot_skins[index].model_name, gearbox_bot_models[index]);
-         strcpy(bot_skins[index].bot_name, gearbox_bot_names[index]);
-      }
-   }
-   else if (mod_id == HOLYWARS_DLL)
-   {
-	   number_skins = HOLYWARS_MAX_SKINS;
-
-      for (index=0; index < HOLYWARS_MAX_SKINS; index++)
-      {
-         strcpy(bot_skins[index].model_name, holywars_bot_models[index]);
-         strcpy(bot_skins[index].bot_name, holywars_bot_names[index]);
-      }
+      strcpy(bot_skins[index].model_name, valve_bot_models[index]);
+      strcpy(bot_skins[index].bot_name, valve_bot_names[index]);
    }
 
    // find the directory name of the currently running MOD...

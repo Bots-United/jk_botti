@@ -10,52 +10,80 @@
 #define BOT_FUNC_H
 
 
+#define AIM_RACC_OLD 1
+#define AIM_RACC 2
+
 //prototypes of bot functions...
 
-void BotSpawnInit( bot_t *pBot );
+void BotSpawnInit( bot_t &pBot );
 void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
                 const char *arg3, const char *arg4, const char *arg5 );
-void BotStartGame( bot_t *pBot );
-int BotInFieldOfView( bot_t *pBot, Vector dest );
-bool BotEntityIsVisible( bot_t *pBot, Vector dest );
-void BotPickLogo(bot_t *pBot);
+void BotStartGame( bot_t &pBot );
+int BotInFieldOfView( bot_t &pBot, const Vector & dest );
+qboolean BotEntityIsVisible( bot_t &pBot, const Vector & dest );
+void BotPickLogo(bot_t &pBot);
 void BotSprayLogo(edict_t *pEntity, char *logo_name);
-void BotFindItem( bot_t *pBot );
-bool BotLookForMedic( bot_t *pBot );
-bool BotLookForGrenades( bot_t *pBot );
-void BotThink( bot_t *pBot );
+void BotFindItem( bot_t &pBot );
+qboolean BotLookForMedic( bot_t &pBot );
+qboolean BotLookForGrenades( bot_t &pBot );
+void BotThink( bot_t &pBot );
+qboolean BotAimsAtSomething (bot_t &pBot);
+void BotPointGun (bot_t &pBot, qboolean save_v_angle);
+void BotAimThink( bot_t &pBot );
 
 void LoadBotModels(void);
 
-void BotFixIdealPitch( edict_t *pEdict );
-float BotChangePitch( bot_t *pBot, float speed );
-void BotFixIdealYaw( edict_t *pEdict );
-float BotChangeYaw( bot_t *pBot, float speed );
-bool BotFindWaypoint( bot_t *pBot );
-bool BotHeadTowardWaypoint( bot_t *pBot );
-void BotOnLadder( bot_t *pBot, float moved_distance );
-void BotUnderWater( bot_t *pBot );
-void BotUseLift( bot_t *pBot, float moved_distance );
-bool BotStuckInCorner( bot_t *pBot );
-void BotTurnAtWall( bot_t *pBot, TraceResult *tr, bool negative );
-bool BotCantMoveForward( bot_t *pBot, TraceResult *tr );
-bool BotCanJumpUp( bot_t *pBot, bool *bDuckJump );
-bool BotCanDuckUnder( bot_t *pBot );
-void BotRandomTurn( bot_t *pBot );
-bool BotFollowUser( bot_t *pBot );
-bool BotCheckWallOnLeft( bot_t *pBot );
-bool BotCheckWallOnRight( bot_t *pBot );
-void BotLookForDrop( bot_t *pBot );
+//void BotFixIdealPitch( edict_t *pEdict );
+//void BotFixIdealYaw( edict_t *pEdict );
+
+inline void BotFixIdealPitch(edict_t *pEdict)
+{
+   float &idealpitch = pEdict->v.idealpitch;
+   
+   // check for wrap around of angle...
+   if (idealpitch > 180)
+      do { idealpitch -= 360; } while(idealpitch > 180);
+   else if (idealpitch < -180)
+      do { idealpitch += 360; } while(idealpitch < -180);
+}
+
+inline void BotFixIdealYaw(edict_t *pEdict)
+{
+   float &ideal_yaw = pEdict->v.ideal_yaw;
+   
+   // check for wrap around of angle...
+   if (ideal_yaw > 180)
+      do { ideal_yaw -= 360; } while(ideal_yaw > 180);
+   else if (ideal_yaw < -180)
+      do { ideal_yaw += 360; } while(ideal_yaw < -180);
+}
+
+float BotChangePitch( bot_t &pBot, float speed );
+float BotChangeYaw( bot_t &pBot, float speed );
+qboolean BotFindWaypoint( bot_t &pBot );
+qboolean BotHeadTowardWaypoint( bot_t &pBot );
+void BotOnLadder( bot_t &pBot, float moved_distance );
+void BotUnderWater( bot_t &pBot );
+void BotUseLift( bot_t &pBot, float moved_distance );
+qboolean BotStuckInCorner( bot_t &pBot );
+void BotTurnAtWall( bot_t &pBot, TraceResult *tr, qboolean negative );
+qboolean BotCantMoveForward( bot_t &pBot, TraceResult *tr );
+qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump );
+qboolean BotCanDuckUnder( bot_t &pBot );
+void BotRandomTurn( bot_t &pBot );
+qboolean BotFollowUser( bot_t &pBot );
+qboolean BotCheckWallOnLeft( bot_t &pBot );
+qboolean BotCheckWallOnRight( bot_t &pBot );
+void BotLookForDrop( bot_t &pBot );
 
 void BotCheckTeamplay(void);
-edict_t *BotFindEnemy( bot_t *pBot );
-Vector BotBodyTarget( edict_t *pBotEnemy, bot_t *pBot );
-bool BotFireWeapon( Vector v_enemy, bot_t *pBot, int weapon_choice);
-void BotShootAtEnemy( bot_t *pBot );
-bool BotShootTripmine( bot_t *pBot );
-bool BotGrenadeArm( bot_t *pBot );
-void BotGrenadeThrow( bot_t *pBot );
+edict_t *BotFindEnemy( bot_t &pBot );
+Vector BotBodyTarget( edict_t *pBotEnemy, bot_t &pBot );
+qboolean BotFireWeapon( const Vector & v_enemy, bot_t &pBot, int weapon_choice );
+void BotShootAtEnemy( bot_t &pBot );
+qboolean BotShootTripmine( bot_t &pBot );
 
+void free_posdata_list(int idx);
 
 #endif // BOT_FUNC_H
 

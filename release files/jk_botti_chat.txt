@@ -1,0 +1,83 @@
+These are comment lines.  Any lines appearing before the [bot_chat] section
+will be treated as comments and ignored.  Each bot chat section can have up
+to 100 lines of text.  Each line is treated as a separate chat message.
+Lines must be 80 characters or less.  Lines longer than 80 characters will
+be truncated.  The messages in the [bot_chat] section are said randomly
+during the game.  Every 30 seconds the bots will check to see if they
+should speak a [bot_chat] message.  The percent of time they will speak
+a chat message is set by the "bot_chat_percent" value found in the bot.cfg
+file.  Bots that get a kill will speak messages from the [bot_taunt] section.
+The percent of time that they will speak a taunt message is set by the
+"bot_taunt_percent" value in the bot.cfg file.  Bots that get killed will
+speak a message from the [bot_whine] section.  The percent of time that
+they will speak a whine message is set by the "bot_whine_percent" value
+in the bot.cfg file.  You can use "%n" in the [bot_chat] section if you
+wish to fill in the name of the bot speaking that message.  You can use
+"%n" in the [bot_taunt] section to fill in the name of the player that
+was killed.  You can use "%n" in the [bot_whine] section to fill in the
+name of the player that killed this bot.  You can use "%r" in any of these
+sections if you want to fill in a random player name (player names are
+chosen from those currently connected to the server, not from the
+bot_names.txt file).  You can use "%n" or "%r" multiple times in a single
+chat message if you want.
+
+Chat messages will be modified by the BotChatHumanizer code.  This code
+will swap or drop characters in the messages to make the bot appear more
+human (humans make mistakes, bots don't :) ).  Bots will also occasionally
+convert the chat text to all lowercase.  When filling in player's names,
+bots will occasionally remove the clan tags from the name (i.e. clan tags
+can be things like: "[- LPB -]", "{HQ}", "<OoO>", or "-=<Xmen>=-").  So
+if the players name is "[[KLM]]BaDAzz", the bot may modify this to "BaDAzz"
+or "badazz".  The percent of time the bots will remove the clan tag is
+set by the "bot_chat_tag_percent" in the bot.cfg file.  The percent of
+time the bots will drop characters is defined by "bot_chat_drop_percent"
+in the bot.cfg file.  The percent of time the bots will swap characters
+is defined by "bot_chat_swap_percent" in the bot.cfg file and the percent
+of time the bots will convert messages to all lowercase is defined by the
+"bot_chat_lower_percent" value in the bot.cfg file.
+
+If you have a chat message that you don't want to have any characters
+dropped or swapped in (like sending a message with a URL), you can use
+a '!' character as the first character in the chat message to indicate
+that this chat message should not be modified (no drops, swaps, or changing
+to lowercase).  The '!' will be removed from the chat message before it
+gets send to other players.
+
+[bot_chat]
+Hey, where is everybody?
+I think I'll just camp here and wait for some llamas to come by.
+!OH MAN!  Come check this out...
+Hello?  Is anybody else out there?
+LOL!  I almost blew myself up!
+Hey %r, come over here so I can kill you.
+!COOL!  Did you see that?
+
+[bot_taunt]
+Man, did you see that shot!
+Hey %n, I killed you without even trying!
+!%n - you suck!  LOL!
+Hah!  Got another one!
+%n, you need to go back and practice on the hazard course firing range!!!
+Hey %n, my grandma can play this game better than you can!
+%n, maybe you should try aiming for the head!
+!%n, I KICKED YOUR ASS!
+Man %n, you suck worse than %r does!
+
+[bot_whine]
+CHEATER ALERT!  CHEATER ALERT!  %n is cheating!
+Hey! What the...  %n is using a HEAD SHOT script!
+%n you are sooooo good... NOT!
+Ok %n, now I'm coming after YOU!!!
+Hey everybody, %n is cheating.  I vote we get the admin to kick him off!
+We got a CAMPER over here!  %n is CAMPING!!!
+Where's the admin?  Can somebody kick %n off of this server?
+Oh Man!  I got killed again?  Let's see... sv_cheats 1, impulse 101, right?
+!Doooooooh!  %n why do you keep killing me?
+Alright %n, you're gonna be SOOOO dead!
+Who dares mess with my l33t shooting skills!  %n you're gonna die!
+%n if you kill me ONE MORE TIME...
+Hey %n, I let you have that one.  I was resting my mouse hand.
+%n, why don't you pick on someone else for a change?
+Hey %n, you should kill somebody else once in a while!
+!%n! STOP KILLING ME!!!
+Ok %n, now I'm going to HAVE to kill you!

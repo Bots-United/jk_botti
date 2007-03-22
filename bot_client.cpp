@@ -19,6 +19,7 @@
 #include "bot_func.h"
 #include "bot_client.h"
 #include "bot_weapons.h"
+#include "bot_weapon_select.h"
 
 // types of damage to ignore...
 #define IGNORE_DAMAGE (DMG_CRUSH | DMG_BURN | DMG_FREEZE | DMG_FALL | \
@@ -26,154 +27,14 @@
                        DMG_DROWNRECOVER | DMG_ACID | DMG_SLOWBURN | \
                        DMG_SLOWFREEZE | 0xFF000000)
 
-extern int mod_id;
 extern bot_t bots[32];
 extern int num_logos;
-extern edict_t *holywars_saint;
-extern int halo_status;
-extern int holywars_gamemode;
 
 extern int bot_taunt_count;
 extern int recent_bot_taunt[];
 extern bot_chat_t bot_taunt[MAX_BOT_CHAT];
 
 bot_weapon_t weapon_defs[MAX_WEAPONS]; // array of weapon definitions
-
-
-// This message is sent when the TFC VGUI menu is displayed.
-void BotClient_TFC_VGUI(void *p, int bot_index)
-{
-   static int state = 0;   // current state machine state
-
-   if (state == 0)
-   {
-      if ((*(int *)p) == 2)  // is it a team select menu?
-
-         bots[bot_index].start_action = MSG_TFC_TEAM_SELECT;
-
-      else if ((*(int *)p) == 3)  // is is a class selection menu?
-
-         bots[bot_index].start_action = MSG_TFC_CLASS_SELECT;
-   }
-
-   state++;
-
-   if (state == 1)
-      state = 0;
-}
-
-
-// This message is sent when the Counter-Strike VGUI menu is displayed.
-void BotClient_CS_VGUI(void *p, int bot_index)
-{
-   static int state = 0;   // current state machine state
-
-   if (state == 0)
-   {
-      if ((*(int *)p) == 2)  // is it a team select menu?
-
-         bots[bot_index].start_action = MSG_CS_TEAM_SELECT;
-
-      else if ((*(int *)p) == 26)  // is is a terrorist model select menu?
-
-         bots[bot_index].start_action = MSG_CS_T_SELECT;
-
-      else if ((*(int *)p) == 27)  // is is a counter-terrorist model select menu?
-
-         bots[bot_index].start_action = MSG_CS_CT_SELECT;
-   }
-
-   state++;
-
-   if (state == 5)  // ignore other fields in VGUI message
-      state = 0;
-}
-
-
-// This message is sent when a menu is being displayed in Counter-Strike.
-void BotClient_CS_ShowMenu(void *p, int bot_index)
-{
-   static int state = 0;   // current state machine state
-
-   if (state < 3)
-   {
-      state++;  // ignore first 3 fields of message
-      return;
-   }
-
-   if (strcmp((char *)p, "#Team_Select") == 0)  // team select menu?
-   {
-      bots[bot_index].start_action = MSG_CS_TEAM_SELECT;
-   }
-   else if (strcmp((char *)p, "#Terrorist_Select") == 0)  // T model select?
-   {
-      bots[bot_index].start_action = MSG_CS_T_SELECT;
-   }
-   else if (strcmp((char *)p, "#CT_Select") == 0)  // CT model select menu?
-   {
-      bots[bot_index].start_action = MSG_CS_CT_SELECT;
-   }
-
-   state = 0;  // reset state machine
-}
-
-
-// This message is sent when the OpFor VGUI menu is displayed.
-void BotClient_Gearbox_VGUI(void *p, int bot_index)
-{
-   static int state = 0;   // current state machine state
-
-   if (state == 0)
-   {
-      if ((*(int *)p) == 2)  // is it a team select menu?
-
-         bots[bot_index].start_action = MSG_OPFOR_TEAM_SELECT;
-
-      else if ((*(int *)p) == 3)  // is is a class selection menu?
-
-         bots[bot_index].start_action = MSG_OPFOR_CLASS_SELECT;
-   }
-
-   state++;
-
-   if (state == 1)
-      state = 0;
-}
-
-
-// This message is sent when the FrontLineForce VGUI menu is displayed.
-void BotClient_FLF_VGUI(void *p, int bot_index)
-{
-   static int state = 0;   // current state machine state
-
-   if (p == NULL)  // handle pfnMessageEnd case
-   {
-      state = 0;
-      return;
-   }
-
-   if (state == 0)
-   {
-      if ((*(int *)p) == 2)  // is it a team select menu?
-         bots[bot_index].start_action = MSG_FLF_TEAM_SELECT;
-      else if ((*(int *)p) == 3)  // is it a class selection menu?
-         bots[bot_index].start_action = MSG_FLF_CLASS_SELECT;
-      else if ((*(int *)p) == 70)  // is it a weapon selection menu?
-         bots[bot_index].start_action = MSG_FLF_WEAPON_SELECT;
-      else if ((*(int *)p) == 72)  // is it a submachine gun selection menu?
-         bots[bot_index].start_action = MSG_FLF_SUBMACHINE_SELECT;
-      else if ((*(int *)p) == 73)  // is it a shotgun selection menu?
-         bots[bot_index].start_action = MSG_FLF_SHOTGUN_SELECT;
-      else if ((*(int *)p) == 75)  // is it a rifle selection menu?
-         bots[bot_index].start_action = MSG_FLF_RIFLE_SELECT;
-      else if ((*(int *)p) == 76)  // is it a pistol selection menu?
-         bots[bot_index].start_action = MSG_FLF_PISTOL_SELECT;
-      else if ((*(int *)p) == 78)  // is it a heavyweapons selection menu?
-         bots[bot_index].start_action = MSG_FLF_HEAVYWEAPONS_SELECT;
-   }
-
-   state++;
-}
 
 
 // This message is sent when a client joins the game.  All of the weapons
@@ -230,42 +91,10 @@ void BotClient_Valve_WeaponList(void *p, int bot_index)
       bot_weapon.iFlags = *(int *)p;  // flags for weapon (WTF???)
 
       // store away this weapon with it's ammo information...
-      if (mod_id == DMC_DLL)
-         weapon_defs[bot_weapon.iSlot] = bot_weapon;
-      else
-         weapon_defs[bot_weapon.iId] = bot_weapon;
+      weapon_defs[bot_weapon.iId] = bot_weapon;
    }
 }
 
-void BotClient_TFC_WeaponList(void *p, int bot_index)
-{
-   // this is just like the Valve Weapon List message
-   BotClient_Valve_WeaponList(p, bot_index);
-}
-
-void BotClient_CS_WeaponList(void *p, int bot_index)
-{
-   // this is just like the Valve Weapon List message
-   BotClient_Valve_WeaponList(p, bot_index);
-}
-
-void BotClient_Gearbox_WeaponList(void *p, int bot_index)
-{
-   // this is just like the Valve Weapon List message
-   BotClient_Valve_WeaponList(p, bot_index);
-}
-
-void BotClient_FLF_WeaponList(void *p, int bot_index)
-{
-   // this is just like the Valve Weapon List message
-   BotClient_Valve_WeaponList(p, bot_index);
-}
-
-void BotClient_DMC_WeaponList(void *p, int bot_index)
-{
-   // this is just like the Valve Weapon List message
-   BotClient_Valve_WeaponList(p, bot_index);
-}
 
 // This message is sent when a weapon is selected (either by the bot chosing
 // a weapon or by the server auto assigning the bot a weapon).
@@ -292,70 +121,38 @@ void BotClient_Valve_CurrentWeapon(void *p, int bot_index)
 
       iClip = *(int *)p;  // ammo currently in the clip for this weapon
 
-      if (mod_id == DMC_DLL)
+      if (iId <= 31)
       {
-         if ((iState == 1) && (iId <= 128))
-            bots[bot_index].pEdict->v.weapons |= iId; // BUGFIX: since DMC doesn't use the "weapons" bitmap in entvars_t, we need to fill it ourselves -- Pierre-Marie Baty
-      }
-      else
-      {
-         if (iId <= 31)
+         if (iState == 1)
          {
-            if (iState == 1)
-            {
-               bots[bot_index].current_weapon.iId = iId;
-               bots[bot_index].current_weapon.iClip = iClip;
+            bots[bot_index].current_weapon.iId = iId;
+            bots[bot_index].current_weapon.iClip = iClip;
 
-               // update the ammo counts for this weapon...
-               bots[bot_index].current_weapon.iAmmo1 =
-                  bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo1];
-               bots[bot_index].current_weapon.iAmmo2 =
-                  bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo2];
+            // update the ammo counts for this weapon...
+            bots[bot_index].current_weapon.iAmmo1 =
+               bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo1];
+            bots[bot_index].current_weapon.iAmmo2 =
+               bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo2];
+            
+            bot_weapon_select_t *pSelect = NULL;
+            bot_fire_delay_t *pDelay = NULL;
+            int found = 0;
+            
+            GetWeaponSelect(&pSelect, &pDelay);
+            
+            for(int i = 0; pSelect && pSelect[i].iId; i++) {
+               if(iId == pSelect[i].iId) {
+                  bots[bot_index].current_opt_distance = pSelect[i].opt_distance;
+                  found = 1;
+               	  break;
+               }
             }
+            
+            if(!found)
+               bots[bot_index].current_opt_distance = 99999.0;
          }
       }
    }
-}
-
-void BotClient_TFC_CurrentWeapon(void *p, int bot_index)
-{
-   // this is just like the Valve Current Weapon message
-   BotClient_Valve_CurrentWeapon(p, bot_index);
-}
-
-void BotClient_CS_CurrentWeapon(void *p, int bot_index)
-{
-   // this is just like the Valve Current Weapon message
-   BotClient_Valve_CurrentWeapon(p, bot_index);
-}
-
-void BotClient_Gearbox_CurrentWeapon(void *p, int bot_index)
-{
-   // this is just like the Valve Current Weapon message
-   BotClient_Valve_CurrentWeapon(p, bot_index);
-}
-
-void BotClient_FLF_CurrentWeapon(void *p, int bot_index)
-{
-   // this is just like the Valve Current Weapon message
-   BotClient_Valve_CurrentWeapon(p, bot_index);
-}
-
-void BotClient_DMC_CurrentWeapon(void *p, int bot_index)
-{
-   // this is just like the Valve Current Weapon message
-   BotClient_Valve_CurrentWeapon(p, bot_index);
-}
-
-
-void BotClient_DMC_QItems (void *p, int bot_index)
-{
-   // this DMC-specific message updates a client data with all the stuff the player is carrying,
-   // be it weapons, armor, powerups and ammo, each item being represented by a bit in a long
-   // integer bitmap. The first 8 (LSB) bits are the weapons.
-
-   // since DMC doesn't use the "weapons" bitmap in entvars_t, we need to fill it ourselves
-   bots[bot_index].pEdict->v.weapons |= (*(int *) p & 0x000000FF); // lazy Valve programmers...
 }
 
 
@@ -390,35 +187,6 @@ void BotClient_Valve_AmmoX(void *p, int bot_index)
    }
 }
 
-void BotClient_TFC_AmmoX(void *p, int bot_index)
-{
-   // this is just like the Valve AmmoX message
-   BotClient_Valve_AmmoX(p, bot_index);
-}
-
-void BotClient_CS_AmmoX(void *p, int bot_index)
-{
-   // this is just like the Valve AmmoX message
-   BotClient_Valve_AmmoX(p, bot_index);
-}
-
-void BotClient_Gearbox_AmmoX(void *p, int bot_index)
-{
-   // this is just like the Valve AmmoX message
-   BotClient_Valve_AmmoX(p, bot_index);
-}
-
-void BotClient_FLF_AmmoX(void *p, int bot_index)
-{
-   // this is just like the Valve AmmoX message
-   BotClient_Valve_AmmoX(p, bot_index);
-}
-
-void BotClient_DMC_AmmoX(void *p, int bot_index)
-{
-   // this is just like the Valve AmmoX message
-   BotClient_Valve_AmmoX(p, bot_index);
-}
 
 // This message is sent when the bot picks up some ammo (AmmoX messages are
 // also sent so this message is probably not really necessary except it
@@ -454,96 +222,12 @@ void BotClient_Valve_AmmoPickup(void *p, int bot_index)
    }
 }
 
-void BotClient_TFC_AmmoPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Ammo Pickup message
-   BotClient_Valve_AmmoPickup(p, bot_index);
-}
-
-void BotClient_CS_AmmoPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Ammo Pickup message
-   BotClient_Valve_AmmoPickup(p, bot_index);
-}
-
-void BotClient_Gearbox_AmmoPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Ammo Pickup message
-   BotClient_Valve_AmmoPickup(p, bot_index);
-}
-
-void BotClient_FLF_AmmoPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Ammo Pickup message
-   BotClient_Valve_AmmoPickup(p, bot_index);
-}
-
-void BotClient_DMC_AmmoPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Ammo Pickup message
-   BotClient_Valve_AmmoPickup(p, bot_index);
-}
-
-// This message is sent whenever grenade ammounts are adjusted.
-void BotClient_TFC_SecAmmoVal(void *p, int bot_index)
-{
-   static int state = 0;   // current state machine state
-   static int type;
-   static int ammount;
-
-   if (state == 0)
-   {
-      state++;
-      type = *(int *)p;   // 0 = primary, 1 = secondary
-   }
-   else if (state == 1)
-   {
-      state = 0;
-
-      ammount = *(int *)p;  // the ammount of ammo currently available
-
-      if (type == 0)
-         bots[bot_index].gren1 = ammount;  // store it away
-      else if (type == 1)
-         bots[bot_index].gren2 = ammount;  // store it away
-   }
-}
-
 
 // This message gets sent when the bot picks up a weapon.
 void BotClient_Valve_WeaponPickup(void *p, int bot_index)
 {
 }
 
-void BotClient_TFC_WeaponPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Weapon Pickup message
-   BotClient_Valve_WeaponPickup(p, bot_index);
-}
-
-void BotClient_CS_WeaponPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Weapon Pickup message
-   BotClient_Valve_WeaponPickup(p, bot_index);
-}
-
-void BotClient_Gearbox_WeaponPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Weapon Pickup message
-   BotClient_Valve_WeaponPickup(p, bot_index);
-}
-
-void BotClient_FLF_WeaponPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Weapon Pickup message
-   BotClient_Valve_WeaponPickup(p, bot_index);
-}
-
-void BotClient_DMC_WeaponPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Weapon Pickup message
-   BotClient_Valve_WeaponPickup(p, bot_index);
-}
 
 // This message gets sent when the bot picks up an item (like a battery
 // or a healthkit)
@@ -551,105 +235,18 @@ void BotClient_Valve_ItemPickup(void *p, int bot_index)
 {
 }
 
-void BotClient_TFC_ItemPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Item Pickup message
-   BotClient_Valve_ItemPickup(p, bot_index);
-}
-
-void BotClient_CS_ItemPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Item Pickup message
-   BotClient_Valve_ItemPickup(p, bot_index);
-}
-
-void BotClient_Gearbox_ItemPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Item Pickup message
-   BotClient_Valve_ItemPickup(p, bot_index);
-}
-
-void BotClient_FLF_ItemPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Item Pickup message
-   BotClient_Valve_ItemPickup(p, bot_index);
-}
-
-void BotClient_DMC_ItemPickup(void *p, int bot_index)
-{
-   // this is just like the Valve Item Pickup message
-   BotClient_Valve_ItemPickup(p, bot_index);
-}
 
 // This message gets sent when the bots health changes.
 void BotClient_Valve_Health(void *p, int bot_index)
 {
 }
 
-void BotClient_TFC_Health(void *p, int bot_index)
-{
-   // this is just like the Valve Health message
-   BotClient_Valve_Health(p, bot_index);
-}
-
-void BotClient_CS_Health(void *p, int bot_index)
-{
-   // this is just like the Valve Health message
-   BotClient_Valve_Health(p, bot_index);
-}
-
-void BotClient_Gearbox_Health(void *p, int bot_index)
-{
-   // this is just like the Valve Health message
-   BotClient_Valve_Health(p, bot_index);
-}
-
-void BotClient_FLF_Health(void *p, int bot_index)
-{
-   // this is just like the Valve Health message
-   BotClient_Valve_Health(p, bot_index);
-}
-
-void BotClient_DMC_Health(void *p, int bot_index)
-{
-   // this is just like the Valve Health message
-   BotClient_Valve_Health(p, bot_index);
-}
 
 // This message gets sent when the bots armor changes.
 void BotClient_Valve_Battery(void *p, int bot_index)
 {
 }
 
-void BotClient_TFC_Battery(void *p, int bot_index)
-{
-   // this is just like the Valve Battery message
-   BotClient_Valve_Battery(p, bot_index);
-}
-
-void BotClient_CS_Battery(void *p, int bot_index)
-{
-   // this is just like the Valve Battery message
-   BotClient_Valve_Battery(p, bot_index);
-}
-
-void BotClient_Gearbox_Battery(void *p, int bot_index)
-{
-   // this is just like the Valve Battery message
-   BotClient_Valve_Battery(p, bot_index);
-}
-
-void BotClient_FLF_Battery(void *p, int bot_index)
-{
-   // this is just like the Valve Battery message
-   BotClient_Valve_Battery(p, bot_index);
-}
-
-void BotClient_DMC_Battery(void *p, int bot_index)
-{
-   // this is just like the Valve Battery message
-   BotClient_Valve_Battery(p, bot_index);
-}
 
 // This message gets sent when the bots are getting damaged.
 void BotClient_Valve_Damage(void *p, int bot_index)
@@ -718,57 +315,11 @@ void BotClient_Valve_Damage(void *p, int bot_index)
    }
 }
 
-void BotClient_TFC_Damage(void *p, int bot_index)
-{
-   // this is just like the Valve Damage message
-   BotClient_Valve_Damage(p, bot_index);
-}
-
-void BotClient_CS_Damage(void *p, int bot_index)
-{
-   // this is just like the Valve Damage message
-   BotClient_Valve_Damage(p, bot_index);
-}
-
-void BotClient_Gearbox_Damage(void *p, int bot_index)
-{
-   // this is just like the Valve Damage message
-   BotClient_Valve_Damage(p, bot_index);
-}
-
-void BotClient_FLF_Damage(void *p, int bot_index)
-{
-   // this is just like the Valve Damage message
-   BotClient_Valve_Damage(p, bot_index);
-}
-
-void BotClient_DMC_Damage(void *p, int bot_index)
-{
-   // this is just like the Valve Damage message
-   BotClient_Valve_Damage(p, bot_index);
-}
-
-// This message gets sent when the bots money ammount changes (for CS)
-void BotClient_CS_Money(void *p, int bot_index)
-{
-   static int state = 0;   // current state machine state
-
-   if (state == 0)
-   {
-      state++;
-
-      bots[bot_index].bot_money = *(int *)p;  // amount of money
-   }
-   else
-   {
-      state = 0;  // ingore this field
-   }
-}
-
 
 // This message gets sent when the bots get killed
 void BotClient_Valve_DeathMsg(void *p, int bot_index)
 {
+   const float globaltime = gpGlobals->time;
    static int state = 0;   // current state machine state
    static int killer_index;
    static int victim_index;
@@ -806,10 +357,10 @@ void BotClient_Valve_DeathMsg(void *p, int bot_index)
       {
          if (killer_index != victim_index)  // didn't kill self...
          {
-            if ((RANDOM_LONG(1, 100) <= bots[index].logo_percent) && (num_logos))
+            if ((RANDOM_LONG2(1, 100) <= bots[index].logo_percent) && (num_logos))
             {
                bots[index].b_spray_logo = TRUE;  // this bot should spray logo now
-               bots[index].f_spray_logo_time = gpGlobals->time;
+               bots[index].f_spray_logo_time = globaltime;
             }
          }
 
@@ -817,21 +368,21 @@ void BotClient_Valve_DeathMsg(void *p, int bot_index)
          {
             // are there any taunt messages and should the bot taunt?
             if ((bot_taunt_count > 0) &&
-                (RANDOM_LONG(1,100) <= bots[index].taunt_percent))
+                (RANDOM_LONG2(1,100) <= bots[index].taunt_percent))
             {
                int taunt_index;
-               bool used;
+               qboolean used;
                int i, recent_count;
 
                // set chat flag and time to chat...
                bots[index].b_bot_say = TRUE;
-               bots[index].f_bot_say = gpGlobals->time + 5.0 + RANDOM_FLOAT(0.0, 5.0);
+               bots[index].f_bot_say = globaltime + 5.0 + RANDOM_FLOAT2(0.0, 5.0);
 
                recent_count = 0;
 
                while (recent_count < 5)
                {
-                  taunt_index = RANDOM_LONG(0, bot_taunt_count-1);
+                  taunt_index = RANDOM_LONG2(0, bot_taunt_count-1);
 
                   used = FALSE;
 
@@ -894,163 +445,10 @@ void BotClient_Valve_DeathMsg(void *p, int bot_index)
    }
 }
 
-void BotClient_TFC_DeathMsg(void *p, int bot_index)
-{
-   // this is just like the Valve DeathMsg message
-   BotClient_Valve_DeathMsg(p, bot_index);
-}
-
-void BotClient_CS_DeathMsg(void *p, int bot_index)
-{
-   // this is just like the Valve DeathMsg message
-   BotClient_Valve_DeathMsg(p, bot_index);
-}
-
-void BotClient_Gearbox_DeathMsg(void *p, int bot_index)
-{
-   // this is just like the Valve DeathMsg message
-   BotClient_Valve_DeathMsg(p, bot_index);
-}
-
-void BotClient_FLF_DeathMsg(void *p, int bot_index)
-{
-   // this is just like the Valve DeathMsg message
-   BotClient_Valve_DeathMsg(p, bot_index);
-}
-
-void BotClient_DMC_DeathMsg(void *p, int bot_index)
-{
-   // this is just like the Valve DeathMsg message
-   BotClient_Valve_DeathMsg(p, bot_index);
-}
-
-// This message gets sent when a text message is displayed
-void BotClient_TFC_TextMsg(void *p, int bot_index)
-{
-   static int state = 0;   // current state machine state
-   static int msg_dest = 0;
-
-   if (p == NULL)  // handle pfnMessageEnd case
-   {
-      state = 0;
-      return;
-   }
-
-   if (state == 0)
-   {
-      state++;
-      msg_dest = *(int *)p;  // HUD_PRINTCENTER, etc.
-   }
-   else if (state == 1)
-   {
-      if (strcmp((char *)p, "#Sentry_finish") == 0)  // sentry gun built
-      {
-         bots[bot_index].sentrygun_level = 1;
-      }
-      else if (strcmp((char *)p, "#Sentry_upgrade") == 0)  // sentry gun upgraded
-      {
-         bots[bot_index].sentrygun_level += 1;
-
-         bots[bot_index].pBotEnemy = NULL;  // don't attack it anymore
-         bots[bot_index].enemy_attack_count = 0;
-      }
-      else if (strcmp((char *)p, "#Sentry_destroyed") == 0)  // sentry gun destroyed
-      {
-         bots[bot_index].sentrygun_waypoint = -1;
-         bots[bot_index].sentrygun_level = 0;
-      }
-      else if (strcmp((char *)p, "#Dispenser_finish") == 0)  // dispenser built
-      {
-         bots[bot_index].dispenser_built = 1;
-      }
-      else if (strcmp((char *)p, "#Dispenser_destroyed") == 0)  // dispenser destroyed
-      {
-         bots[bot_index].dispenser_waypoint = -1;
-         bots[bot_index].dispenser_built = 0;
-      }
-   }
-}
-
-// This message gets sent when a text message is displayed
-void BotClient_FLF_TextMsg(void *p, int bot_index)
-{
-   static int state = 0;   // current state machine state
-   static int msg_dest = 0;
-
-   if (p == NULL)
-   {
-      state = 0;
-      return;
-   }
-
-   if (state == 0)
-   {
-      state++;
-      msg_dest = *(int *)p;  // HUD_PRINTCENTER, etc.
-   }
-   else if (state == 1)
-   {
-      if (strcmp((char *)p, "You are Attacking\n") == 0)  // attacker msg
-      {
-         bots[bot_index].defender = 0;  // attacker
-      }
-      else if (strcmp((char *)p, "You are Defending\n") == 0)  // defender msg
-      {
-         bots[bot_index].defender = 1;  // defender
-      }
-   }
-}
-
-
-// This message gets sent when the WarmUpTime is enabled/disabled
-void BotClient_FLF_WarmUp(void *p, int bot_index)
-{
-   bots[bot_index].warmup = *(int *)p;
-}
-
-
-// This message gets sent to ALL when the WarmUpTime is enabled/disabled
-void BotClient_FLF_WarmUpAll(void *p, int bot_index)
-{
-   for (int i=0; i < 32; i++)
-   {
-      if (bots[i].is_used)  // count the number of bots in use
-         bots[i].warmup = *(int *)p;
-   }
-}
-
-
-// This message gets sent when the round is over
-void BotClient_FLF_WinMessage(void *p, int bot_index)
-{
-   for (int i=0; i < 32; i++)
-   {
-      if (bots[i].is_used)  // count the number of bots in use
-         bots[i].round_end = 1;
-   }
-}
-
-
-// This message gets sent when a weapon is hidden or restored
-void BotClient_FLF_HideWeapon(void *p, int bot_index)
-{
-   int hide;
-
-   hide = *(int *)p;
-
-   if ((hide == 0) && (bots[bot_index].b_use_capture))
-   {
-      bots[bot_index].b_use_capture = FALSE;
-      bots[bot_index].f_use_capture_time = 0.0;
-   }
-
-   if ((hide) && (bots[bot_index].b_use_capture))
-      bots[bot_index].f_use_capture_time = gpGlobals->time + 30;
-}
-
 
 void BotClient_Valve_ScreenFade(void *p, int bot_index)
 {
+   const float globaltime = gpGlobals->time;
    static int state = 0;   // current state machine state
    static int duration;
    static int hold_time;
@@ -1077,97 +475,10 @@ void BotClient_Valve_ScreenFade(void *p, int bot_index)
       state = 0;
 
       length = (duration + hold_time) / 4096;
-      bots[bot_index].blinded_time = gpGlobals->time + length - 2.0;
+      bots[bot_index].blinded_time = globaltime + length - 2.0;
    }
    else
    {
       state++;
-   }
-}
-
-void BotClient_TFC_ScreenFade(void *p, int bot_index)
-{
-   // this is just like the Valve ScreenFade message
-   BotClient_Valve_ScreenFade(p, bot_index);
-}
-
-void BotClient_CS_ScreenFade(void *p, int bot_index)
-{
-   // this is just like the Valve ScreenFade message
-   BotClient_Valve_ScreenFade(p, bot_index);
-}
-
-void BotClient_Gearbox_ScreenFade(void *p, int bot_index)
-{
-   // this is just like the Valve ScreenFade message
-   BotClient_Valve_ScreenFade(p, bot_index);
-}
-
-void BotClient_FLF_ScreenFade(void *p, int bot_index)
-{
-   // this is just like the Valve ScreenFade message
-   BotClient_Valve_ScreenFade(p, bot_index);
-}
-
-
-void BotClient_HolyWars_Halo(void *p, int edict)
-{
-   int type = *(int *)p;
-
-   if (type == 0)  // wait for halo to respawn
-   {
-      holywars_saint = NULL;
-      halo_status = HW_WAIT_SPAWN;
-   }
-   else if (type == 1)  // there's no saint
-   {
-      holywars_saint = NULL;
-   }
-   else if (type == 2)  // there's a new saint
-   {
-      halo_status = HW_NEW_SAINT;
-   }
-   else if (type == 3)  // you are the new saint
-   {
-      holywars_saint = (edict_t *)edict;
-      halo_status = HW_NEW_SAINT;
-   }
-}
-
-void BotClient_HolyWars_GameMode(void *p, int bot_index)
-{
-   int mode = *(int *)p;
-
-   holywars_gamemode = mode;
-}
-
-void BotClient_HolyWars_HudText(void *p, int bot_index)
-{
-   if (strncmp((char *)p, "Voting for", 10) == 0)
-   {
-      bots[bot_index].vote_in_progress = TRUE;
-      bots[bot_index].f_vote_time = gpGlobals->time + RANDOM_LONG(2.0, 5.0);
-   }
-}
-
-void BotClient_CS_HLTV(void *p, int bot_index)
-{
-   static int state = 0;   // current state machine state
-   static int players;
-   int index;
-
-   if (state == 0)
-      players = *(int *) p;
-   else if (state == 1)
-   {
-      // new round in CS 1.6
-      if ((players == 0) && (*(int *) p == 0))
-      {
-         for (index = 0; index < 32; index++)
-         {
-            if (bots[index].is_used)
-               BotSpawnInit (&bots[index]); // reset bots for new round
-         }
-      }
    }
 }

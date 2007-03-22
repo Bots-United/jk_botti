@@ -66,7 +66,7 @@ void LoadBotChat(void)
       recent_bot_whine[i] = -1;
    }
 
-   UTIL_BuildFileName(filename, "HPB_bot_chat.txt", NULL);
+   UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/jk_botti_chat.txt", NULL);
 
    bfp = fopen(filename, "r");
 
@@ -265,18 +265,18 @@ void BotDropCharacter(char *in_string, char *out_string)
    int len, pos;
    int count = 0;
    char *src, *dest;
-   bool is_bad;
+   qboolean is_bad;
 
    strcpy(out_string, in_string);
 
    len = strlen(out_string);
-   pos = RANDOM_LONG(1, len-1);  // don't drop position zero
+   pos = RANDOM_LONG2(1, len-1);  // don't drop position zero
 
    is_bad = !isalpha(out_string[pos]) || (out_string[pos-1] == '%');
 
    while ((is_bad) && (count < 20))
    {
-      pos = RANDOM_LONG(1, len-1);
+      pos = RANDOM_LONG2(1, len-1);
       is_bad = !isalpha(out_string[pos]) || (out_string[pos-1] == '%');
       count++;
    }
@@ -297,19 +297,19 @@ void BotSwapCharacter(char *in_string, char *out_string)
    int len, pos;
    int count = 0;
    char temp;
-   bool is_bad;
+   qboolean is_bad;
 
    strcpy(out_string, in_string);
 
    len = strlen(out_string);
-   pos = RANDOM_LONG(1, len-2);  // don't swap position zero
+   pos = RANDOM_LONG2(1, len-2);  // don't swap position zero
 
    is_bad = !isalpha(out_string[pos]) || !isalpha(out_string[pos+1]) ||
             (out_string[pos-1] == '%');
 
    while ((is_bad) && (count < 20))
    {
-      pos = RANDOM_LONG(1, len-2);
+      pos = RANDOM_LONG2(1, len-2);
       is_bad = !isalpha(out_string[pos]) || !isalpha(out_string[pos+1]) ||
                (out_string[pos-1] == '%');
       count++;
@@ -328,7 +328,7 @@ void BotChatName(char *original_name, char *out_name)
 {
    int pos;
 
-   if (RANDOM_LONG(1, 100) <= bot_chat_tag_percent)
+   if (RANDOM_LONG2(1, 100) <= bot_chat_tag_percent)
    {
       char temp_name[80];
 
@@ -346,7 +346,7 @@ void BotChatName(char *original_name, char *out_name)
       out_name[31] = 0;
    }
 
-   if (RANDOM_LONG(1, 100) <= bot_chat_lower_percent)
+   if (RANDOM_LONG2(1, 100) <= bot_chat_lower_percent)
    {
       pos=0;
       while ((pos < 80) && (out_name[pos]))
@@ -367,9 +367,9 @@ void BotChatText(char *in_text, char *out_text)
    strncpy(temp_text, in_text, 79);
    temp_text[80] = 0;
 
-   if (RANDOM_LONG(1, 100) <= bot_chat_drop_percent)
+   if (RANDOM_LONG2(1, 100) <= bot_chat_drop_percent)
    {
-      count = RANDOM_LONG(1, 3);
+      count = RANDOM_LONG2(1, 3);
 
       while (count)
       {
@@ -379,9 +379,9 @@ void BotChatText(char *in_text, char *out_text)
       }
    }
 
-   if (RANDOM_LONG(1, 100) <= bot_chat_swap_percent)
+   if (RANDOM_LONG2(1, 100) <= bot_chat_swap_percent)
    {
-      count = RANDOM_LONG(1, 2);
+      count = RANDOM_LONG2(1, 2);
 
       while (count)
       {
@@ -391,7 +391,7 @@ void BotChatText(char *in_text, char *out_text)
       }
    }
 
-   if (RANDOM_LONG(1, 100) <= bot_chat_lower_percent)
+   if (RANDOM_LONG2(1, 100) <= bot_chat_lower_percent)
    {
       pos=0;
       while (temp_text[pos])
@@ -441,8 +441,8 @@ void BotChatFillInName(char *bot_say_msg, char *chat_text,
    int chat_index, say_index;
    char *name_pos, *rand_pos;
    char random_name[64];
-   int index, name_offset, rand_offset;
-   bool is_bad;
+   int index, name_offset=0, rand_offset;
+   qboolean is_bad;
 
    chat_index = 0;
    say_index = 0;
@@ -481,14 +481,14 @@ void BotChatFillInName(char *bot_say_msg, char *chat_text,
 
          // pick a name at random from the list of players...
 
-         index = RANDOM_LONG(0, player_count-1);
+         index = RANDOM_LONG2(0, player_count-1);
 
          is_bad = (strcmp(player_names[index], chat_name) == 0) ||
                   (strcmp(player_names[index], bot_name) == 0);
 
          while ((is_bad) && (count < 20))
          {
-            index = RANDOM_LONG(0, player_count-1);
+            index = RANDOM_LONG2(0, player_count-1);
 
             is_bad = (strcmp(player_names[index], chat_name) == 0) ||
                      (strcmp(player_names[index], bot_name) == 0);
