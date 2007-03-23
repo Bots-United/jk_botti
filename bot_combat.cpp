@@ -17,7 +17,8 @@
 #include "bot_func.h"
 #include "bot_weapons.h"
 #include "bot_skill.h"
-
+#include "bot_weapon_select.h"
+#include "waypoint.h"
 
 extern bot_weapon_t weapon_defs[MAX_WEAPONS];
 extern qboolean b_observer_mode;
@@ -40,28 +41,29 @@ typedef struct posdata_s {
 posdata_t * pos_latest[32];
 posdata_t * pos_oldest[32];
 
-#include "bot_weapon_select.h"
-
 int turn_method = AIM_RACC;
-//float turn_skill = 4;
-static const qboolean aim_fix = TRUE;
 
 //
-qboolean BotAimsAtSomething (bot_t &pBot)
+/*qboolean BotAimsAtSomething (bot_t &pBot)
 {
-   if(!pBot.pBotEnemy)
+   edict_t *pEdict = pBot.pEdict;
+   Vector vForward, vRight, vUp;
+   Vector v_aim;
+   TraceResult tr;
+   
+   if(FNullEnt(pEdict) || FNullEnt(pBot.pBotEnemy))
       return FALSE;
    
    float prediction_ammount = skill_settings[pBot.bot_skill].prediction_latency;
-   float shootcone_radius   = skill_settings[pBot.bot_skill].shootcone_radius;
+   float shootcone_diameter = skill_settings[pBot.bot_skill].shootcone_diameter;
    float shootcone_minangle = skill_settings[pBot.bot_skill].shootcone_minangle;
    
    if(FInShootCone(pBot.pBotEnemy->v.origin, pBot.pEdict, 
-                   (GetPredictedPlayerPosition(pBot.pBotEnemy, gpGlobals->time - prediction_ammount, gpGlobals->time) - pBot.pEdict->v.origin).Length(), shootcone_radius, shootcone_minangle))
+                   (GetPredictedPlayerPosition(pBot.pBotEnemy, gpGlobals->time - prediction_ammount, gpGlobals->time) - pBot.pEdict->v.origin).Length(), shootcone_diameter, shootcone_minangle))
       return TRUE;
    
    return FALSE;
-}
+}*/
 
 //
 void BotPointGun (bot_t &pBot, qboolean save_v_angle)
@@ -87,15 +89,11 @@ void BotPointGun (bot_t &pBot, qboolean save_v_angle)
       pEdict->v.yaw_speed = v_deviation.y * pBot.f_frame_time * speed;
       pEdict->v.pitch_speed = v_deviation.x * pBot.f_frame_time * speed;
    }
-
    // else do we want new RACC style aiming ?
    else if (turn_method == AIM_RACC)
    {
       // if bot is aiming at something, aim fast, else take our time...
-      if (BotAimsAtSomething (pBot))
-         speed = 0.7 + (turn_skill - 1) / 10; // fast aim
-      else
-         speed = 0.2 + (turn_skill - 1) / 20; // slow aim
+      speed = 0.7 + (turn_skill - 1) / 10; // fast aim
 
       // thanks Tobias "Killaruna" Heimann and Johannes "@$3.1415rin" Lampel for this one
       pEdict->v.yaw_speed = (pEdict->v.yaw_speed * exp (log (speed / 2) * pBot.f_frame_time * 20)
@@ -126,16 +124,12 @@ void BotPointGun (bot_t &pBot, qboolean save_v_angle)
    pEdict->v.angles.x = UTIL_WrapAngle (pEdict->v.v_angle.x / 3);
    pEdict->v.angles.y = UTIL_WrapAngle (pEdict->v.v_angle.y);
    pEdict->v.angles.z = 0;
-
-   // did the bot maker not get rid of Paulo-La-Frite's "bugfix" bug ?
-   if (aim_fix)
-      pEdict->v.angles.x = UTIL_WrapAngle (-pEdict->v.angles.x); // if the bug is still here, fix it again
    
+   pEdict->v.angles.x = UTIL_WrapAngle ( -pEdict->v.angles.x );
+
    // save angles
    if( save_v_angle )
-      pBot.bot_v_angle = UTIL_WrapAngles (pEdict->v.angles);
-   
-   return;
+      pBot.bot_v_angle = UTIL_WrapAngles (pEdict->v.v_angle);
 }
 
 //
@@ -275,11 +269,15 @@ void GatherPlayerData(void) {
 // used instead of using pBotEnemy->v.origin in aim code.
 //  example: GetPredictedPlayerPosition(pBotEnemy, gpGlobals->time - 0.3, gpGlobals->time) // use 300ms old position data
 //  if bot's aim lags behind moving target increase value of AHEAD_MULTIPLIER.
-#define AHEAD_MULTIPLIER 1.5
-Vector GetPredictedPlayerPosition(edict_t * pPlayer, float time, const float globaltime) {
+#define AHEAD_MULTIPLIER 1.4
+Vector GetPredictedPlayerPosition(edict_t * pPlayer, float time, const float globaltime) 
+{
    posdata_t * newer;
    posdata_t * older;
    int idx;
+   
+   if(FNullEnt(pPlayer))
+      return(Vector(0,0,0));
    
    idx = ENTINDEX(pPlayer) - 1;
    if(idx < 0 || idx >= gpGlobals->maxClients || !pos_latest[idx] || !pos_oldest[idx])
@@ -448,7 +446,7 @@ qboolean FHearable(bot_t &pBot, edict_t *pPlayer) {
 qboolean UpdateSounds(bot_t &pBot, edict_t *pPlayer) {
    // is the bot close enough to hear this sound?
    if(FHearable(pBot, pPlayer)) {
-      Vector bot_angles = UTIL_VecToAngles( pPlayer->v.origin );
+      Vector bot_angles = UTIL_VecToAngles( pPlayer->v.origin - pBot.pEdict->v.origin );
       
       pBot.pEdict->v.ideal_yaw = bot_angles.y;
 
@@ -458,6 +456,22 @@ qboolean UpdateSounds(bot_t &pBot, edict_t *pPlayer) {
    }
    
    return(FALSE);
+}
+
+qboolean FCanShootInHead(edict_t * pEdict, edict_t * pTarget, const Vector & v_dest)
+{
+   float enemyHalfHeight = ((pTarget->v.flags & FL_DUCKING) == FL_DUCKING ? 36 : 72) / 2.0;
+   float distance = (v_dest - pEdict->v.origin).Length();
+   
+   Vector2D triangle;
+   
+   triangle.x = distance;
+   triangle.y = enemyHalfHeight;
+   
+   if(cos(deg2rad(12.5)) < (distance / triangle.Length()))
+      return FALSE; //greater angle, smaller cosine
+   
+   return TRUE;
 }
 
 edict_t *BotFindEnemy( bot_t &pBot )
@@ -482,6 +496,9 @@ edict_t *BotFindEnemy( bot_t &pBot )
 
          // don't have an enemy anymore so null out the pointer...
          pBot.pBotEnemy = NULL;
+         
+         // level look
+         pEdict->v.idealpitch = 0;
       }
       else  // enemy is still alive
       {
@@ -489,13 +506,16 @@ edict_t *BotFindEnemy( bot_t &pBot )
          Vector vecPredEnemy;
 
          vecPredEnemy = GetPredictedPlayerPosition(pBot.pBotEnemy, globaltime - skill_settings[pBot.bot_skill].prediction_latency, globaltime);
-         vecEnd = vecPredEnemy + pBot.pBotEnemy->v.view_ofs;
 
+         if(FCanShootInHead(pEdict, pBot.pBotEnemy, vecPredEnemy))
+            vecEnd = vecPredEnemy + pBot.pBotEnemy->v.view_ofs;
+         else
+            vecEnd = vecPredEnemy;
+         
          if (!checked_teamplay)  // check for team play...
             BotCheckTeamplay();
 
-         if( FInViewCone( vecEnd, pEdict ) &&
-                  FVisible( vecEnd, pEdict ))
+         if( FInViewCone( vecEnd, pEdict ) && FVisible( vecEnd, pEdict ))
          {
             // face the enemy
             Vector v_enemy = vecPredEnemy - pEdict->v.origin;
@@ -577,7 +597,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
          // skip invalid players and skip self (i.e. this bot)
          if ((pPlayer) && (!pPlayer->free) && (pPlayer != pEdict))
          {
-            if ((b_observer_mode) && !(pPlayer->v.flags & FL_FAKECLIENT) && !(pPlayer->v.flags & FL_THIRDPARTYBOT))
+            if ((b_observer_mode) && !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
                continue;
             
             // skip this player if not alive (i.e. dead or dying)
@@ -590,9 +610,8 @@ edict_t *BotFindEnemy( bot_t &pBot )
 
             vecEnd = pPlayer->v.origin + pPlayer->v.view_ofs;
 
-            // see if bot can't see or hear the player...
-            if (!(FInViewCone( vecEnd, pEdict ) && FVisible( vecEnd, pEdict )) &&
-                !FHearable(pBot, pPlayer))
+            // see if bot can't see the player...
+            if (!(FInViewCone( vecEnd, pEdict ) && FVisible( vecEnd, pEdict )))
                continue;
 
             float distance = (pPlayer->v.origin - pEdict->v.origin).Length();
@@ -639,44 +658,17 @@ edict_t *BotFindEnemy( bot_t &pBot )
    return (pNewEnemy);
 }
 
-
 //
-void SelectBetterAttack(const int bot_skill, const bot_weapon_select_t &select, qboolean &use_primary, qboolean &use_secondary) 
-{
-   // check bot skill, skill levels have been checked by caller so that either one is true!
-   // check if we like higher skill better than less
-   if(bot_skill > select.secondary_skill_level || 
-      (select.prefer_higher_skill_attack && select.secondary_skill_level > select.primary_skill_level))
-   {
-      use_secondary = FALSE;
-      return;
-   }
-
-   if(bot_skill > select.primary_skill_level ||
-      (select.prefer_higher_skill_attack && select.primary_skill_level > select.secondary_skill_level))
-   {
-      use_primary = FALSE;
-      return;
-   }
-   
-   // use old method last
-   if(select.primary_fire_percent < RANDOM_LONG2(1, 100)) 
-      use_secondary = FALSE;
-   else
-      use_primary = FALSE;
-}
-
-
-//
-qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, const bot_fire_delay_t &delay, const int iId, qboolean use_primary, qboolean use_secondary)
+qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, const bot_fire_delay_t &delay, qboolean use_primary, qboolean use_secondary)
 {
    const float globaltime = gpGlobals->time;
    edict_t *pEdict = pBot.pEdict;
+   const int iId = select.iId;
 
    // Select primary or secondary based on bot skill and random percent
    if(use_primary && use_secondary)
    {
-      SelectBetterAttack(pBot.bot_skill + 1, select, use_primary, use_secondary);
+      BotSelectAttack(pBot, select, use_primary, use_secondary);
    }
 
    //
@@ -767,212 +759,19 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, 
 
 
 //
-qboolean IsValidWeaponChoose(bot_t &pBot, const bot_weapon_select_t &select, const int weapon_choice) 
-{
-   // Severians and Bubblemod checks, skip egon (bubblemod-egon is total conversion and severians-egon is selfkilling after time)
-   if ((submod_id == SUBMOD_SEVS || submod_id == SUBMOD_BUBBLEMOD) && select.iId == VALVE_WEAPON_EGON)
-      return(FALSE);
-        
-   // was a weapon choice specified? (and if so do they NOT match?)
-   if ((weapon_choice != 0) &&
-       (weapon_choice != select.iId)) 
-   {
-      return(FALSE);
-   }
-   
-   // is the bot NOT carrying this weapon?
-   if (!(pBot.pEdict->v.weapons & (1<<select.iId)))
-      return(FALSE);
-
-   // is the bot NOT skilled enough to use this weapon?
-   if ((pBot.bot_skill+1) > select.primary_skill_level && (pBot.bot_skill+1) > select.secondary_skill_level)
-   {
-      return(FALSE);
-   }
-
-   // is the bot underwater and does this weapon NOT work under water?
-   if ((pBot.pEdict->v.waterlevel == 3) &&
-       !(select.can_use_underwater))
-   {
-      return(FALSE);
-   }
-   
-   return(TRUE);
-}
-
-
-//
-qboolean IsValidPrimaryAttack(bot_t &pBot, const bot_weapon_select_t &select, const int weapon_index, const float distance, const int weapon_choice)
-{
-   qboolean primary_valid = FALSE;
-   qboolean primary_in_range;
-   
-   primary_in_range = (weapon_choice != 0) || (distance >= select.primary_min_distance && distance <= select.primary_max_distance);
-
-   // no ammo required for this weapon OR
-   // enough ammo available to fire AND
-   // the bot is far enough away to use primary fire AND
-   // the bot is close enough to the enemy to use primary fire
-   if (primary_in_range && (weapon_defs[weapon_index].iAmmo1 == -1 || pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] >= select.min_primary_ammo))
-   {
-      primary_valid = TRUE;
-   }
-   
-   return(primary_valid);
-}
-
-
-//
-qboolean IsValidSecondaryAttack(bot_t &pBot, const bot_weapon_select_t &select, const int weapon_index, const float distance, const int weapon_choice)
-{
-   qboolean secondary_valid = FALSE;
-   qboolean secondary_in_range;
-   
-   // target is close enough
-   secondary_in_range = (weapon_choice != 0) || (distance >= select.secondary_min_distance && distance <= select.secondary_max_distance);
-
-   // see if there is enough secondary ammo AND
-   // the bot is far enough away to use secondary fire AND
-   // the bot is close enough to the enemy to use secondary fire
-   if (secondary_in_range && 
-       ((weapon_defs[weapon_index].iAmmo2 == -1 && !select.secondary_use_primary_ammo) ||
-         (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo2] >= select.min_secondary_ammo) ||
-         (select.secondary_use_primary_ammo && 
-          (weapon_defs[weapon_index].iAmmo1 == -1 || pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] >= select.min_primary_ammo))))
-   {
-      secondary_valid = TRUE;
-      
-      // MP5 cannot use secondary if primary is empty
-      if(weapon_index == VALVE_WEAPON_MP5 &&
-         (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] <
-          select.min_primary_ammo))
-      {
-         secondary_valid = FALSE;
-      }
-   }
-   
-   return(secondary_valid);
-}
-
-
-//
-qboolean GetGoodWeaponCount(bot_t &pBot)
-{
-   bot_weapon_select_t * pSelect = &valve_weapon_select[0];
-   int select_index;
-   int good_count = 0;
-   
-   // loop through all the weapons until terminator is found...
-   select_index = -1;
-   while (pSelect[++select_index].iId) {
-      if(!IsValidWeaponChoose(pBot, pSelect[select_index], 0))
-         continue;
-      
-      if(pSelect[select_index].avoid_this_gun || pSelect[select_index].iId == VALVE_WEAPON_CROWBAR ||
-         pSelect[select_index].iId == VALVE_WEAPON_SNARK || pSelect[select_index].iId == VALVE_WEAPON_HANDGRENADE)
-         continue;
-      
-      // weapon_choice != 0, don't do distance check
-      if(!IsValidSecondaryAttack(pBot, pSelect[select_index], pSelect[select_index].iId, 0.0, -1) &&
-         !IsValidPrimaryAttack(pBot, pSelect[select_index], pSelect[select_index].iId, 0.0, -1))
-         continue;
-      
-      // not bad gun
-      good_count++;
-   }
-   
-   return(good_count);
-}
-
-
-//
-qboolean AllWeaponsRunningOutOfAmmo(bot_t &pBot)
-{
-   bot_weapon_select_t * pSelect = &valve_weapon_select[0];
-   int select_index;
-   
-   // loop through all the weapons until terminator is found...
-   select_index = -1;
-   while (pSelect[++select_index].iId) {
-      if(!IsValidWeaponChoose(pBot, pSelect[select_index], 0))
-         continue;
-      
-      if(pSelect[select_index].low_ammo_primary == -1 && pSelect[select_index].low_ammo_secondary == -1)
-         continue;
-      
-      // weapon_choice != 0, don't do distance check
-      if(!IsValidSecondaryAttack(pBot, pSelect[select_index], pSelect[select_index].iId, 0.0, -1) &&
-         !IsValidPrimaryAttack(pBot, pSelect[select_index], pSelect[select_index].iId, 0.0, -1))
-         continue;
-      
-      int weapon_index = pSelect[select_index].iId;
-      
-      // low primary ammo?
-      if(pSelect[select_index].low_ammo_primary > -1 &&
-         (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] <= pSelect[select_index].low_ammo_primary))
-         continue;
-      
-      // low secondary ammo?
-      if(pSelect[select_index].low_ammo_secondary > -1 &&
-         ((pSelect[select_index].secondary_use_primary_ammo && 
-           pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] <= pSelect[select_index].low_ammo_secondary) ||
-          (!pSelect[select_index].secondary_use_primary_ammo && 
-           pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo2] <= pSelect[select_index].low_ammo_secondary)))
-         continue;
-      
-      // this gun had enough ammo
-      return(FALSE);
-   }
-   
-   return(TRUE);
-}
-
-
-// Check if want to change to better weapon
-int GetBetterWeaponChoice(bot_t &pBot, const bot_weapon_select_t &current, const bot_weapon_select_t *pSelect, const float distance, const int weapon_choice, qboolean *use_primary, qboolean *use_secondary) {
-   int select_index;
-   *use_primary = FALSE;
-   *use_secondary = FALSE;
-   
-   // check if we don't like current weapon.
-   if(!current.avoid_this_gun || weapon_choice != 0) {
-      return -1;
-   }
-     
-   // loop through all the weapons until terminator is found...
-   select_index = -1;
-   while (pSelect[++select_index].iId) {
-      if(!IsValidWeaponChoose(pBot, pSelect[select_index], 0))
-         continue;
-      
-      if(pSelect[select_index].avoid_this_gun)
-         continue;
-
-      *use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], pSelect[select_index].iId, distance, 0);
-      *use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], pSelect[select_index].iId, distance, 0);
-      
-      if(*use_primary || *use_secondary)
-         return select_index;
-   }
-   
-   return -1;
-}
-
-
-//
-qboolean TrySelectWeapon(bot_t &pBot, const int iId, const int select_index, const bot_weapon_select_t &select, const bot_fire_delay_t &delay)
+qboolean TrySelectWeapon(bot_t &pBot, const int select_index, const bot_weapon_select_t &select, const bot_fire_delay_t &delay)
 {
    // select this weapon if it isn't already selected
-   if (pBot.current_weapon.iId != iId)
+   if (pBot.current_weapon.iId != select.iId)
    {
       UTIL_SelectItem(pBot.pEdict, (char*)select.weapon_name);
       pBot.zooming = FALSE;
    }
    
-   if (delay.iId != iId)
+   if (delay.iId != select.iId)
    {
       char msg[80];
-      snprintf(msg, sizeof(msg), "fire_delay mismatch for weapon id=%d\n", iId);
+      snprintf(msg, sizeof(msg), "fire_delay mismatch for weapon id=%d\n", select.iId);
       ALERT(at_console, "%s", msg);
       
       pBot.current_weapon_index = -1;
@@ -989,7 +788,6 @@ qboolean TrySelectWeapon(bot_t &pBot, const int iId, const int select_index, con
 // specifing a weapon_choice allows you to choose the weapon the bot will
 // use (assuming enough ammo exists for that weapon)
 // BotFireWeapon will return TRUE if weapon was fired, FALSE otherwise
-
 qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
 {
    const float globaltime = gpGlobals->time;
@@ -1000,13 +798,15 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
    qboolean use_primary;
    qboolean use_secondary;
    float distance;
+   int min_skill;
+   int min_index;
    
    distance = v_enemy.Length();  // how far away is the enemy?
 
-   pSelect = &valve_weapon_select[0];
-   pDelay = &valve_fire_delay[0];
-
-      // are we charging the primary fire?
+   pSelect = &weapon_select[0];
+   pDelay = &fire_delay[0];
+   
+   // are we charging the primary fire?
    if (pBot.f_primary_charging > 0)
    {
       iId = pBot.charging_weapon_id;
@@ -1094,32 +894,39 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
    if(pBot.current_weapon_index >= 0)
    {
       select_index = pBot.current_weapon_index;
-         
+      
       // Check if we can use this weapon
-      if (IsValidWeaponChoose(pBot, pSelect[select_index], weapon_choice))
+      if ((weapon_choice == pSelect[select_index].iId || weapon_choice == 0) || 
+      	  (IsValidWeaponChoose(pBot, pSelect[select_index]) && 
+      	   IsValidToFireAtTheMoment(pBot, pSelect[select_index])))
       {
-         // Check if we REALLY want to change to other weapon (aka current gun == shit)
-         better_index = GetBetterWeaponChoice(pBot, pSelect[select_index], pSelect, distance, weapon_choice, &use_primary, &use_secondary);
-         if(better_index > -1) 
-            select_index = better_index;
+      	 better_index = -1;
+      	 
+      	 if(weapon_choice == 0)
+      	 {
+            // Check if we REALLY want to change to other weapon (aka current gun == shit)
+            better_index = BotGetBetterWeaponChoice(pBot, pSelect[select_index], pSelect, distance, &use_primary, &use_secondary);
+            if(better_index > -1) 
+               select_index = better_index;
+         }
          
          iId = pSelect[select_index].iId;
       
          if(better_index == -1)
          {
             // Check if this weapon is ok for current contitions
-            use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], iId, distance, weapon_choice);
-            use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], iId, distance, weapon_choice);
+            use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, weapon_choice != 0);
+            use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, weapon_choice != 0);
          }
          
          if(use_primary || use_secondary)
          {
-            if(!TrySelectWeapon(pBot, iId, select_index, pSelect[select_index], pDelay[select_index]))
+            if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
                return FALSE; //error
-      
-            return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], iId, use_primary, use_secondary));
+
+            return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], use_primary, use_secondary));
          }
-     }
+      }
    }
 
    // loop through all the weapons until terminator is found...
@@ -1134,31 +941,84 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       }
          
       // Check if we can use this weapon
-      if (!IsValidWeaponChoose(pBot, pSelect[select_index], weapon_choice)) 
-      {
+      if(!(weapon_choice == pSelect[select_index].iId || weapon_choice == 0))
          continue;
-      }
+
+      if(!IsValidWeaponChoose(pBot, pSelect[select_index]))
+      	 continue;
+
+      if(!IsValidToFireAtTheMoment(pBot, pSelect[select_index]))
+         continue;
 
       // is use percent greater than weapon use percent?
       if (RANDOM_LONG2(1, 100) > pSelect[select_index].use_percent)
-      {
          continue;
-      }
 
       iId = pSelect[select_index].iId;
 
       // Check if this weapon is ok for current contitions
-      use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], iId, distance, weapon_choice);
-      use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], iId, distance, weapon_choice);
+      use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, weapon_choice != 0);
+      use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, weapon_choice != 0);
       if(use_primary || use_secondary)
       {
-         if(!TrySelectWeapon(pBot, iId, select_index, pSelect[select_index], pDelay[select_index]))
+         if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
             return FALSE; //error
-      
-         return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], iId, use_primary, use_secondary));
+
+         return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], use_primary, use_secondary));
       }
    }
+   
+   // AT THIS POINT:
+   // We didn't find good weapon, now try find least skilled weapon that bot has, but avoid avoidable weapons
+   min_index = -1;
+   min_skill = -1;
+   
+   select_index = -1;
+   while (pSelect[++select_index].iId)
+   {         
+      // Check if we can use this weapon
+      if(!(weapon_choice == pSelect[select_index].iId || weapon_choice == 0))
+         continue;
 
+      if(!IsValidWeaponChoose(pBot, pSelect[select_index]))
+         continue;
+      
+      // Underwater: only use avoidable weapon if can be used underwater
+      if(pBot.pEdict->v.waterlevel == 3)
+      {
+         if(!pSelect[select_index].can_use_underwater)
+            continue;
+      }
+      else if(pSelect[select_index].avoid_this_gun)
+      	 continue;     	 
+
+      // is use percent greater than weapon use percent?
+      if (RANDOM_LONG2(1, 100) > pSelect[select_index].use_percent)
+         continue;
+
+      iId = pSelect[select_index].iId;
+
+      // Check if this weapon is ok for current contitions
+      use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, weapon_choice != 0);
+      use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, weapon_choice != 0);
+      if(use_primary || use_secondary)
+      {
+         if(pSelect[select_index].primary_skill_level > min_skill || pSelect[select_index].secondary_skill_level > min_skill)
+         {
+            min_skill = max(pSelect[select_index].primary_skill_level, pSelect[select_index].secondary_skill_level);
+            min_index = select_index;
+         }
+      }
+   }
+   
+   if(min_index > -1 && min_skill > -1)
+   {
+      if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
+         return FALSE; //error
+      
+      return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], use_primary, use_secondary));
+   }
+   
    // didn't have any available weapons or ammo, return FALSE
    return FALSE;
 }
@@ -1218,12 +1078,19 @@ void BotShootAtEnemy( bot_t &pBot )
          v_enemy_aimpos = v_predicted_pos - pBot.pBotEnemy->v.view_ofs;
       }
       else
-         v_enemy_aimpos = v_predicted_pos + pBot.pBotEnemy->v.view_ofs;
+      {
+         if(FCanShootInHead(pEdict, pBot.pBotEnemy, v_predicted_pos))
+            v_enemy_aimpos = v_predicted_pos + pBot.pBotEnemy->v.view_ofs;// aim for the head...
+         else
+            v_enemy_aimpos = v_predicted_pos;
+      }
    }
    else
    {
-      // aim for the head...
-      v_enemy_aimpos = v_predicted_pos + pBot.pBotEnemy->v.view_ofs;
+      if(FCanShootInHead(pEdict, pBot.pBotEnemy, v_predicted_pos))
+         v_enemy_aimpos = v_predicted_pos + pBot.pBotEnemy->v.view_ofs;// aim for the head...
+      else
+         v_enemy_aimpos = v_predicted_pos;
    }
    
    v_enemy = v_enemy_aimpos - GetGunPosition(pEdict);
@@ -1259,22 +1126,28 @@ void BotShootAtEnemy( bot_t &pBot )
    if (pBot.f_shoot_time <= globaltime)
    {
       edict_t * pHit = 0;
-      
+            
       // only fire if we can see enemy and if aiming target circle with radius 150.0 
       if((FVisible(v_enemy_aimpos, pEdict, &pHit) || pHit == pBot.pBotEnemy) &&
           FInViewCone(v_enemy_aimpos, pEdict)) 
       {
-         float shootcone_radius   = skill_settings[pBot.bot_skill].shootcone_radius;
+         float shootcone_diameter = skill_settings[pBot.bot_skill].shootcone_diameter;
          float shootcone_minangle = skill_settings[pBot.bot_skill].shootcone_minangle;
-         
+                  
          // check if it is possible to hit target
-         if(FInShootCone(v_enemy_aimpos, pEdict, f_distance, shootcone_radius, shootcone_minangle)) 
+         if(FInShootCone(v_enemy_aimpos, pEdict, f_distance, shootcone_diameter, shootcone_minangle)) 
          {
             // select the best weapon to use at this distance and fire...
             if(!BotFireWeapon(v_enemy, pBot, 0))
             {
                pBot.pBotEnemy = NULL;
                pBot.f_bot_find_enemy_time = globaltime + 3.0;
+               
+               // level look
+               pEdict->v.idealpitch = 0;
+                              
+               // get nearest waypoint to bot
+               pBot.curr_waypoint_index = WaypointFindNearest(pBot.pEdict, 1024);
             }
          }
       } 
@@ -1294,30 +1167,11 @@ qboolean BotShootTripmine( bot_t &pBot )
       return FALSE;
 
    // aim at the tripmine and fire the glock...
-
    Vector v_enemy = pBot.v_tripmine - GetGunPosition( pEdict );
+   Vector enemy_angle = UTIL_VecToAngles(v_enemy);
 
-   pEdict->v.v_angle = UTIL_VecToAngles( v_enemy );
-
-   if (pEdict->v.v_angle.y > 180)
-      pEdict->v.v_angle.y -=360;
-
-   // Paulo-La-Frite - START bot aiming bug fix
-   if (pEdict->v.v_angle.x > 180)
-      pEdict->v.v_angle.x -=360;
-
-   // set the body angles to point the gun correctly
-   pEdict->v.angles.x = pEdict->v.v_angle.x / 3;
-   pEdict->v.angles.y = pEdict->v.v_angle.y;
-   pEdict->v.angles.z = 0;
-
-   // adjust the view angle pitch to aim correctly (MUST be after body v.angles stuff)
-   pEdict->v.v_angle.x = -pEdict->v.v_angle.x;
-   // Paulo-La-Frite - END
-
-   pEdict->v.ideal_yaw = pEdict->v.v_angle.y;
-
-   BotFixIdealYaw(pEdict);
-
+   pEdict->v.idealpitch = UTIL_WrapAngle(enemy_angle.x);
+   pEdict->v.ideal_yaw = UTIL_WrapAngle(enemy_angle.y);
+   
    return (BotFireWeapon( v_enemy, pBot, VALVE_WEAPON_GLOCK ));
 }

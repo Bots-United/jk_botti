@@ -1364,6 +1364,8 @@ void BotThink( bot_t &pBot )
    {
       BotStartGame( pBot );
       
+      BotAimThink( pBot );
+      
       g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot.f_move_speed,
                                    0, 0, pEdict->v.button, 0, (byte)pBot.msecval);
 
@@ -1449,9 +1451,11 @@ void BotThink( bot_t &pBot )
          }
       }
 
-      if (RANDOM_LONG2(1, 100) > 50)
+      if (RANDOM_LONG2(1, 100) <= 50)
          pEdict->v.button = IN_ATTACK;
-            
+      
+      BotAimThink( pBot );
+      
       g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot.f_move_speed,
                                    0, 0, pEdict->v.button, 0, (byte)pBot.msecval);
 
@@ -1552,8 +1556,7 @@ void BotThink( bot_t &pBot )
    }
 
    // check if time to check for player sounds (if don't already have enemy)
-   if ((pBot.f_sound_update_time <= globaltime) &&
-       (pBot.pBotEnemy == NULL))
+   if ((pBot.f_sound_update_time <= globaltime) && (pBot.pBotEnemy == NULL))
    {
       int ind;
       edict_t *pPlayer;
@@ -1568,7 +1571,7 @@ void BotThink( bot_t &pBot )
          if ((pPlayer) && (!pPlayer->free) && (pPlayer != pEdict))
          {
             // if observer mode enabled, don't listen to this player...
-            if ((b_observer_mode) && !(pPlayer->v.flags & FL_FAKECLIENT) && !(pPlayer->v.flags & FL_THIRDPARTYBOT))
+            if ((b_observer_mode) && !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
                continue;
 
             if (GetPredictedIsAlive(pPlayer, globaltime - skill_settings[pBot.bot_skill].prediction_latency))
@@ -1577,9 +1580,9 @@ void BotThink( bot_t &pBot )
                if (UpdateSounds(pBot, pPlayer))
                {
                   pBot.pBotEnemy = pPlayer;
-                  
-                  // don't check for sounds for another 0.5*(bot_skill+1) seconds
-                  pBot.f_sound_update_time = globaltime + (0.5 * (pBot.bot_skill + 1));
+
+                  // don't check for sounds for another 0.33*(bot_skill+1) seconds
+                  pBot.f_sound_update_time = globaltime + (0.33 * (pBot.bot_skill + 1));
                }
             }
          }
@@ -2092,7 +2095,7 @@ void BotThink( bot_t &pBot )
                // set the time that the bot will stop "pausing"
                pBot.f_pause_time = globaltime +
                   RANDOM_FLOAT2(skill_settings[pBot.bot_skill].pause_time[0],
-                               skill_settings[pBot.bot_skill].pause_time[1]) * 0.2;
+                               skill_settings[pBot.bot_skill].pause_time[1]);
             }
          }
       }
@@ -2146,8 +2149,7 @@ void BotThink( bot_t &pBot )
 
       // check if the waypoint is a sniper waypoint AND
       // bot isn't currently aiming at an ememy...
-      if ((waypoints[pBot.curr_waypoint_index].flags & W_FL_SNIPER) &&
-          (pBot.pBotEnemy == NULL))
+      if ((waypoints[pBot.curr_waypoint_index].flags & W_FL_SNIPER) && (pBot.pBotEnemy == NULL))
       {
          {
             // check if the bot need to move back closer to the waypoint...
@@ -2177,7 +2179,7 @@ void BotThink( bot_t &pBot )
                pEdict->v.angles.x = -pEdict->v.v_angle.x / 3;
                pEdict->v.angles.y = pEdict->v.v_angle.y;
                pEdict->v.angles.z = pEdict->v.v_angle.z;
-
+               
                // save the previous speed (for checking if stuck)
                pBot.f_prev_speed = pBot.f_move_speed;
 
@@ -2220,7 +2222,7 @@ void BotThink( bot_t &pBot )
    
    // don't go too close to enemy
    // strafe instead
-   if(pBot.pBotEnemy && 
+   if(pBot.pBotEnemy != NULL && 
       FInViewCone(pBot.pBotEnemy->v.origin, pEdict) && 
       (pBot.pBotEnemy->v.origin - pEdict->v.origin).Length() < pBot.current_opt_distance &&
       RANDOM_LONG2(1, 1000) <= skill_settings[pBot.bot_skill].keep_optimal_distance)
@@ -2254,30 +2256,52 @@ void BotThink( bot_t &pBot )
          pBot.f_strafe_direction = 0.0 * RANDOM_FLOAT2(-0.005, 0.005);
    }
    
-   if (pBot.f_random_jump_duck_time > 0.0 && pBot.f_random_jump_duck_time <= globaltime) {
+   if (pBot.f_random_jump_duck_time > 0.0 && pBot.f_random_jump_duck_time <= globaltime) 
+   {
        pEdict->v.button |= IN_DUCK;  // need to duck (random duckjump)
-       if(pBot.f_random_jump_duck_end > 0.0 && pBot.f_random_jump_duck_end <= globaltime) {
+       
+       if(pBot.f_random_jump_duck_end > 0.0 && pBot.f_random_jump_duck_end <= globaltime) 
+       {
           pBot.f_random_jump_duck_time = 0.0;
           pBot.f_random_jump_duck_end = 0.0;
-          pBot.f_random_jump_time = globaltime + RANDOM_FLOAT2(0.5, 1.5);
+          pBot.f_random_jump_time = globaltime + RANDOM_FLOAT2(0.3, 0.75);
        }
    }
-   
+      
    if (pBot.f_duck_time > globaltime)
-      pEdict->v.button |= IN_DUCK;  // need to duck (crowbar attack)
+      pEdict->v.button |= IN_DUCK;  // need to duck (crowbar attack, and random combat ducking)
 
-   if (pBot.f_random_jump_time <= globaltime) {
-        pBot.f_random_jump_time = globaltime + RANDOM_FLOAT2(0.5, 1.0);
-        
-        if(!(pEdict->v.button & IN_DUCK) && 
-           (pEdict->v.movetype != MOVETYPE_FLY) &&
-           (moved_distance >= 10.0) && 
-           /*(pBot.f_prev_speed >= 10.0) &&*/
-           (pBot.f_move_speed > 1)) {
-                pEdict->v.button |= IN_JUMP;
-                pBot.f_random_jump_duck_time = globaltime + RANDOM_FLOAT2(0.05, 0.2);
-                pBot.f_random_jump_duck_end = pBot.f_random_jump_duck_time + RANDOM_FLOAT2(0.3, 0.7);
+   if (pBot.f_random_jump_time <= globaltime) 
+   {
+        // if in combat mode jump more
+        if(!FBitSet(pEdict->v.button, IN_DUCK) && !FBitSet(pEdict->v.button, IN_JUMP) &&
+           FBitSet(pEdict->v.flags, FL_ONGROUND) && pEdict->v.movetype != MOVETYPE_FLY &&
+           (moved_distance >= 10.0 || pBot.pBotEnemy != NULL) && pBot.f_move_speed > 1 &&
+           RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_jump_frequency)
+        {
+           pEdict->v.button |= IN_JUMP;
+           
+           if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_jump_duck_frequency)
+           {
+              pBot.f_random_jump_duck_time = globaltime + RANDOM_FLOAT2(0.2, 0.3);
+              pBot.f_random_jump_duck_end = pBot.f_random_jump_duck_time + RANDOM_FLOAT2(0.6, 0.8);
+              pBot.f_random_jump_time = pBot.f_random_jump_duck_end + 0.3;
+           }
         }
+        
+        // combat mode random ducking
+        if(pBot.f_random_jump_time <= globaltime &&
+           pBot.pBotEnemy != NULL && !FBitSet(pEdict->v.button, IN_DUCK) && !FBitSet(pEdict->v.button, IN_JUMP) &&
+           FBitSet(pEdict->v.flags, FL_ONGROUND) && pEdict->v.movetype != MOVETYPE_FLY &&
+           RANDOM_LONG2(1, 1000) <= skill_settings[pBot.bot_skill].random_duck_frequency)
+        {
+           pEdict->v.button |= IN_DUCK;
+           pBot.f_duck_time = globaltime + RANDOM_FLOAT2(0.4, 0.8);
+           pBot.f_random_jump_time = pBot.f_duck_time + RANDOM_FLOAT2(0.25, 0.5);
+        }
+        
+        if(pBot.f_random_jump_time <= globaltime)
+           pBot.f_random_jump_time = globaltime + RANDOM_FLOAT2(0.5, 0.7);
    }
    
    if (pBot.f_grenade_search_time <= globaltime)
@@ -2317,7 +2341,8 @@ void BotThink( bot_t &pBot )
    else
       f_strafe_speed = pBot.f_strafe_direction * pBot.f_move_speed;
    
-   if(f_strafe_speed != 0.0 || pBot.f_move_speed != 0.0) {
+   if(f_strafe_speed != 0.0 || pBot.f_move_speed != 0.0) 
+   {
       Vector2D calc;
       
       calc.x = f_strafe_speed;
@@ -2328,7 +2353,7 @@ void BotThink( bot_t &pBot )
       f_strafe_speed = calc.x;
       pBot.f_move_speed = calc.y;
    }
-     
+           
    BotAimThink( pBot );
    
    g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot.f_move_speed,

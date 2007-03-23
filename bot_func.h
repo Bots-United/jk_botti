@@ -28,33 +28,7 @@ void BotThink( bot_t &pBot );
 qboolean BotAimsAtSomething (bot_t &pBot);
 void BotPointGun (bot_t &pBot, qboolean save_v_angle);
 void BotAimThink( bot_t &pBot );
-
 void LoadBotModels(void);
-
-//void BotFixIdealPitch( edict_t *pEdict );
-//void BotFixIdealYaw( edict_t *pEdict );
-
-inline void BotFixIdealPitch(edict_t *pEdict)
-{
-   float &idealpitch = pEdict->v.idealpitch;
-   
-   // check for wrap around of angle...
-   if (idealpitch > 180)
-      do { idealpitch -= 360; } while(idealpitch > 180);
-   else if (idealpitch < -180)
-      do { idealpitch += 360; } while(idealpitch < -180);
-}
-
-inline void BotFixIdealYaw(edict_t *pEdict)
-{
-   float &ideal_yaw = pEdict->v.ideal_yaw;
-   
-   // check for wrap around of angle...
-   if (ideal_yaw > 180)
-      do { ideal_yaw -= 360; } while(ideal_yaw > 180);
-   else if (ideal_yaw < -180)
-      do { ideal_yaw += 360; } while(ideal_yaw < -180);
-}
 
 float BotChangePitch( bot_t &pBot, float speed );
 float BotChangeYaw( bot_t &pBot, float speed );

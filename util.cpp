@@ -38,53 +38,7 @@
 extern bot_t bots[32];
 extern qboolean is_team_play;
 
-
-
-float UTIL_WrapAngle (float angle_to_wrap)
-{
-   float angle = angle_to_wrap;
-   
-   // check for wraparound of angle
-   if(angle > 180)
-      do { angle -= 360; } while(angle > 180);
-   else if(angle < -180)
-      do { angle += 360; } while(angle < -180);
-
-   return angle;
-}
-
-
-Vector UTIL_WrapAngles (const Vector & angles_to_wrap)
-{
-   Vector angles = angles_to_wrap;
-
-   // check for wraparound of angles
-   if(angles.x > 180)
-      do { angles.x -= 360; } while(angles.x > 180);
-   else if(angles.x < -180)
-      do { angles.x += 360; } while(angles.x < -180);
-   
-   if(angles.y > 180)
-      do { angles.y -= 360; } while(angles.y > 180);
-   else if(angles.y < -180)
-      do { angles.y += 360; } while(angles.y < -180);
-   
-   if(angles.z > 180)
-      do { angles.z -= 360; } while(angles.z > 180);
-   else if(angles.z < -180)
-      do { angles.z += 360; } while(angles.z < -180);
-
-   return angles;
-}
-
-
-Vector UTIL_GetOrigin(edict_t *pEdict)
-{
-        if (strncmp(STRING(pEdict->v.classname), "func_", 5) == 0)
-                return VecBModelOrigin(pEdict);
-
-        return pEdict->v.origin; 
-}
+trigger_sound_t trigger_sounds[32];
 
 
 void ClientPrint( edict_t *pEntity, int msg_dest, const char *msg_name)
@@ -109,7 +63,6 @@ void UTIL_SayText( const char *pText, edict_t *pEdict )
       WRITE_STRING( pText );
    MESSAGE_END();
 }
-
 
 void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
 {
@@ -184,7 +137,6 @@ void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
    SERVER_PRINT( text );
 }
 
-
 #ifdef   DEBUG
 edict_t *DBG_EntOfVars( const entvars_t *pev )
 {
@@ -199,7 +151,6 @@ edict_t *DBG_EntOfVars( const entvars_t *pev )
 }
 #endif //DEBUG
 
-
 // return team string 0 through 3 based what MOD uses for team numbers
 char * UTIL_GetTeam(edict_t *pEntity, char teamstr[32])
 {
@@ -210,57 +161,9 @@ char * UTIL_GetTeam(edict_t *pEntity, char teamstr[32])
    *model_name = 0; 
    strncat(model_name, INFOKEY_VALUE (infobuffer, "model"), sizeof(model_name));
 
-   // must be HL or OpFor deathmatch...
-   {
-      strcpy(teamstr, model_name);
-      return(teamstr);
-   }
+   strcpy(teamstr, model_name);
+   return(teamstr);
 }
-
-
-int UTIL_GetBotIndex(edict_t *pEdict)
-{
-   int index;
-
-   for (index=0; index < 32; index++)
-   {
-      if (bots[index].pEdict == pEdict)
-      {
-         return index;
-      }
-   }
-
-   return -1;  // return -1 if edict is not a bot
-}
-
-
-bot_t *UTIL_GetBotPointer(edict_t *pEdict)
-{
-   int index;
-
-   for (index=0; index < 32; index++)
-   {
-      if (bots[index].pEdict == pEdict)
-      {
-         break;
-      }
-   }
-
-   if (index < 32)
-      return (&bots[index]);
-
-   return NULL;  // return NULL if edict is not a bot
-}
-
-
-qboolean FInViewCone(const Vector & Origin, edict_t *pEdict)
-{
-   //MAKE_VECTORS ( pEdict->v.angles );
-   Vector vForward, vRight, vUp;
-   UTIL_MakeVectorsPrivate( pEdict->v.angles, vForward, vRight, vUp);
-   return (DotProduct((Origin - pEdict->v.origin).Normalize(), vForward) > cos(deg2rad(80)));
-}
-
 
 qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit )
 {
@@ -295,27 +198,47 @@ qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit )
    }
 }
 
-
-qboolean FInShootCone(const Vector & Origin, edict_t *pEdict, float distance, float target_radius, float min_angle)
+qboolean FInShootCone(const Vector & Origin, edict_t *pEdict, float distance, float diameter, float min_angle)
 {
+   /*
+   
+      <----- distance ---->
+      
+                  ___....->T^           ^
+       ...----''''          | <- radius |
+     O ------------------->Qv           |
+     ^ '''----....___                   | <- diameter
+     |               ''''->             v
+     |
+     Bot(pEdict)
+   
+    T: Target (Origin)
+    
+    if angle Q-O-T is less than min_angle, always return true.
+   
+   */
+   
    if(distance < 0.01)
       return TRUE;
 
    Vector vForward, vRight, vUp;
-   UTIL_MakeVectorsPrivate( pEdict->v.angles, vForward, vRight, vUp);
+   UTIL_MakeVectorsPrivate( pEdict->v.v_angle, vForward, vRight, vUp );
    
-   float flDot = DotProduct( (Origin - pEdict->v.origin).Normalize(), vForward );
-   float cos_value = distance / sqrt( (target_radius * target_radius) / 4.0 + (distance * distance) );
-   
-   if( flDot > cos_value )
+   // angle between forward-view-vector and vector to player (as cos(angle))
+   float flDot = DotProduct( (Origin - (pEdict->v.origin + pEdict->v.view_ofs)).Normalize(), vForward );
+   if(flDot > cos(deg2rad(min_angle))) // smaller angle, bigger cosine
       return TRUE;
    
-   if( flDot > cos(deg2rad(min_angle)) )
-      return TRUE;
+   Vector2D triangle;
+   triangle.x = distance;
+   triangle.y = diameter / 2.0;
    
+   // full angle of shootcode at this distance (as cos(angle))   
+   if(flDot > (distance / triangle.Length())) // smaller angle, bigger cosine
+      return TRUE;
+      
    return FALSE;
 }
-
 
 void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index)
 {
@@ -338,9 +261,6 @@ void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index)
    MDLL_CmdEnd(pEdict);
 }
 
-
-trigger_sound_t trigger_sounds[32];
-
 void SaveSound(edict_t * pPlayer, float time, const Vector & origin, float volume, float attenuation, int used) {
    int i = ENTINDEX(pPlayer) - 1;
    if(i < 0 || i >= gpGlobals->maxClients)
@@ -352,7 +272,6 @@ void SaveSound(edict_t * pPlayer, float time, const Vector & origin, float volum
    trigger_sounds[i].attenuation = attenuation;
    trigger_sounds[i].used = used;
 }
-
 
 void UTIL_ShowMenu( edict_t *pEdict, int slots, int displaytime, qboolean needmore, char *pText )
 {
@@ -452,6 +371,17 @@ void UTIL_ServerPrintf( char *fmt, ... )
    SERVER_PRINT( string );
 }
 
+char* UTIL_VarArgs( char *format, ... )
+{
+   va_list	    argptr;
+   static char string[1024];
+	
+   va_start (argptr, format);
+   vsnprintf (string, sizeof(string), format,argptr);
+   va_end (argptr);
+
+   return string;	
+}
 
 void GetGameDir (char *game_dir)
 {

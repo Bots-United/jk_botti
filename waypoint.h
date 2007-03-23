@@ -51,7 +51,8 @@ typedef struct {
 typedef struct {
    int flags;     // button, lift, flag, health, ammo, etc.
    Vector origin; // location
-   int __reserved[4];
+   int itemflags; // different flags for different ammo/weapons
+   int __reserved[3];
 } WAYPOINT;
 
 #define WAYPOINT_UNREACHABLE   USHRT_MAX
@@ -76,6 +77,7 @@ int  WaypointFindPath(PATH **pPath, int *path_index, int waypoint_index);
 int  WaypointFindNearest(edict_t *pEntity, float distance);
 int  WaypointFindNearest(Vector v_src, edict_t *pEntity, float range);
 int  WaypointFindNearestGoal(edict_t *pEntity, int src, int flags);
+int  WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags);
 int  WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int exclude[]);
 int  WaypointFindNearestGoal(Vector v_src, edict_t *pEntity, float range, int flags);
 int  WaypointFindRandomGoal(edict_t *pEntity, int flags);

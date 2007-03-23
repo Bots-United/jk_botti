@@ -25,6 +25,7 @@
 
 #include "bot.h"
 #include "waypoint.h"
+#include "bot_weapon_select.h"
 
 
 extern int m_spriteTexture;
@@ -125,6 +126,7 @@ void WaypointInit(void)
    {
       waypoints[i].flags = 0;
       waypoints[i].origin = Vector(0,0,0);
+      waypoints[i].itemflags = 0;
 
       wp_display_time[i] = 0.0;
 
@@ -327,22 +329,22 @@ void CollectMapSpawnItems(edict_t *pSpawn)
    int flags = 0;
    int i;
    Vector SpawnOrigin;
+   int itemflag = 0;
    
    if(num_spawnpoints >= MAX_WAYPOINTS / 2)
       return;
    
    if (strncmp("item_health", classname, 11) == 0)
       flags |= W_FL_HEALTH;
-   if (strncmp("item_armor", classname, 10) == 0)
+   else if (strncmp("item_armor", classname, 10) == 0)
       flags |= W_FL_ARMOR;
-   if (strncmp("ammo_", classname, 5) == 0)
+   else if ((itemflag = GetAmmoItemFlag(classname)) != 0)
       flags |= W_FL_AMMO;
-   if (strncmp("weapon_", classname, 7) == 0 && (pSpawn->v.owner == NULL))
+   else if ((itemflag = GetWeaponItemFlag(classname)) != 0 && (pSpawn->v.owner == NULL))
       flags |= W_FL_WEAPON;
-   if (strcmp("item_longjump", classname) == 0)
+   else if (strcmp("item_longjump", classname) == 0)
       flags |= W_FL_LONGJUMP;
-      
-   if(flags == 0)
+   else
       return;
    
    // Trace item on ground
@@ -382,6 +384,7 @@ void CollectMapSpawnItems(edict_t *pSpawn)
       if((spawnpoints[i].origin - SpawnOrigin).Length() < 50.0)
       {
          spawnpoints[i].flags |= flags;
+         spawnpoints[i].itemflags |= itemflag;
          return;
       }
    }
@@ -389,6 +392,7 @@ void CollectMapSpawnItems(edict_t *pSpawn)
    // Add new
    spawnpoints[num_spawnpoints].origin = SpawnOrigin;
    spawnpoints[num_spawnpoints].flags = flags;
+   spawnpoints[num_spawnpoints].itemflags = itemflag;
    num_spawnpoints++;
 }
 
@@ -415,11 +419,12 @@ void WaypointAddSpawnObjects(void)
          {
             if((waypoints[j].origin - spawnpoints[i].origin).Length() < 50.0) 
             {
-               if(waypoints[j].flags != spawnpoints[i].flags)
+               // just add flags and return
+               if(waypoints[j].flags != spawnpoints[i].flags || waypoints[j].itemflags != spawnpoints[i].itemflags)
                	  updated_count++;
                
-               // just add flags and return
                waypoints[j].flags |= spawnpoints[i].flags;
+               waypoints[j].itemflags |= spawnpoints[i].itemflags;
                done = TRUE;
             }
          }
@@ -443,6 +448,7 @@ void WaypointAddSpawnObjects(void)
          break;
    
       waypoints[index].flags = spawnpoints[i].flags;
+      waypoints[index].itemflags = spawnpoints[i].itemflags;
 
       // store the origin (location) of this waypoint
       waypoints[index].origin = spawnpoints[i].origin;
@@ -615,7 +621,57 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags)
       if ((waypoints[index].flags & flags) != flags)
          continue;  // skip this waypoint if the flags don't match
 
-      if (waypoints[index].flags & (W_FL_LONGJUMP| W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
+      if (waypoints[index].flags & (W_FL_LONGJUMP | W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
+      {
+         edict_t *wpt_item = WaypointFindItem(index);
+         if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0))
+            continue;
+      }
+
+      distance = WaypointDistanceFromTo(src, index);
+
+      if (distance < min_distance)
+      {
+         min_index = index;
+         min_distance = distance;
+      }
+   }
+
+   return min_index;
+}
+
+
+int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags)
+{
+   int index, min_index;
+   int distance, min_distance;
+
+   if (num_waypoints < 1)
+      return -1;
+
+   // find the nearest waypoint with the matching flags...
+
+   min_index = -1;
+   min_distance = 99999;
+
+   for (index=0; index < num_waypoints; index++)
+   {
+      if (index == src)
+         continue;  // skip the source waypoint
+
+      if (waypoints[index].flags & W_FL_DELETED)
+         continue;  // skip any deleted waypoints
+
+      if (waypoints[index].flags & W_FL_AIMING)
+         continue;  // skip any aiming waypoints
+
+      if ((waypoints[index].flags & flags) != flags)
+         continue;  // skip this waypoint if the flags don't match
+
+      if (itemflags && !(waypoints[index].itemflags & itemflags))
+      	 continue;  // skip this weapoint if no match for itemflags
+
+      if (waypoints[index].flags & (W_FL_LONGJUMP | W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
       {
          edict_t *wpt_item = WaypointFindItem(index);
          if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0))
@@ -967,6 +1023,12 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
    char item_name[64];
    char nearest_name[64];
    edict_t *nearest_pent;
+   int itemflag;
+   int flags_before;
+   int itemflags_before;
+   
+   flags_before = waypoints[wpt_index].flags;
+   itemflags_before = waypoints[wpt_index].itemflags;
 
    nearest_name[0] = 0;      // null out nearest_name string
    nearest_pent = NULL;
@@ -989,9 +1051,9 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
 
          if ((strncmp("item_health", item_name, 11) == 0) ||
              (strncmp("item_armor", item_name, 10) == 0) ||
-             (strncmp("ammo_", item_name, 5) == 0) ||
+             (GetAmmoItemFlag(item_name) != 0) ||
              (strcmp("item_longjump", item_name) == 0) ||
-             ((strncmp("weapon_", item_name, 7) == 0) &&
+             ((GetWeaponItemFlag(item_name) != 0) &&
               (pent->v.owner == NULL)))
          {
             distance = (pent->v.origin - origin).Length();
@@ -1013,38 +1075,44 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
       if (strncmp("item_health", nearest_name, 11) == 0)
       {
          if (pEntity)
-            ClientPrint(pEntity, HUD_PRINTCONSOLE, "found a healthkit!\n");
+            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs("found a healthkit! (%s)\n", nearest_name));
          waypoints[wpt_index].flags |= W_FL_HEALTH;
       }
 
       if (strncmp("item_armor", nearest_name, 10) == 0)
       {
          if (pEntity)
-            ClientPrint(pEntity, HUD_PRINTCONSOLE, "found some armor!\n");
+            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs("found some armor! (%s)\n", nearest_name));
          waypoints[wpt_index].flags |= W_FL_ARMOR;
       }
 
-      if (strncmp("ammo_", nearest_name, 5) == 0)
+      if ((itemflag = GetAmmoItemFlag(nearest_name)) != 0)
       {
          if (pEntity)
-            ClientPrint(pEntity, HUD_PRINTCONSOLE, "found some ammo!\n");
+            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs("found some ammo! (%s)\n", nearest_name));
          waypoints[wpt_index].flags |= W_FL_AMMO;
+         waypoints[wpt_index].itemflags |= itemflag;
       }
 
-      if ((strncmp("weapon_", nearest_name, 7) == 0) &&
-          (nearest_pent->v.owner == NULL))
+      if ((itemflag = GetWeaponItemFlag(nearest_name)) != 0 && nearest_pent->v.owner == NULL)
       {
          if (pEntity)
-            ClientPrint(pEntity, HUD_PRINTCONSOLE, "found a weapon!\n");
+            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs("found a weapon! (%s)\n", nearest_name));
          waypoints[wpt_index].flags |= W_FL_WEAPON;
+         waypoints[wpt_index].itemflags |= itemflag;
       }
       
       if ((strcmp("item_longjump", nearest_name) == 0))
       {
          if (pEntity)
-            ClientPrint(pEntity, HUD_PRINTCONSOLE, "found a longjump!\n");
+            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs("found a longjump! (%s)\n", nearest_name));
          waypoints[wpt_index].flags |= W_FL_LONGJUMP;
       }
+   }
+   
+   if(flags_before != waypoints[wpt_index].flags || itemflags_before != waypoints[wpt_index].itemflags)
+   {  // save on mapchange
+      g_waypoint_updated = TRUE;
    }
 }
 
@@ -1080,9 +1148,9 @@ edict_t *WaypointFindItem( int wpt_index )
          
          if(((waypoints[wpt_index].flags & W_FL_HEALTH) && strncmp("item_health", item_name, 11) == 0) ||
             ((waypoints[wpt_index].flags & W_FL_ARMOR) && strncmp("item_armor", item_name, 10) == 0) ||
-            ((waypoints[wpt_index].flags & W_FL_AMMO) && strncmp("ammo_", item_name, 5) == 0) ||
+            ((waypoints[wpt_index].flags & W_FL_AMMO) && GetAmmoItemFlag(item_name) != 0) ||
             ((waypoints[wpt_index].flags & W_FL_LONGJUMP) && strcmp("item_longjump", item_name) == 0) ||
-            ((waypoints[wpt_index].flags & W_FL_WEAPON) && strncmp("weapon_", item_name, 7) == 0 && pent->v.owner == NULL))
+            ((waypoints[wpt_index].flags & W_FL_WEAPON) && GetWeaponItemFlag(item_name) != 0 && pent->v.owner == NULL))
          {
             distance = (pent->v.origin - origin).Length();
             
@@ -1124,6 +1192,8 @@ void WaypointAdd(edict_t *pEntity)
 
    // ladder check
    waypoints[index].flags = (pEntity->v.movetype == MOVETYPE_FLY) ? W_FL_LADDER : 0;
+
+   waypoints[index].itemflags = 0;
 
    // store the origin (location) of this waypoint (use entity origin)
    waypoints[index].origin = pEntity->v.origin;
@@ -1220,8 +1290,11 @@ void WaypointAddAiming(edict_t *pEntity)
    //..
    waypoints[index].flags = W_FL_AIMING;  // aiming waypoint
 
-   Vector v_angle = pEntity->v.v_angle;
+   waypoints[index].itemflags = 0; 
 
+   Vector v_angle;
+   
+   v_angle.y = pEntity->v.v_angle.y;
    v_angle.x = 0;  // reset pitch to horizontal
    v_angle.z = 0;  // reset roll to level
 
@@ -1266,9 +1339,6 @@ void WaypointDelete(edict_t *pEntity)
    if (index == -1)
       return;
 
-   // save on mapchange
-   g_waypoint_updated = TRUE;
-
    //..
 
    if ((waypoints[index].flags & W_FL_SNIPER) ||
@@ -1299,8 +1369,12 @@ void WaypointDelete(edict_t *pEntity)
 
       if (min_index != -1)
       {
+         // save on mapchange
+         g_waypoint_updated = TRUE;
+   
          waypoints[min_index].flags = W_FL_DELETED;  // not being used
          waypoints[min_index].origin = Vector(0,0,0);
+         waypoints[min_index].itemflags = 0;
 
          wp_display_time[min_index] = 0.0;
       }
@@ -1331,8 +1405,12 @@ void WaypointDelete(edict_t *pEntity)
       paths[index] = NULL;
    }
 
+   // save on mapchange
+   g_waypoint_updated = TRUE;
+
    waypoints[index].flags = W_FL_DELETED;  // not being used
    waypoints[index].origin = Vector(0,0,0);
+   waypoints[index].itemflags = 0;
 
    wp_display_time[index] = 0.0;
 

@@ -28,9 +28,11 @@ SRC = 	bot.cpp \
 	bot_navigate.cpp \
 	bot_skill.cpp \
 	bot_start.cpp \
+	bot_weapons.cpp \
 	dll.cpp \
 	engine.cpp \
 	h_export.cpp \
+	mt19937ar-cok.cpp \
 	util.cpp \
 	waypoint.cpp
 

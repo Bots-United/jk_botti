@@ -136,11 +136,13 @@ void BotClient_Valve_CurrentWeapon(void *p, int bot_index)
             bot_fire_delay_t *pDelay = NULL;
             int found = 0;
             
-            pSelect = &valve_weapon_select[0];
-            pDelay = &valve_fire_delay[0];
+            pSelect = &weapon_select[0];
+            pDelay = &fire_delay[0];
             
-            for(int i = 0; pSelect && pSelect[i].iId; i++) {
-               if(iId == pSelect[i].iId) {
+            for(int i = 0; pSelect && pSelect[i].iId; i++) 
+            {
+               if(iId == pSelect[i].iId) 
+               	{
                   bots[bot_index].current_opt_distance = pSelect[i].opt_distance;
                   found = 1;
                	  break;

@@ -1,7 +1,5 @@
 //
-// HPB_bot - botman's High Ping Bastard bot
-//
-// (http://planethalflife.com/botman/)
+// JK_Botti - be more human!
 //
 // bot.h
 //
@@ -30,7 +28,6 @@ typedef int BOOL;
 
 
 // global defines
-#define MAX_HEALTH 100
 #define PLAYER_SEARCH_RADIUS     40.0
 
 
@@ -92,11 +89,6 @@ typedef struct trigger_sound_s {
 	float time;
 } trigger_sound_t;
 
-
-extern trigger_sound_t trigger_sounds[32];
-extern void SaveSound(edict_t * pPlayer, float time, const Vector & origin, float volume, float attenuation, int empty);
-
-
 typedef struct
 {
    int  iId;     // weapon ID
@@ -104,7 +96,6 @@ typedef struct
    int  iAmmo1;  // amount of ammo in primary reserve
    int  iAmmo2;  // amount of ammo in secondary reserve
 } bot_current_weapon_t;
-
 
 typedef struct
 {
@@ -272,10 +263,8 @@ typedef struct
 
 } bot_t;
 
-
 #define MAX_TEAMS 32
 #define MAX_TEAMNAME_LENGTH 16
-
 
 #define MAX_FLAGS  5
 
@@ -328,15 +317,15 @@ typedef struct
    char name[16];				// must be null terminated
 } lumpinfo_t;
 
+extern trigger_sound_t trigger_sounds[32];
+extern bot_t bots[32];
+
+extern void SaveSound(edict_t * pPlayer, float time, const Vector & origin, float volume, float attenuation, int empty);
 
 Vector GetPredictedPlayerPosition(edict_t * pPlayer, float time, const float globaltime);
 qboolean GetPredictedIsAlive(edict_t * pPlayer, float time);
 void GatherPlayerData(void);
-
 qboolean AreTeamMates(edict_t * pOther, edict_t * pEdict);
-
-float UTIL_WrapAngle (float angle_to_wrap);
-Vector UTIL_WrapAngles (const Vector & angles_to_wrap);
 
 void RegisterCvars (void);
 void ThinkCvars (void);
@@ -348,108 +337,10 @@ edict_t *UTIL_FindEntityByClassname( edict_t *pentStart, const char *szName );
 edict_t *UTIL_FindEntityByTarget( edict_t *pentStart, const char *szName );
 edict_t *UTIL_FindEntityByTargetname( edict_t *pentStart, const char *szName );
 
-inline Vector GetGunPosition(edict_t *pEdict)
-{
-   return (pEdict->v.origin + pEdict->v.view_ofs);
-}
-
-inline void UTIL_SelectItem(edict_t *pEdict, char *item_name)
-{
-   FakeClientCommand(pEdict, item_name, NULL, NULL);
-}
-
-inline Vector VecBModelOrigin(edict_t *pEdict)
-{
-   return pEdict->v.absmin + (pEdict->v.size * 0.5);
-}
-
-inline Vector UTIL_VecToAngles( const Vector & vec )
-{
-   Vector VecOut;
-   VEC_TO_ANGLES(vec, VecOut);
-   return VecOut;
-}
-
-inline void WRAP_TraceLine(const float *v1, const float *v2, int fNoMonsters, edict_t *pentToSkip, TraceResult *ptr) {
-   TRACE_LINE(v1, v2, fNoMonsters, pentToSkip, ptr);
-}
-
-// Overloaded to add IGNORE_GLASS
-inline void UTIL_TraceLine( const Vector & vecStart, const Vector &vecEnd, IGNORE_MONSTERS igmon, IGNORE_GLASS ignoreGlass, edict_t *pentIgnore, TraceResult *ptr )
-{
-   WRAP_TraceLine( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE) | (ignoreGlass?0x100:0), pentIgnore, ptr );
-}
-
-inline void UTIL_TraceLine( const Vector &vecStart, const Vector &vecEnd, IGNORE_MONSTERS igmon, edict_t *pentIgnore, TraceResult *ptr )
-{
-   WRAP_TraceLine( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE), pentIgnore, ptr );
-}
-
-inline void UTIL_TraceHull( const Vector &vecStart, const Vector &vecEnd, IGNORE_MONSTERS igmon, int hullNumber, edict_t *pentIgnore, TraceResult *ptr )
-{
-	TRACE_HULL( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE), hullNumber, pentIgnore, ptr );
-}
-
-inline void UTIL_TraceMove( const Vector &vecStart, const Vector &vecEnd, IGNORE_MONSTERS igmon, /*int ducking,*/ edict_t *pentIgnore, TraceResult *ptr ) {
-	TRACE_HULL( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE), /*((!ducking) ? head_hull :*/ point_hull/*)*/, pentIgnore, ptr );
-}
-
-inline edict_t *UTIL_FindEntityInSphere( edict_t *pentStart, const Vector &vecCenter, float flRadius )
-{
-   edict_t  *pentEntity;
-
-   pentEntity = FIND_ENTITY_IN_SPHERE( pentStart, vecCenter, flRadius);
-
-   if (!fast_FNullEnt(pentEntity))
-      return pentEntity;
-
-   return NULL;
-}
-
-inline edict_t *UTIL_FindEntityByString( edict_t *pentStart, const char *szKeyword, const char *szValue )
-{
-   edict_t *pentEntity;
-
-   pentEntity = FIND_ENTITY_BY_STRING( pentStart, szKeyword, szValue );
-
-   if (!fast_FNullEnt(pentEntity))
-      return pentEntity;
-   return NULL;
-}
-
-inline edict_t *UTIL_FindEntityByClassname( edict_t *pentStart, const char *szName )
-{
-	return UTIL_FindEntityByString( pentStart, "classname", szName );
-}
-
-inline edict_t *UTIL_FindEntityByTarget( edict_t *pentStart, const char *szName )
-{
-	return UTIL_FindEntityByString( pentStart, "target", szName );
-}
-
-inline edict_t *UTIL_FindEntityByTargetname( edict_t *pentStart, const char *szName )
-{
-	return UTIL_FindEntityByString( pentStart, "targetname", szName );
-}
-
-inline double deg2rad(double deg) {
-	return(deg * (M_PI / 180));
-}
-
 void ClientPrint( edict_t *pEdict, int msg_dest, const char *msg_name);
 void UTIL_SayText( const char *pText, edict_t *pEdict );
 void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message );
 char* UTIL_GetTeam(edict_t *pEntity, char teamstr[32]);
-int UTIL_GetBotIndex(edict_t *pEdict);
-bot_t *UTIL_GetBotPointer(edict_t *pEdict);
-
-//qboolean IsAlive(edict_t *pEdict);
-inline qboolean IsAlive(edict_t *pEdict) {
-   return ((pEdict->v.deadflag == DEAD_NO) &&
-           (pEdict->v.health > 0) &&
-           !(pEdict->v.flags & FL_NOTARGET) &&
-           (pEdict->v.takedamage != 0));
-}
 
 qboolean FHearable(bot_t &pBot, edict_t *pPlayer);
 qboolean FInViewCone( const Vector & Origin, edict_t *pEdict);
@@ -459,14 +350,11 @@ Vector Center(edict_t *pEdict);
 Vector GetGunPosition(edict_t *pEdict);
 void UTIL_SelectItem(edict_t *pEdict, char *item_name);
 void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index);
-Vector VecBModelOrigin(edict_t *pEdict);
-qboolean UpdateSounds(bot_t &pBot, edict_t *pPlayer);
 void UTIL_ShowMenu( edict_t *pEdict, int slots, int displaytime, qboolean needmore, char *pText );
 void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2);
 void GetGameDir (char *game_dir);
 void UTIL_PrintBotInfo(void(*printfunc)(void *, char*), void * arg);
 void UTIL_ServerPrintf( char *fmt, ... );
-Vector UTIL_GetOrigin(edict_t *pEdict);
 
 void LoadBotChat(void);
 void BotTrimBlanks(char *in_string, char *out_string);
@@ -477,31 +365,8 @@ void BotChatName(char *original_name, char *out_name);
 void BotChatText(char *in_text, char *out_text);
 void BotChatFillInName(char *bot_say_msg, char *chat_text, char *chat_name, const char *bot_name);
 
-qboolean GetGoodWeaponCount(bot_t &pBot);
-qboolean AllWeaponsRunningOutOfAmmo(bot_t &pBot);
+qboolean UpdateSounds(bot_t &pBot, edict_t *pPlayer);
 
-inline int RANDOM_LONG2(int lLow, int lHigh) 
-{ 
-	if(lLow==lHigh)
-		return(lLow);
-	
-	int tmp[2];
-	tmp[0] = RANDOM_LONG(lLow, lHigh);
-	tmp[1] = RANDOM_LONG(lLow, lHigh);
-	
-	return(tmp[(!RANDOM_LONG(0, 2) ? 0 : 1)]);
-}
-
-inline float RANDOM_FLOAT2(float flLow, float flHigh) 
-{
-	if(flLow==flHigh)
-		return(flLow);
-	
-	float tmp[2];
-	tmp[0] = RANDOM_FLOAT(flLow, flHigh);
-	tmp[1] = RANDOM_FLOAT(flLow, flHigh);
-	
-	return(tmp[(!RANDOM_LONG(0, 2) ? 0 : 1)]);
-}
+#include "bot_inline_funcs.h"
 
 #endif // BOT_H

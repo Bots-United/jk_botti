@@ -21,7 +21,7 @@
 #include "waypoint.h"
 
 #define VER_MAJOR 0
-#define VER_MINOR 20
+#define VER_MINOR 21
 
 
 #define MENU_NONE  0
@@ -129,6 +129,7 @@ void jk_botti_ServerCommand (void);
 
 
 // START of Metamod stuff
+C_DLLEXPORT int GetEntityAPI2_POST (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion);
 
 enginefuncs_t meta_engfuncs;
 gamedll_funcs_t *gpGamedllFuncs;
@@ -140,7 +141,7 @@ META_FUNCTIONS gMetaFunctionTable =
    NULL, // pfnGetEntityAPI()
    NULL, // pfnGetEntityAPI_Post()
    GetEntityAPI2, // pfnGetEntityAPI2()
-   NULL, // pfnGetEntityAPI2_Post()
+   GetEntityAPI2_POST, // pfnGetEntityAPI2_Post()
    NULL, // pfnGetNewDLLFunctions()
    NULL, // pfnGetNewDLLFunctions_Post()
    GetEngineFunctions, // pfnGetEngineFunctions()
@@ -153,7 +154,7 @@ plugin_info_t Plugin_info = {
    META_INTERFACE_VERSION, // interface version
    "JK_Botti", // plugin name
    "", // plugin version
-   "11/12/05 (dd/mm/yy)", // date of creation
+   "22/03/07 (dd/mm/yy)", // date of creation
    "Jussi Kivilinna", // plugin author
    "http://koti.mbnet.fi/axh/", // plugin URL
    "JK_BOTTI", // plugin logtag
@@ -231,6 +232,9 @@ C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, 
 
    // ask the engine to register the server commands this plugin uses
    REG_SVR_COMMAND ("jk_botti", jk_botti_ServerCommand);
+   
+   // init random
+   init_genrand( time(0) ^ (unsigned long)&bots[0] ^ sizeof(bots) );
    
    return (TRUE); // returning TRUE enables metamod to attach this plugin
 }
@@ -338,6 +342,23 @@ int Spawn( edict_t *pent )
          CollectMapSpawnItems(pent);
    }
 
+   RETURN_META_VALUE (MRES_IGNORED, 0);
+}
+
+
+int Spawn_Post( edict_t *pent )
+{
+   if (gpGlobals->deathmatch)
+   {
+      char *pClassname = (char *)STRING(pent->v.classname);
+
+      if (strcmp(pClassname, "worldspawn") == 0)
+      {
+         // check for team play... gamedll check it in 'worldspawn' spawn and doesn't recheck
+         BotCheckTeamplay();
+      }
+   }
+   
    RETURN_META_VALUE (MRES_IGNORED, 0);
 }
 
@@ -836,7 +857,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
       if ((arg1 != NULL) && (*arg1 != 0))
       {
          int select_index = -1;
-         bot_weapon_select_t *pSelect = &valve_weapon_select[0];
+         bot_weapon_select_t *pSelect = &weapon_select[0];
          
          while ((arg2 != NULL) && (*arg2 != 0) && pSelect[++select_index].iId)
             if (FStrEq(pSelect[select_index].weapon_name, arg1))
@@ -950,7 +971,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             printfunc(arg, "List of available weapons:\n");
             
             select_index = -1;
-            pSelect = &valve_weapon_select[0];
+            pSelect = &weapon_select[0];
 
             while (pSelect[++select_index].iId) {
                snprintf(msg, sizeof(msg), "  %s\n", pSelect[select_index].weapon_name);
@@ -1486,7 +1507,7 @@ void StartFrame( void )
                if(!IsAlive(pPlayer))
                   continue;
                
-               if (FBitSet(pPlayer->v.flags, FL_CLIENT) && !FBitSet(pPlayer->v.flags, FL_FAKECLIENT) && !FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT))
+               if (FBitSet(pPlayer->v.flags, FL_CLIENT) && !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
                {
                   WaypointThink(pPlayer);
                   
@@ -1900,5 +1921,14 @@ C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVers
    gFunctionTable.pfnServerDeactivate = ServerDeactivate;
 
    memcpy (pFunctionTable, &gFunctionTable, sizeof (DLL_FUNCTIONS));
+   return (TRUE);
+}
+
+DLL_FUNCTIONS gFunctionTable_POST;
+C_DLLEXPORT int GetEntityAPI2_POST (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion)
+{
+   gFunctionTable_POST.pfnSpawn = Spawn_Post;
+   
+   memcpy (pFunctionTable, &gFunctionTable_POST, sizeof (DLL_FUNCTIONS));
    return (TRUE);
 }

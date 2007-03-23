@@ -78,7 +78,7 @@ void pfnTraceLine(const float *v1, const float *v2, int fNoMonsters, edict_t *pE
    
    // trace the line considering the ACTUAL view angles of the bot, not the ones it claims to have
    TRACE_LINE (pEdict->v.origin + pEdict->v.view_ofs,
-               pEdict->v.origin + pEdict->v.view_ofs + vForward/*gpGlobals->v_forward*/ * (Vector(v2) - Vector(v1)).Length(),
+               pEdict->v.origin + pEdict->v.view_ofs + vForward * (Vector(v2) - Vector(v1)).Length(),
                fNoMonsters, pEdict, ptr);
    
    RETURN_META(MRES_SUPERCEDE);
@@ -118,8 +118,9 @@ void pfnEmitSound(edict_t *entity, int channel, const char *sample, /*int*/float
 
 void pfnClientCommand(edict_t* pEdict, char* szFmt, ...)
 {
-   if ((pEdict->v.flags & FL_FAKECLIENT) || (pEdict->v.flags & FL_THIRDPARTYBOT))
+   if ((FBitSet(pEdict->v.flags, FL_FAKECLIENT) || FBitSet(pEdict->v.flags, FL_THIRDPARTYBOT)))
       RETURN_META (MRES_SUPERCEDE);
+      
    RETURN_META (MRES_IGNORED);
 }
 
@@ -332,8 +333,9 @@ void pfnWriteEntity(int iValue)
 
 void pfnClientPrintf( edict_t* pEdict, PRINT_TYPE ptype, const char *szMsg )
 {
-   if ((pEdict->v.flags & FL_FAKECLIENT) || (pEdict->v.flags & FL_THIRDPARTYBOT))
+   if ((FBitSet(pEdict->v.flags, FL_FAKECLIENT) || FBitSet(pEdict->v.flags, FL_THIRDPARTYBOT)))
       RETURN_META (MRES_SUPERCEDE);
+      
    RETURN_META (MRES_IGNORED);
 }
 
