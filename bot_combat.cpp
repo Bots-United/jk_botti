@@ -1,7 +1,5 @@
 //
-// HPB bot - botman's High Ping Bastard bot
-//
-// (http://planethalflife.com/botman/)
+// JK_Botti - be more human!
 //
 // bot_combat.cpp
 //
@@ -18,6 +16,7 @@
 #include "bot.h"
 #include "bot_func.h"
 #include "bot_weapons.h"
+#include "bot_skill.h"
 
 
 extern bot_weapon_t weapon_defs[MAX_WEAPONS];
@@ -26,23 +25,6 @@ extern qboolean is_team_play;
 extern qboolean checked_teamplay;
 extern int num_logos;
 extern int submod_id;
-
-float react_delay_min[3][5] = {
-   {0.01, 0.02, 0.03, 0.04, 0.05},
-   {0.07, 0.09, 0.12, 0.14, 0.17},
-   {0.10, 0.12, 0.15, 0.18, 0.21}};
-float react_delay_max[3][5] = {
-   {0.04, 0.06, 0.08, 0.10, 0.12},
-   {0.11, 0.14, 0.18, 0.21, 0.25},
-   {0.15, 0.18, 0.22, 0.25, 0.30}};
-
-float shootcone_values[5][2] = {
-   {200.0, 10.0}, {250.0, 15.0}, {300.0, 25.0}, {350.0, 30.0}, {400.0, 30.0}};
-
-float prediction_times[5][2] = {
-   {0.150, 0.155}, {0.200, 0.210}, {0.250, 0.265}, {0.300, 0.320}, {0.350, 0.375}};
-
-float turn_skills[5] = { 5.0, 3.0, 2.0, 1.0, 0.5 };
 
 
 typedef struct posdata_s {
@@ -70,12 +52,12 @@ qboolean BotAimsAtSomething (bot_t &pBot)
    if(!pBot.pBotEnemy)
       return FALSE;
    
-   float prediction_ammount = RANDOM_FLOAT2(prediction_times[pBot.bot_skill][0], prediction_times[pBot.bot_skill][1]);
-   float shootcone_width    = shootcone_values[pBot.bot_skill][0];
-   float shootcone_minangle = shootcone_values[pBot.bot_skill][1];
+   float prediction_ammount = skill_settings[pBot.bot_skill].prediction_latency;
+   float shootcone_radius   = skill_settings[pBot.bot_skill].shootcone_radius;
+   float shootcone_minangle = skill_settings[pBot.bot_skill].shootcone_minangle;
    
    if(FInShootCone(pBot.pBotEnemy->v.origin, pBot.pEdict, 
-                   (GetPredictedPlayerPosition(pBot.pBotEnemy, gpGlobals->time - prediction_ammount) - pBot.pEdict->v.origin).Length(), shootcone_width, shootcone_minangle))
+                   (GetPredictedPlayerPosition(pBot.pBotEnemy, gpGlobals->time - prediction_ammount, gpGlobals->time) - pBot.pEdict->v.origin).Length(), shootcone_radius, shootcone_minangle))
       return TRUE;
    
    return FALSE;
@@ -91,7 +73,7 @@ void BotPointGun (bot_t &pBot, qboolean save_v_angle)
 
    float speed; // speed : 0.1 - 1
    Vector v_deviation;
-   float turn_skill = turn_skills[pBot.bot_skill];
+   float turn_skill = skill_settings[pBot.bot_skill].turn_skill;
 
    v_deviation = UTIL_WrapAngles (Vector (pEdict->v.idealpitch, pEdict->v.ideal_yaw, 0) - pBot.bot_v_angle);
 
@@ -176,10 +158,8 @@ void BotResetReactionTime(bot_t &pBot) {
 
       int index = pBot.reaction_time - 1;
 
-      int bot_skill = pBot.bot_skill;
-
-      float delay_min = react_delay_min[index][bot_skill];
-      float delay_max = react_delay_max[index][bot_skill];
+      float delay_min = skill_settings[pBot.bot_skill].react_delay_min[index];
+      float delay_max = skill_settings[pBot.bot_skill].react_delay_max[index];
 
       react_delay = RANDOM_FLOAT2(delay_min, delay_max);
 
@@ -243,7 +223,7 @@ void add_next_posdata(int idx, edict_t *pEdict) {
       pos_oldest[idx] = pos_latest[idx];
 }
 
-// remove data older than 500ms
+// remove data older than max + 100ms
 void timetrim_posdata(int idx) {
    posdata_t * list;
    
@@ -251,14 +231,16 @@ void timetrim_posdata(int idx) {
       return;
    
    while(list) {
-      if(list->time + (prediction_times[5-1][1] + 0.1) <= gpGlobals->time) { //max + 100ms
-      	 posdata_t * next = list->newer;
-      	 
-      	 free(list);
-      	 
-      	 list = next;
-      	 list->older = 0;
-      	 pos_oldest[idx] = list;
+      // max + 100ms
+      // max is maximum by skill + max randomness added in GetPredictedPlayerPosition()
+      if(list->time + (skill_settings[4].prediction_latency * 100.0 / 90.0 + 0.1) <= gpGlobals->time) {
+         posdata_t * next = list->newer;
+         
+         free(list);
+         
+         list = next;
+         list->older = 0;
+         pos_oldest[idx] = list;
       }
       else {
          // new enough.. so are all the rest
@@ -278,11 +260,11 @@ void GatherPlayerData(void) {
       edict_t * pEdict = INDEXENT(i+1);
       
       if(fast_FNullEnt(pEdict) || pEdict->free) {
-      	 if(pos_latest[i]) {
-      	    free_posdata_list(i);
-      	 }
+         if(pos_latest[i]) {
+            free_posdata_list(i);
+         }
          
-      	 continue;
+         continue;
       }
       
       add_next_posdata(i, pEdict);
@@ -291,11 +273,10 @@ void GatherPlayerData(void) {
 }
 
 // used instead of using pBotEnemy->v.origin in aim code.
-//  example: GetPredictedPlayerPosition(pBotEnemy, gpGlobals->time - 0.3) // use 300ms old position data
+//  example: GetPredictedPlayerPosition(pBotEnemy, gpGlobals->time - 0.3, gpGlobals->time) // use 300ms old position data
 //  if bot's aim lags behind moving target increase value of AHEAD_MULTIPLIER.
 #define AHEAD_MULTIPLIER 1.5
-Vector GetPredictedPlayerPosition(edict_t * pPlayer, float time) {
-   const float globaltime = gpGlobals->time;
+Vector GetPredictedPlayerPosition(edict_t * pPlayer, float time, const float globaltime) {
    posdata_t * newer;
    posdata_t * older;
    int idx;
@@ -303,6 +284,10 @@ Vector GetPredictedPlayerPosition(edict_t * pPlayer, float time) {
    idx = ENTINDEX(pPlayer) - 1;
    if(idx < 0 || idx >= gpGlobals->maxClients || !pos_latest[idx] || !pos_oldest[idx])
       return(pPlayer->v.origin);
+   
+   // with tint of randomness
+   time = fabs(time - globaltime);
+   time = globaltime - RANDOM_FLOAT2(time * 90.0 / 100.0, time * 100.0 / 90.0);
    
    // find position data slots that are around 'time'
    newer = pos_latest[idx];
@@ -412,6 +397,69 @@ qboolean HaveSameModels(edict_t * pEnt1, edict_t * pEnt2) {
    return(!stricmp(model_name1, model_name2));
 }
 
+// Can pEdict hear pPlayer
+qboolean FHearable(bot_t &pBot, edict_t *pPlayer) {
+   const float globaltime = gpGlobals->time;
+   float distance;
+   trigger_sound_t * sound;
+   
+   // does bot hear this time?
+   if(RANDOM_LONG2(1,100) > skill_settings[pBot.bot_skill].hear_frequency)
+      return(FALSE);
+   
+   int idx = ENTINDEX(pPlayer) - 1;
+   if(idx < 0 || idx >= gpGlobals->maxClients)
+      return(FALSE);
+   
+   sound = &trigger_sounds[idx];
+   if(!sound || !sound->used)
+      return(FALSE);
+   
+   if(sound->attenuation == 0.0) {
+      sound->used = 0;
+      return(FALSE);
+   }
+   
+   // check time between sound time and current time
+   if(sound->time + 2.0 >= globaltime) {
+      sound->used = 0;
+      return(FALSE);
+   }
+   
+   // check distance between sound and player
+   Vector v_sound_to_player = pPlayer->v.origin - sound->origin;
+   if(v_sound_to_player.Length() > 250) {
+      sound->used = 0;
+      return(FALSE);
+   }
+   
+   // is the bot close enough to hear this sound?
+   Vector v_sound = sound->origin - pBot.pEdict->v.origin;
+   distance = v_sound.Length();
+   
+   // is the bot close enough to hear this sound?
+   if(distance < (sound->volume * (1024 / sound->attenuation))) {
+      return(TRUE);
+   }
+   
+   return(FALSE);
+}
+
+qboolean UpdateSounds(bot_t &pBot, edict_t *pPlayer) {
+   // is the bot close enough to hear this sound?
+   if(FHearable(pBot, pPlayer)) {
+      Vector bot_angles = UTIL_VecToAngles( pPlayer->v.origin );
+      
+      pBot.pEdict->v.ideal_yaw = bot_angles.y;
+
+      BotFixIdealYaw(pBot.pEdict);
+
+      return(TRUE);
+   }
+   
+   return(FALSE);
+}
+
 edict_t *BotFindEnemy( bot_t &pBot )
 {
    const float globaltime = gpGlobals->time;
@@ -426,7 +474,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
    {
       // if the enemy is dead?
       // is the enemy dead?, assume bot killed it
-      if (!GetPredictedIsAlive(pBot.pBotEnemy, globaltime - prediction_times[pBot.bot_skill][0])) 
+      if (!GetPredictedIsAlive(pBot.pBotEnemy, globaltime - skill_settings[pBot.bot_skill].prediction_latency)) 
       {
          // the enemy is dead, jump for joy about 10% of the time
          if (RANDOM_LONG2(1, 100) <= 10)
@@ -440,7 +488,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
          Vector vecEnd;
          Vector vecPredEnemy;
 
-         vecPredEnemy = GetPredictedPlayerPosition(pBot.pBotEnemy, globaltime - RANDOM_FLOAT2(prediction_times[pBot.bot_skill][0], prediction_times[pBot.bot_skill][1]));
+         vecPredEnemy = GetPredictedPlayerPosition(pBot.pBotEnemy, globaltime - skill_settings[pBot.bot_skill].prediction_latency, globaltime);
          vecEnd = vecPredEnemy + pBot.pBotEnemy->v.view_ofs;
 
          if (!checked_teamplay)  // check for team play...
@@ -507,9 +555,8 @@ edict_t *BotFindEnemy( bot_t &pBot )
          
          vecEnd = pMonster->v.origin + pMonster->v.view_ofs;
 
-         // see if bot can't see the player...
-         if (!FInViewCone( vecEnd, pEdict ) ||
-             !FVisible( vecEnd, pEdict ))
+         // see if bot can't see ...
+         if (!(FInViewCone( vecEnd, pEdict ) && FVisible( vecEnd, pEdict )))
             continue;
 
          float distance = (pMonster->v.origin - pEdict->v.origin).Length();
@@ -530,11 +577,11 @@ edict_t *BotFindEnemy( bot_t &pBot )
          // skip invalid players and skip self (i.e. this bot)
          if ((pPlayer) && (!pPlayer->free) && (pPlayer != pEdict))
          {
-            if ((b_observer_mode) && !(pPlayer->v.flags & (FL_FAKECLIENT | FL_THIRDPARTYBOT | FL_PROXY)))
+            if ((b_observer_mode) && !(pPlayer->v.flags & FL_FAKECLIENT) && !(pPlayer->v.flags & FL_THIRDPARTYBOT))
                continue;
             
             // skip this player if not alive (i.e. dead or dying)
-            if (!GetPredictedIsAlive(pPlayer, globaltime - prediction_times[pBot.bot_skill][0]))
+            if (!GetPredictedIsAlive(pPlayer, globaltime - skill_settings[pBot.bot_skill].prediction_latency))
                continue;
 
             // don't target teammates
@@ -544,8 +591,8 @@ edict_t *BotFindEnemy( bot_t &pBot )
             vecEnd = pPlayer->v.origin + pPlayer->v.view_ofs;
 
             // see if bot can't see or hear the player...
-            if (!FInViewCone( vecEnd, pEdict ) ||
-                !FVisible( vecEnd, pEdict ) )
+            if (!(FInViewCone( vecEnd, pEdict ) && FVisible( vecEnd, pEdict )) &&
+                !FHearable(pBot, pPlayer))
                continue;
 
             float distance = (pPlayer->v.origin - pEdict->v.origin).Length();
@@ -594,11 +641,45 @@ edict_t *BotFindEnemy( bot_t &pBot )
 
 
 //
-qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t *pSelect, const bot_fire_delay_t *pDelay, const int select_index, const int iId, const qboolean use_primary, const qboolean use_secondary)
+void SelectBetterAttack(const int bot_skill, const bot_weapon_select_t &select, qboolean &use_primary, qboolean &use_secondary) 
+{
+   // check bot skill, skill levels have been checked by caller so that either one is true!
+   // check if we like higher skill better than less
+   if(bot_skill > select.secondary_skill_level || 
+      (select.prefer_higher_skill_attack && select.secondary_skill_level > select.primary_skill_level))
+   {
+      use_secondary = FALSE;
+      return;
+   }
+
+   if(bot_skill > select.primary_skill_level ||
+      (select.prefer_higher_skill_attack && select.primary_skill_level > select.secondary_skill_level))
+   {
+      use_primary = FALSE;
+      return;
+   }
+   
+   // use old method last
+   if(select.primary_fire_percent < RANDOM_LONG2(1, 100)) 
+      use_secondary = FALSE;
+   else
+      use_primary = FALSE;
+}
+
+
+//
+qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, const bot_fire_delay_t &delay, const int iId, qboolean use_primary, qboolean use_secondary)
 {
    const float globaltime = gpGlobals->time;
    edict_t *pEdict = pBot.pEdict;
 
+   // Select primary or secondary based on bot skill and random percent
+   if(use_primary && use_secondary)
+   {
+      SelectBetterAttack(pBot.bot_skill + 1, select, use_primary, use_secondary);
+   }
+
+   //
    if (iId == VALVE_WEAPON_CROWBAR)
    {
       // check if bot needs to duck down to hit enemy...
@@ -609,39 +690,34 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t *pSelect,
       if (bot_stop == 2)
          bot_stop = 1;
    }
-      
+   
    if (use_primary)
    {
-      if (pSelect[select_index].secondary_zooms && pBot.zooming) {
-      	 pEdict->v.button |= IN_ATTACK2;  // use secondary attack to zoom out
-      	 pBot.zooming = FALSE;
-      }
-      else
-      	 pEdict->v.button |= IN_ATTACK;  // use primary attack
+      pEdict->v.button |= IN_ATTACK;  // use primary attack
 
-      if (pSelect[select_index].primary_fire_charge)
+      if (select.primary_fire_charge)
       {
          pBot.charging_weapon_id = iId;
 
          // release primary fire after the appropriate delay...
          pBot.f_primary_charging = globaltime +
-                        pSelect[select_index].primary_charge_delay;
+                        select.primary_charge_delay;
 
          pBot.f_shoot_time = globaltime;  // keep charging
       }
       else
       {
          // set next time to shoot
-         if (pSelect[select_index].primary_fire_hold)
+         if (select.primary_fire_hold)
             pBot.f_shoot_time = globaltime;  // don't let button up
          else
          {
             int skill = pBot.bot_skill;
             float base_delay, min_delay, max_delay;
 
-            base_delay = pDelay[select_index].primary_base_delay;
-            min_delay = pDelay[select_index].primary_min_delay[skill];
-            max_delay = pDelay[select_index].primary_max_delay[skill];
+            base_delay = delay.primary_base_delay;
+            min_delay = delay.primary_min_delay[skill];
+            max_delay = delay.primary_max_delay[skill];
             
             if(min_delay == 0 && max_delay == 0)
                pBot.f_shoot_time = globaltime + base_delay;
@@ -652,39 +728,31 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t *pSelect,
    }
    else  // MUST be use_secondary...
    {
-      if (pSelect[select_index].secondary_zooms && !pBot.zooming) {
-         pEdict->v.button |= IN_ATTACK2;  // use secondary attack to zoom in
-         pBot.zooming = TRUE;
-      }
-      else if (pSelect[select_index].secondary_zooms && pBot.zooming) {
-      	 pEdict->v.button |= IN_ATTACK;  // use primary attack
-      }
-      else
-      	 pEdict->v.button |= IN_ATTACK2;  // use secondary attack
+      pEdict->v.button |= IN_ATTACK2;  // use secondary attack
 
-      if (pSelect[select_index].secondary_fire_charge)
+      if (select.secondary_fire_charge)
       {
          pBot.charging_weapon_id = iId;
 
          // release secondary fire after the appropriate delay...
          pBot.f_secondary_charging = globaltime +
-                        pSelect[select_index].secondary_charge_delay;
+                        select.secondary_charge_delay;
 
          pBot.f_shoot_time = globaltime;  // keep charging
       }
       else
       {
          // set next time to shoot
-         if (pSelect[select_index].secondary_fire_hold)
+         if (select.secondary_fire_hold)
             pBot.f_shoot_time = globaltime;  // don't let button up
          else
          {
             int skill = pBot.bot_skill;
             float base_delay, min_delay, max_delay;
 
-            base_delay = pDelay[select_index].secondary_base_delay;
-            min_delay = pDelay[select_index].secondary_min_delay[skill];
-            max_delay = pDelay[select_index].secondary_max_delay[skill];
+            base_delay = delay.secondary_base_delay;
+            min_delay = delay.secondary_min_delay[skill];
+            max_delay = delay.secondary_max_delay[skill];
 
             if(min_delay == 0 && max_delay == 0)
                pBot.f_shoot_time = globaltime + base_delay;
@@ -699,10 +767,222 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t *pSelect,
 
 
 //
-void GetWeaponSelect(bot_weapon_select_t **pSelect, bot_fire_delay_t **pDelay)
+qboolean IsValidWeaponChoose(bot_t &pBot, const bot_weapon_select_t &select, const int weapon_choice) 
 {
-   *pSelect = &valve_weapon_select[0];
-   *pDelay = &valve_fire_delay[0];
+   // Severians and Bubblemod checks, skip egon (bubblemod-egon is total conversion and severians-egon is selfkilling after time)
+   if ((submod_id == SUBMOD_SEVS || submod_id == SUBMOD_BUBBLEMOD) && select.iId == VALVE_WEAPON_EGON)
+      return(FALSE);
+        
+   // was a weapon choice specified? (and if so do they NOT match?)
+   if ((weapon_choice != 0) &&
+       (weapon_choice != select.iId)) 
+   {
+      return(FALSE);
+   }
+   
+   // is the bot NOT carrying this weapon?
+   if (!(pBot.pEdict->v.weapons & (1<<select.iId)))
+      return(FALSE);
+
+   // is the bot NOT skilled enough to use this weapon?
+   if ((pBot.bot_skill+1) > select.primary_skill_level && (pBot.bot_skill+1) > select.secondary_skill_level)
+   {
+      return(FALSE);
+   }
+
+   // is the bot underwater and does this weapon NOT work under water?
+   if ((pBot.pEdict->v.waterlevel == 3) &&
+       !(select.can_use_underwater))
+   {
+      return(FALSE);
+   }
+   
+   return(TRUE);
+}
+
+
+//
+qboolean IsValidPrimaryAttack(bot_t &pBot, const bot_weapon_select_t &select, const int weapon_index, const float distance, const int weapon_choice)
+{
+   qboolean primary_valid = FALSE;
+   qboolean primary_in_range;
+   
+   primary_in_range = (weapon_choice != 0) || (distance >= select.primary_min_distance && distance <= select.primary_max_distance);
+
+   // no ammo required for this weapon OR
+   // enough ammo available to fire AND
+   // the bot is far enough away to use primary fire AND
+   // the bot is close enough to the enemy to use primary fire
+   if (primary_in_range && (weapon_defs[weapon_index].iAmmo1 == -1 || pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] >= select.min_primary_ammo))
+   {
+      primary_valid = TRUE;
+   }
+   
+   return(primary_valid);
+}
+
+
+//
+qboolean IsValidSecondaryAttack(bot_t &pBot, const bot_weapon_select_t &select, const int weapon_index, const float distance, const int weapon_choice)
+{
+   qboolean secondary_valid = FALSE;
+   qboolean secondary_in_range;
+   
+   // target is close enough
+   secondary_in_range = (weapon_choice != 0) || (distance >= select.secondary_min_distance && distance <= select.secondary_max_distance);
+
+   // see if there is enough secondary ammo AND
+   // the bot is far enough away to use secondary fire AND
+   // the bot is close enough to the enemy to use secondary fire
+   if (secondary_in_range && 
+       ((weapon_defs[weapon_index].iAmmo2 == -1 && !select.secondary_use_primary_ammo) ||
+         (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo2] >= select.min_secondary_ammo) ||
+         (select.secondary_use_primary_ammo && 
+          (weapon_defs[weapon_index].iAmmo1 == -1 || pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] >= select.min_primary_ammo))))
+   {
+      secondary_valid = TRUE;
+      
+      // MP5 cannot use secondary if primary is empty
+      if(weapon_index == VALVE_WEAPON_MP5 &&
+         (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] <
+          select.min_primary_ammo))
+      {
+         secondary_valid = FALSE;
+      }
+   }
+   
+   return(secondary_valid);
+}
+
+
+//
+qboolean GetGoodWeaponCount(bot_t &pBot)
+{
+   bot_weapon_select_t * pSelect = &valve_weapon_select[0];
+   int select_index;
+   int good_count = 0;
+   
+   // loop through all the weapons until terminator is found...
+   select_index = -1;
+   while (pSelect[++select_index].iId) {
+      if(!IsValidWeaponChoose(pBot, pSelect[select_index], 0))
+         continue;
+      
+      if(pSelect[select_index].avoid_this_gun || pSelect[select_index].iId == VALVE_WEAPON_CROWBAR ||
+         pSelect[select_index].iId == VALVE_WEAPON_SNARK || pSelect[select_index].iId == VALVE_WEAPON_HANDGRENADE)
+         continue;
+      
+      // weapon_choice != 0, don't do distance check
+      if(!IsValidSecondaryAttack(pBot, pSelect[select_index], pSelect[select_index].iId, 0.0, -1) &&
+         !IsValidPrimaryAttack(pBot, pSelect[select_index], pSelect[select_index].iId, 0.0, -1))
+         continue;
+      
+      // not bad gun
+      good_count++;
+   }
+   
+   return(good_count);
+}
+
+
+//
+qboolean AllWeaponsRunningOutOfAmmo(bot_t &pBot)
+{
+   bot_weapon_select_t * pSelect = &valve_weapon_select[0];
+   int select_index;
+   
+   // loop through all the weapons until terminator is found...
+   select_index = -1;
+   while (pSelect[++select_index].iId) {
+      if(!IsValidWeaponChoose(pBot, pSelect[select_index], 0))
+         continue;
+      
+      if(pSelect[select_index].low_ammo_primary == -1 && pSelect[select_index].low_ammo_secondary == -1)
+         continue;
+      
+      // weapon_choice != 0, don't do distance check
+      if(!IsValidSecondaryAttack(pBot, pSelect[select_index], pSelect[select_index].iId, 0.0, -1) &&
+         !IsValidPrimaryAttack(pBot, pSelect[select_index], pSelect[select_index].iId, 0.0, -1))
+         continue;
+      
+      int weapon_index = pSelect[select_index].iId;
+      
+      // low primary ammo?
+      if(pSelect[select_index].low_ammo_primary > -1 &&
+         (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] <= pSelect[select_index].low_ammo_primary))
+         continue;
+      
+      // low secondary ammo?
+      if(pSelect[select_index].low_ammo_secondary > -1 &&
+         ((pSelect[select_index].secondary_use_primary_ammo && 
+           pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] <= pSelect[select_index].low_ammo_secondary) ||
+          (!pSelect[select_index].secondary_use_primary_ammo && 
+           pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo2] <= pSelect[select_index].low_ammo_secondary)))
+         continue;
+      
+      // this gun had enough ammo
+      return(FALSE);
+   }
+   
+   return(TRUE);
+}
+
+
+// Check if want to change to better weapon
+int GetBetterWeaponChoice(bot_t &pBot, const bot_weapon_select_t &current, const bot_weapon_select_t *pSelect, const float distance, const int weapon_choice, qboolean *use_primary, qboolean *use_secondary) {
+   int select_index;
+   *use_primary = FALSE;
+   *use_secondary = FALSE;
+   
+   // check if we don't like current weapon.
+   if(!current.avoid_this_gun || weapon_choice != 0) {
+      return -1;
+   }
+     
+   // loop through all the weapons until terminator is found...
+   select_index = -1;
+   while (pSelect[++select_index].iId) {
+      if(!IsValidWeaponChoose(pBot, pSelect[select_index], 0))
+         continue;
+      
+      if(pSelect[select_index].avoid_this_gun)
+         continue;
+
+      *use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], pSelect[select_index].iId, distance, 0);
+      *use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], pSelect[select_index].iId, distance, 0);
+      
+      if(*use_primary || *use_secondary)
+         return select_index;
+   }
+   
+   return -1;
+}
+
+
+//
+qboolean TrySelectWeapon(bot_t &pBot, const int iId, const int select_index, const bot_weapon_select_t &select, const bot_fire_delay_t &delay)
+{
+   // select this weapon if it isn't already selected
+   if (pBot.current_weapon.iId != iId)
+   {
+      UTIL_SelectItem(pBot.pEdict, (char*)select.weapon_name);
+      pBot.zooming = FALSE;
+   }
+   
+   if (delay.iId != iId)
+   {
+      char msg[80];
+      snprintf(msg, sizeof(msg), "fire_delay mismatch for weapon id=%d\n", iId);
+      ALERT(at_console, "%s", msg);
+      
+      pBot.current_weapon_index = -1;
+      
+      return FALSE;
+   }
+   
+   pBot.current_weapon_index = select_index;
+   
+   return TRUE;
 }
 
 
@@ -710,394 +990,172 @@ void GetWeaponSelect(bot_weapon_select_t **pSelect, bot_fire_delay_t **pDelay)
 // use (assuming enough ammo exists for that weapon)
 // BotFireWeapon will return TRUE if weapon was fired, FALSE otherwise
 
-qboolean BotFireWeapon( const Vector & v_enemy, bot_t &pBot, int weapon_choice)
+qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
 {
    const float globaltime = gpGlobals->time;
-   bot_weapon_select_t *pSelect = NULL;
-   bot_fire_delay_t *pDelay = NULL;
-   int select_index;
-   int iId, weapon_index;
+   bot_weapon_select_t *pSelect;
+   bot_fire_delay_t *pDelay;
+   int select_index, better_index;
+   int iId;
    qboolean use_primary;
    qboolean use_secondary;
-   int use_percent;
-   int primary_percent;
-   qboolean primary_in_range, secondary_in_range;
+   float distance;
+   
+   distance = v_enemy.Length();  // how far away is the enemy?
 
-   edict_t *pEdict = pBot.pEdict;
+   pSelect = &valve_weapon_select[0];
+   pDelay = &valve_fire_delay[0];
 
-   float distance = v_enemy.Length();  // how far away is the enemy?
-
-   GetWeaponSelect(&pSelect, &pDelay);
-
-   if (pSelect)
-   {
       // are we charging the primary fire?
-      if (pBot.f_primary_charging > 0)
+   if (pBot.f_primary_charging > 0)
+   {
+      iId = pBot.charging_weapon_id;
+
+      // is it time to fire the charged weapon?
+      if (pBot.f_primary_charging <= globaltime)
       {
-         iId = pBot.charging_weapon_id;
+         // we DON'T set pEdict->v.button here to release the
+         // fire button which will fire the charged weapon
 
-         // is it time to fire the charged weapon?
-         if (pBot.f_primary_charging <= globaltime)
-         {
-            // we DON'T set pEdict->v.button here to release the
-            // fire button which will fire the charged weapon
+         pBot.f_primary_charging = -1;  // -1 means not charging
 
-            pBot.f_primary_charging = -1;  // -1 means not charging
+         // find the correct fire delay for this weapon
+         select_index = 0;
 
-            // find the correct fire delay for this weapon
-            select_index = 0;
+         while ((pSelect[select_index].iId) &&
+                (pSelect[select_index].iId != iId))
+            select_index++;
 
-            while ((pSelect[select_index].iId) &&
-                   (pSelect[select_index].iId != iId))
-               select_index++;
+         // set next time to shoot
+         int skill = pBot.bot_skill;
+         float base_delay, min_delay, max_delay;
 
-            // set next time to shoot
-            int skill = pBot.bot_skill;
-            float base_delay, min_delay, max_delay;
+         base_delay = pDelay[select_index].primary_base_delay;
+         min_delay = pDelay[select_index].primary_min_delay[skill];
+         max_delay = pDelay[select_index].primary_max_delay[skill];
 
-            base_delay = pDelay[select_index].primary_base_delay;
-            min_delay = pDelay[select_index].primary_min_delay[skill];
-            max_delay = pDelay[select_index].primary_max_delay[skill];
+         pBot.f_shoot_time = globaltime + base_delay +
+            RANDOM_FLOAT2(min_delay, max_delay);
 
-            pBot.f_shoot_time = globaltime + base_delay +
-               RANDOM_FLOAT2(min_delay, max_delay);
-
-            return TRUE;
-         }
-         else
-         {
-            pEdict->v.button |= IN_ATTACK;   // charge the weapon
-            pBot.f_shoot_time = globaltime;  // keep charging
-
-            return TRUE;
-         }
+         return TRUE;
       }
-
-      // are we charging the secondary fire?
-      if (pBot.f_secondary_charging > 0)
+      else
       {
-         iId = pBot.charging_weapon_id;
+         pBot.pEdict->v.button |= IN_ATTACK;   // charge the weapon
+         pBot.f_shoot_time = globaltime;  // keep charging
 
-         // is it time to fire the charged weapon?
-         if (pBot.f_secondary_charging <= globaltime)
-         {
-            // we DON'T set pEdict->v.button here to release the
-            // fire button which will fire the charged weapon
-
-            pBot.f_secondary_charging = -1;  // -1 means not charging
-
-            // find the correct fire delay for this weapon
-            select_index = 0;
-
-            while ((pSelect[select_index].iId) &&
-                   (pSelect[select_index].iId != iId))
-               select_index++;
-
-            // set next time to shoot
-            int skill = pBot.bot_skill;
-            float base_delay, min_delay, max_delay;
-
-            base_delay = pDelay[select_index].secondary_base_delay;
-            min_delay = pDelay[select_index].secondary_min_delay[skill];
-            max_delay = pDelay[select_index].secondary_max_delay[skill];
-
-            pBot.f_shoot_time = globaltime + base_delay +
-               RANDOM_FLOAT2(min_delay, max_delay);
-
-            return TRUE;
-         }
-         else
-         {
-            pEdict->v.button |= IN_ATTACK2;  // charge the weapon
-            pBot.f_shoot_time = globaltime;  // keep charging
-
-            return TRUE;
-         }
+         return TRUE;
       }
-      
-      // check if we can reuse currently active weapon
-      while(pBot.current_weapon_index >= 0) { //'while' instead of 'if' for breaking out
-         select_index = pBot.current_weapon_index;
-         
-         // was a weapon choice specified? (and if so do they NOT match?)
-         if ((weapon_choice != 0) &&
-             (weapon_choice != pSelect[select_index].iId)) {
-            break;
-         }
-         
-         // is the bot NOT carrying this weapon?
-         if (!(pBot.pEdict->v.weapons & (1<<pSelect[select_index].iId)))
-            break;
+   }
 
-         // is the bot NOT skilled enough to use this weapon?
-         if ((pBot.bot_skill+1) > pSelect[select_index].skill_level)
-         {
-            break;
-         }
+   // are we charging the secondary fire?
+   if (pBot.f_secondary_charging > 0)
+   {
+      iId = pBot.charging_weapon_id;
 
-         // is the bot underwater and does this weapon NOT work under water?
-         if ((pEdict->v.waterlevel == 3) &&
-             !(pSelect[select_index].can_use_underwater))
-         {
-            break;
-         }
+      // is it time to fire the charged weapon?
+      if (pBot.f_secondary_charging <= globaltime)
+      {
+         // we DON'T set pEdict->v.button here to release the
+         // fire button which will fire the charged weapon
+
+         pBot.f_secondary_charging = -1;  // -1 means not charging
+
+         // find the correct fire delay for this weapon
+         select_index = 0;
+
+         while ((pSelect[select_index].iId) &&
+                (pSelect[select_index].iId != iId))
+            select_index++;
+
+         // set next time to shoot
+         int skill = pBot.bot_skill;
+         float base_delay, min_delay, max_delay;
+
+         base_delay = pDelay[select_index].secondary_base_delay;
+         min_delay = pDelay[select_index].secondary_min_delay[skill];
+         max_delay = pDelay[select_index].secondary_max_delay[skill];
+
+         pBot.f_shoot_time = globaltime + base_delay +
+            RANDOM_FLOAT2(min_delay, max_delay);
+
+         return TRUE;
+      }
+      else
+      {
+         pBot.pEdict->v.button |= IN_ATTACK2;  // charge the weapon
+         pBot.f_shoot_time = globaltime;  // keep charging
+
+         return TRUE;
+      }
+   }
+   
+   // check if we can reuse currently active weapon
+   if(pBot.current_weapon_index >= 0)
+   {
+      select_index = pBot.current_weapon_index;
+         
+      // Check if we can use this weapon
+      if (IsValidWeaponChoose(pBot, pSelect[select_index], weapon_choice))
+      {
+         // Check if we REALLY want to change to other weapon (aka current gun == shit)
+         better_index = GetBetterWeaponChoice(pBot, pSelect[select_index], pSelect, distance, weapon_choice, &use_primary, &use_secondary);
+         if(better_index > -1) 
+            select_index = better_index;
          
          iId = pSelect[select_index].iId;
-         weapon_index = iId;
-         use_primary = FALSE;
-         use_secondary = FALSE;
-         primary_percent = RANDOM_LONG2(1, 100);
-
-         // is primary percent less than weapon primary percent AND
-         // no ammo required for this weapon OR
-            // enough ammo available to fire AND
-         // the bot is far enough away to use primary fire AND
-         // the bot is close enough to the enemy to use primary fire
-
-         primary_in_range = (distance >= pSelect[select_index].primary_min_distance) &&
-                            (distance <= pSelect[select_index].primary_max_distance);
-
-         secondary_in_range = (distance >= pSelect[select_index].secondary_min_distance) &&
-                              (distance <= pSelect[select_index].secondary_max_distance);
-
-         if (weapon_choice != 0)
-         {
-            primary_in_range = TRUE;
-            secondary_in_range = TRUE;
-         }
-
-         if ((primary_percent <= pSelect[select_index].primary_fire_percent) &&
-             ((weapon_defs[weapon_index].iAmmo1 == -1) ||
-              (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] >=
-               pSelect[select_index].min_primary_ammo)) &&
-             (primary_in_range))
-         {
-            use_primary = TRUE;
-         }
-
-         // otherwise see if there is enough secondary ammo AND
-         // the bot is far enough away to use secondary fire AND
-         // the bot is close enough to the enemy to use secondary fire
-
-         else if (((weapon_defs[weapon_index].iAmmo2 == -1 && 
-                    !pSelect[select_index].secondary_use_primary_ammo) ||
-                   (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo2] >=
-                    pSelect[select_index].min_secondary_ammo) ||
-                   (pSelect[select_index].secondary_use_primary_ammo &&
-                    ((weapon_defs[weapon_index].iAmmo1 == -1) ||
-                     (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] >= 
-                      pSelect[select_index].min_primary_ammo)))) &&
-                  (secondary_in_range))
-         {
-            use_secondary = TRUE;
-            
-            // MP5 cannot use secondary if primary is empty
-            if(iId == VALVE_WEAPON_MP5 &&
-               (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] <
-                pSelect[select_index].min_primary_ammo))
-            {
-               use_secondary = FALSE;
-            }
-         }
-         
-         //
-         // Try primary again without primary vs secondary percent check
-         //
-         
-         else if (((weapon_defs[weapon_index].iAmmo1 == -1) ||
-                  (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] >=
-                   pSelect[select_index].min_primary_ammo)) &&
-                  (primary_in_range))
-         {
-            use_primary = TRUE;
-         }
-
-         // see if there wasn't enough ammo to fire the weapon...
-         if ((use_primary == FALSE) && (use_secondary == FALSE))
-         {
-            break;
-         }
-
-         // select this weapon if it isn't already selected
-         if (pBot.current_weapon.iId != iId)
-         {
-            UTIL_SelectItem(pEdict, (char*)pSelect[select_index].weapon_name);
-            pBot.zooming = FALSE;
-         }
-         
-         if (pDelay[select_index].iId != iId)
-         {
-            char msg[80];
-            snprintf(msg, sizeof(msg), "fire_delay mismatch for weapon id=%d\n",iId);
-            ALERT(at_console, "%s", msg);
-            
-            pBot.current_weapon_index = -1;
-            
-            return FALSE;
-         }
-         
-         pBot.current_weapon_index = select_index;
-         
-         return(BotFireSelectedWeapon(pBot, pSelect, pDelay, select_index, iId, use_primary, use_secondary));
-      }
       
-      select_index = 0;
+         if(better_index == -1)
+         {
+            // Check if this weapon is ok for current contitions
+            use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], iId, distance, weapon_choice);
+            use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], iId, distance, weapon_choice);
+         }
+         
+         if(use_primary || use_secondary)
+         {
+            if(!TrySelectWeapon(pBot, iId, select_index, pSelect[select_index], pDelay[select_index]))
+               return FALSE; //error
+      
+            return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], iId, use_primary, use_secondary));
+         }
+     }
+   }
 
-      // loop through all the weapons until terminator is found...
-      while (pSelect[select_index].iId)
+   // loop through all the weapons until terminator is found...
+   select_index = -1;
+   while (pSelect[++select_index].iId)
+   {
+      // skip currently selected weapon.. it wasn't good enough earlier so it isn't now either
+      if(pBot.current_weapon_index >= 0 && pBot.current_weapon_index == select_index)
       {
-      	 // skip currently selected weapon.. it wasn't good enough earlier so it isn't that now either
-      	 if(pBot.current_weapon_index >= 0 && pBot.current_weapon_index == select_index)
-      	 {
-            select_index++;  // skip to next weapon
-            pBot.current_weapon_index = -1; // forget current weapon
-            continue;
-         }
-      	 
-      	 // severians doesn't like egon
-      	 if (pSelect[select_index].not_on_severians && submod_id == SUBMOD_SEVS)
-         {
-            select_index++;  // skip to next weapon
-            continue;
-         }
+         pBot.current_weapon_index = -1; // forget current weapon
+         continue;
+      }
          
-         // was a weapon choice specified? (and if so do they NOT match?)
-         if ((weapon_choice != 0) &&
-             (weapon_choice != pSelect[select_index].iId))
-         {
-            select_index++;  // skip to next weapon
-            continue;
-         }
+      // Check if we can use this weapon
+      if (!IsValidWeaponChoose(pBot, pSelect[select_index], weapon_choice)) 
+      {
+         continue;
+      }
 
-         // is the bot NOT carrying this weapon?
-         if (!(pBot.pEdict->v.weapons & (1<<pSelect[select_index].iId)))
-         {
-            select_index++;  // skip to next weapon
-            continue;
-         }
+      // is use percent greater than weapon use percent?
+      if (RANDOM_LONG2(1, 100) > pSelect[select_index].use_percent)
+      {
+         continue;
+      }
 
-         // is the bot NOT skilled enough to use this weapon?
-         if ((pBot.bot_skill+1) > pSelect[select_index].skill_level)
-         {
-            select_index++;  // skip to next weapon
-            continue;
-         }
+      iId = pSelect[select_index].iId;
 
-         // is the bot underwater and does this weapon NOT work under water?
-         if ((pEdict->v.waterlevel == 3) &&
-             !(pSelect[select_index].can_use_underwater))
-         {
-            select_index++;  // skip to next weapon
-            continue;
-         }
-
-         use_percent = RANDOM_LONG2(1, 100);
-
-         // is use percent greater than weapon use percent?
-         if (use_percent > pSelect[select_index].use_percent)
-         {
-            select_index++;  // skip to next weapon
-            continue;
-         }
-
-         iId = pSelect[select_index].iId;
-         weapon_index = iId;
-         use_primary = FALSE;
-         use_secondary = FALSE;
-         primary_percent = RANDOM_LONG2(1, 100);
-
-         // is primary percent less than weapon primary percent AND
-         // no ammo required for this weapon OR
-            // enough ammo available to fire AND
-         // the bot is far enough away to use primary fire AND
-         // the bot is close enough to the enemy to use primary fire
-
-         primary_in_range = (distance >= pSelect[select_index].primary_min_distance) &&
-                            (distance <= pSelect[select_index].primary_max_distance);
-
-         secondary_in_range = (distance >= pSelect[select_index].secondary_min_distance) &&
-                              (distance <= pSelect[select_index].secondary_max_distance);
-
-         if (weapon_choice != 0)
-         {
-            primary_in_range = TRUE;
-            secondary_in_range = TRUE;
-         }
-
-         if ((primary_percent <= pSelect[select_index].primary_fire_percent) &&
-             ((weapon_defs[weapon_index].iAmmo1 == -1) ||
-              (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] >=
-               pSelect[select_index].min_primary_ammo)) &&
-             (primary_in_range))
-         {
-            use_primary = TRUE;
-         }
-
-         // otherwise see if there is enough secondary ammo AND
-         // the bot is far enough away to use secondary fire AND
-         // the bot is close enough to the enemy to use secondary fire
-
-         else if (((weapon_defs[weapon_index].iAmmo2 == -1 && 
-                    !pSelect[select_index].secondary_use_primary_ammo) ||
-                   (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo2] >=
-                    pSelect[select_index].min_secondary_ammo) ||
-                   (pSelect[select_index].secondary_use_primary_ammo &&
-                    ((weapon_defs[weapon_index].iAmmo1 == -1) ||
-                     (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] >= 
-                      pSelect[select_index].min_primary_ammo)))) &&
-                  (secondary_in_range))
-         {
-            use_secondary = TRUE;
-            
-            // MP5 cannot use secondary if primary is empty
-            if(iId == VALVE_WEAPON_MP5 &&
-               (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] <
-                pSelect[select_index].min_primary_ammo))
-            {
-               use_secondary = FALSE;
-            }
-         }
-         
-         //
-         // Try primary again without primary vs secondary percent check
-         //
-         
-         else if (((weapon_defs[weapon_index].iAmmo1 == -1) ||
-                  (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] >=
-                   pSelect[select_index].min_primary_ammo)) &&
-                  (primary_in_range))
-         {
-            use_primary = TRUE;
-         }
-         
-         // see if there wasn't enough ammo to fire the weapon...
-         if ((use_primary == FALSE) && (use_secondary == FALSE))
-         {
-            select_index++;  // skip to next weapon
-            continue;
-         }
-
-         // select this weapon if it isn't already selected
-         if (pBot.current_weapon.iId != iId)
-         {
-            UTIL_SelectItem(pEdict, (char*)pSelect[select_index].weapon_name);
-            pBot.zooming = FALSE;
-         }
-         
-         if (pDelay[select_index].iId != iId)
-         {
-            char msg[80];
-            snprintf(msg, sizeof(msg), "fire_delay mismatch for weapon id=%d\n",iId);
-            ALERT(at_console, "%s", msg);
-            
-            pBot.current_weapon_index = -1;
-            
-            return FALSE;
-         }
-         
-         pBot.current_weapon_index = select_index;
-         
-         return(BotFireSelectedWeapon(pBot, pSelect, pDelay, select_index, iId, use_primary, use_secondary));
+      // Check if this weapon is ok for current contitions
+      use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], iId, distance, weapon_choice);
+      use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], iId, distance, weapon_choice);
+      if(use_primary || use_secondary)
+      {
+         if(!TrySelectWeapon(pBot, iId, select_index, pSelect[select_index], pDelay[select_index]))
+            return FALSE; //error
+      
+         return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], iId, use_primary, use_secondary));
       }
    }
 
@@ -1136,7 +1194,7 @@ void BotShootAtEnemy( bot_t &pBot )
    if (pBot.f_reaction_target_time > globaltime)
       return;
 
-   v_predicted_pos = GetPredictedPlayerPosition(pBot.pBotEnemy, globaltime - RANDOM_FLOAT2(prediction_times[pBot.bot_skill][0], prediction_times[pBot.bot_skill][1]));
+   v_predicted_pos = GetPredictedPlayerPosition(pBot.pBotEnemy, globaltime - skill_settings[pBot.bot_skill].prediction_latency, globaltime);
 
    // do we need to aim at the feet?
    if (pBot.current_weapon.iId == VALVE_WEAPON_RPG)
@@ -1206,11 +1264,11 @@ void BotShootAtEnemy( bot_t &pBot )
       if((FVisible(v_enemy_aimpos, pEdict, &pHit) || pHit == pBot.pBotEnemy) &&
           FInViewCone(v_enemy_aimpos, pEdict)) 
       {
-         float shootcone_width    = shootcone_values[pBot.bot_skill][0];
-         float shootcone_minangle = shootcone_values[pBot.bot_skill][1];
-   
-      	 // check if it is possible to hit target
-         if(FInShootCone(v_enemy_aimpos, pEdict, f_distance, shootcone_width, shootcone_minangle)) 
+         float shootcone_radius   = skill_settings[pBot.bot_skill].shootcone_radius;
+         float shootcone_minangle = skill_settings[pBot.bot_skill].shootcone_minangle;
+         
+         // check if it is possible to hit target
+         if(FInShootCone(v_enemy_aimpos, pEdict, f_distance, shootcone_radius, shootcone_minangle)) 
          {
             // select the best weapon to use at this distance and fire...
             if(!BotFireWeapon(v_enemy, pBot, 0))

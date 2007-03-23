@@ -1,7 +1,5 @@
 //
-// HPB bot - botman's High Ping Bastard bot
-//
-// (http://planethalflife.com/botman/)
+// JK_Botti - be more human!
 //
 // bot.cpp
 //
@@ -19,6 +17,7 @@
 #include "bot_func.h"
 #include "waypoint.h"
 #include "bot_weapons.h"
+#include "bot_skill.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -54,13 +53,7 @@ extern qboolean is_team_play;
 extern int number_skins;
 extern skin_t bot_skins[MAX_SKINS];
 
-
-#define PLAYER_SEARCH_RADIUS     40.0
-#define FLF_PLAYER_SEARCH_RADIUS 60.0
-
-
 #define MAX_BOT_NAMES 100
-
 int number_names = 0;
 char bot_names[MAX_BOT_NAMES][BOT_NAME_LEN+1];
 
@@ -71,20 +64,6 @@ char bot_logos[MAX_BOT_LOGOS][16];
 bot_t bots[32];   // max of 32 bots in a game
 qboolean b_observer_mode = FALSE;
 qboolean b_botdontshoot = FALSE;
-
-// how often (out of 1000 times) the bot will pause, based on bot skill
-float pause_frequency[5] = {4, 7, 10, 15, 20};
-
-float pause_time[5][2] = {
-   {0.2, 0.5}, {0.5, 1.0}, {0.7, 1.3}, {1.0, 1.7}, {1.2, 2.0}};
-
-float battle_straife[5] = { 50.0, 40.0, 30.0, 20.0, 5.0 };
-
-float optimal_distances[5] = { 1.0, 1.2, 1.4, 1.6, 1.8 };
-
-float strafe_percents[5] = { 30.0, 20.0, 10.0, 5.0, 1.0 };
-
-extern float prediction_times[5][2];
 
 
 void BotSpawnInit( bot_t &pBot )
@@ -108,23 +87,19 @@ void BotSpawnInit( bot_t &pBot )
    pBot.f_random_waypoint_time = globaltime;
    pBot.waypoint_goal = -1;
    pBot.f_waypoint_goal_time = 0.0;
-   pBot.waypoint_near_flag = FALSE;
-   pBot.waypoint_flag_origin = Vector(0, 0, 0);
    pBot.prev_waypoint_distance = 0.0;
+   pBot.f_last_item_found = 0.0;
 
-   pBot.weapon_points[0] = 0;
-   pBot.weapon_points[1] = 0;
-   pBot.weapon_points[2] = 0;
-   pBot.weapon_points[3] = 0;
-   pBot.weapon_points[4] = 0;
-   pBot.weapon_points[5] = 0;
+   pBot.exclude_points[0] = 0;
+   pBot.exclude_points[1] = 0;
+   pBot.exclude_points[2] = 0;
+   pBot.exclude_points[3] = 0;
+   pBot.exclude_points[4] = 0;
+   pBot.exclude_points[5] = 0;
 
    pBot.blinded_time = 0.0;
-
    pBot.f_max_speed = CVAR_GET_FLOAT("sv_maxspeed");
-
    pBot.f_prev_speed = 0.0;  // fake "paused" since bot is NOT stuck
-
    pBot.f_find_item = 0.0;
 
    pBot.ladder_dir = LADDER_UNKNOWN;
@@ -155,6 +130,9 @@ void BotSpawnInit( bot_t &pBot )
    pBot.f_aim_x_angle_delta = 0.0;
    pBot.f_aim_y_angle_delta = 0.0;
 
+   pBot.wpt_goal_type = WPT_GOAL_NONE;
+   pBot.f_evaluate_goal_time = 0.0;
+
    pBot.pBotUser = NULL;
    pBot.f_bot_use_time = 0.0;
    pBot.b_bot_say = FALSE;
@@ -183,7 +161,6 @@ void BotSpawnInit( bot_t &pBot )
 
    pBot.f_pause_time = 0.0;
    pBot.f_sound_update_time = 0.0;
-   pBot.bot_has_flag = FALSE;
 
    pBot.b_see_tripmine = FALSE;
    pBot.b_shoot_tripmine = FALSE;
@@ -419,18 +396,18 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
                if (pPlayer)
                   ClientPrint(pPlayer, HUD_PRINTNOTIFY, err_msg );
                if (IsDedicatedServer)
-                  printf(err_msg);
+                  UTIL_ServerPrintf(err_msg);
 
                if (pPlayer)
                   ClientPrint(pPlayer, HUD_PRINTNOTIFY,
                      "use barney, gina, gman, gordon, helmet, hgrunt,\n");
                if (IsDedicatedServer)
-                  printf("use barney, gina, gman, gordon, helmet, hgrunt,\n");
+                  UTIL_ServerPrintf("use barney, gina, gman, gordon, helmet, hgrunt,\n");
                if (pPlayer)
                   ClientPrint(pPlayer, HUD_PRINTNOTIFY,
                      "    recon, robo, scientist, or zombie\n");
                if (IsDedicatedServer)
-                  printf("    recon, robo, scientist, or zombie\n");
+                  UTIL_ServerPrintf("    recon, robo, scientist, or zombie\n");
                return;
             }
          }
@@ -457,10 +434,10 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
       
       if ((arg3 != NULL) && (*arg3 != 0))
          skill = atoi(arg3);
-//printf("skill1: %d\n", skill);
+//UTIL_ServerPrintf("skill1: %d\n", skill);
       if ((skill < 1) || (skill > 5))
          skill = default_bot_skill;
-//printf("skill2: %d\n", skill);
+//UTIL_ServerPrintf("skill2: %d\n", skill);
       if ((arg4 != NULL) && (*arg4 != 0))
          top_color = atoi(arg4);
 
@@ -502,20 +479,34 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
    }
    
    //
-   if(bot_add_level_tag) {
-      int start = 0;
-      
-      if(!strncmp(c_name, "[lvl", 4) && (c_name[4] >= '1' && c_name[4] <= '5') && c_name[5] == ']')
-      {
-         start = 6;
-      }
-      
+   // Bug fix: remove "(1)" tags from name, HLDS adds "(1)" on duplicated names (and "(2), (3), ...")
+   //
+   if(c_name[0] == '(' && (c_name[1] >= '1' && c_name[1] <= '9') && c_name[2] == ')') 
+   {
+      length = strlen(&c_name[3]) + 1; // str+null
+      for(i = 0; i < length; i++)
+         c_name[i] = (&c_name[3])[i];
+   }
+   
+   //
+   // Bug fix: remove [lvlX] tags always
+   //
+   if(!strncmp(c_name, "[lvl", 4) && (c_name[4] >= '1' && c_name[4] <= '5') && c_name[5] == ']')
+   {
+      length = strlen(&c_name[6]) + 1; // str+null
+      for(i = 0; i < length; i++)
+         c_name[i] = (&c_name[6])[i];
+   }
+   
+   //
+   if(bot_add_level_tag) 
+   {
       char tmp[sizeof(c_name)];
       
-      snprintf(tmp, sizeof(tmp), "[lvl%d]%s", skill, &c_name[start]);
-      tmp[BOT_NAME_LEN] = 0;  // make sure c_name is null terminated
+      snprintf(tmp, sizeof(tmp), "[lvl%d]%s", skill, c_name);
+      tmp[sizeof(tmp)-1] = 0;  // make sure c_name is null terminated
       strcpy(c_name, tmp);
-      c_name[BOT_NAME_LEN] = 0;  // make sure c_name is null terminated
+      c_name[sizeof(c_name)-1] = 0;  // make sure c_name is null terminated
    }
    
    BotEnt = (*g_engfuncs.pfnCreateFakeClient)( c_name );
@@ -533,7 +524,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
       int index;
 
       if (IsDedicatedServer)
-         printf("Creating bot (jk_botti)...\n");
+         UTIL_ServerPrintf("Creating bot (jk_botti)...\n");
       else if (pPlayer)
          ClientPrint( pPlayer, HUD_PRINTNOTIFY, "Creating bot (jk_botti)...\n");
 
@@ -587,7 +578,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
       // Pieter van Dijk - use instead of DispatchSpawn() - Hip Hip Hurray!
       MDLL_ClientPutInServer( BotEnt );
 
-      BotEnt->v.flags |= FL_THIRDPARTYBOT;
+      BotEnt->v.flags |= FL_THIRDPARTYBOT | FL_FAKECLIENT;
 
       // initialize all the variables for this bot...
 
@@ -844,11 +835,43 @@ void BotFindItem( bot_t &pBot )
 
    pBot.pBotPickupItem = NULL;
 
+   // forget about our item if it's been three seconds
+   // forget about item if it we picked it up
+   if (pBot.f_last_item_found > 0 && pBot.f_last_item_found < (gpGlobals->time - 5.0))
+   {
+      /*if (b_chat_debug)
+      {
+         sprintf(pBot.debugchat, "I tried to get to %s for too long!\n",
+            STRING(pBot.pBotPickupItem->v.classname));
+         UTIL_HostSay(pBot.pEdict, 0, pBot.debugchat);
+      }*/
+      pBot.f_find_item = gpGlobals->time + 2.0;
+      pBot.f_last_item_found = -1;
+      pBot.pBotPickupItem = NULL;
+   }
+
+   if (pBot.pBotPickupItem && ((pBot.pBotPickupItem->v.effects & EF_NODRAW) ||
+      !BotEntityIsVisible(pBot, UTIL_GetOrigin(pBot.pBotPickupItem))))
+   {
+      /*if (b_chat_debug)
+      {
+         sprintf(pBot.debugchat, "I can't see %s anymore.\n",
+            STRING(pBot.pBotPickupItem->v.classname));
+         UTIL_HostSay(pBot.pEdict, 0, pBot.debugchat);
+      }*/
+      pBot.f_last_item_found = -1;
+      pBot.pBotPickupItem = NULL;
+   }
+
+   // halt the rest of the function
+   if (pBot.f_find_item > gpGlobals->time || pBot.pBotPickupItem)
+      return;
+
    // use a MUCH smaller search radius when waypoints are available
    if ((num_waypoints > 0) && (pBot.curr_waypoint_index != -1))
-      radius = 100.0;
+      radius = 260.0;
    else
-      radius = 500.0;
+      radius = 520.0;
 
    min_distance = radius + 1.0;
 
@@ -886,7 +909,7 @@ void BotFindItem( bot_t &pBot )
             vecEnd = entity_origin;
 
             // trace a line from bot's eyes to func_ladder entity...
-            UTIL_TraceLine( vecStart, vecEnd, dont_ignore_monsters,
+            UTIL_TraceHull( vecStart, vecEnd, dont_ignore_monsters, point_hull,
                             pEdict->v.pContainingEntity, &tr);
 
             // check if traced all the way up to the entity (didn't hit wall)
@@ -914,7 +937,7 @@ void BotFindItem( bot_t &pBot )
          else
          {
             // trace a line from bot's eyes to func_ entity...
-            UTIL_TraceLine( vecStart, vecEnd, dont_ignore_monsters,
+            UTIL_TraceHull( vecStart, vecEnd, dont_ignore_monsters, point_hull,
                             pEdict->v.pContainingEntity, &tr);
 
             // check if traced all the way up to the entity (didn't hit wall)
@@ -1052,6 +1075,18 @@ void BotFindItem( bot_t &pBot )
          {
             // check if entity is a weapon...
             if (strncmp("weapon_", item_name, 7) == 0)
+            {
+               if (pent->v.effects & EF_NODRAW)
+               {
+                  // someone owns this weapon or it hasn't respawned yet
+                  continue;
+               }
+
+               can_pickup = TRUE;
+            }
+            
+            // pick up longjump
+            else if (strcmp("item_longjump", item_name) == 0)
             {
                if (pent->v.effects & EF_NODRAW)
                {
@@ -1211,8 +1246,8 @@ qboolean BotLookForGrenades( bot_t &pBot )
       if (FInViewCone( entity_origin, pEdict ) &&
           FVisible( entity_origin, pEdict ))
       {
-      	 const char ** p_grna = grenade_names;
-      	 
+          const char ** p_grna = grenade_names;
+          
          while(*p_grna) {
             if (strcmp(*p_grna, classname) == 0)
                return TRUE;
@@ -1291,7 +1326,7 @@ void BotThink( bot_t &pBot )
    const float globaltime = gpGlobals->time;
 
 
-   pEdict->v.flags |= FL_THIRDPARTYBOT;
+   pEdict->v.flags |= FL_THIRDPARTYBOT | FL_FAKECLIENT;
 
    if (pBot.name[0] == 0)  // name filled in yet?
       strcpy(pBot.name, STRING(pBot.pEdict->v.netname));
@@ -1533,14 +1568,13 @@ void BotThink( bot_t &pBot )
          if ((pPlayer) && (!pPlayer->free) && (pPlayer != pEdict))
          {
             // if observer mode enabled, don't listen to this player...
-            if ((b_observer_mode) && !(pPlayer->v.flags & (FL_FAKECLIENT | FL_THIRDPARTYBOT | FL_PROXY)))
+            if ((b_observer_mode) && !(pPlayer->v.flags & FL_FAKECLIENT) && !(pPlayer->v.flags & FL_THIRDPARTYBOT))
                continue;
 
-            if (FBitSet(pPlayer->v.flags, FL_CLIENT) &&
-                GetPredictedIsAlive(pPlayer, globaltime - prediction_times[pBot.bot_skill][0]))
+            if (GetPredictedIsAlive(pPlayer, globaltime - skill_settings[pBot.bot_skill].prediction_latency))
             {
                // check for sounds being made by other players...
-               if (UpdateSounds(pEdict, pPlayer))
+               if (UpdateSounds(pBot, pPlayer))
                {
                   pBot.pBotEnemy = pPlayer;
                   
@@ -2051,14 +2085,14 @@ void BotThink( bot_t &pBot )
 
             // should the bot pause for a while here?
             // (don't pause on ladders or while being "used"...
-            if ((RANDOM_LONG2(1, 1000) <= pause_frequency[pBot.bot_skill]) &&
+            if ((RANDOM_LONG2(1, 1000) <= skill_settings[pBot.bot_skill].pause_frequency) &&
                 (pEdict->v.movetype != MOVETYPE_FLY) &&
                 (pBot.pBotUser == NULL))
             {
                // set the time that the bot will stop "pausing"
                pBot.f_pause_time = globaltime +
-                  RANDOM_FLOAT2(pause_time[pBot.bot_skill][0],
-                               pause_time[pBot.bot_skill][1]) * 0.2;
+                  RANDOM_FLOAT2(skill_settings[pBot.bot_skill].pause_time[0],
+                               skill_settings[pBot.bot_skill].pause_time[1]) * 0.2;
             }
          }
       }
@@ -2184,18 +2218,14 @@ void BotThink( bot_t &pBot )
       }
    }
    
-   if (pBot.f_pause_time > globaltime)  // is the bot "paused"?
-      pBot.f_move_speed = 0;  // don't move while pausing
-   
-   //TODO: doesn't work.. bots freeze
-   
    // don't go too close to enemy
    // strafe instead
    if(pBot.pBotEnemy && 
       FInViewCone(pBot.pBotEnemy->v.origin, pEdict) && 
-      (pBot.pBotEnemy->v.origin - pEdict->v.origin).Length() < (pBot.current_opt_distance * optimal_distances[pBot.bot_skill]))
+      (pBot.pBotEnemy->v.origin - pEdict->v.origin).Length() < pBot.current_opt_distance &&
+      RANDOM_LONG2(1, 1000) <= skill_settings[pBot.bot_skill].keep_optimal_distance)
    {
-      if(RANDOM_LONG2(1, 100) <= battle_straife[pBot.bot_skill]) 
+      if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].battle_strafe) 
       {
          if(pBot.f_strafe_time <= globaltime) {
             pBot.f_strafe_time = globaltime + RANDOM_FLOAT2(1.0, 2.0);
@@ -2213,7 +2243,7 @@ void BotThink( bot_t &pBot )
    {
       pBot.f_strafe_time = globaltime + RANDOM_FLOAT2(0.1, 1.0);
 
-      if (RANDOM_LONG2(1, 100) <= strafe_percents[pBot.bot_skill])
+      if (RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].normal_strafe)
       {
          if (RANDOM_LONG2(1, 100) <= 50)
             pBot.f_strafe_direction = -1.0;
@@ -2241,8 +2271,8 @@ void BotThink( bot_t &pBot )
         
         if(!(pEdict->v.button & IN_DUCK) && 
            (pEdict->v.movetype != MOVETYPE_FLY) &&
-           (moved_distance >= 16.0) && 
-           (pBot.f_prev_speed >= 10.0) && 
+           (moved_distance >= 10.0) && 
+           /*(pBot.f_prev_speed >= 10.0) &&*/
            (pBot.f_move_speed > 1)) {
                 pEdict->v.button |= IN_JUMP;
                 pBot.f_random_jump_duck_time = globaltime + RANDOM_FLOAT2(0.05, 0.2);
@@ -2267,6 +2297,10 @@ void BotThink( bot_t &pBot )
       else
          pBot.f_move_speed = -pBot.f_move_speed;
    }
+
+   // is the bot "paused"?
+   if (pBot.f_pause_time > globaltime) 
+      pBot.f_move_speed = pBot.f_strafe_direction = 0;  // don't move while pausing
 
    pEdict->v.v_angle.z = 0;  // reset roll to 0 (straight up and down)
 
@@ -2294,7 +2328,7 @@ void BotThink( bot_t &pBot )
       f_strafe_speed = calc.x;
       pBot.f_move_speed = calc.y;
    }
-   
+     
    BotAimThink( pBot );
    
    g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot.f_move_speed,

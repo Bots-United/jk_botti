@@ -1,7 +1,5 @@
 //
-// HPB bot - botman's High Ping Bastard bot
-//
-// (http://planethalflife.com/botman/)
+// JK_Botti - be more human!
 //
 // bot_navigate.cpp
 //
@@ -19,6 +17,8 @@
 #include "bot_func.h"
 #include "bot_weapons.h"
 #include "waypoint.h"
+#include "bot_weapons.h"
+#include "bot_weapon_select.h"
 
 
 extern WAYPOINT waypoints[MAX_WAYPOINTS];
@@ -30,37 +30,11 @@ extern bot_weapon_t weapon_defs[MAX_WEAPONS];
 // SET THIS UP BASED ON MOD!!!
 int max_drop_height = 800;
 
-char welcome_msg[80];
+char welcome_msg[80] = "Kiitos kun kaytat JK botti <3\nThank you for using JK botti <3\n";
 int x_welcome_msg_len = 42;
-/*unsigned char x_welcome_msg[] = {
-'H'^0x5a, 'P'^0xa5, 'B'^0x5a, ' '^0xa5, 'b'^0x5a, 'o'^0xa5, 't'^0x5a, ' '^0xa5,
-'-'^0x5a, ' '^0xa5, 'h'^0x5a, 't'^0xa5, 't'^0x5a, 'p'^0xa5, ':'^0x5a, '/'^0xa5,
-'/'^0x5a, 'p'^0xa5, 'l'^0x5a, 'a'^0xa5, 'n'^0x5a, 'e'^0xa5, 't'^0x5a, 'h'^0xa5,
-'a'^0x5a, 'l'^0xa5, 'f'^0x5a, 'l'^0xa5, 'i'^0x5a, 'f'^0xa5, 'e'^0x5a, '.'^0xa5,
-'c'^0x5a, 'o'^0xa5, 'm'^0x5a, '/'^0xa5, 'b'^0x5a, 'o'^0xa5, 't'^0x5a, 'm'^0xa5,
-'a'^0x5a, 'n'^0xa5};*/
 
 
 extern void BotCheckTeamplay(void);
-
-
-void welcome_init(void)
-{
-   /*
-   for (int i=0; i < x_welcome_msg_len; i++)
-   {
-      if ((i % 2) == 0)
-         welcome_msg[i] = x_welcome_msg[i]^0x5a;
-      else
-         welcome_msg[i] = x_welcome_msg[i]^0xa5;
-   }
-   welcome_msg[x_welcome_msg_len] = 0;*/
-   
-   strcpy(welcome_msg, "Kiitos kun kaytat JK botti <3\n");
-   for(int i = strlen(welcome_msg); i < x_welcome_msg_len; i++)
-      welcome_msg[i] = ' ';
-   welcome_msg[x_welcome_msg_len] = 0;
-}
 
 
 // returns the number of degrees left to turn toward ideal pitch...
@@ -214,7 +188,6 @@ qboolean BotFindWaypoint( bot_t &pBot )
 {
    const float globaltime = gpGlobals->time;
    int index, select_index;
-   char teamstr[32];
    PATH *pPath = NULL;
    int path_index;
    float distance, min_distance[3];
@@ -222,18 +195,13 @@ qboolean BotFindWaypoint( bot_t &pBot )
 
    edict_t *pEdict = pBot.pEdict;
    
-   if(is_team_play)
-      UTIL_GetTeam(pEdict, teamstr);
-   else
-      teamstr[0] = 0;
-
    for (index=0; index < 3; index++)
    {
       min_distance[index] = 9999.0;
       min_index[index] = -1;
    }
 
-   index = WaypointFindPath(&pPath, &path_index, pBot.curr_waypoint_index, atoi(teamstr));
+   index = WaypointFindPath(&pPath, &path_index, pBot.curr_waypoint_index);
 
    while (index != -1)
    {
@@ -275,7 +243,7 @@ qboolean BotFindWaypoint( bot_t &pBot )
       }
 
       // find the next path to a waypoint
-      index = WaypointFindPath(&pPath, &path_index, pBot.curr_waypoint_index, atoi(teamstr));
+      index = WaypointFindPath(&pPath, &path_index, pBot.curr_waypoint_index);
    }
 
    select_index = -1;
@@ -325,6 +293,230 @@ qboolean BotFindWaypoint( bot_t &pBot )
 }
 
 
+void BotEvaluateGoal( bot_t &pBot )
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   // we're dying!  Forget about our goal
+   if (pBot.waypoint_goal != -1 && pEdict->v.health <= 25 && pBot.wpt_goal_type != WPT_GOAL_HEALTH)
+   {
+      pBot.f_waypoint_goal_time = 0;
+      pBot.waypoint_goal = -1;
+   }
+}
+
+
+int BotFindWaypointGoal( bot_t &pBot )
+{
+   // misc wpt stuff
+   int index = -1, temp_index = -1;
+   int count = 0;
+   edict_t *pEdict = pBot.pEdict;
+   bot_weapon_select_t *pSelect;
+   float distance;
+   float mindistance = 9999;
+
+   pSelect = &valve_weapon_select[0];
+
+   int random = RANDOM_LONG2(1,100);
+   int health_chance = (int)floor((MAX_HEALTH - pEdict->v.health));
+   
+   // this forces to get more health if it's less than 25
+   if (health_chance != 0) 
+   	health_chance += 25;
+   
+   if (random < health_chance)
+   {   // look for health if we're pretty dead
+      index = WaypointFindNearestGoal(pEdict, pBot.curr_waypoint_index, W_FL_HEALTH, pBot.exclude_points);
+
+      while ((index == -1) && (count < 3))
+      {
+         index = WaypointFindRandomGoal(pEdict, W_FL_HEALTH);
+
+         count++;
+      }
+      // clear our count
+      count = 0;
+
+      if (index != -1)
+         pBot.wpt_goal_type = WPT_GOAL_HEALTH;
+
+      return index;
+   }
+
+   if (!pBot.pBotEnemy)
+   {   // only if not engaging
+      if (pEdict->v.health < MAX_HEALTH)
+      {   // find nearest health
+         temp_index = WaypointFindNearestGoal(pEdict, pBot.curr_waypoint_index, W_FL_HEALTH, pBot.exclude_points);
+
+         while ((temp_index == -1) && (count < 3))
+         {
+            temp_index = WaypointFindRandomGoal(pEdict, W_FL_HEALTH, pBot.exclude_points);
+
+            count++;
+         }
+         // clear our count
+         count = 0;
+         // get distance
+         if (temp_index > -1 && temp_index < num_waypoints)
+         {
+            distance = WaypointDistanceFromTo(pBot.curr_waypoint_index, temp_index);
+
+            if (distance < mindistance)
+            {
+               mindistance = distance;
+               index = temp_index;
+               pBot.wpt_goal_type = WPT_GOAL_HEALTH;
+            }
+         }
+      }
+
+      if (pEdict->v.armorvalue < 100)
+      {   // find nearest armor
+         temp_index = WaypointFindNearestGoal(pEdict, pBot.curr_waypoint_index, W_FL_ARMOR, pBot.exclude_points);
+
+         while ((temp_index == -1) && (count < 3))
+         {
+            temp_index = WaypointFindRandomGoal(pEdict, W_FL_ARMOR, pBot.exclude_points);
+
+            count++;
+         }
+         // clear our count
+         count = 0;
+         // get distance
+         if (temp_index > -1 && temp_index < num_waypoints)
+         {
+            distance = WaypointDistanceFromTo(pBot.curr_waypoint_index, temp_index);
+
+            if (distance < mindistance)
+            {
+               mindistance = distance;
+               index = temp_index;
+               pBot.wpt_goal_type = WPT_GOAL_ARMOR;
+            }
+         }
+      }
+
+/*
+      if (!pBot.b_longjump)
+      {   // find a longjump module
+         temp_index = WaypointFindNearestGoal(pEdict, pBot.curr_waypoint_index, W_FL_LONGJUMP, pBot.exclude_points);
+
+         while ((temp_index == -1) && (count < 3))
+         {
+            index = WaypointFindRandomGoal(pEdict, W_FL_LONGJUMP, pBot.exclude_points);
+            count++;
+         }
+         count = 0;
+         // get distance
+         if (temp_index > -1 && temp_index < num_waypoints)
+         {
+            distance = WaypointDistanceFromTo(pBot.curr_waypoint_index, temp_index);
+
+            if (distance < mindistance)
+            {
+               mindistance = distance;
+               index = temp_index;
+               pBot.wpt_goal_type = WPT_GOAL_ITEM;
+            }
+         }
+      }
+*/
+
+      int good_weapon_num = GetGoodWeaponCount(pBot);
+      qboolean ammo_low = AllWeaponsRunningOutOfAmmo(pBot);
+            
+      if (good_weapon_num == 0 || (ammo_low && good_weapon_num < 3))
+      {  // find new weapon if only have shitty weapons or running out of ammo on all weapons 
+         // find weapon
+         temp_index = WaypointFindNearestGoal(pEdict, pBot.curr_waypoint_index, W_FL_WEAPON, pBot.exclude_points);
+                     
+         if (temp_index != -1)
+         {
+            distance = WaypointDistanceFromTo(pBot.curr_waypoint_index, temp_index); 
+            if (distance < mindistance)
+            {
+               index = temp_index;
+               mindistance = distance;
+               pBot.wpt_goal_type = WPT_GOAL_WEAPON;
+            }
+         }
+      }
+
+      if (ammo_low)
+      {  // find new ammo if running out of ammo on all weapons 
+         // find weapon
+         temp_index = WaypointFindNearestGoal(pEdict, pBot.curr_waypoint_index, W_FL_AMMO, pBot.exclude_points);
+                     
+         if (temp_index != -1)
+         {
+            distance = WaypointDistanceFromTo(pBot.curr_waypoint_index, temp_index); 
+            if (distance < mindistance)
+            {
+               index = temp_index;
+               mindistance = distance;
+               pBot.wpt_goal_type = WPT_GOAL_AMMO;
+            }
+         }
+      } 
+   }
+   else if (pBot.pBotEnemy)
+   {   // find a waypoint near our enemy
+      index = WaypointFindNearest(pBot.pBotEnemy, 512);
+
+      if (index != -1)
+      {
+         pBot.wpt_goal_type = WPT_GOAL_ENEMY;
+      }
+   }
+
+   // we couldn't find ANYTHING, go somewhere random
+   if (index == -1)
+   {
+      index = WaypointFindRandomGoal(pEdict, 0);
+
+      if (index != -1)
+         pBot.wpt_goal_type = WPT_GOAL_NONE;
+   }
+
+
+   if (index != -1)
+   {     
+      /*
+      char msg[80];
+      switch (pBot.wpt_goal_type)
+      {
+         case WPT_GOAL_HEALTH:
+            snprintf(msg, sizeof(msg), "[%s] %s", pBot.name, "I am going for some health!\n");
+            break;
+         case WPT_GOAL_ARMOR:
+            snprintf(msg, sizeof(msg), "[%s] %s", pBot.name, "I am going for some armor!\n");
+            break;
+         case WPT_GOAL_WEAPON:
+            snprintf(msg, sizeof(msg), "[%s] %s", pBot.name, "I am going for a weapon!\n");
+            break;
+         case WPT_GOAL_AMMO:
+            snprintf(msg, sizeof(msg), "[%s] %s", pBot.name, "I am going for some ammo!\n");
+            break;
+         case WPT_GOAL_ITEM:
+            snprintf(msg, sizeof(msg), "[%s] %s", pBot.name, "I am going for an item!\n");
+            break;
+         case WPT_GOAL_ENEMY:
+            snprintf(msg, sizeof(msg), "[%s] %s", pBot.name, "I am tracking/engaging an enemy!\n");
+            break;
+         default:
+            snprintf(msg, sizeof(msg), "[%s] %s", pBot.name, "I have an unknown goal!\n");
+            break;
+      }
+      
+      SERVER_PRINT(msg);*/
+   }
+
+   return index;
+}
+
+
 qboolean BotHeadTowardWaypoint( bot_t &pBot )
 {
    const float globaltime = gpGlobals->time;
@@ -334,20 +526,10 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
    int index;
    qboolean status;
    float waypoint_distance, min_distance;
-   char teamstr[32];
-   qboolean bot_has_flag = FALSE;
    qboolean touching;
 
    edict_t *pEdict = pBot.pEdict;
 
-   if (!checked_teamplay)  // check for team play...
-      BotCheckTeamplay();
-
-   // is team play enabled (or is it Counter-Strike)?
-   if (is_team_play)
-      UTIL_GetTeam(pEdict, teamstr);
-   else
-      teamstr[0] = 0;  // not team play (all waypoints are valid for everyone)
 
    // check if the bot has been trying to get to this waypoint for a while...
    if ((pBot.f_waypoint_time + 5.0) < globaltime)
@@ -355,6 +537,11 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
       pBot.curr_waypoint_index = -1;  // forget about this waypoint
       pBot.waypoint_goal = -1;  // also forget about a goal
    }
+
+   // no goal, no goal time
+   if ((pBot.waypoint_goal == -1) && (pBot.f_waypoint_goal_time > globaltime + 2) &&
+       (pBot.f_waypoint_goal_time != 0.0))
+      pBot.f_waypoint_goal_time = 0.0;
 
    // check if we need to find a waypoint...
    if (pBot.curr_waypoint_index == -1)
@@ -366,12 +553,12 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
           (pBot.pEdict->v.waterlevel == 3))
       {
          // find the nearest visible waypoint
-         i = WaypointFindNearest(pEdict, REACHABLE_RANGE, atoi(teamstr));
+         i = WaypointFindNearest(pEdict, REACHABLE_RANGE);
       }
       else
       {
          // find the nearest reachable waypoint
-         i = WaypointFindReachable(pEdict, REACHABLE_RANGE, atoi(teamstr));
+         i = WaypointFindReachable(pEdict, REACHABLE_RANGE);
       }
 
       if (i == -1)
@@ -407,12 +594,12 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
                 (pBot.pEdict->v.waterlevel == 3))
             {
                // find the nearest visible waypoint
-               i = WaypointFindNearest(pEdict, REACHABLE_RANGE, atoi(teamstr));
+               i = WaypointFindNearest(pEdict, REACHABLE_RANGE);
             }
             else
             {
                // find the nearest reachable waypoint
-               i = WaypointFindReachable(pEdict, REACHABLE_RANGE, atoi(teamstr));
+               i = WaypointFindReachable(pEdict, REACHABLE_RANGE);
             }
 
             if (i == -1)
@@ -436,20 +623,18 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
    min_distance = 50.0;
 
    // if this is a crouch waypoint, bot must be fairly close...
-   if (waypoints[pBot.curr_waypoint_index].flags & W_FL_CROUCH)
-      min_distance = 20.0;
-
    if (waypoints[pBot.curr_waypoint_index].flags & W_FL_JUMP)
       min_distance = 25.0;
-
-   if (waypoints[pBot.curr_waypoint_index].flags & W_FL_SENTRYGUN)
-      min_distance = 20.0;
-
-   if (waypoints[pBot.curr_waypoint_index].flags & W_FL_DISPENSER)
+   
+   if (waypoints[pBot.curr_waypoint_index].flags & W_FL_CROUCH)
       min_distance = 20.0;
 
    // if this is a ladder waypoint, bot must be fairly close to get on ladder
    if (waypoints[pBot.curr_waypoint_index].flags & W_FL_LADDER)
+      min_distance = 20.0;
+
+   // if item waypoint, go close
+   if (waypoints[pBot.curr_waypoint_index].flags & (W_FL_LONGJUMP | W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
       min_distance = 20.0;
 
    // if trying to get out of water, need to get very close to waypoint...
@@ -475,6 +660,9 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
       qboolean waypoint_found = FALSE;
 
       pBot.prev_waypoint_distance = 0.0;
+
+      // reeval our goal
+      BotEvaluateGoal( pBot );
 
       // check if the waypoint is a door waypoint
       if (waypoints[pBot.curr_waypoint_index].flags & W_FL_DOOR)
@@ -519,42 +707,27 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
       // check if the bot has reached the goal waypoint...
       if (pBot.curr_waypoint_index == pBot.waypoint_goal)
       {
-         pBot.waypoint_goal = -1;  // forget this goal waypoint
-
-         if (pBot.waypoint_near_flag)
+         // if this waypoint has an item, make sure we get it
+         if (waypoints[pBot.waypoint_goal].flags & (W_FL_LONGJUMP| W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
          {
-            pBot.waypoint_near_flag = FALSE;
-
-            // just head towards the flag/card/ball
-            Vector v_flag = pBot.waypoint_flag_origin - pEdict->v.origin;
-
-            Vector bot_angles = UTIL_VecToAngles( v_flag );
-
-            pEdict->v.ideal_yaw = bot_angles.y;
-
-            BotFixIdealYaw(pEdict);
-
-            return TRUE;
+            pBot.pBotPickupItem = WaypointFindItem(pBot.waypoint_goal);
+            pBot.f_find_item = gpGlobals->time + 0.2;
+            pBot.f_last_item_found = gpGlobals->time;
          }
-      }
 
-      // check if the bot is carrying the flag/card/ball...
-      if (bot_has_flag)
-      {
-         pBot.bot_has_flag = TRUE;
+         pBot.exclude_points[4] = pBot.exclude_points[3];
+         pBot.exclude_points[3] = pBot.exclude_points[2];
+         pBot.exclude_points[2] = pBot.exclude_points[1];
+         pBot.exclude_points[1] = pBot.exclude_points[0];
+         pBot.exclude_points[0] = pBot.curr_waypoint_index;
 
-         // find the nearest flag goal waypoint...
+         if (pBot.pBotEnemy)
+            pBot.f_waypoint_goal_time = gpGlobals->time;
+         else   // a little delay time, since we'll touch the waypoint before we actually get what it has
+            pBot.f_waypoint_goal_time = gpGlobals->time + 0.25;
 
-         index = WaypointFindNearestGoal(pEdict, pBot.curr_waypoint_index,
-                                         atoi(teamstr), W_FL_FLAG_GOAL);
-
-         pBot.waypoint_goal = index;  // goal index or -1
-
-         pBot.waypoint_near_flag = FALSE;
-      }
-      else
-      {
-         pBot.bot_has_flag = FALSE;
+         pBot.waypoint_goal = -1;  // forget this goal waypoint
+         pBot.wpt_goal_type = WPT_GOAL_NONE;
       }
 
       // test special case of bot underwater and close to surface...
@@ -582,7 +755,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
             if (contents == CONTENTS_EMPTY)
             {
                // find the nearest visible waypoint
-               i = WaypointFindNearest(tr.vecEndPos, pEdict, 100, atoi(teamstr));
+               i = WaypointFindNearest(tr.vecEndPos, pEdict, 100);
 
                if (i != -1)
                {
@@ -598,60 +771,36 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
             }
          }
       }
-
+      
       // if the bot doesn't have a goal waypoint then pick one...
-      if ((pBot.waypoint_goal == -1) &&
+      if ((pBot.waypoint_goal == -1 || pBot.pBotEnemy) &&
           (pBot.f_waypoint_goal_time < globaltime))
       {
-         // don't pick a goal more often than every 10 seconds...
-         pBot.f_waypoint_goal_time = globaltime + 10.0;
-
-         pBot.waypoint_near_flag = FALSE;
-
-
-// IF HEALTH LESS THAN CRITICAL LEVEL, GO FIND HEALTH!!!
-
-// IF AMMO LESS THAN CRITICAL LEVEL, GO FIND AMMO!!!
-
-// GO FIND WEAPONS HERE!!!
-
-
-         if (RANDOM_LONG2(1, 100) <= 50)
-         {
-            index = WaypointFindNearestGoal(pEdict, pBot.curr_waypoint_index,
-                                               atoi(teamstr), W_FL_WEAPON, pBot.weapon_points);
-         }
-         else
-         {
-            int count = 0;
-
-            index = -1;
-
-            while ((index == -1) && (count < 3))
-            {
-               index = WaypointFindRandomGoal(pEdict, atoi(teamstr), W_FL_WEAPON, pBot.weapon_points);
-               count++;
-            }
-         }
+         // tracking something, pick goal much more often
+         if (pBot.pBotEnemy)
+            pBot.f_waypoint_goal_time = gpGlobals->time + 0.5;
+         else // don't pick a goal more often than every 120 seconds...
+            pBot.f_waypoint_goal_time = gpGlobals->time + 120.0;
+      
+         index = BotFindWaypointGoal(pBot);
 
          if (index != -1)
          {
             pBot.waypoint_goal = index;
 
-            pBot.weapon_points[4] = pBot.weapon_points[3];
-            pBot.weapon_points[3] = pBot.weapon_points[2];
-            pBot.weapon_points[2] = pBot.weapon_points[1];
-            pBot.weapon_points[1] = pBot.weapon_points[0];
-            pBot.weapon_points[0] = pBot.waypoint_goal;
+            pBot.exclude_points[4] = pBot.exclude_points[3];
+            pBot.exclude_points[3] = pBot.exclude_points[2];
+            pBot.exclude_points[2] = pBot.exclude_points[1];
+            pBot.exclude_points[1] = pBot.exclude_points[0];
+            pBot.exclude_points[0] = pBot.waypoint_goal;
          }
       }
-
+      
       // check if the bot has a goal waypoint...
       if (pBot.waypoint_goal != -1)
       {
          // get the next waypoint to reach goal...
-         i = WaypointRouteFromTo(pBot.curr_waypoint_index,
-                                    pBot.waypoint_goal, atoi(teamstr));
+         i = WaypointRouteFromTo(pBot.curr_waypoint_index, pBot.waypoint_goal);
 
          if (i != WAYPOINT_UNREACHABLE)  // can we get to the goal from here?
          {

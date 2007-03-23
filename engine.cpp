@@ -1,7 +1,5 @@
 //
-// HPB bot - botman's High Ping Bastard bot
-//
-// (http://planethalflife.com/botman/)
+// JK_Botti - be more human!
 //
 // engine.cpp
 //
@@ -39,13 +37,13 @@ void (*botMsgEndFunction)(void *, int) = NULL;
 int botMsgIndex;
 
 void pfnSetSize(edict_t *e, const float *rgflMin, const float *rgflMax) {
-	int index = UTIL_GetBotIndex(e);
-	if(index == -1)
-		RETURN_META (MRES_IGNORED);
-		
-	bots[index].ducking = (Vector((float *)rgflMin) == VEC_DUCK_HULL_MIN && Vector((float *)rgflMax) == VEC_DUCK_HULL_MAX);
-	
-	RETURN_META (MRES_IGNORED);
+   int index = UTIL_GetBotIndex(e);
+   if(index == -1)
+      RETURN_META (MRES_IGNORED);
+                
+   bots[index].ducking = (Vector((float *)rgflMin) == VEC_DUCK_HULL_MIN && Vector((float *)rgflMax) == VEC_DUCK_HULL_MAX);
+        
+   RETURN_META (MRES_IGNORED);
 }
 
 void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 ) {
@@ -74,11 +72,13 @@ void pfnTraceLine(const float *v1, const float *v2, int fNoMonsters, edict_t *pE
    
    BotPointGun (bots[index], FALSE); // update the bot's view angles in advance, but don't save them
    
-   MAKE_VECTORS (pEdict->v.v_angle); // build base vectors in bot's actual view direction
+   // build base vectors in bot's actual view direction
+   Vector vForward, vRight, vUp;
+   UTIL_MakeVectorsPrivate( pEdict->v.angles, vForward, vRight, vUp);
    
    // trace the line considering the ACTUAL view angles of the bot, not the ones it claims to have
    TRACE_LINE (pEdict->v.origin + pEdict->v.view_ofs,
-               pEdict->v.origin + pEdict->v.view_ofs + gpGlobals->v_forward * (Vector(v2) - Vector(v1)).Length(),
+               pEdict->v.origin + pEdict->v.view_ofs + vForward/*gpGlobals->v_forward*/ * (Vector(v2) - Vector(v1)).Length(),
                fNoMonsters, pEdict, ptr);
    
    RETURN_META(MRES_SUPERCEDE);

@@ -2,7 +2,11 @@ CPP = gcc -mno-cygwin -mwindows -mdll
 TARGET = jk_botti_mm
 ARCHFLAG = i686
 BASEFLAGS = 
-OPTFLAGS = -O3 -ffast-math -fno-rtti -fno-exceptions
+#OPTFLAGS = -O0 -ggdb 
+OPTFLAGS = -O3 -ffast-math -fomit-frame-pointer -fno-rtti -fno-exceptions
+#LINKFLGS = 
+LINKFLGS = -s
+
 INCLUDES = -I"./metamod" \
 	-I"./common" \
 	-I"./dlls" \
@@ -10,7 +14,8 @@ INCLUDES = -I"./metamod" \
 	-I"./pm_shared"
 CPPFLAGS = -Wall ${BASEFLAGS} ${OPTFLAGS} -march=${ARCHFLAG} ${INCLUDES}
 
-SRC = 	bot.cpp \
+SRC = 	bot_skill.cpp\
+	bot.cpp \
 	bot_chat.cpp \
 	bot_client.cpp \
 	bot_combat.cpp \
@@ -26,7 +31,7 @@ SRC = 	bot.cpp \
 OBJ = $(SRC:%.cpp=%.o)
 
 ${TARGET}.dll: ${OBJ}
-	${CPP} -o $@ ${OBJ} -Xlinker --add-stdcall-alias -s
+	${CPP} -o $@ ${OBJ} -Xlinker --add-stdcall-alias ${LINKFLGS}
 	cp $@ Release
 
 clean:

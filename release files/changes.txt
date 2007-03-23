@@ -1,5 +1,15 @@
 JK_botti
 
+[0.18]
+ - Modified autowaypointing to work on dedicated server automatically.
+   - Enable autowaypointing with 'autowaypoint 1' config setting.
+ - Fixed printing on dedicated server console (used printf before, changed to SERVER_PRINT).
+ - Creating waypoints based on map item locations in autowaypointing mode.
+ - Added basic goal system. (code from GraveBot by Ghoul)
+ - Added command for modifing weapon selection data (botweapon like in GraveBot)
+ - Made lower level bots less leet, lvl1 is still about the same.
+ - Bots can now hear footsteps and weapon firing.
+
 [0.17]
  - Config-files come with binary packages
  - Dropped Opposing Force support

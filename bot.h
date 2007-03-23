@@ -25,8 +25,13 @@ typedef int BOOL;
 // for detecting submods
 #define SUBMOD_HLDM 0
 #define SUBMOD_SEVS 1
-#define SUBMOD_BUBBLEMOD 2 //how to detect?
+#define SUBMOD_BUBBLEMOD 2
 #define SUBMOD_XDM 3
+
+
+// global defines
+#define MAX_HEALTH 100
+#define PLAYER_SEARCH_RADIUS     40.0
 
 
 // define a new bit flag for bot identification
@@ -48,11 +53,15 @@ void FakeClientCommand(edict_t *pBot, char *arg1, char *arg2, char *arg3);
 #define RESPAWN_NEED_TO_RESPAWN  2
 #define RESPAWN_IS_RESPAWNING    3
 
-// game start messages for OpFor...
-#define MSG_OPFOR_IDLE          1
-#define MSG_OPFOR_TEAM_SELECT   2
-#define MSG_OPFOR_CLASS_SELECT  3
-
+// waypoint goal types
+#define WPT_GOAL_NONE		0
+#define WPT_GOAL_HEALTH		1
+#define WPT_GOAL_ARMOR		2
+#define WPT_GOAL_WEAPON		3
+#define WPT_GOAL_AMMO		4
+#define WPT_GOAL_ITEM		5
+#define WPT_GOAL_LOCATION	8
+#define WPT_GOAL_ENEMY		9
 
 // instant damage (from cbase.h)
 #define DMG_CRUSH			(1 << 0)	// crushed by falling or moving object
@@ -171,14 +180,17 @@ typedef struct
    float f_random_waypoint_time;
    int waypoint_goal;
    float f_waypoint_goal_time;
-   qboolean waypoint_near_flag;
-   Vector waypoint_flag_origin;
    float prev_waypoint_distance;
-   int weapon_points[6];  // five weapon locations + 1 null
+   int exclude_points[6];  // five item locations + 1 null
+
+   float f_last_item_found;
 
    edict_t *pBotEnemy;
    float f_bot_see_enemy_time;
    float f_bot_find_enemy_time;
+
+   int wpt_goal_type;
+   float f_evaluate_goal_time;
 
    Vector v_enemy_previous_origin;
    float f_aim_tracking_time;
@@ -223,7 +235,6 @@ typedef struct
    float f_move_speed;
    float f_pause_time;
    float f_sound_update_time;
-   qboolean  bot_has_flag;
 
    qboolean  b_see_tripmine;
    qboolean  b_shoot_tripmine;
@@ -318,7 +329,7 @@ typedef struct
 } lumpinfo_t;
 
 
-Vector GetPredictedPlayerPosition(edict_t * pPlayer, float time);
+Vector GetPredictedPlayerPosition(edict_t * pPlayer, float time, const float globaltime);
 qboolean GetPredictedIsAlive(edict_t * pPlayer, float time);
 void GatherPlayerData(void);
 
@@ -440,7 +451,7 @@ inline qboolean IsAlive(edict_t *pEdict) {
            (pEdict->v.takedamage != 0));
 }
 
-qboolean FHearable(edict_t *pEdict, edict_t *pPlayer);
+qboolean FHearable(bot_t &pBot, edict_t *pPlayer);
 qboolean FInViewCone( const Vector & Origin, edict_t *pEdict);
 qboolean FInShootCone( const Vector & Origin, edict_t *pEdict, float distance, float target_radius, float min_angle);
 qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit = 0);
@@ -449,11 +460,13 @@ Vector GetGunPosition(edict_t *pEdict);
 void UTIL_SelectItem(edict_t *pEdict, char *item_name);
 void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index);
 Vector VecBModelOrigin(edict_t *pEdict);
-qboolean UpdateSounds(edict_t *pEdict, edict_t *pPlayer);
+qboolean UpdateSounds(bot_t &pBot, edict_t *pPlayer);
 void UTIL_ShowMenu( edict_t *pEdict, int slots, int displaytime, qboolean needmore, char *pText );
 void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2);
 void GetGameDir (char *game_dir);
 void UTIL_PrintBotInfo(void(*printfunc)(void *, char*), void * arg);
+void UTIL_ServerPrintf( char *fmt, ... );
+Vector UTIL_GetOrigin(edict_t *pEdict);
 
 void LoadBotChat(void);
 void BotTrimBlanks(char *in_string, char *out_string);
@@ -464,23 +477,31 @@ void BotChatName(char *original_name, char *out_name);
 void BotChatText(char *in_text, char *out_text);
 void BotChatFillInName(char *bot_say_msg, char *chat_text, char *chat_name, const char *bot_name);
 
-inline int RANDOM_LONG2(int lLow, int lHigh) { 
-	int tmp = RANDOM_LONG(lLow, lHigh);
+qboolean GetGoodWeaponCount(bot_t &pBot);
+qboolean AllWeaponsRunningOutOfAmmo(bot_t &pBot);
+
+inline int RANDOM_LONG2(int lLow, int lHigh) 
+{ 
+	if(lLow==lHigh)
+		return(lLow);
 	
-	if(RANDOM_LONG(0, 100) <= 50)
-	   tmp = RANDOM_LONG(lLow, lHigh);
+	int tmp[2];
+	tmp[0] = RANDOM_LONG(lLow, lHigh);
+	tmp[1] = RANDOM_LONG(lLow, lHigh);
 	
-	return(tmp);
+	return(tmp[(!RANDOM_LONG(0, 2) ? 0 : 1)]);
 }
 
-inline float RANDOM_FLOAT2(float flLow, float flHigh) { 
-	float tmp = RANDOM_FLOAT(flLow, flHigh);
+inline float RANDOM_FLOAT2(float flLow, float flHigh) 
+{
+	if(flLow==flHigh)
+		return(flLow);
 	
-	if(RANDOM_FLOAT(0.0, 100.0) <= 50.0)
-	   tmp = RANDOM_FLOAT(flLow, flHigh);
+	float tmp[2];
+	tmp[0] = RANDOM_FLOAT(flLow, flHigh);
+	tmp[1] = RANDOM_FLOAT(flLow, flHigh);
 	
-	return(tmp);
+	return(tmp[(!RANDOM_LONG(0, 2) ? 0 : 1)]);
 }
 
 #endif // BOT_H
-

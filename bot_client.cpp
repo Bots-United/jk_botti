@@ -1,7 +1,5 @@
 //
-// HPB bot - botman's High Ping Bastard bot
-//
-// (http://planethalflife.com/botman/)
+// JK_Botti - be more human!
 //
 // bot_client.cpp
 //
@@ -138,7 +136,8 @@ void BotClient_Valve_CurrentWeapon(void *p, int bot_index)
             bot_fire_delay_t *pDelay = NULL;
             int found = 0;
             
-            GetWeaponSelect(&pSelect, &pDelay);
+            pSelect = &valve_weapon_select[0];
+            pDelay = &valve_fire_delay[0];
             
             for(int i = 0; pSelect && pSelect[i].iId; i++) {
                if(iId == pSelect[i].iId) {

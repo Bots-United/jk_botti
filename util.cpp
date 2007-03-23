@@ -78,8 +78,17 @@ Vector UTIL_WrapAngles (const Vector & angles_to_wrap)
 }
 
 
+Vector UTIL_GetOrigin(edict_t *pEdict)
+{
+        if (strncmp(STRING(pEdict->v.classname), "func_", 5) == 0)
+                return VecBModelOrigin(pEdict);
+
+        return pEdict->v.origin; 
+}
+
+
 void ClientPrint( edict_t *pEntity, int msg_dest, const char *msg_name)
-{	
+{       
    if (GET_USER_MSG_ID (PLID, "TextMsg", NULL) <= 0)
       REG_USER_MSG ("TextMsg", -1);
 
@@ -246,15 +255,10 @@ bot_t *UTIL_GetBotPointer(edict_t *pEdict)
 
 qboolean FInViewCone(const Vector & Origin, edict_t *pEdict)
 {
-   // get current FOV of bot
-   /*float fov = pEdict->v.fov;
-   if(fov <= 0.0001) {
-      // use default FOV, 80 degrees
-      fov = 80;
-   }*/
-
-   MAKE_VECTORS ( pEdict->v.angles );
-   return (DotProduct((Origin - pEdict->v.origin).Normalize(), gpGlobals->v_forward) > cos(deg2rad(80/*fov*/)));
+   //MAKE_VECTORS ( pEdict->v.angles );
+   Vector vForward, vRight, vUp;
+   UTIL_MakeVectorsPrivate( pEdict->v.angles, vForward, vRight, vUp);
+   return (DotProduct((Origin - pEdict->v.origin).Normalize(), vForward) > cos(deg2rad(80)));
 }
 
 
@@ -294,12 +298,13 @@ qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit )
 
 qboolean FInShootCone(const Vector & Origin, edict_t *pEdict, float distance, float target_radius, float min_angle)
 {
-   MAKE_VECTORS ( pEdict->v.angles );
-   
    if(distance < 0.01)
       return TRUE;
+
+   Vector vForward, vRight, vUp;
+   UTIL_MakeVectorsPrivate( pEdict->v.angles, vForward, vRight, vUp);
    
-   float flDot = DotProduct( (Origin - pEdict->v.origin).Normalize(), gpGlobals->v_forward );
+   float flDot = DotProduct( (Origin - pEdict->v.origin).Normalize(), vForward );
    float cos_value = distance / sqrt( (target_radius * target_radius) / 4.0 + (distance * distance) );
    
    if( flDot > cos_value )
@@ -337,74 +342,15 @@ void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index)
 trigger_sound_t trigger_sounds[32];
 
 void SaveSound(edict_t * pPlayer, float time, const Vector & origin, float volume, float attenuation, int used) {
-	int i = ENTINDEX(pPlayer) - 1;
-	if(i < 0 || i >= gpGlobals->maxClients)
-		return;
-	
-	trigger_sounds[i].time = time;
-	trigger_sounds[i].origin = origin;
-	trigger_sounds[i].volume = volume;
-	trigger_sounds[i].attenuation = attenuation;
-	trigger_sounds[i].used = used;
-}
-
-qboolean FHearable(edict_t *pEdict, edict_t *pPlayer) {
-        const float globaltime = gpGlobals->time;
-	float distance;
-	trigger_sound_t * sound;
-	
-	int idx = ENTINDEX(pPlayer) - 1;
-	if(idx < 0 || idx >= gpGlobals->maxClients)
-		return(FALSE);
-	
-	sound = &trigger_sounds[idx];
-	if(!sound || !sound->used)
-		return(FALSE);
-	
-	if(sound->attenuation == 0.0) {
-		sound->used = 0;
-		return(FALSE);
-	}
-	
-	// check time between sound time and current time
-	if(sound->time + 5.0 >= globaltime) {
-		sound->used = 0;
-		return(FALSE);
-	}
-	
-	// check distance between sound and player
-	Vector v_sound_to_player = pPlayer->v.origin - sound->origin;
-	if(v_sound_to_player.Length() > 250) {
-		sound->used = 0;
-		return(FALSE);
-	}
-	
-	// is the bot close enough to hear this sound?
-	Vector v_sound = sound->origin - pEdict->v.origin;
-	distance = v_sound.Length();
-	
-	// is the bot close enough to hear this sound?
-	if(distance < (sound->volume * (1024 / sound->attenuation))) {
-		return(TRUE);
-	}
-	
-	return(FALSE);
-}
-
-
-qboolean UpdateSounds(edict_t *pEdict, edict_t *pPlayer) {
-	// is the bot close enough to hear this sound?
-	if(FHearable(pEdict, pPlayer)) {
-		Vector bot_angles = UTIL_VecToAngles( pPlayer->v.origin );
-		
-		pEdict->v.ideal_yaw = bot_angles.y;
-
-		BotFixIdealYaw(pEdict);
-
-		return(TRUE);
-	}
-	
-	return(FALSE);
+   int i = ENTINDEX(pPlayer) - 1;
+   if(i < 0 || i >= gpGlobals->maxClients)
+      return;
+   
+   trigger_sounds[i].time = time;
+   trigger_sounds[i].origin = origin;
+   trigger_sounds[i].volume = volume;
+   trigger_sounds[i].attenuation = attenuation;
+   trigger_sounds[i].used = used;
 }
 
 
@@ -432,13 +378,13 @@ void UTIL_PrintBotInfo(void(*printfunc)(void *, char*), void * arg) {
    {
       if (bots[bot_index].is_used) {
          count++;
-         snprintf(msg, sizeof(msg), "Bot #%d\n", count); 
+         snprintf(msg, sizeof(msg), "Bot #%d\n", count);
          printfunc(arg, msg);
-         snprintf(msg, sizeof(msg), " name: %s\n", bots[bot_index].name); 
+         snprintf(msg, sizeof(msg), " name: %s\n", bots[bot_index].name);
          printfunc(arg, msg);
-         snprintf(msg, sizeof(msg), " skin: %s\n", bots[bot_index].skin); 
+         snprintf(msg, sizeof(msg), " skin: %s\n", bots[bot_index].skin);
          printfunc(arg, msg);
-         snprintf(msg, sizeof(msg), " skill: %d\n", bots[bot_index].bot_skill + 1); 
+         snprintf(msg, sizeof(msg), " skill: %d\n", bots[bot_index].bot_skill + 1);
          printfunc(arg, msg);
          snprintf(msg, sizeof(msg), " got enemy: %s\n", (bots[bot_index].pBotEnemy != 0) ? "true" : "false"); 
          printfunc(arg, msg);
@@ -457,8 +403,8 @@ void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2)
    {
       if (*arg1 && *arg2)
       {
-      	 snprintf(filename, size, "valve/%s/%s", arg1, arg2);
-      	 return;
+         snprintf(filename, size, "valve/%s/%s", arg1, arg2);
+         return;
       }
    }
 
@@ -467,7 +413,7 @@ void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2)
       if (*arg1)
       {
          snprintf(filename, size, "valve/%s", arg1);
-      	 return;
+         return;
       }
    }
    
@@ -481,15 +427,29 @@ void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2)
 //=========================================================
 void UTIL_LogPrintf( char *fmt, ... )
 {
-   va_list        argptr;
-   static char    string[1024];
+   va_list argptr;
+   char string[1024];
 
-   va_start  ( argptr, fmt );
-   vsnprintf ( string, sizeof(string), fmt, argptr );
-   va_end    ( argptr );
+   va_start( argptr, fmt );
+   vsnprintf( string, sizeof(string), fmt, argptr );
+   va_end( argptr );
 
    // Print to server console
    ALERT( at_logged, "%s", string );
+}
+
+
+void UTIL_ServerPrintf( char *fmt, ... )
+{
+   va_list argptr;
+   char string[128];
+   
+   va_start( argptr, fmt );
+   vsnprintf( string, sizeof(string), fmt, argptr );
+   va_end( argptr );
+
+   // Print to server console
+   SERVER_PRINT( string );
 }
 
 

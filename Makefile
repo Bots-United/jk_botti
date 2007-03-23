@@ -1,8 +1,18 @@
-CPP = gcc-linux
+ifeq ($(OS),Windows_NT)
+	CPP = gcc -mno-cygwin
+	LINKFLAGS = -mdll -Xlinker --add-stdcall-alias -s
+	DLLEND = .dll
+else
+	CPP = gcc-linux
+	LINKFLAGS = -fPIC -shared -ldl -s
+	DLLEND = _i386.so
+endif
+
 TARGET = jk_botti_mm
 ARCHFLAG = i686
 BASEFLAGS = 
-OPTFLAGS = -O3 -ffast-math -fno-rtti -fno-exceptions
+OPTFLAGS = -O3 -ffast-math -fno-rtti -fno-exceptions #-fomit-frame-pointer
+#OPTFLAGS = -O0 -g -fno-rtti -fno-exceptions
 INCLUDES = -I"./metamod" \
 	-I"./common" \
 	-I"./dlls" \
@@ -16,6 +26,7 @@ SRC = 	bot.cpp \
 	bot_combat.cpp \
 	bot_models.cpp \
 	bot_navigate.cpp \
+	bot_skill.cpp \
 	bot_start.cpp \
 	dll.cpp \
 	engine.cpp \
@@ -25,8 +36,8 @@ SRC = 	bot.cpp \
 
 OBJ = $(SRC:%.cpp=%.o)
 
-${TARGET}_i386.so: ${OBJ}
-	${CPP} -fPIC -shared -o $@ ${OBJ} -ldl -s
+${TARGET}${DLLEND}: ${OBJ}
+	${CPP} -o $@ ${OBJ} ${LINKFLAGS}
 	cp $@ Release
 
 clean:

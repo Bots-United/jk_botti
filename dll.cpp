@@ -1,7 +1,5 @@
 //
-// HPB bot - botman's High Ping Bastard bot
-//
-// (http://planethalflife.com/botman/)
+// JK_Botti - be more human!
 //
 // dll.cpp
 //
@@ -23,7 +21,7 @@
 #include "waypoint.h"
 
 #define VER_MAJOR 0
-#define VER_MINOR 17
+#define VER_MINOR 20
 
 
 #define MENU_NONE  0
@@ -43,6 +41,7 @@ extern qboolean g_waypoint_on;
 extern qboolean g_auto_waypoint;
 extern qboolean g_path_waypoint;
 extern qboolean g_path_waypoint_enable;
+extern qboolean g_waypoint_updated;
 extern int num_waypoints;  // number of waypoints currently in use
 extern WAYPOINT waypoints[MAX_WAYPOINTS];
 extern float wp_display_time[MAX_WAYPOINTS];
@@ -50,6 +49,8 @@ extern bot_t bots[32];
 extern qboolean b_observer_mode;
 extern qboolean b_botdontshoot;
 extern char welcome_msg[80];
+
+#include "bot_weapon_select.h"
 
 int submod_id = SUBMOD_HLDM;
 
@@ -100,6 +101,7 @@ float bot_cfg_pause_time = 0.0;
 float respawn_time = 0.0;
 float gather_data_time = 0.0;
 qboolean spawn_time_reset = FALSE;
+float waypoint_time = 0.0;
 
 char *show_menu_none = {" "};
 char *show_menu_1 =
@@ -123,8 +125,6 @@ void BotLogoInit(void);
 void UpdateClientData(const struct edict_s *ent, int sendweapons, struct clientdata_s *cd);
 void ProcessBotCfgFile(void);
 void jk_botti_ServerCommand (void);
-
-extern void welcome_init(void);
 
 
 
@@ -271,7 +271,6 @@ C_DLLEXPORT int Meta_Detach (PLUG_LOADTIME now, PL_UNLOAD_REASON reason)
 // END of Metamod stuff
 
 
-
 void GameDLLInit( void )
 {
    int i;
@@ -280,8 +279,6 @@ void GameDLLInit( void )
 
    for (i=0; i<32; i++)
       clients[i] = NULL;
-
-   welcome_init();
 
    // initialize the bots array of structures...
    memset(bots, 0, sizeof(bots));
@@ -294,6 +291,7 @@ void GameDLLInit( void )
 
    RETURN_META (MRES_IGNORED);
 }
+
 
 int Spawn( edict_t *pent )
 {
@@ -328,6 +326,7 @@ int Spawn( edict_t *pent )
          bot_cfg_pause_time = 0.0;
          respawn_time = 0.0;
          gather_data_time = 0.0;
+         waypoint_time = -1.0;
          spawn_time_reset = FALSE;
 
          prev_num_bots = num_bots;
@@ -335,10 +334,13 @@ int Spawn( edict_t *pent )
 
          bot_check_time = gpGlobals->time + 60.0;
       }
+      else
+         CollectMapSpawnItems(pent);
    }
 
    RETURN_META_VALUE (MRES_IGNORED, 0);
 }
+
 
 BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ]  )
 { 
@@ -392,6 +394,7 @@ BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddres
    RETURN_META_VALUE (MRES_IGNORED, 0);
 }
 
+
 void ClientDisconnect( edict_t *pEntity )
 {
    if (gpGlobals->deathmatch)
@@ -426,6 +429,7 @@ void ClientDisconnect( edict_t *pEntity )
    RETURN_META (MRES_IGNORED);
 }
 
+
 void ClientPutInServer( edict_t *pEntity )
 {
    int i = 0;
@@ -441,9 +445,530 @@ void ClientPutInServer( edict_t *pEntity )
    RETURN_META (MRES_IGNORED);
 }
 
-static void print_to_client(void * arg, char * msg) {
+
+static void print_to_client(void *arg, char *msg) {
    ClientPrint((edict_t *)arg, HUD_PRINTNOTIFY, msg);
 }
+
+qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, const char * pcmd, const char * arg1, const char * arg2, const char * arg3, const char * arg4, const char * arg5, qboolean is_cfgcmd) 
+{
+   const float globaltime = gpGlobals->time;
+   char msg[128];
+   qboolean is_clientcmd;
+   qboolean is_servercmd;
+   
+   is_clientcmd = !is_cfgcmd && !!arg; //arg is pEntity on clientcmd
+   is_servercmd = !is_clientcmd && !is_cfgcmd;
+   
+   if (FStrEq(pcmd, "info"))
+   {
+      UTIL_PrintBotInfo(printfunc, arg);
+      
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "addbot"))
+   {
+      BotCreate( (edict_t *)arg, arg1, arg2, arg3, arg4, arg5 );
+
+      bot_check_time = globaltime + 5.0;
+      if(is_cfgcmd)
+         bot_cfg_pause_time = globaltime + 2.0;
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "observer"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+         if (temp)
+            b_observer_mode = TRUE;
+         else
+            b_observer_mode = FALSE;
+      }
+
+      if (b_observer_mode)
+         printfunc(arg, "observer mode ENABLED\n");
+      else
+         printfunc(arg, "observer mode DISABLED\n");
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "botskill"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < 1) || (temp > 5))
+            printfunc(arg, "invalid botskill value!\n");
+         else
+            default_bot_skill = temp;
+      }
+
+      snprintf(msg, sizeof(msg), "botskill is %d\n", default_bot_skill);
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "randomize_bots_on_mapchange"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         randomize_bots_on_mapchange = !!atoi(arg1);
+      }
+
+      snprintf(msg, sizeof(msg), "randomize_bots_on_mapchange is %s\n", (randomize_bots_on_mapchange?"on":"off"));
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_add_level_tag"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         bot_add_level_tag = !!atoi(arg1);
+      }
+
+      snprintf(msg, sizeof(msg), "bot_add_level_tag is %s\n", (bot_add_level_tag?"on":"off"));
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "turn_method"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if(temp != AIM_RACC_OLD && temp != AIM_RACC) 
+            printfunc(arg, "invalid turn_method value!\n");
+         else
+            turn_method = temp;
+      }
+
+      snprintf(msg, sizeof(msg), "turn_method is %d\n", turn_method);
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "botthinkfps"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < 1) || (temp > 100))
+            printfunc(arg, "invalid botthinkfps value!\n");
+         else
+            bot_think_spf = 1.0 / temp;
+      }
+
+      snprintf(msg, sizeof(msg), "botthinkfps is %.2f\n", 1.0 / bot_think_spf);
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_chat_percent"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < 0) || (temp > 100))
+            printfunc(arg, "invalid bot_chat_percent value!\n");
+         else
+            bot_chat_percent = temp;
+      }
+
+      snprintf(msg, sizeof(msg), "bot_chat_percent is %d\n", bot_chat_percent);
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_taunt_percent"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < 0) || (temp > 100))
+            printfunc(arg, "invalid bot_taunt_percent value!\n");
+         else
+            bot_taunt_percent = temp;
+      }
+
+      snprintf(msg, sizeof(msg), "bot_taunt_percent is %d\n", bot_taunt_percent);
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_whine_percent"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < 0) || (temp > 100))
+            printfunc(arg, "invalid bot_whine_percent value!\n");
+         else
+            bot_whine_percent = temp;
+      }
+
+      snprintf(msg, sizeof(msg), "bot_whine_percent is %d\n", bot_whine_percent);
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_chat_tag_percent"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < 0) || (temp > 100))
+            printfunc(arg, "invalid bot_chat_tag_percent value!\n");
+         else
+            bot_chat_tag_percent = temp;
+      }
+
+      snprintf(msg, sizeof(msg), "bot_chat_tag_percent is %d\n", bot_chat_tag_percent);
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_chat_drop_percent"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < 0) || (temp > 100))
+            printfunc(arg, "invalid bot_chat_drop_percent value!\n");
+         else
+            bot_chat_drop_percent = temp;
+      }
+
+      snprintf(msg, sizeof(msg), "bot_chat_drop_percent is %d\n", bot_chat_drop_percent);
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_chat_swap_percent"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < 0) || (temp > 100))
+            printfunc(arg, "invalid bot_chat_swap_percent value!\n");
+         else
+            bot_chat_swap_percent = temp;
+      }
+
+      snprintf(msg, sizeof(msg), "bot_chat_swap_percent is %d\n", bot_chat_swap_percent);
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_chat_lower_percent"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < 0) || (temp > 100))
+            printfunc(arg, "invalid bot_chat_lower_percent value!\n");
+         else
+            bot_chat_lower_percent = temp;
+      }
+
+      snprintf(msg, sizeof(msg), "bot_chat_lower_percent is %d\n", bot_chat_lower_percent);
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_logo_percent"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < 0) || (temp > 100))
+            printfunc(arg, "invalid bot_logo_percent value!\n");
+         else
+            bot_logo_percent = temp;
+      }
+
+      snprintf(msg, sizeof(msg), "bot_logo_percent is %d\n", bot_logo_percent);
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_reaction_time"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < 0) || (temp > 3))
+            printfunc(arg, "invalid bot_reaction_time value!\n");
+         else
+            bot_reaction_time = temp;
+      }
+
+      if (bot_reaction_time)
+         snprintf(msg, sizeof(msg), "bot_reaction_time is %d\n", bot_reaction_time);
+      else
+         snprintf(msg, sizeof(msg), "bot_reaction_time is DISABLED\n");
+
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "random_color"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if (temp)
+            b_random_color = TRUE;
+         else
+            b_random_color = FALSE;
+      }
+
+      if (b_random_color)
+         printfunc(arg, "random_color ENABLED\n");
+      else
+         printfunc(arg, "random_color DISABLED\n");
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "botdontshoot"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+         if (temp)
+            b_botdontshoot = TRUE;
+         else
+            b_botdontshoot = FALSE;
+      }
+
+      if (b_botdontshoot)
+         printfunc(arg, "botdontshoot ENABLED\n");
+      else
+         printfunc(arg, "botdontshoot DISABLED\n");
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "min_bots"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         min_bots = atoi( arg1 );
+
+         if ((min_bots < 0) || (min_bots > 31))
+            min_bots = 1;
+      }
+      
+      snprintf(msg, sizeof(msg), "min_bots is set to %d\n", min_bots);
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "max_bots"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         max_bots = atoi( arg1 );
+
+         if ((max_bots < 0) || (max_bots > 31))
+            max_bots = 1;
+      }
+      
+      snprintf(msg, sizeof(msg), "max_bots is set to %d\n", max_bots);
+      printfunc(arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "pause") && is_cfgcmd)
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         bot_cfg_pause_time = globaltime + atoi( arg1 );
+      }
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "autowaypoint"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         if (FStrEq(arg1, "on"))
+         {
+            g_auto_waypoint = TRUE;
+         }
+         else if (FStrEq(arg1, "off"))
+         {
+            g_auto_waypoint = FALSE;
+         }
+         else
+         {
+            g_auto_waypoint = !!atoi(arg1);
+         }
+
+         if (g_auto_waypoint)
+         {
+            if(is_clientcmd)
+               g_waypoint_on = TRUE; //just in case
+            printfunc(arg, "autowaypoint is ON\n");
+         }
+         else
+            printfunc(arg, "autowaypoint is OFF\n");
+      }
+      
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "botweapon"))
+   {  // this command allows editing of weapon information
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int select_index = -1;
+         bot_weapon_select_t *pSelect = &valve_weapon_select[0];
+         
+         while ((arg2 != NULL) && (*arg2 != 0) && pSelect[++select_index].iId)
+            if (FStrEq(pSelect[select_index].weapon_name, arg1))
+               break;
+         
+         if((arg2 != NULL) && (*arg2 != 0) && pSelect[select_index].iId)
+         {
+#define CHECK_AND_SET_BOTWEAPON_INT(setting) \
+   if (FStrEq(arg2, #setting)) { \
+      if ((arg3 != NULL) && (*arg3 != 0)) { \
+         int temp = atoi(arg3); \
+         pSelect[select_index].setting = temp; \
+         snprintf(msg, sizeof(msg), "%s for weapon %s is now %i.\n", arg2, arg1, temp); \
+      } else \
+         snprintf(msg, sizeof(msg), "%s for weapon %s is %i.\n", arg2, arg1, pSelect[select_index].setting); \
+   }
+#define CHECK_AND_SET_BOTWEAPON_QBOOLEAN(setting) \
+   if (FStrEq(arg2, #setting)) { \
+      if ((arg3 != NULL) && (*arg3 != 0)) { \
+         qboolean temp = atoi(arg3) ? TRUE : FALSE; \
+         pSelect[select_index].setting = temp; \
+         snprintf(msg, sizeof(msg), "%s for weapon %s is now %s.\n", arg2, arg1, temp ? "TRUE" : "FALSE"); \
+      } else \
+         snprintf(msg, sizeof(msg), "%s for weapon %s is %s.\n", arg2, arg1, pSelect[select_index].setting ? "TRUE" : "FALSE"); \
+   }
+#define CHECK_AND_SET_BOTWEAPON_FLOAT(setting) \
+   if (FStrEq(arg2, #setting)) { \
+      if ((arg3 != NULL) && (*arg3 != 0)) { \
+         float temp = atof(arg3); \
+         pSelect[select_index].setting = temp; \
+         snprintf(msg, sizeof(msg), "%s for weapon %s is now %f.\n", arg2, arg1, temp); \
+      } else \
+         snprintf(msg, sizeof(msg), "%s for weapon %s is %f.\n", arg2, arg1, pSelect[select_index].setting); \
+   }
+                 CHECK_AND_SET_BOTWEAPON_INT(primary_skill_level)   // bot skill must be less than or equal to this value
+            else CHECK_AND_SET_BOTWEAPON_INT(secondary_skill_level) // bot skill must be less than or equal to this value
+            else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(avoid_this_gun)  // bot avoids using this weapon if possible
+            else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(prefer_higher_skill_attack) // bot uses better of primary and secondary attacks if both avaible
+            else CHECK_AND_SET_BOTWEAPON_FLOAT(primary_min_distance)   // 0 = no minimum
+            else CHECK_AND_SET_BOTWEAPON_FLOAT(primary_max_distance)   // 9999 = no maximum
+            else CHECK_AND_SET_BOTWEAPON_FLOAT(secondary_min_distance) // 0 = no minimum    
+            else CHECK_AND_SET_BOTWEAPON_FLOAT(secondary_max_distance) // 9999 = no maximum
+            else CHECK_AND_SET_BOTWEAPON_FLOAT(opt_distance) // optimal distance from target
+            else CHECK_AND_SET_BOTWEAPON_INT(use_percent)   // times out of 100 to use this weapon when available
+            else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(can_use_underwater)     // can use this weapon underwater
+            else CHECK_AND_SET_BOTWEAPON_INT(primary_fire_percent)   // times out of 100 to use primary fire
+            else CHECK_AND_SET_BOTWEAPON_INT(min_primary_ammo)       // minimum ammout of primary ammo needed to fire
+            else CHECK_AND_SET_BOTWEAPON_INT(min_secondary_ammo)     // minimum ammout of seconday ammo needed to fire
+            else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(primary_fire_hold)      // hold down primary fire button to use?
+            else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(secondary_fire_hold)    // hold down secondary fire button to use?
+            else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(primary_fire_charge)    // charge weapon using primary fire?
+            else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(secondary_fire_charge)  // charge weapon using secondary fire?
+            else CHECK_AND_SET_BOTWEAPON_FLOAT(primary_charge_delay)   // time to charge weapon
+            else CHECK_AND_SET_BOTWEAPON_FLOAT(secondary_charge_delay) // time to charge weapon
+            else CHECK_AND_SET_BOTWEAPON_INT(low_ammo_primary)        // low ammo level
+            else CHECK_AND_SET_BOTWEAPON_INT(low_ammo_secondary)      // low ammo level
+            //else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(secondary_use_primary_ammo; //does secondary fire use primary ammo?
+            else {
+              snprintf(msg, sizeof(msg), "unknown weapon setting %s.\n", arg2);
+              printfunc(arg, msg);
+            }
+         }
+         else if(FStrEq("list", arg1)) {
+            printfunc(arg, "List of available settings:\n");
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "primary_skill_level", "int", "primary", "bot skill must be less than or equal to this value");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "secondary_skill_level", "int", "secondary", "bot skill must be less than or equal to this value");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   %s\n", "avoid_this_gun", "0/1", "bot avoids using this weapon if possible");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   %s\n", "prefer_higher_skill_attack", "0/1", "bot uses higher skill attack of primary and secondary attacks if both available");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "primary_min_distance", "float", "primary", "minimum distance for using this weapon; 0 = no minimum");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "primary_max_distance", "float", "primary", "maximum distance for using this weapon; 9999 = no maximum");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "secondary_min_distance", "float", "secondary", "minimum distance for using this weapon; 0 = no minimum");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "secondary_max_distance", "float", "secondary", "maximum distance for using this weapon; 9999 = no maximum");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   %s\n", "opt_distance", "float", "optimal distance from target");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   %s\n", "use_percent", "int", "times out of 100 to use this weapon when available");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   %s\n", "can_use_underwater", "0/1", "can use this weapon underwater");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   %s\n", "primary_fire_percent", "int", "times out of 100 to use primary fire");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "min_primary_ammo", "int", "primary", "minimum ammouth of ammo needed to fire");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "min_secondary_ammo", "int", "secondary", "minimum ammouth of ammo needed to fire");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "primary_fire_hold", "0/1", "primary", "hold down fire button to use?");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "secondary_fire_hold", "0/1", "secondary", "hold down fire button to use?");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "primary_fire_charge", "0/1", "primary", "charge weapon using fire?");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "secondary_fire_charge", "0/1", "secondary", "charge weapon using fire?");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "primary_charge_delay", "float", "primary", "time to charge weapon");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "secondary_charge_delay", "float", "secondary", "time to charge weapon");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "low_ammo_primary", "int", "primary", "running out of ammo level");
+            printfunc(arg, msg);
+            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "low_ammo_secondary", "int", "secondary", "secondary out of ammo level");
+            printfunc(arg, msg);
+         }
+         else if(FStrEq("weapons", arg1)) {
+            printfunc(arg, "List of available weapons:\n");
+            
+            select_index = -1;
+            pSelect = &valve_weapon_select[0];
+
+            while (pSelect[++select_index].iId) {
+               snprintf(msg, sizeof(msg), "  %s\n", pSelect[select_index].weapon_name);
+               printfunc(arg, msg);
+            }
+         }
+         else 
+            printfunc(arg, "Could not complete request! (unknown arg1)\n");
+      }
+      else
+         printfunc(arg, "Could not complete request! (arg1 not given)\n");
+      
+      return TRUE;
+   }
+
+   return FALSE;
+}
+
 
 void ClientCommand( edict_t *pEntity )
 {
@@ -457,310 +982,10 @@ void ClientCommand( edict_t *pEntity )
    // only allow custom commands if deathmatch mode and NOT dedicated server and
    // client sending command is the listen server client...
 
-   if ((gpGlobals->deathmatch) && (!IsDedicatedServer) &&
-       (pEntity == listenserver_edict))
+   if ((gpGlobals->deathmatch) && (!IsDedicatedServer) && (pEntity == listenserver_edict))
    {
-      const float globaltime = gpGlobals->time;
-      char msg[80];
-       
-      if (FStrEq(pcmd, "info"))
+      if(ProcessCommand(print_to_client, pEntity, pcmd, arg1, arg2, arg3, arg4, arg5, FALSE))
       {
-      	 UTIL_PrintBotInfo(print_to_client, pEntity);
-      	 RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "addbot"))
-      {
-         BotCreate( pEntity, arg1, arg2, arg3, arg4, arg5 );
-
-         bot_check_time = globaltime + 5.0;
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "observer"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-            if (temp)
-               b_observer_mode = TRUE;
-            else
-               b_observer_mode = FALSE;
-         }
-
-         if (b_observer_mode)
-            ClientPrint(pEntity, HUD_PRINTNOTIFY, "observer mode ENABLED\n");
-         else
-            ClientPrint(pEntity, HUD_PRINTNOTIFY, "observer mode DISABLED\n");
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "botskill"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-
-            if ((temp < 1) || (temp > 5))
-               ClientPrint(pEntity, HUD_PRINTNOTIFY, "invalid botskill value!\n");
-            else
-               default_bot_skill = temp;
-         }
-
-         snprintf(msg, sizeof(msg), "botskill is %d\n", default_bot_skill);
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "randomize_bots_on_mapchange"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            randomize_bots_on_mapchange = !!atoi(arg1);
-         }
-
-         snprintf(msg, sizeof(msg), "randomize_bots_on_mapchange is %s\n", (randomize_bots_on_mapchange?"on":"off"));
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "bot_add_level_tag"))
-      {
-      	 if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            bot_add_level_tag = !!atoi(arg1);
-         }
-
-         snprintf(msg, sizeof(msg), "bot_add_level_tag is %s\n", (bot_add_level_tag?"on":"off"));
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "turn_method"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-
-            if(temp != AIM_RACC_OLD && temp != AIM_RACC) 
-               ClientPrint(pEntity, HUD_PRINTNOTIFY, "invalid turn_method value!\n");
-            else
-               turn_method = temp;
-         }
-
-         snprintf(msg, sizeof(msg), "turn_method is %d\n", turn_method);
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "botthinkfps"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-
-            if ((temp < 1) || (temp > 100))
-               ClientPrint(pEntity, HUD_PRINTNOTIFY, "invalid botthinkfps value!\n");
-            else
-               bot_think_spf = 1.0 / temp;
-         }
-
-         snprintf(msg, sizeof(msg), "botthinkfps is %.2f\n", 1.0 / bot_think_spf);
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "bot_chat_percent"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-
-            if ((temp < 0) || (temp > 100))
-               ClientPrint(pEntity, HUD_PRINTNOTIFY, "invalid bot_chat_percent value!\n");
-            else
-               bot_chat_percent = temp;
-         }
-
-         snprintf(msg, sizeof(msg), "bot_chat_percent is %d\n", bot_chat_percent);
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "bot_taunt_percent"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-
-            if ((temp < 0) || (temp > 100))
-               ClientPrint(pEntity, HUD_PRINTNOTIFY, "invalid bot_taunt_percent value!\n");
-            else
-               bot_taunt_percent = temp;
-         }
-
-         snprintf(msg, sizeof(msg), "bot_taunt_percent is %d\n", bot_taunt_percent);
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "bot_whine_percent"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-
-            if ((temp < 0) || (temp > 100))
-               ClientPrint(pEntity, HUD_PRINTNOTIFY, "invalid bot_whine_percent value!\n");
-            else
-               bot_whine_percent = temp;
-         }
-
-         snprintf(msg, sizeof(msg), "bot_whine_percent is %d\n", bot_whine_percent);
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "bot_chat_tag_percent"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-
-            if ((temp < 0) || (temp > 100))
-               ClientPrint(pEntity, HUD_PRINTNOTIFY, "invalid bot_chat_tag_percent value!\n");
-            else
-               bot_chat_tag_percent = temp;
-         }
-
-         snprintf(msg, sizeof(msg), "bot_chat_tag_percent is %d\n", bot_chat_tag_percent);
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "bot_chat_drop_percent"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-
-            if ((temp < 0) || (temp > 100))
-               ClientPrint(pEntity, HUD_PRINTNOTIFY, "invalid bot_chat_drop_percent value!\n");
-            else
-               bot_chat_drop_percent = temp;
-         }
-
-         snprintf(msg, sizeof(msg), "bot_chat_drop_percent is %d\n", bot_chat_drop_percent);
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "bot_chat_swap_percent"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-
-            if ((temp < 0) || (temp > 100))
-               ClientPrint(pEntity, HUD_PRINTNOTIFY, "invalid bot_chat_swap_percent value!\n");
-            else
-               bot_chat_swap_percent = temp;
-         }
-
-         snprintf(msg, sizeof(msg), "bot_chat_swap_percent is %d\n", bot_chat_swap_percent);
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "bot_chat_lower_percent"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-
-            if ((temp < 0) || (temp > 100))
-               ClientPrint(pEntity, HUD_PRINTNOTIFY, "invalid bot_chat_lower_percent value!\n");
-            else
-               bot_chat_lower_percent = temp;
-         }
-
-         snprintf(msg, sizeof(msg), "bot_chat_lower_percent is %d\n", bot_chat_lower_percent);
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "bot_logo_percent"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-
-            if ((temp < 0) || (temp > 100))
-               ClientPrint(pEntity, HUD_PRINTNOTIFY, "invalid bot_logo_percent value!\n");
-            else
-               bot_logo_percent = temp;
-         }
-
-         snprintf(msg, sizeof(msg), "bot_logo_percent is %d\n", bot_logo_percent);
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "bot_reaction_time"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-
-            if ((temp < 0) || (temp > 3))
-               ClientPrint(pEntity, HUD_PRINTNOTIFY, "invalid bot_reaction_time value!\n");
-            else
-               bot_reaction_time = temp;
-         }
-
-         if (bot_reaction_time)
-            snprintf(msg, sizeof(msg), "bot_reaction_time is %d\n", bot_reaction_time);
-         else
-            snprintf(msg, sizeof(msg), "bot_reaction_time is DISABLED\n");
-
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "random_color"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-
-            if (temp)
-               b_random_color = TRUE;
-            else
-               b_random_color = FALSE;
-         }
-
-         if (b_random_color)
-            ClientPrint(pEntity, HUD_PRINTNOTIFY, "random_color ENABLED\n");
-         else
-            ClientPrint(pEntity, HUD_PRINTNOTIFY, "random_color DISABLED\n");
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "botdontshoot"))
-      {
-         if ((arg1 != NULL) && (*arg1 != 0))
-         {
-            int temp = atoi(arg1);
-            if (temp)
-               b_botdontshoot = TRUE;
-            else
-               b_botdontshoot = FALSE;
-         }
-
-         if (b_botdontshoot)
-            ClientPrint(pEntity, HUD_PRINTNOTIFY, "botdontshoot ENABLED\n");
-         else
-            ClientPrint(pEntity, HUD_PRINTNOTIFY, "botdontshoot DISABLED\n");
-
          RETURN_META (MRES_SUPERCEDE);
       }
       else if (FStrEq(pcmd, "waypoint"))
@@ -809,7 +1034,7 @@ void ClientCommand( edict_t *pEntity )
             if (num_waypoints < 1)
                RETURN_META (MRES_SUPERCEDE);
 
-            index = WaypointFindNearest(pEntity, 50.0, -1);
+            index = WaypointFindNearest(pEntity, 50.0);
 
             if (index == -1)
                RETURN_META (MRES_SUPERCEDE);
@@ -838,27 +1063,6 @@ void ClientCommand( edict_t *pEntity )
             else
                ClientPrint(pEntity, HUD_PRINTNOTIFY, "waypoints are OFF\n");
          }
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
-      else if (FStrEq(pcmd, "autowaypoint"))
-      {
-         if (FStrEq(arg1, "on"))
-         {
-            g_auto_waypoint = TRUE;
-            g_waypoint_on = TRUE;  // turn this on just in case
-         }
-         else if (FStrEq(arg1, "off"))
-         {
-            g_auto_waypoint = FALSE;
-         }
-
-         if (g_auto_waypoint)
-            snprintf(msg, sizeof(msg), "autowaypoint is ON\n");
-         else
-            snprintf(msg, sizeof(msg), "autowaypoint is OFF\n");
-
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
 
          RETURN_META (MRES_SUPERCEDE);
       }
@@ -958,66 +1162,12 @@ void ClientCommand( edict_t *pEntity )
          }
          else if (g_menu_state == MENU_2)  // team specific menu
          {
-            if (waypoints[g_menu_waypoint].flags & W_FL_TEAM_SPECIFIC)
-            {
-               waypoints[g_menu_waypoint].flags &= ~W_FL_TEAM;
-               waypoints[g_menu_waypoint].flags &= ~W_FL_TEAM_SPECIFIC; // off
-            }
-            else
-            {
-               int team = atoi(arg1);
-
-               team--;  // make 0 to 3
-
-               // this is kind of a kludge (team bits MUST be LSB!!!)
-               waypoints[g_menu_waypoint].flags |= team;
-               waypoints[g_menu_waypoint].flags |= W_FL_TEAM_SPECIFIC; // on
-            }
+                
          }
          else if (g_menu_state == MENU_3)  // third menu...
          {
             {
-               if (FStrEq(arg1, "1"))  // flag location
-               {
-                  if (waypoints[g_menu_waypoint].flags & W_FL_FLAG)
-                     waypoints[g_menu_waypoint].flags &= ~W_FL_FLAG;  // off
-                  else
-                     waypoints[g_menu_waypoint].flags |= W_FL_FLAG;  // on
-               }
-               else if (FStrEq(arg1, "2"))  // flag goal
-               {
-                  if (waypoints[g_menu_waypoint].flags & W_FL_FLAG_GOAL)
-                     waypoints[g_menu_waypoint].flags &= ~W_FL_FLAG_GOAL;  // off
-                  else
-                     waypoints[g_menu_waypoint].flags |= W_FL_FLAG_GOAL;  // on
-               }
-               else if (FStrEq(arg1, "3"))  // sentry gun
-               {
-                  if (waypoints[g_menu_waypoint].flags & W_FL_SENTRYGUN)
-                     waypoints[g_menu_waypoint].flags &= ~W_FL_SENTRYGUN;  // off
-                  else
-                  {
-                     waypoints[g_menu_waypoint].flags |= W_FL_SENTRYGUN;  // on
-
-                     // set the aiming waypoint...
-
-                     WaypointAddAiming(pEntity);
-                  }
-               }
-               else if (FStrEq(arg1, "4"))  // dispenser
-               {
-                  if (waypoints[g_menu_waypoint].flags & W_FL_DISPENSER)
-                     waypoints[g_menu_waypoint].flags &= ~W_FL_DISPENSER;  // off
-                  else
-                  {
-                     waypoints[g_menu_waypoint].flags |= W_FL_DISPENSER;  // on
-
-                     // set the aiming waypoint...
-
-                     WaypointAddAiming(pEntity);
-                  }
-               }
-               else if (FStrEq(arg1, "5"))
+               if (FStrEq(arg1, "5"))
                {
                   g_menu_state = MENU_4;
 
@@ -1111,76 +1261,327 @@ void ClientCommand( edict_t *pEntity )
    RETURN_META (MRES_IGNORED);
 }
 
+
 static void (*old_PM_PlaySound)(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch);
 
 void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch) {
-	const float globaltime = gpGlobals->time;
-	edict_t * pPlayer;
-	int idx;
-	
-	idx = ENGINE_CURRENT_PLAYER();
-	if(idx < 0 || idx >= gpGlobals->maxClients)
-		goto _exit;
-	
-	pPlayer = INDEXENT(idx+1);
-	if(!pPlayer || pPlayer->free)
-		goto _exit;
-	
-	SaveSound(pPlayer, globaltime, pPlayer->v.origin, volume, attenuation, 1);
-		
+        const float globaltime = gpGlobals->time;
+        edict_t * pPlayer;
+        int idx;
+        
+        idx = ENGINE_CURRENT_PLAYER();
+        if(idx < 0 || idx >= gpGlobals->maxClients)
+                goto _exit;
+        
+        pPlayer = INDEXENT(idx+1);
+        if(!pPlayer || pPlayer->free)
+                goto _exit;
+        
+        SaveSound(pPlayer, globaltime, pPlayer->v.origin, volume, attenuation, 1);
+                
 _exit:
-	(*old_PM_PlaySound)(channel, sample, volume, attenuation, fFlags, pitch);
+        (*old_PM_PlaySound)(channel, sample, volume, attenuation, fFlags, pitch);
 }
+
 
 void PM_Move(struct playermove_s *ppmove, qboolean server) {
-	//
-	if(ppmove && gpGlobals->deathmatch) {
-		//hook footstep sound function
-		if(ppmove->PM_PlaySound != &new_PM_PlaySound) {
-			old_PM_PlaySound = ppmove->PM_PlaySound;
-			ppmove->PM_PlaySound = &new_PM_PlaySound;
-			
-			RETURN_META (MRES_HANDLED);
-		}
-	}
-	
-	RETURN_META (MRES_IGNORED);
+        //
+        if(ppmove && gpGlobals->deathmatch) {
+                //hook footstep sound function
+                if(ppmove->PM_PlaySound != &new_PM_PlaySound) {
+                        old_PM_PlaySound = ppmove->PM_PlaySound;
+                        ppmove->PM_PlaySound = &new_PM_PlaySound;
+                        
+                        RETURN_META (MRES_HANDLED);
+                }
+        }
+        
+        RETURN_META (MRES_IGNORED);
 }
 
-static void CheckSubMod(void)
+
+void CheckSubMod(void)
 {
-   // Check if Severians or Bubblemod
+   static int checked = 0;
+   
+   if(checked > 100)
+      return;
+
+   // Check if Severians, XDM or Bubblemod
    const char * desc = MDLL_GetGameDescription();
    
    if(!strnicmp(desc, "Sev", 3))
       submod_id = SUBMOD_SEVS;
    else if(!strnicmp(desc, "XDM", 3))
       submod_id = SUBMOD_XDM;
-   else 
+   else if(CVAR_GET_POINTER("bm_ver") != NULL)
+      submod_id = SUBMOD_BUBBLEMOD;
+   else
       submod_id = SUBMOD_HLDM;
+      
+   checked++;
 }
 
-static void StartFrame( void )
+
+void StartFrame( void )
 {
-   if (gpGlobals->deathmatch)
+   if (!gpGlobals->deathmatch)
+      RETURN_META (MRES_IGNORED);
+
+   edict_t *pPlayer;
+   static int i, index, bot_index;
+   static float previous_time = -1.0;
+   char msg[256];
+   int count;
+   
+   const float globaltime = gpGlobals->time;
+
+   CheckSubMod();
+
+   // if a new map has started then (MUST BE FIRST IN StartFrame)...
+   if ((globaltime + 0.1) < previous_time)
    {
-      edict_t *pPlayer;
-      static int i, index, player_index, bot_index;
-      static float previous_time = -1.0;
-      char msg[256];
-      int count;
+      char filename[256];
+      char mapname[64];
+
+      // check if mapname_bot.cfg file exists...
+      strcpy(mapname, STRING(gpGlobals->mapname));
+      strcat(mapname, "_jk_botti.cfg");
+
+      UTIL_BuildFileName_N(filename, sizeof(filename), "maps", mapname);
+
+      if ((bot_cfg_fp = fopen(filename, "r")) != NULL)
+      {
+         snprintf(msg, sizeof(msg), "Executing %s\n", filename);
+         ALERT( at_console, "%s", msg );
+
+         for (index = 0; index < 32; index++)
+         {
+            bots[index].is_used = FALSE;
+            bots[index].respawn_state = 0;
+            bots[index].f_kick_time = 0.0;
+         }
+
+         if (IsDedicatedServer)
+            bot_cfg_pause_time = globaltime + 5.0;
+         else
+            bot_cfg_pause_time = globaltime + 20.0;
+      }
+      else
+      {
+         count = 0;
+
+         // mark the bots as needing to be respawned...
+         for (index = 0; index < 32; index++)
+         {
+            if (count >= prev_num_bots)
+            {
+               bots[index].is_used = FALSE;
+               bots[index].respawn_state = 0;
+               bots[index].f_kick_time = 0.0;
+            }
+
+            if (bots[index].is_used)  // is this slot used?
+            {
+               bots[index].respawn_state = RESPAWN_NEED_TO_RESPAWN;
+               count++;
+            }
+
+            // check for any bots that were very recently kicked...
+            if ((bots[index].f_kick_time + 5.0) > previous_time)
+            {
+               bots[index].respawn_state = RESPAWN_NEED_TO_RESPAWN;
+               count++;
+            }
+            else
+               bots[index].f_kick_time = 0.0;  // reset to prevent false spawns later
+         }
+
+         // set the respawn time
+         if (IsDedicatedServer)
+            respawn_time = globaltime + 5.0;
+         else
+            respawn_time = globaltime + 20.0;
+      }
+
+      bot_check_time = globaltime + 60.0;
+   }
+
+   if (!IsDedicatedServer)
+   {
+      if ((listenserver_edict != NULL) && (welcome_sent == FALSE) &&
+          (welcome_time < 1.0))
+      {
+         // are they out of observer mode yet?
+         if (IsAlive(listenserver_edict))
+            welcome_time = globaltime + 5.0;  // welcome in 5 seconds
+      }
+
+      if ((welcome_time > 0.0) && (welcome_time < globaltime) &&
+          (welcome_sent == FALSE))
+      {
+         char version[80];
+
+         snprintf(version, sizeof(version), "%s Version %d.%d\n", welcome_msg, VER_MAJOR, VER_MINOR);
+
+         // let's send a welcome message to this client...
+         UTIL_SayText(version, listenserver_edict);
+
+         welcome_sent = TRUE;  // clear this so we only do it once
+      }
+   }
+   
+   static char skip_think_frame = 0;
+   if(!!(skip_think_frame = !skip_think_frame))
+   {
+      count = 0;
       
-      const float globaltime = gpGlobals->time;
+      if (globaltime >= gather_data_time) {
+         GatherPlayerData();
+         gather_data_time = globaltime + (1.0 / 30); //30 fps
+      }
+      
+      if (bot_stop == 0)
+      {            
+         for (bot_index = 0; bot_index < gpGlobals->maxClients; bot_index++)
+         {
+            if ((bots[bot_index].is_used) &&  // is this slot used AND
+               (bots[bot_index].respawn_state == RESPAWN_IDLE))  // not respawning
+            {
+               if (globaltime >= bots[bot_index].bot_think_time)
+               {
+                  BotThink(bots[bot_index]);
+                  
+                  do {
+                     bots[bot_index].bot_think_time = globaltime + bot_think_spf * RANDOM_FLOAT2(0.95, 1.05);
+                  } while( globaltime + 1.0 < bots[bot_index].bot_think_time );
+               }
+               
+               count++;
+            }
+         }
+      }
 
-      CheckSubMod();
+      if (count > num_bots)
+         num_bots = count;
 
-      // if a new map has started then (MUST BE FIRST IN StartFrame)...
-      if ((globaltime + 0.1) < previous_time)
+      // Autowaypointing engine and else, limit to half of botthink rate
+      if (globaltime >= waypoint_time)
+      {
+         int waypoint_player_count = 0;
+         int waypoint_player_index = 1;
+         
+         WaypointAddSpawnObjects();
+         
+         // 10 times / sec, note: this is extremely slow, do checking only for max 4 players on one frame
+         waypoint_time = globaltime + (1.0/10.0);
+         
+         while(waypoint_player_index <= gpGlobals->maxClients)
+         {
+            pPlayer = INDEXENT(waypoint_player_index++);
+
+            if (pPlayer && !pPlayer->free)
+            {
+               // Is player alive?
+               if(!IsAlive(pPlayer))
+                  continue;
+               
+               if (FBitSet(pPlayer->v.flags, FL_CLIENT) && !FBitSet(pPlayer->v.flags, FL_FAKECLIENT) && !FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT))
+               {
+                  WaypointThink(pPlayer);
+                  
+                  if(++waypoint_player_count >= 4)
+                     break;
+               }
+            }
+         }
+      }
+   }
+
+   // are we currently respawning bots and is it time to spawn one yet?
+   if ((respawn_time > 1.0) && (respawn_time <= globaltime))
+   {
+      int index = 0;
+
+      // find bot needing to be respawned...
+      while ((index < 32) &&
+             (bots[index].respawn_state != RESPAWN_NEED_TO_RESPAWN))
+         index++;
+
+      if (index < 32)
+      {
+         //int strafe = bot_strafe_percent;  // save global strafe percent
+         int chat = bot_chat_percent;    // save global chat percent
+         int taunt = bot_taunt_percent;  // save global taunt percent
+         int whine = bot_whine_percent;  // save global whine percent
+         int logo = bot_logo_percent;    // save global logo percent
+         int tag = bot_chat_tag_percent;    // save global clan tag percent
+         int drop = bot_chat_drop_percent;  // save global chat drop percent
+         int swap = bot_chat_swap_percent;  // save global chat swap percent
+         int lower = bot_chat_lower_percent; // save global chat lower percent
+         int react = bot_reaction_time;
+
+         bots[index].respawn_state = RESPAWN_IS_RESPAWNING;
+         bots[index].is_used = FALSE;      // free up this slot
+
+         //bot_strafe_percent = bots[index].strafe_percent;
+         bot_chat_percent = bots[index].chat_percent;
+         bot_taunt_percent = bots[index].taunt_percent;
+         bot_whine_percent = bots[index].whine_percent;
+         bot_logo_percent = bots[index].logo_percent;
+         bot_chat_tag_percent = bots[index].chat_tag_percent;
+         bot_chat_drop_percent = bots[index].chat_drop_percent;
+         bot_chat_swap_percent = bots[index].chat_swap_percent;
+         bot_chat_lower_percent = bots[index].chat_lower_percent;
+         bot_reaction_time = bots[index].reaction_time;
+
+         // respawn 1 bot then wait a while (otherwise engine crashes)
+         {
+            char c_skill[2];
+            char c_topcolor[4];
+            char c_bottomcolor[4];
+
+            snprintf(c_skill, sizeof(c_skill), "%d", bots[index].bot_skill+1);
+            snprintf(c_topcolor, sizeof(c_topcolor), "%d", bots[index].top_color);
+            snprintf(c_bottomcolor, sizeof(c_bottomcolor), "%d", bots[index].bottom_color);
+//UTIL_ServerPrintf("c_skill: %s\n", c_skill);               
+            if(randomize_bots_on_mapchange)
+               BotCreate(NULL, NULL, NULL, c_skill, NULL, NULL);
+            else
+               BotCreate(NULL, bots[index].skin, bots[index].name, c_skill, c_topcolor, c_bottomcolor);
+         }
+
+         //bot_strafe_percent = strafe;  // restore global strafe percent
+         bot_chat_percent = chat;    // restore global chat percent
+         bot_taunt_percent = taunt;  // restore global taunt percent
+         bot_whine_percent = whine;  // restore global whine percent
+         bot_logo_percent = logo;  // restore global logo percent
+         bot_chat_tag_percent = tag;    // restore global chat percent
+         bot_chat_drop_percent = drop;    // restore global chat percent
+         bot_chat_swap_percent = swap;    // restore global chat percent
+         bot_chat_lower_percent = lower;    // restore global chat percent
+         bot_reaction_time = react;
+
+         respawn_time = globaltime + 2.0;  // set next respawn time
+
+         bot_check_time = globaltime + 5.0;
+      }
+      else
+      {
+         respawn_time = 0.0;
+      }
+   }
+
+   if (g_GameRules)
+   {
+      if (need_to_open_cfg)  // have we open jk_botti.cfg file yet?
       {
          char filename[256];
          char mapname[64];
 
-         // check if mapname_bot.cfg file exists...
+         need_to_open_cfg = FALSE;  // only do this once!!!
+
+         // check if mapname_jk_botti.cfg file exists...
 
          strcpy(mapname, STRING(gpGlobals->mapname));
          strcat(mapname, "_jk_botti.cfg");
@@ -1191,300 +1592,78 @@ static void StartFrame( void )
          {
             snprintf(msg, sizeof(msg), "Executing %s\n", filename);
             ALERT( at_console, "%s", msg );
-
-            for (index = 0; index < 32; index++)
-            {
-               bots[index].is_used = FALSE;
-               bots[index].respawn_state = 0;
-               bots[index].f_kick_time = 0.0;
-            }
-
-            if (IsDedicatedServer)
-               bot_cfg_pause_time = globaltime + 5.0;
-            else
-               bot_cfg_pause_time = globaltime + 20.0;
          }
          else
          {
-            count = 0;
+            UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/jk_botti.cfg", NULL);
 
-            // mark the bots as needing to be respawned...
-            for (index = 0; index < 32; index++)
-            {
-               if (count >= prev_num_bots)
-               {
-                  bots[index].is_used = FALSE;
-                  bots[index].respawn_state = 0;
-                  bots[index].f_kick_time = 0.0;
-               }
+            snprintf(msg, sizeof(msg), "Executing %s\n", filename);
+            ALERT( at_console, "%s", msg );
 
-               if (bots[index].is_used)  // is this slot used?
-               {
-                  bots[index].respawn_state = RESPAWN_NEED_TO_RESPAWN;
-                  count++;
-               }
+            bot_cfg_fp = fopen(filename, "r");
 
-               // check for any bots that were very recently kicked...
-               if ((bots[index].f_kick_time + 5.0) > previous_time)
-               {
-                  bots[index].respawn_state = RESPAWN_NEED_TO_RESPAWN;
-                  count++;
-               }
-               else
-                  bots[index].f_kick_time = 0.0;  // reset to prevent false spawns later
-            }
-
-            // set the respawn time
-            if (IsDedicatedServer)
-               respawn_time = globaltime + 5.0;
-            else
-               respawn_time = globaltime + 20.0;
+            if (bot_cfg_fp == NULL)
+               ALERT( at_console, "%s", "jk_botti.cfg file not found\n" );
          }
 
-         bot_check_time = globaltime + 60.0;
+         if (IsDedicatedServer)
+            bot_cfg_pause_time = globaltime + 5.0;
+         else
+            bot_cfg_pause_time = globaltime + 20.0;
       }
 
-      if (!IsDedicatedServer)
+      if (!IsDedicatedServer && !spawn_time_reset)
       {
-         if ((listenserver_edict != NULL) && (welcome_sent == FALSE) &&
-             (welcome_time < 1.0))
+         if (listenserver_edict != NULL)
          {
-            // are they out of observer mode yet?
             if (IsAlive(listenserver_edict))
-               welcome_time = globaltime + 5.0;  // welcome in 5 seconds
-         }
-
-         if ((welcome_time > 0.0) && (welcome_time < globaltime) &&
-             (welcome_sent == FALSE))
-         {
-            char version[80];
-
-            snprintf(version, sizeof(version), "%s Version %d.%d\n", welcome_msg, VER_MAJOR, VER_MINOR);
-
-            // let's send a welcome message to this client...
-            UTIL_SayText(version, listenserver_edict);
-
-            welcome_sent = TRUE;  // clear this so we only do it once
-         }
-      }
-      
-      static char skip_think_frame = 0;
-      if(!!(skip_think_frame = !skip_think_frame))
-      {
-         count = 0;
-         
-         if (globaltime >= gather_data_time) {
-            GatherPlayerData();
-            gather_data_time = globaltime + (1.0 / 30); //30 fps
-         }
-         
-         if (bot_stop == 0)
-         {            
-            for (bot_index = 0; bot_index < gpGlobals->maxClients; bot_index++)
             {
-               if ((bots[bot_index].is_used) &&  // is this slot used AND
-                  (bots[bot_index].respawn_state == RESPAWN_IDLE))  // not respawning
-               {
-                  if (globaltime >= bots[bot_index].bot_think_time)
-                  {
-                     BotThink(bots[bot_index]);
-                     
-                     do {
-                        bots[bot_index].bot_think_time = globaltime + bot_think_spf * RANDOM_FLOAT2(0.95, 1.05);
-                     } while( globaltime + 1.0 < bots[bot_index].bot_think_time );
-                  }
-                  
-                  count++;
-               }
-            }
-         }
+               spawn_time_reset = TRUE;
 
-         if (count > num_bots)
-            num_bots = count;
-      }
+               if (respawn_time >= 1.0)
+                  respawn_time = min(respawn_time, globaltime + (float)1.0);
 
-      if (g_waypoint_on)
-      {
-         for (player_index = 1; player_index <= gpGlobals->maxClients; player_index++)
-         {
-            pPlayer = INDEXENT(player_index);
-
-            if (pPlayer && !pPlayer->free)
-            {
-               if (FBitSet(pPlayer->v.flags, FL_CLIENT) && !(pPlayer->v.flags & (FL_FAKECLIENT | FL_THIRDPARTYBOT | FL_PROXY)))
-               {
-                     WaypointThink(pPlayer);
-               }
+               if (bot_cfg_pause_time >= 1.0)
+                  bot_cfg_pause_time = min(bot_cfg_pause_time, globaltime + (float)1.0);
             }
          }
       }
 
-      // are we currently respawning bots and is it time to spawn one yet?
-      if ((respawn_time > 1.0) && (respawn_time <= globaltime))
+      if ((bot_cfg_fp) &&
+          (bot_cfg_pause_time >= 1.0) && (bot_cfg_pause_time <= globaltime))
       {
-         int index = 0;
-
-         // find bot needing to be respawned...
-         while ((index < 32) &&
-                (bots[index].respawn_state != RESPAWN_NEED_TO_RESPAWN))
-            index++;
-
-         if (index < 32)
-         {
-            //int strafe = bot_strafe_percent;  // save global strafe percent
-            int chat = bot_chat_percent;    // save global chat percent
-            int taunt = bot_taunt_percent;  // save global taunt percent
-            int whine = bot_whine_percent;  // save global whine percent
-            int logo = bot_logo_percent;    // save global logo percent
-            int tag = bot_chat_tag_percent;    // save global clan tag percent
-            int drop = bot_chat_drop_percent;  // save global chat drop percent
-            int swap = bot_chat_swap_percent;  // save global chat swap percent
-            int lower = bot_chat_lower_percent; // save global chat lower percent
-            int react = bot_reaction_time;
-
-            bots[index].respawn_state = RESPAWN_IS_RESPAWNING;
-            bots[index].is_used = FALSE;      // free up this slot
-
-            //bot_strafe_percent = bots[index].strafe_percent;
-            bot_chat_percent = bots[index].chat_percent;
-            bot_taunt_percent = bots[index].taunt_percent;
-            bot_whine_percent = bots[index].whine_percent;
-            bot_logo_percent = bots[index].logo_percent;
-            bot_chat_tag_percent = bots[index].chat_tag_percent;
-            bot_chat_drop_percent = bots[index].chat_drop_percent;
-            bot_chat_swap_percent = bots[index].chat_swap_percent;
-            bot_chat_lower_percent = bots[index].chat_lower_percent;
-            bot_reaction_time = bots[index].reaction_time;
-
-            // respawn 1 bot then wait a while (otherwise engine crashes)
-            {
-               char c_skill[2];
-               char c_topcolor[4];
-               char c_bottomcolor[4];
-
-               snprintf(c_skill, sizeof(c_skill), "%d", bots[index].bot_skill+1);
-               snprintf(c_topcolor, sizeof(c_topcolor), "%d", bots[index].top_color);
-               snprintf(c_bottomcolor, sizeof(c_bottomcolor), "%d", bots[index].bottom_color);
-//printf("c_skill: %s\n", c_skill);               
-               if(randomize_bots_on_mapchange)
-                  BotCreate(NULL, NULL, NULL, c_skill, NULL, NULL);
-               else
-                  BotCreate(NULL, bots[index].skin, bots[index].name, c_skill, c_topcolor, c_bottomcolor);
-            }
-
-            //bot_strafe_percent = strafe;  // restore global strafe percent
-            bot_chat_percent = chat;    // restore global chat percent
-            bot_taunt_percent = taunt;  // restore global taunt percent
-            bot_whine_percent = whine;  // restore global whine percent
-            bot_logo_percent = logo;  // restore global logo percent
-            bot_chat_tag_percent = tag;    // restore global chat percent
-            bot_chat_drop_percent = drop;    // restore global chat percent
-            bot_chat_swap_percent = swap;    // restore global chat percent
-            bot_chat_lower_percent = lower;    // restore global chat percent
-            bot_reaction_time = react;
-
-            respawn_time = globaltime + 2.0;  // set next respawn time
-
-            bot_check_time = globaltime + 5.0;
-         }
-         else
-         {
-            respawn_time = 0.0;
-         }
+         // process jk_botti.cfg file options...
+         ProcessBotCfgFile();
       }
 
-      if (g_GameRules)
+   }      
+
+   // check if time to see if a bot needs to be created...
+   if (bot_check_time < globaltime)
+   {
+      count = 0;
+
+      bot_check_time = globaltime + 5.0;
+
+      for (i = 0; i < 32; i++)
       {
-         if (need_to_open_cfg)  // have we open jk_botti.cfg file yet?
-         {
-            char filename[256];
-            char mapname[64];
-
-            need_to_open_cfg = FALSE;  // only do this once!!!
-
-            // check if mapname_jk_botti.cfg file exists...
-
-            strcpy(mapname, STRING(gpGlobals->mapname));
-            strcat(mapname, "_jk_botti.cfg");
-
-            UTIL_BuildFileName_N(filename, sizeof(filename), "maps", mapname);
-
-            if ((bot_cfg_fp = fopen(filename, "r")) != NULL)
-            {
-               snprintf(msg, sizeof(msg), "Executing %s\n", filename);
-               ALERT( at_console, "%s", msg );
-            }
-            else
-            {
-               UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/jk_botti.cfg", NULL);
-
-               snprintf(msg, sizeof(msg), "Executing %s\n", filename);
-               ALERT( at_console, "%s", msg );
-
-               bot_cfg_fp = fopen(filename, "r");
-
-               if (bot_cfg_fp == NULL)
-                  ALERT( at_console, "%s", "jk_botti.cfg file not found\n" );
-            }
-
-            if (IsDedicatedServer)
-               bot_cfg_pause_time = globaltime + 5.0;
-            else
-               bot_cfg_pause_time = globaltime + 20.0;
-         }
-
-         if (!IsDedicatedServer && !spawn_time_reset)
-         {
-            if (listenserver_edict != NULL)
-            {
-               if (IsAlive(listenserver_edict))
-               {
-                  spawn_time_reset = TRUE;
-
-                  if (respawn_time >= 1.0)
-                     respawn_time = min(respawn_time, globaltime + (float)1.0);
-
-                  if (bot_cfg_pause_time >= 1.0)
-                     bot_cfg_pause_time = min(bot_cfg_pause_time, globaltime + (float)1.0);
-               }
-            }
-         }
-
-         if ((bot_cfg_fp) &&
-             (bot_cfg_pause_time >= 1.0) && (bot_cfg_pause_time <= globaltime))
-         {
-            // process jk_botti.cfg file options...
-            ProcessBotCfgFile();
-         }
-
-      }      
-
-      // check if time to see if a bot needs to be created...
-      if (bot_check_time < globaltime)
-      {
-         count = 0;
-
-         bot_check_time = globaltime + 5.0;
-
-         for (i = 0; i < 32; i++)
-         {
-            if (clients[i] != NULL)
-               count++;
-         }
-
-         // if there are currently less than the maximum number of "players"
-         // then add another bot using the default skill level...
-         if ((count < max_bots) && (max_bots != -1))
-         {
-            BotCreate( NULL, NULL, NULL, NULL, NULL, NULL );
-         }
+         if (clients[i] != NULL)
+            count++;
       }
 
-      previous_time = globaltime;
+      // if there are currently less than the maximum number of "players"
+      // then add another bot using the default skill level...
+      if ((count < max_bots) && (max_bots != -1))
+      {
+         BotCreate( NULL, NULL, NULL, NULL, NULL, NULL );
+      }
    }
 
-   RETURN_META (MRES_IGNORED);
+   previous_time = globaltime;
+
+   RETURN_META (MRES_HANDLED);
 }
+
 
 void FakeClientCommand(edict_t *pBot, char *arg1, char *arg2, char *arg3)
 {
@@ -1530,6 +1709,11 @@ void FakeClientCommand(edict_t *pBot, char *arg1, char *arg2, char *arg3)
    MDLL_ClientCommand(pBot);
 
    isFakeClientCommand = FALSE;
+}
+
+
+static void print_to_null(void *, char *) 
+{
 }
 
 
@@ -1608,11 +1792,7 @@ void ProcessBotCfgFile(void)
    {
       cmd_line[cmd_index++] = 0;
       arg1 = &cmd_line[cmd_index];
-/*
-      // if arg starts with " find next " or end of string
-      if(cmd_line[cmd_index] == '\"') 
-      	 do { cmd_index++; } while(cmd_line[cmd_index] != '\"' && cmd_line[cmd_index] != 0);
-*/
+
       // skip to blank or end of string...
       while ((cmd_line[cmd_index] != ' ') && (cmd_line[cmd_index] != 0))
          cmd_index++;
@@ -1621,11 +1801,7 @@ void ProcessBotCfgFile(void)
       {
          cmd_line[cmd_index++] = 0;
          arg2 = &cmd_line[cmd_index];
-/*
-         // if arg starts with " find next " or end of string
-         if(cmd_line[cmd_index] == '\"') 
-            do { cmd_index++; } while(cmd_line[cmd_index] != '\"' && cmd_line[cmd_index] != 0);
-*/
+
          // skip to blank or end of string...
          while ((cmd_line[cmd_index] != ' ') && (cmd_line[cmd_index] != 0))
             cmd_index++;
@@ -1634,11 +1810,7 @@ void ProcessBotCfgFile(void)
          {
             cmd_line[cmd_index++] = 0;
             arg3 = &cmd_line[cmd_index];
-/*
-            // if arg starts with " find next " or end of string
-            if(cmd_line[cmd_index] == '\"') 
-               do { cmd_index++; } while(cmd_line[cmd_index] != '\"' && cmd_line[cmd_index] != 0);
-*/
+
             // skip to blank or end of string...
             while ((cmd_line[cmd_index] != ' ') && (cmd_line[cmd_index] != 0))
                cmd_index++;
@@ -1647,11 +1819,7 @@ void ProcessBotCfgFile(void)
             {
                cmd_line[cmd_index++] = 0;
                arg4 = &cmd_line[cmd_index];
-/*             
-               // if arg starts with " find next " or end of string
-               if(cmd_line[cmd_index] == '\"') 
-                  do { cmd_index++; } while(cmd_line[cmd_index] != '\"' && cmd_line[cmd_index] != 0);
-*/
+
                // skip to blank or end of string...
                while ((cmd_line[cmd_index] != ' ') && (cmd_line[cmd_index] != 0))
                   cmd_index++;
@@ -1660,18 +1828,6 @@ void ProcessBotCfgFile(void)
                {
                   cmd_line[cmd_index++] = 0;
                   arg5 = &cmd_line[cmd_index];
-/*
-                  // if arg starts with " find next " or end of string
-                  if(cmd_line[cmd_index] == '\"') 
-                     do { cmd_index++; } while(cmd_line[cmd_index] != '\"' && cmd_line[cmd_index] != 0);
-                  
-                  // skip to blank or end of string...
-                  while ((cmd_line[cmd_index] != ' ') && (cmd_line[cmd_index] != 0))
-                     cmd_index++;
-                  
-                  if (cmd_line[cmd_index] == ' ')
-                     cmd_line[cmd_index++] = 0;
-*/
                }
             }
          }
@@ -1692,235 +1848,29 @@ void ProcessBotCfgFile(void)
    if(arg5 && !strcmp(arg5, "\"\""))
       *arg5=0;
 
-   if (strcmp(cmd, "addbot") == 0)
-   {
-      BotCreate( NULL, arg1, arg2, arg3, arg4, arg5 );
-
-      // have to delay here or engine gives "Tried to write to
-      // uninitialized sizebuf_t" error and crashes...
-
-      bot_cfg_pause_time = globaltime + 2.0;
-      bot_check_time = globaltime + 5.0;
-
+   if(ProcessCommand(print_to_null, NULL, cmd, arg1, arg2, arg3, arg4, arg5, TRUE))
       return;
-   }
-
-   if (strcmp(cmd, "botskill") == 0)
-   {
-      int temp = atoi(arg1);
-
-      if ((temp >= 1) && (temp <= 5))
-         default_bot_skill = atoi( arg1 );  // set default bot skill level
-
-      return;
-   }
    
-   if (strcmp(cmd, "randomize_bots_on_mapchange") == 0)
-   {
-      randomize_bots_on_mapchange = !!atoi(arg1);
-
-      return;
-   }
-      
-   if (strcmp(cmd, "turn_method") == 0)
-   {
-      int temp = atoi(arg1);
-      
-      if (temp == AIM_RACC_OLD || temp == AIM_RACC)
-         turn_method = temp;
-      
-      return;
-   }
-   
-   if (strcmp(cmd, "botthinkfps") == 0)
-   {
-      int temp = atoi(arg1);
-      
-      if ((temp >= 1) && (temp <= 100))
-         bot_think_spf = 1.0 / (float)temp;
-      
-      return;
-   }
-
-   if (strcmp(cmd, "random_color") == 0)
-   {
-      int temp = atoi(arg1);
-
-      if (temp)
-         b_random_color = TRUE;
-      else
-         b_random_color = FALSE;
-
-      return;
-   }
-
-   if (strcmp(cmd, "bot_add_level_tag") == 0)
-   {
-      bot_add_level_tag = !!atoi( arg1 );
-
-      return;
-   }
-
-   if (strcmp(cmd, "bot_chat_percent") == 0)
-   {
-      int temp = atoi(arg1);
-
-      if ((temp >= 0) && (temp <= 100))
-         bot_chat_percent = atoi( arg1 );  // set bot chat percent
-
-      return;
-   }
-
-   if (strcmp(cmd, "bot_taunt_percent") == 0)
-   {
-      int temp = atoi(arg1);
-
-      if ((temp >= 0) && (temp <= 100))
-         bot_taunt_percent = atoi( arg1 );  // set bot taunt percent
-
-      return;
-   }
-
-   if (strcmp(cmd, "bot_whine_percent") == 0)
-   {
-      int temp = atoi(arg1);
-
-      if ((temp >= 0) && (temp <= 100))
-         bot_whine_percent = atoi( arg1 );  // set bot whine percent
-
-      return;
-   }
-
-   if (strcmp(cmd, "bot_chat_tag_percent") == 0)
-   {
-      int temp = atoi(arg1);
-
-      if ((temp >= 0) && (temp <= 100))
-         bot_chat_tag_percent = atoi( arg1 );  // set bot chat percent
-
-      return;
-   }
-
-   if (strcmp(cmd, "bot_chat_drop_percent") == 0)
-   {
-      int temp = atoi(arg1);
-
-      if ((temp >= 0) && (temp <= 100))
-         bot_chat_drop_percent = atoi( arg1 );  // set bot chat percent
-
-      return;
-   }
-
-   if (strcmp(cmd, "bot_chat_swap_percent") == 0)
-   {
-      int temp = atoi(arg1);
-
-      if ((temp >= 0) && (temp <= 100))
-         bot_chat_swap_percent = atoi( arg1 );  // set bot chat percent
-
-      return;
-   }
-
-   if (strcmp(cmd, "bot_chat_lower_percent") == 0)
-   {
-      int temp = atoi(arg1);
-
-      if ((temp >= 0) && (temp <= 100))
-         bot_chat_lower_percent = atoi( arg1 );  // set bot chat percent
-
-      return;
-   }
-
-   if (strcmp(cmd, "bot_logo_percent") == 0)
-   {
-      int temp = atoi(arg1);
-
-      if ((temp >= 0) && (temp <= 100))
-         bot_logo_percent = atoi( arg1 );  // set bot strafe percent
-
-      return;
-   }
-
-   if (strcmp(cmd, "bot_reaction_time") == 0)
-   {
-      int temp = atoi(arg1);
-
-      if ((temp >= 0) && (temp <= 3))
-         bot_reaction_time = atoi( arg1 );  // set bot reaction time
-
-      return;
-   }
-
-   if (strcmp(cmd, "observer") == 0)
-   {
-      int temp = atoi(arg1);
-
-      if (temp)
-         b_observer_mode = TRUE;
-      else
-         b_observer_mode = FALSE;
-
-      return;
-   }
-
-   if (strcmp(cmd, "botdontshoot") == 0)
-   {
-      int temp = atoi(arg1);
-
-      if (temp)
-         b_botdontshoot = TRUE;
-      else
-         b_botdontshoot = FALSE;
-
-      return;
-   }
-
-   if (strcmp(cmd, "min_bots") == 0)
-   {
-      min_bots = atoi( arg1 );
-
-      if ((min_bots < 0) || (min_bots > 31))
-         min_bots = 1;
-
-      if (IsDedicatedServer)
-      {
-         snprintf(msg, sizeof(msg), "min_bots set to %d\n", min_bots);
-         printf(msg);
-      }
-
-      return;
-   }
-
-   if (strcmp(cmd, "max_bots") == 0)
-   {
-      max_bots = atoi( arg1 );
-
-      if ((max_bots < 0) || (max_bots > 31)) 
-         max_bots = 1;
-
-      if (IsDedicatedServer)
-      {
-         snprintf(msg, sizeof(msg), "max_bots set to %d\n", max_bots);
-         printf(msg);
-      }
-
-      return;
-   }
-
-   if (strcmp(cmd, "pause") == 0)
-   {
-      bot_cfg_pause_time = globaltime + atoi( arg1 );
-
-      return;
-   }
-
    snprintf(msg, sizeof(msg), "executing server command: %s\n", server_cmd);
    ALERT( at_console, "%s", msg );
 
    if (IsDedicatedServer)
-      printf(msg);
+      UTIL_ServerPrintf(msg);
 
    SERVER_COMMAND(server_cmd);
+}
+
+
+void ServerDeactivate(void)
+{
+   if(!gpGlobals->deathmatch)
+      RETURN_META (MRES_IGNORED);
+   
+   // automatic saving in autowaypoint mode, only if there are changes!
+   if(g_auto_waypoint && g_waypoint_updated)
+      WaypointSave();
+   
+   RETURN_META (MRES_HANDLED);
 }
 
 
@@ -1932,39 +1882,8 @@ static void print_to_server_output(void *, char * msg)
 
 void jk_botti_ServerCommand (void)
 {
-   const float globaltime = gpGlobals->time;
-   char msg[128];
-
-   if (strcmp(CMD_ARGV (1), "addbot") == 0)
-   {
-      BotCreate( NULL, CMD_ARGV (2), CMD_ARGV (3), CMD_ARGV (4), CMD_ARGV (5), CMD_ARGV (6) );
-
-      bot_check_time = globaltime + 5.0;
-   }
-   else if (strcmp(CMD_ARGV (1), "min_bots") == 0)
-   {
-      min_bots = atoi( CMD_ARGV (2) );
-
-      if ((min_bots < 0) || (min_bots > 31))
-         min_bots = 1;
-
-      snprintf(msg, sizeof(msg), "min_bots set to %d\n", min_bots);
-      SERVER_PRINT(msg);
-   }
-   else if (strcmp(CMD_ARGV (1), "max_bots") == 0)
-   {
-      max_bots = atoi( CMD_ARGV (2) );
-
-      if ((max_bots < 0) || (max_bots > 31)) 
-         max_bots = 1;
-
-      snprintf(msg, sizeof(msg), "max_bots set to %d\n", max_bots);
-      SERVER_PRINT(msg);
-   }
-   else if (strcmp(CMD_ARGV (1), "info") == 0)
-   {
-      //print out bot info
-      UTIL_PrintBotInfo(print_to_server_output, NULL);
+   if(!ProcessCommand(print_to_server_output, NULL, CMD_ARGV (1), CMD_ARGV (2), CMD_ARGV (3), CMD_ARGV (4), CMD_ARGV (5), CMD_ARGV (6), FALSE)) {
+      SERVER_PRINT(CMD_ARGV (1)); SERVER_PRINT(": Unknown command \'"); SERVER_PRINT(CMD_ARGV (2)); SERVER_PRINT("\'\n");
    }
 }
 
@@ -1978,6 +1897,7 @@ C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVers
    gFunctionTable.pfnClientPutInServer = ClientPutInServer;
    gFunctionTable.pfnClientCommand = ClientCommand;
    gFunctionTable.pfnStartFrame = StartFrame;
+   gFunctionTable.pfnServerDeactivate = ServerDeactivate;
 
    memcpy (pFunctionTable, &gFunctionTable, sizeof (DLL_FUNCTIONS));
    return (TRUE);
