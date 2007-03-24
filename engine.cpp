@@ -28,7 +28,6 @@ char g_arg2[1024];
 char g_arg3[1024];
 
 extern int get_cvars;
-extern int turn_method;
 extern qboolean aim_fix;
 extern float turn_skill;
 
@@ -52,36 +51,6 @@ void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventi
    SaveSound((edict_t*)pInvoker, globaltime, pInvoker->v.origin, 1.0, ATTN_NORM, 1);
    
    RETURN_META (MRES_IGNORED);
-}
-
-void pfnTraceLine(const float *v1, const float *v2, int fNoMonsters, edict_t *pEdict, TraceResult *ptr)
-{
-   int index;
-   
-   if(!pEdict)
-      RETURN_META(MRES_IGNORED);
-   
-   // check to see if a bot is sending this traceline...
-   index = UTIL_GetBotIndex(pEdict);
-   if(index < 0)
-      RETURN_META(MRES_IGNORED);
-      
-   // AND it is firing 
-   if(!(pEdict->v.button & (IN_ATTACK | IN_ATTACK2)))
-      RETURN_META(MRES_IGNORED);
-   
-   BotPointGun (bots[index], FALSE); // update the bot's view angles in advance, but don't save them
-   
-   // build base vectors in bot's actual view direction
-   Vector vForward, vRight, vUp;
-   UTIL_MakeVectorsPrivate( pEdict->v.angles, vForward, vRight, vUp);
-   
-   // trace the line considering the ACTUAL view angles of the bot, not the ones it claims to have
-   TRACE_LINE (pEdict->v.origin + pEdict->v.view_ofs,
-               pEdict->v.origin + pEdict->v.view_ofs + vForward * (Vector(v2) - Vector(v1)).Length(),
-               fNoMonsters, pEdict, ptr);
-   
-   RETURN_META(MRES_SUPERCEDE);
 }
 
 void pfnChangeLevel(char* s1, char* s2)
@@ -412,7 +381,6 @@ C_DLLEXPORT int GetEngineFunctions (enginefuncs_t *pengfuncsFromEngine, int *int
    meta_engfuncs.pfnCmd_Argc = pfnCmd_Argc;
    meta_engfuncs.pfnSetClientMaxspeed = pfnSetClientMaxspeed;
    meta_engfuncs.pfnSetSize = pfnSetSize;
-   meta_engfuncs.pfnTraceLine = pfnTraceLine;
 
    memcpy (pengfuncsFromEngine, &meta_engfuncs, sizeof (enginefuncs_t));
    return TRUE;

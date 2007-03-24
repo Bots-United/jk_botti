@@ -111,7 +111,6 @@ typedef struct
    float f_kick_time;
    float f_create_time;
    float f_frame_time;
-   Vector bot_v_angle;
    
    int chat_percent;
    int taunt_percent;
@@ -205,7 +204,15 @@ typedef struct
    float f_random_jump_time;
    float f_random_jump_duck_time;
    float f_random_jump_duck_end;
-
+   float f_random_duck_time;
+   
+   qboolean b_was_longjump_lasttime;
+   qboolean b_longjump;
+   float f_combat_longjump;
+   qboolean b_combat_longjump;
+   float f_longjump_time;
+   qboolean b_longjump_do_jump;
+   
    float f_sniper_aim_time;
 
    float f_prediction_ammount;
@@ -322,7 +329,8 @@ extern bot_t bots[32];
 
 extern void SaveSound(edict_t * pPlayer, float time, const Vector & origin, float volume, float attenuation, int empty);
 
-Vector GetPredictedPlayerPosition(edict_t * pPlayer, float time, const float globaltime);
+Vector GetPredictedPlayerPosition(bot_t &pBot, qboolean without_velocity = FALSE);
+qboolean FPredictedVisible(bot_t &pBot);
 qboolean GetPredictedIsAlive(edict_t * pPlayer, float time);
 void GatherPlayerData(void);
 qboolean AreTeamMates(edict_t * pOther, edict_t * pEdict);
@@ -355,6 +363,7 @@ void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2);
 void GetGameDir (char *game_dir);
 void UTIL_PrintBotInfo(void(*printfunc)(void *, char*), void * arg);
 void UTIL_ServerPrintf( char *fmt, ... );
+void UTIL_ConsolePrintf( char *fmt, ... );
 
 void LoadBotChat(void);
 void BotTrimBlanks(char *in_string, char *out_string);
@@ -364,6 +373,7 @@ void BotSwapCharacter(char *in_string, char *out_string);
 void BotChatName(char *original_name, char *out_name);
 void BotChatText(char *in_text, char *out_text);
 void BotChatFillInName(char *bot_say_msg, char *chat_text, char *chat_name, const char *bot_name);
+void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distance);
 
 qboolean UpdateSounds(bot_t &pBot, edict_t *pPlayer);
 

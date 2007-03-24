@@ -9,6 +9,68 @@
 
 #include <inttypes.h>
 
+inline Vector UTIL_AnglesToForward(const Vector &angles)
+{
+   // from pm_shared/pm_math.h
+   float /*sr, cr, roll,*/ sp, cp, pitch, sy, cy, yaw;
+
+   pitch = angles.x * (M_PI*2 / 360);
+   sp = sin(pitch);
+   cp = cos(pitch);
+
+   yaw = angles.y * (M_PI*2 / 360);
+   sy = sin(yaw);
+   cy = cos(yaw);
+
+   //roll = angles.z * (M_PI*2 / 360);
+   //sr = sin(roll);
+   //cr = cos(roll);
+
+   return(Vector(cp*cy, cp*sy, -sp));
+}
+
+inline Vector UTIL_AnglesToRight(const Vector &angles)
+{
+   // from pm_shared/pm_math.h
+   float sr, cr, roll, sp, cp, pitch, sy, cy, yaw;
+
+   pitch = angles.x * (M_PI*2 / 360);
+   sp = sin(pitch);
+   cp = cos(pitch);
+
+   yaw = angles.y * (M_PI*2 / 360);
+   sy = sin(yaw);
+   cy = cos(yaw);
+
+   roll = angles.z * (M_PI*2 / 360);
+   sr = sin(roll);
+   cr = cos(roll);
+
+   return(Vector(-1*sr*sp*cy+-1*cr*-sy, -1*sr*sp*sy+-1*cr*cy, -1*sr*cp));
+}
+
+inline void UTIL_MakeVectorsPrivate( const Vector &angles, Vector &v_forward, Vector &v_right, Vector &v_up )
+{
+   // from pm_shared/pm_math.h
+   float sr, cr, roll, sp, cp, pitch, sy, cy, yaw;
+
+   pitch = angles.x * (M_PI*2 / 360);
+   sp = sin(pitch);
+   cp = cos(pitch);
+
+   yaw = angles.y * (M_PI*2 / 360);
+   sy = sin(yaw);
+   cy = cos(yaw);
+
+   roll = angles.z * (M_PI*2 / 360);
+   sr = sin(roll);
+   cr = cos(roll);
+
+   v_forward = Vector(cp*cy, cp*sy, -sp);
+   v_right   = Vector(-1*sr*sp*cy+-1*cr*-sy, -1*sr*sp*sy+-1*cr*cy, -1*sr*cp);
+   v_up      = Vector(cr*sp*cy+-sr*-sy, cr*sp*sy+-sr*cy, cr*cp);
+}
+
 inline Vector GetGunPosition(edict_t *pEdict)
 {
    return (pEdict->v.origin + pEdict->v.view_ofs);
@@ -24,19 +86,15 @@ inline Vector VecBModelOrigin(edict_t *pEdict)
    return pEdict->v.absmin + (pEdict->v.size * 0.5);
 }
 
-inline void WRAP_TraceLine(const float *v1, const float *v2, int fNoMonsters, edict_t *pentToSkip, TraceResult *ptr) {
-   TRACE_LINE(v1, v2, fNoMonsters, pentToSkip, ptr);
-}
-
 // Overloaded to add IGNORE_GLASS
 inline void UTIL_TraceLine( const Vector & vecStart, const Vector &vecEnd, IGNORE_MONSTERS igmon, IGNORE_GLASS ignoreGlass, edict_t *pentIgnore, TraceResult *ptr )
 {
-   WRAP_TraceLine( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE) | (ignoreGlass?0x100:0), pentIgnore, ptr );
+   TRACE_LINE( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE) | (ignoreGlass?0x100:0), pentIgnore, ptr );
 }
 
 inline void UTIL_TraceLine( const Vector &vecStart, const Vector &vecEnd, IGNORE_MONSTERS igmon, edict_t *pentIgnore, TraceResult *ptr )
 {
-   WRAP_TraceLine( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE), pentIgnore, ptr );
+   TRACE_LINE( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE), pentIgnore, ptr );
 }
 
 inline void UTIL_TraceHull( const Vector &vecStart, const Vector &vecEnd, IGNORE_MONSTERS igmon, int hullNumber, edict_t *pentIgnore, TraceResult *ptr )
@@ -44,8 +102,9 @@ inline void UTIL_TraceHull( const Vector &vecStart, const Vector &vecEnd, IGNORE
    TRACE_HULL( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE), hullNumber, pentIgnore, ptr );
 }
 
-inline void UTIL_TraceMove( const Vector &vecStart, const Vector &vecEnd, IGNORE_MONSTERS igmon, /*int ducking,*/ edict_t *pentIgnore, TraceResult *ptr ) {
-   TRACE_HULL( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE), /*((!ducking) ? head_hull :*/ point_hull/*)*/, pentIgnore, ptr );
+inline void UTIL_TraceMove( const Vector &vecStart, const Vector &vecEnd, IGNORE_MONSTERS igmon, edict_t *pentIgnore, TraceResult *ptr ) 
+{
+   TRACE_HULL( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE), point_hull, pentIgnore, ptr );
 }
 
 inline edict_t *UTIL_FindEntityInSphere( edict_t *pentStart, const Vector &vecCenter, float flRadius )
@@ -54,7 +113,7 @@ inline edict_t *UTIL_FindEntityInSphere( edict_t *pentStart, const Vector &vecCe
 
    pentEntity = FIND_ENTITY_IN_SPHERE( pentStart, vecCenter, flRadius);
 
-   if (!fast_FNullEnt(pentEntity))
+   if (!FNullEnt(pentEntity))
       return pentEntity;
 
    return NULL;
@@ -66,8 +125,9 @@ inline edict_t *UTIL_FindEntityByString( edict_t *pentStart, const char *szKeywo
 
    pentEntity = FIND_ENTITY_BY_STRING( pentStart, szKeyword, szValue );
 
-   if (!fast_FNullEnt(pentEntity))
+   if (!FNullEnt(pentEntity))
       return pentEntity;
+   
    return NULL;
 }
 
@@ -172,79 +232,46 @@ inline bot_t *UTIL_GetBotPointer(edict_t *pEdict)
 
 inline qboolean FInViewCone(const Vector & Origin, edict_t *pEdict)
 {
-   Vector vForward, vRight, vUp;
-   UTIL_MakeVectorsPrivate( pEdict->v.angles, vForward, vRight, vUp);
-   return (DotProduct((Origin - pEdict->v.origin).Normalize(), vForward) > cos(deg2rad(80)));
+   return(DotProduct((Origin - pEdict->v.origin).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle)) > cos(deg2rad(80)));
 }
 
-extern void init_genrand(unsigned long s);
-extern void mt_next_state(void);
-extern int mt_left;
-extern unsigned long *mt_next;
-
-/* generates a random number on [0,1] with 53-bit resolution*/
-inline double genrand_real1_res53(void)
+/* generates a random number on [0,0x7fffffff]-interval */
+inline long genrand_int31(void)
 {
-   unsigned long a,b;
+   extern unsigned long minimalistic_randomness_idnum;
+   minimalistic_randomness_idnum = 1664525L * minimalistic_randomness_idnum + 1013904223L;
+   return(long)(minimalistic_randomness_idnum>>1);
+}
 
-   if (mt_left > 2)
-   {
-      mt_left-=2;
-      a = *mt_next++;
-      b = *mt_next++;
-   }
-   else if (mt_left == 2)
-   {
-      a = *mt_next++;
-      mt_next_state();
-      b = *mt_next++;
-   }
-   else
-   {
-      mt_next_state();
-      mt_left--;
-      a = *mt_next++;
-      b = *mt_next++;
-   }
-
-   /* Tempering */
-   a ^= (a >> 11);
-   b ^= (b >> 11);
-   a ^= (a << 7) & 0x9d2c5680UL;
-   b ^= (b << 7) & 0x9d2c5680UL;
-   a ^= (a << 15) & 0xefc60000UL;
-   b ^= (b << 15) & 0xefc60000UL;
-   a ^= (a >> 18);
-   b ^= (b >> 18);
-   a >>= 5;
-   b >>= 6;
-   
-   return(a*67108864.0+b)*(1.0/9007199254740991.0);
-   /* divided by 2^53-1 */
+/* generates a random number on [0,1]-real-interval */
+inline double genrand_real1()
+{
+   return (double)genrand_int31() * (1.0/2147483647.0); 
+   /* divided by 2^31-1 */ 
 }
 
 inline int RANDOM_LONG2(int lLow, int lHigh) 
 {
    double rnd_diff, add;
    
-   if(lLow <= lHigh)
+   if(lLow >= lHigh)
       return(lLow);
 
-   rnd_diff = genrand_real1_res53() * (lHigh - lLow);
-   add = -0.5;
+   rnd_diff = genrand_real1() * (lHigh - lLow);
+   add = 0.5;
       
-   if(rnd_diff >= 0)
-      add = 0.5;
+   if(rnd_diff < 0)
+      add = -0.5;
       
    return((int)(rnd_diff+add) + lLow);
 }
 
 inline float RANDOM_FLOAT2(float flLow, float flHigh) 
 {
-   if(flLow <= flHigh)
+   if(flLow >= flHigh)
       return(flLow);
       
-   return(genrand_real1_res53() * (flHigh - flLow) + flLow);
+   return(genrand_real1() * (flHigh - flLow) + flLow);
 }
 
 #endif /*BOT_INLINE_FUNCS*/

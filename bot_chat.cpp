@@ -67,6 +67,9 @@ void LoadBotChat(void)
    UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/jk_botti_chat.txt", NULL);
 
    bfp = fopen(filename, "r");
+   
+   if(bfp != NULL)
+      UTIL_ConsolePrintf("Loading %s...\n", filename);
 
    while (bfp != NULL)
    {
@@ -415,7 +418,7 @@ void BotChatGetPlayers(void)
       edict_t *pPlayer = INDEXENT(index);
 
       // skip invalid players
-      if ((pPlayer) && (!pPlayer->free))
+      if ((pPlayer) && (!pPlayer->free) && !FBitSet(pPlayer->v.flags, FL_PROXY))
       {
          if (pPlayer->v.netname)
          {

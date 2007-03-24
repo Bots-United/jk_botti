@@ -21,7 +21,7 @@
 #include "waypoint.h"
 
 #define VER_MAJOR 0
-#define VER_MINOR 21
+#define VER_MINOR 29
 
 
 #define MENU_NONE  0
@@ -90,8 +90,6 @@ int g_menu_state = 0;
 int bot_stop = 0;
 int randomize_bots_on_mapchange = 0;
 
-extern int turn_method;
-
 qboolean is_team_play = FALSE;
 qboolean checked_teamplay = FALSE;
 
@@ -102,6 +100,8 @@ float respawn_time = 0.0;
 float gather_data_time = 0.0;
 qboolean spawn_time_reset = FALSE;
 float waypoint_time = 0.0;
+
+unsigned long minimalistic_randomness_idnum = 1;
 
 char *show_menu_none = {" "};
 char *show_menu_1 =
@@ -234,7 +234,17 @@ C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, 
    REG_SVR_COMMAND ("jk_botti", jk_botti_ServerCommand);
    
    // init random
-   init_genrand( time(0) ^ (unsigned long)&bots[0] ^ sizeof(bots) );
+   minimalistic_randomness_idnum = time(0) ^ (unsigned long)&bots[0] ^ sizeof(bots);
+   
+   {
+      static cvar_t jk_botti_version = { "jk_botti_version", "", FCVAR_EXTDLL|FCVAR_SERVER, 0, NULL};
+      char ver[10];
+      
+      CVAR_REGISTER(&jk_botti_version);
+      
+      snprintf(ver, sizeof(ver), "%d.%d", VER_MAJOR, VER_MINOR);
+      CVAR_SET_STRING("jk_botti_version", ver);
+   }
    
    return (TRUE); // returning TRUE enables metamod to attach this plugin
 }
@@ -297,6 +307,22 @@ void GameDLLInit( void )
 }
 
 
+void CheckSubMod(void)
+{
+   // Check if Severians, XDM or Bubblemod
+   const char * desc = MDLL_GetGameDescription();
+   
+   if(!strnicmp(desc, "Sev", 3))
+      submod_id = SUBMOD_SEVS;
+   else if(!strnicmp(desc, "XDM", 3))
+      submod_id = SUBMOD_XDM;
+   else if(CVAR_GET_POINTER("bm_ver") != NULL)
+      submod_id = SUBMOD_BUBBLEMOD;
+   else
+      submod_id = SUBMOD_HLDM;
+}
+
+
 int Spawn( edict_t *pent )
 {
    if (gpGlobals->deathmatch)
@@ -305,6 +331,8 @@ int Spawn( edict_t *pent )
 
       if (strcmp(pClassname, "worldspawn") == 0)
       {
+         CheckSubMod();
+      	
          // do level initialization stuff here...
          for(int i = 0; i < 32; i++)
             free_posdata_list(i);
@@ -552,23 +580,6 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
       }
 
       snprintf(msg, sizeof(msg), "bot_add_level_tag is %s\n", (bot_add_level_tag?"on":"off"));
-      printfunc(arg, msg);
-
-      return TRUE;
-   }
-   else if (FStrEq(pcmd, "turn_method"))
-   {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-
-         if(temp != AIM_RACC_OLD && temp != AIM_RACC) 
-            printfunc(arg, "invalid turn_method value!\n");
-         else
-            turn_method = temp;
-      }
-
-      snprintf(msg, sizeof(msg), "turn_method is %d\n", turn_method);
       printfunc(arg, msg);
 
       return TRUE;
@@ -1285,82 +1296,59 @@ void ClientCommand( edict_t *pEntity )
 
 static void (*old_PM_PlaySound)(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch);
 
-void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch) {
-        const float globaltime = gpGlobals->time;
-        edict_t * pPlayer;
-        int idx;
-        
-        idx = ENGINE_CURRENT_PLAYER();
-        if(idx < 0 || idx >= gpGlobals->maxClients)
-                goto _exit;
-        
-        pPlayer = INDEXENT(idx+1);
-        if(!pPlayer || pPlayer->free)
-                goto _exit;
-        
-        SaveSound(pPlayer, globaltime, pPlayer->v.origin, volume, attenuation, 1);
-                
-_exit:
-        (*old_PM_PlaySound)(channel, sample, volume, attenuation, fFlags, pitch);
-}
-
-
-void PM_Move(struct playermove_s *ppmove, qboolean server) {
-        //
-        if(ppmove && gpGlobals->deathmatch) {
-                //hook footstep sound function
-                if(ppmove->PM_PlaySound != &new_PM_PlaySound) {
-                        old_PM_PlaySound = ppmove->PM_PlaySound;
-                        ppmove->PM_PlaySound = &new_PM_PlaySound;
-                        
-                        RETURN_META (MRES_HANDLED);
-                }
-        }
-        
-        RETURN_META (MRES_IGNORED);
-}
-
-
-void CheckSubMod(void)
+void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch) 
 {
-   static int checked = 0;
+   const float globaltime = gpGlobals->time;
+   edict_t * pPlayer;
+   int idx;
    
-   if(checked > 100)
-      return;
-
-   // Check if Severians, XDM or Bubblemod
-   const char * desc = MDLL_GetGameDescription();
+   idx = ENGINE_CURRENT_PLAYER();
+   if(idx < 0 || idx >= gpGlobals->maxClients)
+      goto _exit;
    
-   if(!strnicmp(desc, "Sev", 3))
-      submod_id = SUBMOD_SEVS;
-   else if(!strnicmp(desc, "XDM", 3))
-      submod_id = SUBMOD_XDM;
-   else if(CVAR_GET_POINTER("bm_ver") != NULL)
-      submod_id = SUBMOD_BUBBLEMOD;
-   else
-      submod_id = SUBMOD_HLDM;
+   pPlayer = INDEXENT(idx+1);
+   if(!pPlayer || pPlayer->free || FBitSet(pPlayer->v.flags, FL_PROXY))
+      goto _exit;
+   
+   SaveSound(pPlayer, globaltime, pPlayer->v.origin, volume, attenuation, 1);
       
-   checked++;
+_exit:
+   (*old_PM_PlaySound)(channel, sample, volume, attenuation, fFlags, pitch);
+}
+
+
+void PM_Move(struct playermove_s *ppmove, qboolean server) 
+{
+   //
+   if(ppmove && gpGlobals->deathmatch) 
+   {
+      //hook footstep sound function
+      if(ppmove->PM_PlaySound != &new_PM_PlaySound) 
+      {
+         old_PM_PlaySound = ppmove->PM_PlaySound;
+         ppmove->PM_PlaySound = &new_PM_PlaySound;
+         
+         RETURN_META (MRES_HANDLED);
+      }
+   }
+   
+   RETURN_META (MRES_IGNORED);
 }
 
 
 void StartFrame( void )
 {
-   if (!gpGlobals->deathmatch)
-      RETURN_META (MRES_IGNORED);
-
+   const float globaltime = gpGlobals->time;
    edict_t *pPlayer;
    static int i, index, bot_index;
    static float previous_time = -1.0;
-   char msg[256];
    int count;
    
-   const float globaltime = gpGlobals->time;
-
-   CheckSubMod();
-
+   if (!gpGlobals->deathmatch)
+      RETURN_META (MRES_IGNORED);
+   
    // if a new map has started then (MUST BE FIRST IN StartFrame)...
-   if ((globaltime + 0.1) < previous_time)
+   if (globaltime + 0.1 < previous_time)
    {
       char filename[256];
       char mapname[64];
@@ -1369,12 +1357,11 @@ void StartFrame( void )
       strcpy(mapname, STRING(gpGlobals->mapname));
       strcat(mapname, "_jk_botti.cfg");
 
-      UTIL_BuildFileName_N(filename, sizeof(filename), "maps", mapname);
+      UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti", mapname);
 
       if ((bot_cfg_fp = fopen(filename, "r")) != NULL)
       {
-         snprintf(msg, sizeof(msg), "Executing %s\n", filename);
-         ALERT( at_console, "%s", msg );
+         UTIL_ConsolePrintf("Executing %s\n", filename);
 
          for (index = 0; index < 32; index++)
          {
@@ -1501,13 +1488,14 @@ void StartFrame( void )
          {
             pPlayer = INDEXENT(waypoint_player_index++);
 
-            if (pPlayer && !pPlayer->free)
+            if (pPlayer && !pPlayer->free && !FBitSet(pPlayer->v.flags, FL_PROXY))
             {
                // Is player alive?
                if(!IsAlive(pPlayer))
                   continue;
                
-               if (FBitSet(pPlayer->v.flags, FL_CLIENT) && !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
+               if (FBitSet(pPlayer->v.flags, FL_CLIENT) && !FBitSet(pPlayer->v.flags, FL_PROXY) && 
+               	   !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
                {
                   WaypointThink(pPlayer);
                   
@@ -1607,24 +1595,24 @@ void StartFrame( void )
          strcpy(mapname, STRING(gpGlobals->mapname));
          strcat(mapname, "_jk_botti.cfg");
 
-         UTIL_BuildFileName_N(filename, sizeof(filename), "maps", mapname);
+         UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti", mapname);
 
          if ((bot_cfg_fp = fopen(filename, "r")) != NULL)
          {
-            snprintf(msg, sizeof(msg), "Executing %s\n", filename);
-            ALERT( at_console, "%s", msg );
+            UTIL_ConsolePrintf("Executing %s\n", filename);
          }
          else
          {
             UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/jk_botti.cfg", NULL);
 
-            snprintf(msg, sizeof(msg), "Executing %s\n", filename);
-            ALERT( at_console, "%s", msg );
+            UTIL_ConsolePrintf("Executing %s\n", filename);
 
             bot_cfg_fp = fopen(filename, "r");
 
             if (bot_cfg_fp == NULL)
-               ALERT( at_console, "%s", "jk_botti.cfg file not found\n" );
+            {
+               UTIL_ConsolePrintf("jk_botti.cfg file not found\n" );
+            }
          }
 
          if (IsDedicatedServer)
@@ -1746,7 +1734,6 @@ void ProcessBotCfgFile(void)
    int cmd_index;
    static char server_cmd[80];
    char *cmd, *arg1, *arg2, *arg3, *arg4, *arg5;
-   char msg[80];
 
    if (bot_cfg_pause_time > globaltime)
       return;
@@ -1872,11 +1859,7 @@ void ProcessBotCfgFile(void)
    if(ProcessCommand(print_to_null, NULL, cmd, arg1, arg2, arg3, arg4, arg5, TRUE))
       return;
    
-   snprintf(msg, sizeof(msg), "executing server command: %s\n", server_cmd);
-   ALERT( at_console, "%s", msg );
-
-   if (IsDedicatedServer)
-      UTIL_ServerPrintf(msg);
+   UTIL_ConsolePrintf("executing server command: %s\n", server_cmd);
 
    SERVER_COMMAND(server_cmd);
 }
@@ -1897,14 +1880,14 @@ void ServerDeactivate(void)
 
 static void print_to_server_output(void *, char * msg) 
 {
-   SERVER_PRINT(msg);
+   UTIL_ConsolePrintf(msg);
 }
 
 
 void jk_botti_ServerCommand (void)
 {
    if(!ProcessCommand(print_to_server_output, NULL, CMD_ARGV (1), CMD_ARGV (2), CMD_ARGV (3), CMD_ARGV (4), CMD_ARGV (5), CMD_ARGV (6), FALSE)) {
-      SERVER_PRINT(CMD_ARGV (1)); SERVER_PRINT(": Unknown command \'"); SERVER_PRINT(CMD_ARGV (2)); SERVER_PRINT("\'\n");
+      UTIL_ConsolePrintf("%s: Unknown command \'%s\'\n", CMD_ARGV(1), CMD_ARGV(2));
    }
 }
 

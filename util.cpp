@@ -110,8 +110,7 @@ void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
    UTIL_GetTeam(pEntity, sender_teamstr);
 
    client = NULL;
-   while ( ((client = UTIL_FindEntityByClassname( client, "player" )) != NULL) &&
-           (!fast_FNullEnt(client)) )
+   while((client = UTIL_FindEntityByClassname( client, "player" )) != NULL && !FNullEnt(client))
    {
       if ( client == pEntity )  // skip sender of message
          continue;
@@ -142,10 +141,11 @@ edict_t *DBG_EntOfVars( const entvars_t *pev )
 {
    if (pev->pContainingEntity != NULL)
       return pev->pContainingEntity;
-   ALERT(at_console, "%s", "entvars_t pContainingEntity is NULL, calling into engine");
+   
+   UTIL_ConsolePrintf("%s", "entvars_t pContainingEntity is NULL, calling into engine");
    edict_t* pent = (*g_engfuncs.pfnFindEntityByVars)((entvars_t*)pev);
    if (pent == NULL)
-      ALERT(at_console, "%s", "DAMN!  Even the engine couldn't FindEntityByVars!");
+      UTIL_ConsolePrintf("%s", "DAMN!  Even the engine couldn't FindEntityByVars!");
    ((entvars_t *)pev)->pContainingEntity = pent;
    return pent;
 }
@@ -220,12 +220,9 @@ qboolean FInShootCone(const Vector & Origin, edict_t *pEdict, float distance, fl
    
    if(distance < 0.01)
       return TRUE;
-
-   Vector vForward, vRight, vUp;
-   UTIL_MakeVectorsPrivate( pEdict->v.v_angle, vForward, vRight, vUp );
    
    // angle between forward-view-vector and vector to player (as cos(angle))
-   float flDot = DotProduct( (Origin - (pEdict->v.origin + pEdict->v.view_ofs)).Normalize(), vForward );
+   float flDot = DotProduct( (Origin - (pEdict->v.origin + pEdict->v.view_ofs)).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle) );
    if(flDot > cos(deg2rad(min_angle))) // smaller angle, bigger cosine
       return TRUE;
    
@@ -261,7 +258,8 @@ void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index)
    MDLL_CmdEnd(pEdict);
 }
 
-void SaveSound(edict_t * pPlayer, float time, const Vector & origin, float volume, float attenuation, int used) {
+void SaveSound(edict_t * pPlayer, float time, const Vector & origin, float volume, float attenuation, int used) 
+{
    int i = ENTINDEX(pPlayer) - 1;
    if(i < 0 || i >= gpGlobals->maxClients)
       return;
@@ -340,6 +338,7 @@ void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2)
    return;
 }
 
+
 //=========================================================
 // UTIL_LogPrintf - Prints a logged message to console.
 // Preceded by LOG: ( timestamp ) < message >
@@ -357,15 +356,41 @@ void UTIL_LogPrintf( char *fmt, ... )
    ALERT( at_logged, "%s", string );
 }
 
-
 void UTIL_ServerPrintf( char *fmt, ... )
 {
    va_list argptr;
-   char string[128];
+   char string[512];
    
    va_start( argptr, fmt );
    vsnprintf( string, sizeof(string), fmt, argptr );
    va_end( argptr );
+
+   // Print to server console
+   SERVER_PRINT( string );
+}
+
+void UTIL_ConsolePrintf( char *fmt, ... )
+{
+   va_list argptr;
+   char string[1024];
+   size_t len;
+   
+   strcpy(string, "[jk_botti] ");
+   len = strlen(string);
+   
+   va_start( argptr, fmt );
+   vsnprintf( string+len, sizeof(string)-len, fmt, argptr );
+   va_end( argptr );
+
+   // end msg with newline if not already
+   len = strlen(string);
+   if(string[len-1] != '\n')
+   {
+      if(len < sizeof(string)-2)// -1 null, -1 for newline
+         strcat(string, "\n");
+      else
+         string[len-1] = '\n';
+   }
 
    // Print to server console
    SERVER_PRINT( string );
@@ -382,6 +407,7 @@ char* UTIL_VarArgs( char *format, ... )
 
    return string;	
 }
+
 
 void GetGameDir (char *game_dir)
 {

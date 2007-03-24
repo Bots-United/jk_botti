@@ -186,7 +186,7 @@ void WaypointAddPath(short int add_index, short int path_index)
 
    if (p == NULL)
    {
-      ALERT(at_error, "%s", "jk_botti - Error allocating memory for path!");
+      UTIL_ConsolePrintf("%s", "Error allocating memory for path!");
    }
 
    p->index[0] = path_index;
@@ -490,10 +490,7 @@ void WaypointAddSpawnObjects(void)
    
    if(count || updated_count) 
    {
-      char msg[80];
-      
-      snprintf(msg, sizeof(msg), "jk_botti - Added total %d map-object based waypoints and updated flags for %d!\n", count, updated_count);
-      SERVER_PRINT(msg);
+      UTIL_ConsolePrintf("Added total %d map-object based waypoints and updated flags for %d!\n", count, updated_count);
       
       g_waypoint_updated = TRUE;
    }
@@ -535,8 +532,8 @@ int WaypointFindNearest(edict_t *pEntity, float range)
       if ((distance < min_distance) && (distance < range))
       {
          // if waypoint is visible from current position (even behind head)...
-         UTIL_TraceHull( pEntity->v.origin + pEntity->v.view_ofs, waypoints[i].origin,
-                         ignore_monsters, point_hull, pEntity->v.pContainingEntity, &tr );
+         UTIL_TraceMove( pEntity->v.origin + pEntity->v.view_ofs, waypoints[i].origin,
+                         ignore_monsters, pEntity->v.pContainingEntity, &tr );
 
          if (tr.flFraction >= 1.0)
          {
@@ -579,8 +576,8 @@ int WaypointFindNearest(Vector v_src, edict_t *pEntity, float range)
       if ((distance < min_distance) && (distance < range))
       {
          // if waypoint is visible from source position...
-         UTIL_TraceHull( v_src, waypoints[index].origin, ignore_monsters,
-                         point_hull, pEntity->v.pContainingEntity, &tr );
+         UTIL_TraceMove( v_src, waypoints[index].origin, ignore_monsters,
+                              pEntity->v.pContainingEntity, &tr );
 
          if (tr.flFraction >= 1.0)
          {
@@ -1041,7 +1038,7 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
 
    while ((pent = UTIL_FindEntityInSphere( pent, origin, radius )) != NULL)
    {
-      UTIL_TraceHull( origin, pent->v.origin, ignore_monsters, point_hull, 
+      UTIL_TraceMove( origin, pent->v.origin, ignore_monsters,  
                       pEntity ? pEntity->v.pContainingEntity : NULL, &tr );
 
       // make sure entity is visible...
@@ -1139,7 +1136,7 @@ edict_t *WaypointFindItem( int wpt_index )
    //********************************************************
    while ((pent = UTIL_FindEntityInSphere( pent, origin, radius )) != NULL)
    {
-      UTIL_TraceHull( origin, pent->v.origin, ignore_monsters, point_hull, NULL, &tr );
+      UTIL_TraceMove( origin, pent->v.origin, ignore_monsters, NULL, &tr );
       
       // make sure entity is visible...
       if ((tr.flFraction >= 1.0) || (tr.pHit == pent) || !(pent->v.effects & EF_NODRAW) || !(pent->v.frame > 0))
@@ -1298,12 +1295,8 @@ void WaypointAddAiming(edict_t *pEntity)
    v_angle.x = 0;  // reset pitch to horizontal
    v_angle.z = 0;  // reset roll to level
 
-   //MAKE_VECTORS(v_angle);
-   Vector vForward, vRight, vUp;
-   UTIL_MakeVectorsPrivate(v_angle, vForward, vRight, vUp);
-
    // store the origin (location) of this waypoint (use entity origin)
-   waypoints[index].origin = pEntity->v.origin + vForward * 25;
+   waypoints[index].origin = pEntity->v.origin + UTIL_AnglesToForward(v_angle) * 25;
 
    // set the time that this waypoint was originally displayed...
    wp_display_time[index] = globaltime;
@@ -1566,7 +1559,7 @@ qboolean WaypointLoad(edict_t *pEntity)
 
    UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/waypoints", mapname);
 
-   UTIL_ServerPrintf("jk_botti - loading waypoint file: %s\n", filename);
+   UTIL_ConsolePrintf("loading waypoint file: %s\n", filename);
 
    bfp = fopen(filename, "rb");
 
@@ -1580,7 +1573,8 @@ qboolean WaypointLoad(edict_t *pEntity)
       {
          if (header.waypoint_file_version != WAYPOINT_VERSION)
          {
-            UTIL_ServerPrintf("Incompatible jk_botti waypoint file version!\n" "Waypoints not loaded!\n");
+            UTIL_ConsolePrintf("Incompatible jk_botti waypoint file version!\n");
+            UTIL_ConsolePrintf("Waypoints not loaded!\n");
 
             fclose(bfp);
             return FALSE;
@@ -1654,7 +1648,7 @@ qboolean WaypointLoad(edict_t *pEntity)
       }
 
       if (IsDedicatedServer)
-         UTIL_ServerPrintf("waypoint file %s not found!\n", filename);
+         UTIL_ConsolePrintf("waypoint file %s not found!\n", filename);
 
       return FALSE;
    }
@@ -1715,7 +1709,7 @@ void WaypointSave(void)
 
    UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/waypoints", mapname);
 
-   UTIL_ServerPrintf("jk_botti - saving waypoint file: %s\n", filename);
+   UTIL_ConsolePrintf("saving waypoint file: %s\n", filename);
 
    FILE *bfp = fopen(filename, "wb");
 
@@ -1773,7 +1767,7 @@ qboolean WaypointReachable(Vector v_src, Vector v_dest, edict_t *pEntity)
    {
       // check if this waypoint is "visible"...
       if(on_ladder)
-         UTIL_TraceHull( v_src, v_dest, ignore_monsters, point_hull, 
+         UTIL_TraceMove( v_src, v_dest, ignore_monsters,  
                       !pEntity ? NULL : pEntity->v.pContainingEntity, &tr );
       else
          UTIL_TraceHull( v_src, v_dest, ignore_monsters, head_hull, 
@@ -1824,7 +1818,7 @@ qboolean WaypointReachable(Vector v_src, Vector v_dest, edict_t *pEntity)
 
          v_down.z = v_down.z - 1000.0;  // straight down 1000 units
 
-         UTIL_TraceHull(v_check, v_down, ignore_monsters, point_hull, 
+         UTIL_TraceMove(v_check, v_down, ignore_monsters,  
                         !pEntity ? NULL : pEntity->v.pContainingEntity, &tr);
 
          last_height = tr.flFraction * 1000.0;  // height from ground
@@ -1839,7 +1833,7 @@ qboolean WaypointReachable(Vector v_src, Vector v_dest, edict_t *pEntity)
             v_down = v_check;
             v_down.z = v_down.z - 1000.0;  // straight down 1000 units
 
-            UTIL_TraceHull(v_check, v_down, ignore_monsters, point_hull,
+            UTIL_TraceMove(v_check, v_down, ignore_monsters, 
                            !pEntity ? NULL : pEntity->v.pContainingEntity, &tr);
 
             curr_height = tr.flFraction * 1000.0;  // height from ground
@@ -1890,8 +1884,8 @@ int WaypointFindReachable(edict_t *pEntity, float range)
       if (distance < min_distance)
       {
          // if waypoint is visible from current position (even behind head)...
-         UTIL_TraceHull( pEntity->v.origin + pEntity->v.view_ofs, waypoints[i].origin,
-                         ignore_monsters, point_hull, pEntity->v.pContainingEntity, &tr );
+         UTIL_TraceMove( pEntity->v.origin + pEntity->v.view_ofs, waypoints[i].origin,
+                         ignore_monsters, pEntity->v.pContainingEntity, &tr );
 
          if (tr.flFraction >= 1.0)
          {
@@ -2185,7 +2179,6 @@ void WaypointRouteInit(void)
    unsigned int a, b;
    float distance;
    unsigned short *pShortestPath, *pFromTo;
-   char msg[80];
    unsigned int num_items;
    FILE *bfp;
    char filename2[256];
@@ -2226,18 +2219,17 @@ void WaypointRouteInit(void)
 
       if (stat1.st_mtime < stat2.st_mtime)  // is ".wpt" older than ".matrix" file?
       {
-         snprintf(msg, sizeof(msg), "jk_botti[matrix load] - loading jk_botti waypoint path matrix\n");
-         SERVER_PRINT(msg);
+         UTIL_ConsolePrintf("[matrix load] - loading jk_botti waypoint path matrix\n");
 
          shortest_path = (unsigned short *)malloc(sizeof(unsigned short) * array_size);
 
          if (shortest_path == NULL)
-            SERVER_PRINT("jk_botti[matrix load] - Error allocating memory for shortest path!\n");
+            UTIL_ConsolePrintf("[matrix load] - Error allocating memory for shortest path!\n");
 
          from_to = (unsigned short *)malloc(sizeof(unsigned short) * array_size);
 
          if (from_to == NULL)
-            SERVER_PRINT("jk_botti[matrix load] - Error allocating memory for from to matrix!\n");
+            UTIL_ConsolePrintf("[matrix load] - Error allocating memory for from to matrix!\n");
 
          bfp = fopen(filename2, "rb");
 
@@ -2248,7 +2240,7 @@ void WaypointRouteInit(void)
             if(num_items != 16 || strcmp(header, "jkbotti_matrixA\0") != 0)
             {
                // if couldn't read enough data, free memory to recalculate it
-               SERVER_PRINT("jk_botti[matrix load] - error reading first matrix file header, recalculating...\n");
+               UTIL_ConsolePrintf("[matrix load] - error reading first matrix file header, recalculating...\n");
 
                free(shortest_path);
                shortest_path = NULL;
@@ -2263,7 +2255,7 @@ void WaypointRouteInit(void)
                if (num_items != array_size)
                {
                   // if couldn't read enough data, free memory to recalculate it
-                  SERVER_PRINT("jk_botti[matrix load] - error reading enough path items, recalculating...\n");
+                  UTIL_ConsolePrintf("[matrix load] - error reading enough path items, recalculating...\n");
 
                   free(shortest_path);
                   shortest_path = NULL;
@@ -2278,7 +2270,7 @@ void WaypointRouteInit(void)
                   if(num_items != 16 || strcmp(header, "jkbotti_matrixB\0") != 0)
                   {
                      // if couldn't read enough data, free memory to recalculate it
-                     SERVER_PRINT("jk_botti[matrix load] - error reading second matrix file header, recalculating...\n");
+                     UTIL_ConsolePrintf("[matrix load] - error reading second matrix file header, recalculating...\n");
 
                      free(shortest_path);
                      shortest_path = NULL;
@@ -2293,7 +2285,7 @@ void WaypointRouteInit(void)
                      if (num_items != array_size)
                      {
                         // if couldn't read enough data, free memory to recalculate it
-                        SERVER_PRINT("jk_botti[matrix load] - error reading enough path items, recalculating...\n");
+                        UTIL_ConsolePrintf("[matrix load] - error reading enough path items, recalculating...\n");
 
                         free(shortest_path);
                         shortest_path = NULL;
@@ -2307,7 +2299,7 @@ void WaypointRouteInit(void)
          }
          else
          {
-            SERVER_PRINT("jk_botti[matrix load] - Error reading waypoint paths!\n");
+            UTIL_ConsolePrintf("[matrix load] - Error reading waypoint paths!\n");
 
             free(shortest_path);
             shortest_path = NULL;
@@ -2320,24 +2312,23 @@ void WaypointRouteInit(void)
       }
       else
       {
-      	 SERVER_PRINT("jk_botti[matrix load] - Waypoint file is newer than matrix file, recalculating...\n");
+      	 UTIL_ConsolePrintf("[matrix load] - Waypoint file is newer than matrix file, recalculating...\n");
       }
    }
 
    if (shortest_path == NULL)
    {
-      snprintf(msg, sizeof(msg), "jk_botti[matrix calc] - calculating jk_botti waypoint path matrix\n");
-      SERVER_PRINT(msg);
+      UTIL_ConsolePrintf("[matrix calc] - calculating jk_botti waypoint path matrix\n");
 
       shortest_path = (unsigned short *)malloc(sizeof(unsigned short) * array_size);
 
       if (shortest_path == NULL)
-         SERVER_PRINT("jk_botti[matrix calc] - Error allocating memory for shortest path!\n");
+         UTIL_ConsolePrintf("[matrix calc] - Error allocating memory for shortest path!\n");
 
       from_to = (unsigned short *)malloc(sizeof(unsigned short) * array_size);
 
       if (from_to == NULL)
-         SERVER_PRINT("jk_botti[matrix calc] - Error allocating memory for from to matrix!\n");
+         UTIL_ConsolePrintf("[matrix calc] - Error allocating memory for from to matrix!\n");
 
       pShortestPath = shortest_path;
       pFromTo = from_to;
@@ -2371,9 +2362,8 @@ void WaypointRouteInit(void)
 
                      if (distance > REACHABLE_RANGE)
                      {
-                        snprintf(msg, sizeof(msg), "jk_botti[matrix calc] - Waypoint path distance > %4.1f at from %d to %d\n",
+                        UTIL_ConsolePrintf("[matrix calc] - Waypoint path distance > %4.1f at from %d to %d\n",
                                      REACHABLE_RANGE, row, index);
-                        SERVER_PRINT(msg);
                      }
                      else
                      {
@@ -2447,11 +2437,10 @@ void WaypointRouteInit(void)
       }
       else
       {
-         SERVER_PRINT("jk_botti[matrix calc] - Error writing waypoint paths!\n");
+         UTIL_ConsolePrintf("[matrix calc] - Error writing waypoint paths!\n");
       }
 
-      snprintf(msg, sizeof(msg), "jk_botti[matrix calc] - waypoint path calculations complete!\n");
-      SERVER_PRINT(msg);
+      UTIL_ConsolePrintf("[matrix calc] - waypoint path calculations complete!\n");
    }
 }
 

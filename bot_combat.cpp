@@ -31,6 +31,7 @@ extern int submod_id;
 typedef struct posdata_s {
    float time;
    qboolean was_alive;
+   qboolean ducking;
    Vector origin;
    Vector velocity;
    //Vector accel;
@@ -41,105 +42,75 @@ typedef struct posdata_s {
 posdata_t * pos_latest[32];
 posdata_t * pos_oldest[32];
 
-int turn_method = AIM_RACC;
-
 //
-/*qboolean BotAimsAtSomething (bot_t &pBot)
+qboolean BotAimsAtSomething (bot_t &pBot)
 {
-   edict_t *pEdict = pBot.pEdict;
-   Vector vForward, vRight, vUp;
-   Vector v_aim;
-   TraceResult tr;
-   
-   if(FNullEnt(pEdict) || FNullEnt(pBot.pBotEnemy))
+   if(!pBot.pBotEnemy)
       return FALSE;
    
-   float prediction_ammount = skill_settings[pBot.bot_skill].prediction_latency;
-   float shootcone_diameter = skill_settings[pBot.bot_skill].shootcone_diameter;
-   float shootcone_minangle = skill_settings[pBot.bot_skill].shootcone_minangle;
-   
-   if(FInShootCone(pBot.pBotEnemy->v.origin, pBot.pEdict, 
-                   (GetPredictedPlayerPosition(pBot.pBotEnemy, gpGlobals->time - prediction_ammount, gpGlobals->time) - pBot.pEdict->v.origin).Length(), shootcone_diameter, shootcone_minangle))
-      return TRUE;
-   
-   return FALSE;
-}*/
+   return(FPredictedVisible(pBot));
+}
 
 //
-void BotPointGun (bot_t &pBot, qboolean save_v_angle)
+void BotPointGun(bot_t &pBot)
 {
    // this function is called every frame for every bot. Its purpose is to make the bot
    // move its crosshair to the direction where it wants to look. There is some kind of
    // filtering for the view, to make it human-like.
-   edict_t *pEdict = pBot.pEdict;
 
    float speed; // speed : 0.1 - 1
    Vector v_deviation;
    float turn_skill = skill_settings[pBot.bot_skill].turn_skill;
+   
+   edict_t *pEdict = pBot.pEdict;
 
-   v_deviation = UTIL_WrapAngles (Vector (pEdict->v.idealpitch, pEdict->v.ideal_yaw, 0) - pBot.bot_v_angle);
+   v_deviation = UTIL_WrapAngles (Vector (pEdict->v.idealpitch, pEdict->v.ideal_yaw, 0) - pEdict->v.v_angle);
 
-   // do we want old RACC style aiming ?
-   if (turn_method == AIM_RACC_OLD)
-   {
-      // limit the turn skill
-      speed = (turn_skill * 3 < 1 / pBot.f_frame_time ? turn_skill * 3 : 1 / pBot.f_frame_time);
-
-      // offset yaw and pitch at some percentage of the deviation, based on skill and frame time.
-      pEdict->v.yaw_speed = v_deviation.y * pBot.f_frame_time * speed;
-      pEdict->v.pitch_speed = v_deviation.x * pBot.f_frame_time * speed;
-   }
-   // else do we want new RACC style aiming ?
-   else if (turn_method == AIM_RACC)
-   {
-      // if bot is aiming at something, aim fast, else take our time...
+   // if bot is aiming at something, aim fast, else take our time...
+   if (pBot.b_combat_longjump || BotAimsAtSomething (pBot))
       speed = 0.7 + (turn_skill - 1) / 10; // fast aim
+   else if(pBot.curr_waypoint_index != -1)
+      speed = 0.5 + (turn_skill - 1) / 15; // medium aim
+   else
+      speed = 0.2 + (turn_skill - 1) / 20; // slow aim
 
-      // thanks Tobias "Killaruna" Heimann and Johannes "@$3.1415rin" Lampel for this one
-      pEdict->v.yaw_speed = (pEdict->v.yaw_speed * exp (log (speed / 2) * pBot.f_frame_time * 20)
+   // thanks Tobias "Killaruna" Heimann and Johannes "@$3.1415rin" Lampel for this one
+   pEdict->v.yaw_speed = (pEdict->v.yaw_speed * exp (log (speed / 2) * pBot.f_frame_time * 20)
                              + speed * v_deviation.y * (1 - exp (log (speed / 2) * pBot.f_frame_time * 20)))
                             * pBot.f_frame_time * 20;
-      pEdict->v.pitch_speed = (pEdict->v.pitch_speed * exp (log (speed / 2) * pBot.f_frame_time * 20)
+   pEdict->v.pitch_speed = (pEdict->v.pitch_speed * exp (log (speed / 2) * pBot.f_frame_time * 20)
                                + speed * v_deviation.x * (1 - exp (log (speed / 2) * pBot.f_frame_time * 20)))
                               * pBot.f_frame_time * 20;
 
-      // influence of y movement on x axis, based on skill (less influence than x on y since it's
-      // easier and more natural for the bot to "move its mouse" horizontally than vertically)
-      if (pEdict->v.pitch_speed > 0)
-         pEdict->v.pitch_speed += pEdict->v.yaw_speed / (1.5 * (1 + turn_skill));
-      else
-         pEdict->v.pitch_speed -= pEdict->v.yaw_speed / (1.5 * (1 + turn_skill));
+   // influence of y movement on x axis, based on skill (less influence than x on y since it's
+   // easier and more natural for the bot to "move its mouse" horizontally than vertically)
+   if (pEdict->v.pitch_speed > 0)
+      pEdict->v.pitch_speed += pEdict->v.yaw_speed / (1.5 * (1 + turn_skill));
+   else
+      pEdict->v.pitch_speed -= pEdict->v.yaw_speed / (1.5 * (1 + turn_skill));
 
-      // influence of x movement on y axis, based on skill
-      if (pEdict->v.yaw_speed > 0)
-         pEdict->v.yaw_speed += pEdict->v.pitch_speed / (1 + turn_skill);
-      else
-         pEdict->v.yaw_speed -= pEdict->v.pitch_speed / (1 + turn_skill);
-   }
+   // influence of x movement on y axis, based on skill
+   if (pEdict->v.yaw_speed > 0)
+      pEdict->v.yaw_speed += pEdict->v.pitch_speed / (1 + turn_skill);
+   else
+      pEdict->v.yaw_speed -= pEdict->v.pitch_speed / (1 + turn_skill);
 
    // move the aim cursor
-   pEdict->v.v_angle = UTIL_WrapAngles (pBot.bot_v_angle + Vector (pEdict->v.pitch_speed, pEdict->v.yaw_speed, 0)); 
+   pEdict->v.v_angle = UTIL_WrapAngles (pEdict->v.v_angle + Vector (pEdict->v.pitch_speed, pEdict->v.yaw_speed, 0)); 
 
    // set the body angles to point the gun correctly
-   pEdict->v.angles.x = UTIL_WrapAngle (pEdict->v.v_angle.x / 3);
+   pEdict->v.angles.x = UTIL_WrapAngle (-pEdict->v.v_angle.x / 3);
    pEdict->v.angles.y = UTIL_WrapAngle (pEdict->v.v_angle.y);
    pEdict->v.angles.z = 0;
-   
-   pEdict->v.angles.x = UTIL_WrapAngle ( -pEdict->v.angles.x );
-
-   // save angles
-   if( save_v_angle )
-      pBot.bot_v_angle = UTIL_WrapAngles (pEdict->v.v_angle);
 }
 
 //
-void BotAimThink( bot_t &pBot ) {   
+void BotAim( bot_t &pBot ) 
+{   
    // make bot aim and turn
-   BotPointGun(pBot, TRUE); // update and save this bot's view angles
+   BotPointGun(pBot); // update and save this bot's view angles
    
-   // systematically wrap all player angles to avoid engine freezes
-   pBot.pEdict->v.angles = UTIL_WrapAngles(pBot.pEdict->v.angles);
-   pBot.pEdict->v.v_angle = UTIL_WrapAngles(pBot.pEdict->v.v_angle);
+   // wrap angles that were not wrapped in pointgun
    pBot.pEdict->v.idealpitch = UTIL_WrapAngle(pBot.pEdict->v.idealpitch);
    pBot.pEdict->v.ideal_yaw = UTIL_WrapAngle(pBot.pEdict->v.ideal_yaw);
 }
@@ -177,12 +148,14 @@ void BotCheckTeamplay(void)
 }
 
 // called in clientdisconnect
-void free_posdata_list(int idx) {
+void free_posdata_list(int idx) 
+{
    posdata_t * next;
    
    next = pos_latest[idx];
    
-   while(next) {
+   while(next) 
+   {
       posdata_t * curr = next;
       
       next = curr->older;
@@ -194,12 +167,14 @@ void free_posdata_list(int idx) {
 }
 
 //
-void add_next_posdata(int idx, edict_t *pEdict) {
+void add_next_posdata(int idx, edict_t *pEdict)
+{
    posdata_t * curr_latest = pos_latest[idx];
    
    pos_latest[idx] = (posdata_t*)malloc(sizeof(posdata_t));
    
-   if(curr_latest) {
+   if(curr_latest) 
+   {
       curr_latest->newer = pos_latest[idx];
    }
    
@@ -210,6 +185,7 @@ void add_next_posdata(int idx, edict_t *pEdict) {
    pos_latest[idx]->velocity = pEdict->v.basevelocity + pEdict->v.velocity;   
    
    pos_latest[idx]->was_alive = !!IsAlive(pEdict);
+   pos_latest[idx]->ducking = (pEdict->v.flags & FL_DUCKING) == FL_DUCKING;
    
    pos_latest[idx]->time = gpGlobals->time;
    
@@ -218,16 +194,19 @@ void add_next_posdata(int idx, edict_t *pEdict) {
 }
 
 // remove data older than max + 100ms
-void timetrim_posdata(int idx) {
+void timetrim_posdata(int idx) 
+{
    posdata_t * list;
    
    if(!(list = pos_oldest[idx]))
       return;
    
-   while(list) {
+   while(list) 
+   {
       // max + 100ms
       // max is maximum by skill + max randomness added in GetPredictedPlayerPosition()
-      if(list->time + (skill_settings[4].prediction_latency * 100.0 / 90.0 + 0.1) <= gpGlobals->time) {
+      if(list->time + (skill_settings[4].prediction_latency * 100.0 / 90.0 + 0.1) <= gpGlobals->time) 
+      {
          posdata_t * next = list->newer;
          
          free(list);
@@ -236,25 +215,31 @@ void timetrim_posdata(int idx) {
          list->older = 0;
          pos_oldest[idx] = list;
       }
-      else {
+      else 
+      {
          // new enough.. so are all the rest
          break;
       }
    }
    
-   if(!pos_oldest[idx]) {
+   if(!pos_oldest[idx]) 
+   {
       pos_oldest[idx] = 0;
       pos_latest[idx] = 0;
    }
 }
 
 // called every 33ms (30fps) from startframe
-void GatherPlayerData(void) {
-   for(int i = 0; i < gpGlobals->maxClients; i++) {
+void GatherPlayerData(void) 
+{
+   for(int i = 0; i < gpGlobals->maxClients; i++)
+   {
       edict_t * pEdict = INDEXENT(i+1);
       
-      if(fast_FNullEnt(pEdict) || pEdict->free) {
-         if(pos_latest[i]) {
+      if(FNullEnt(pEdict) || pEdict->free || FBitSet(pEdict->v.flags, FL_PROXY))
+      {
+         if(pos_latest[i]) 
+         {
             free_posdata_list(i);
          }
          
@@ -266,14 +251,65 @@ void GatherPlayerData(void) {
    }
 }
 
+//
+Vector AddPredictionVelocityVaritation(bot_t &pBot, const Vector & velocity)
+{
+   if(velocity.x == 0 && velocity.y == 0)
+      return velocity;
+   
+   float maxvar = (1.0 + skill_settings[pBot.bot_skill].prediction_velocity_varitation);
+   float minvar = (1.0 - skill_settings[pBot.bot_skill].prediction_velocity_varitation);
+   
+   Vector2D flat = Vector2D(velocity.x, velocity.y);
+   
+   flat = flat.Normalize() * (flat.Length() * RANDOM_FLOAT2(minvar, maxvar));
+   
+   return Vector(flat.x, flat.y, velocity.z);
+}
+
+// Prevent bots from shooting at on ground when aiming on falling player that hits ground (Z axis fixup only)
+Vector TracePredictedMovement(bot_t &pBot, Vector v_src, Vector v_velocity, float time, qboolean ducking, qboolean without_velocity)
+{
+   if(without_velocity)
+      return(v_src);
+   
+   Vector v_dest;
+   
+   v_velocity = AddPredictionVelocityVaritation(pBot, v_velocity);
+   v_dest = v_src + v_velocity * time;
+   
+   TraceResult tr;
+   UTIL_TraceHull( v_src, v_dest, ignore_monsters, (ducking) ? head_hull : human_hull, pBot.pBotEnemy->v.pContainingEntity, &tr);
+   
+   if(!tr.fStartSolid && tr.flFraction < 0.9999)
+      v_dest.z = tr.vecEndPos.z;
+   
+   return(v_dest);
+}
+
+//
+qboolean FPredictedVisible(bot_t &pBot)
+{
+   if(!pBot.pBotEnemy)
+      return(FALSE);
+   
+   Vector v_enemy = GetPredictedPlayerPosition(pBot, TRUE); //only get position
+   edict_t * pHit = 0;
+   
+   return(FVisible(v_enemy, pBot.pEdict, &pHit) || pHit == pBot.pBotEnemy);
+}
+
 // used instead of using pBotEnemy->v.origin in aim code.
 //  example: GetPredictedPlayerPosition(pBotEnemy, gpGlobals->time - 0.3, gpGlobals->time) // use 300ms old position data
 //  if bot's aim lags behind moving target increase value of AHEAD_MULTIPLIER.
-#define AHEAD_MULTIPLIER 1.4
-Vector GetPredictedPlayerPosition(edict_t * pPlayer, float time, const float globaltime) 
+#define AHEAD_MULTIPLIER 1.5
+Vector GetPredictedPlayerPosition(bot_t &pBot, qboolean without_velocity) 
 {
+   const float globaltime = gpGlobals->time;
+   edict_t * pPlayer = pBot.pBotEnemy;
    posdata_t * newer;
    posdata_t * older;
+   float time;
    int idx;
    
    if(FNullEnt(pPlayer))
@@ -283,21 +319,24 @@ Vector GetPredictedPlayerPosition(edict_t * pPlayer, float time, const float glo
    if(idx < 0 || idx >= gpGlobals->maxClients || !pos_latest[idx] || !pos_oldest[idx])
       return(pPlayer->v.origin);
    
-   // with tint of randomness
-   time = fabs(time - globaltime);
-   time = globaltime - RANDOM_FLOAT2(time * 90.0 / 100.0, time * 100.0 / 90.0);
+   // get prediction time based on bot skill
+   time = skill_settings[pBot.bot_skill].prediction_latency;
+   time = globaltime - RANDOM_FLOAT2(time * 90.0 / 100.0, time * 100.0 / 90.0); // with tint of randomness
    
    // find position data slots that are around 'time'
    newer = pos_latest[idx];
    older = 0;
-   while(newer) {
-      if(newer->time > time) {
+   while(newer) 
+   {
+      if(newer->time > time) 
+      {
          //this is too new for us.. proceed
          newer = newer->older;
          continue;
       }
-      if(newer->time == time) {
-         return(newer->origin + (fabs(globaltime - time) * AHEAD_MULTIPLIER) * newer->velocity); 
+      if(newer->time == time) 
+      {
+         return(TracePredictedMovement(pBot, newer->origin, newer->velocity, fabs(globaltime - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity)); 
       }
       
       //this time is older than previous..
@@ -306,11 +345,13 @@ Vector GetPredictedPlayerPosition(edict_t * pPlayer, float time, const float glo
       break;
    }
    
-   if(!older) {
-      return(pos_oldest[idx]->origin + (fabs(globaltime - time) * AHEAD_MULTIPLIER) * pos_oldest[idx]->velocity); 
+   if(!older) 
+   {
+      return(TracePredictedMovement(pBot, pos_oldest[idx]->origin, pos_oldest[idx]->velocity, fabs(globaltime - pos_oldest[idx]->time) * AHEAD_MULTIPLIER, pos_oldest[idx]->ducking, without_velocity)); 
    }
    
-   if(!newer) {
+   if(!newer) 
+   {
       static posdata_t newertmp;
       
       newertmp.origin = pPlayer->v.origin;
@@ -321,30 +362,35 @@ Vector GetPredictedPlayerPosition(edict_t * pPlayer, float time, const float glo
       newer = &newertmp;
    }
    
+   // don't mix dead data with alive data
+   if(!newer->was_alive && older->was_alive) 
+   {
+      return(TracePredictedMovement(pBot, newer->origin, newer->velocity, fabs(globaltime - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity)); 
+   }
+   if(!older->was_alive && newer->was_alive) 
+   {
+      return(TracePredictedMovement(pBot, older->origin, older->velocity, fabs(globaltime - older->time) * AHEAD_MULTIPLIER, older->ducking, without_velocity)); 
+   }
+   
    float newer_diff = fabs(newer->time - time);
    float older_diff = fabs(older->time - time);
    float total_diff = newer_diff + older_diff;
-   
-   if(total_diff == 0.0) {
+      
+   if(total_diff == 0.0) 
+   {
       // zero div would crash server.. 
       // zero diff means that both data are from same time
-      return(newer->origin + (fabs(globaltime - time) * AHEAD_MULTIPLIER) * newer->velocity); 
-   }
-   
-   // don't mix dead data with alive data
-   if(!newer->was_alive && older->was_alive) {
-      return(newer->origin + (fabs(globaltime - time) * AHEAD_MULTIPLIER) * newer->velocity); 
-   }
-   if(!older->was_alive && newer->was_alive) {
-      return(older->origin + (fabs(globaltime - time) * AHEAD_MULTIPLIER) * older->velocity); 
+      return(TracePredictedMovement(pBot, newer->origin, newer->velocity, fabs(globaltime - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity)); 
    }
    
    // make weighted average
    Vector pred_origin = (older_diff/total_diff) * newer->origin + (newer_diff/total_diff) * older->origin;
-   Vector pred_velocity = (older_diff/total_diff) * newer->velocity + (newer_diff/total_diff) * older->velocity;
+   Vector pred_velocity;
+   if(!without_velocity)
+      pred_velocity = (older_diff/total_diff) * newer->velocity + (newer_diff/total_diff) * older->velocity;
    
    // use old origin and use old velocity to predict current position
-   return(pred_origin + (fabs(globaltime - time) * AHEAD_MULTIPLIER) * pred_velocity);
+   return(TracePredictedMovement(pBot, pred_origin, pred_velocity, fabs(globaltime - time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity)); 
 }
 
 //
@@ -505,7 +551,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
          Vector vecEnd;
          Vector vecPredEnemy;
 
-         vecPredEnemy = GetPredictedPlayerPosition(pBot.pBotEnemy, globaltime - skill_settings[pBot.bot_skill].prediction_latency, globaltime);
+         vecPredEnemy = GetPredictedPlayerPosition(pBot);
 
          if(FCanShootInHead(pEdict, pBot.pBotEnemy, vecPredEnemy))
             vecEnd = vecPredEnemy + pBot.pBotEnemy->v.view_ofs;
@@ -562,7 +608,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
       nearestdistance = 9999;
 
       // search the world for monsters...
-      while (!fast_FNullEnt (pMonster = UTIL_FindEntityInSphere (pMonster, pEdict->v.origin, 1000)))
+      while (!FNullEnt (pMonster = UTIL_FindEntityInSphere (pMonster, pEdict->v.origin, 1000)))
       {
          if (!(pMonster->v.flags & FL_MONSTER))
             continue; // discard anything that is not a monster
@@ -595,7 +641,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
          edict_t *pPlayer = INDEXENT(i);
 
          // skip invalid players and skip self (i.e. this bot)
-         if ((pPlayer) && (!pPlayer->free) && (pPlayer != pEdict))
+         if ((pPlayer) && (!pPlayer->free) && (pPlayer != pEdict) && !FBitSet(pPlayer->v.flags, FL_PROXY))
          {
             if ((b_observer_mode) && !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
                continue;
@@ -770,9 +816,7 @@ qboolean TrySelectWeapon(bot_t &pBot, const int select_index, const bot_weapon_s
    
    if (delay.iId != select.iId)
    {
-      char msg[80];
-      snprintf(msg, sizeof(msg), "fire_delay mismatch for weapon id=%d\n", select.iId);
-      ALERT(at_console, "%s", msg);
+      UTIL_ConsolePrintf("fire_delay mismatch for weapon id=%d\n", select.iId);
       
       pBot.current_weapon_index = -1;
       
@@ -805,6 +849,19 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
 
    pSelect = &weapon_select[0];
    pDelay = &fire_delay[0];
+
+   // keep weapon only if can be used underwater
+   if(pBot.pEdict->v.waterlevel == 3)
+   {
+      select_index = pBot.current_weapon_index;
+      
+      if(!pSelect[select_index].can_use_underwater)
+      {
+         pBot.current_weapon_index = -1;
+         pBot.f_primary_charging = -1;
+         pBot.f_secondary_charging = -1;
+      }
+   }
    
    // are we charging the primary fire?
    if (pBot.f_primary_charging > 0)
@@ -990,7 +1047,7 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
             continue;
       }
       else if(pSelect[select_index].avoid_this_gun)
-      	 continue;     	 
+      	 continue;
 
       // is use percent greater than weapon use percent?
       if (RANDOM_LONG2(1, 100) > pSelect[select_index].use_percent)
@@ -1048,13 +1105,14 @@ void BotShootAtEnemy( bot_t &pBot )
    Vector v_enemy;
    Vector v_enemy_aimpos;
    Vector v_predicted_pos;
-
+   edict_t * pHit = 0;
+   
    edict_t *pEdict = pBot.pEdict;
 
    if (pBot.f_reaction_target_time > globaltime)
       return;
 
-   v_predicted_pos = GetPredictedPlayerPosition(pBot.pBotEnemy, globaltime - skill_settings[pBot.bot_skill].prediction_latency, globaltime);
+   v_predicted_pos = GetPredictedPlayerPosition(pBot);
 
    // do we need to aim at the feet?
    if (pBot.current_weapon.iId == VALVE_WEAPON_RPG)
@@ -1079,18 +1137,32 @@ void BotShootAtEnemy( bot_t &pBot )
       }
       else
       {
+         v_enemy_aimpos = v_predicted_pos;
          if(FCanShootInHead(pEdict, pBot.pBotEnemy, v_predicted_pos))
-            v_enemy_aimpos = v_predicted_pos + pBot.pBotEnemy->v.view_ofs;// aim for the head...
-         else
-            v_enemy_aimpos = v_predicted_pos;
+            v_enemy_aimpos += pBot.pBotEnemy->v.view_ofs;// aim for the head...
       }
    }
    else
    {
+      v_enemy_aimpos = v_predicted_pos;
       if(FCanShootInHead(pEdict, pBot.pBotEnemy, v_predicted_pos))
-         v_enemy_aimpos = v_predicted_pos + pBot.pBotEnemy->v.view_ofs;// aim for the head...
-      else
-         v_enemy_aimpos = v_predicted_pos;
+         v_enemy_aimpos += pBot.pBotEnemy->v.view_ofs;// aim for the head...
+   }
+   
+   // Enemy not visible?
+   if(!pBot.b_combat_longjump && !FVisible(v_enemy_aimpos, pEdict, &pHit) && pHit != pBot.pBotEnemy)
+   {
+      // get waypoint close to him and track him down!
+      int old_wp = pBot.curr_waypoint_index;
+      
+      // get waypoint close to target
+      pBot.curr_waypoint_index = WaypointFindNearest(pBot.pBotEnemy, 512);
+      
+      //
+      if(pBot.curr_waypoint_index != -1 && BotHeadTowardWaypoint(pBot))
+         return;
+      
+      pBot.curr_waypoint_index = old_wp;
    }
    
    v_enemy = v_enemy_aimpos - GetGunPosition(pEdict);
@@ -1106,11 +1178,14 @@ void BotShootAtEnemy( bot_t &pBot )
    // adjust the view angle pitch to aim correctly
    enemy_angle.x = -enemy_angle.x;
    
-   pEdict->v.idealpitch = enemy_angle.x;
-   BotFixIdealPitch(pEdict);
+   if(!pBot.b_combat_longjump)
+   {
+      pEdict->v.idealpitch = enemy_angle.x;
+      BotFixIdealPitch(pEdict);
 
-   pEdict->v.ideal_yaw = enemy_angle.y;
-   BotFixIdealYaw(pEdict);
+      pEdict->v.ideal_yaw = enemy_angle.y;
+      BotFixIdealYaw(pEdict);
+   }
    
    v_enemy.z = 0;  // ignore z component (up & down)
 
@@ -1120,16 +1195,14 @@ void BotShootAtEnemy( bot_t &pBot )
       pBot.f_move_speed = pBot.f_max_speed;
    else                     // don't move if close enough
       pBot.f_move_speed =10.0;
-
-
+   
    // is it time to shoot yet?
    if (pBot.f_shoot_time <= globaltime)
    {
-      edict_t * pHit = 0;
+      pHit = 0;
             
-      // only fire if we can see enemy and if aiming target circle with radius 150.0 
-      if((FVisible(v_enemy_aimpos, pEdict, &pHit) || pHit == pBot.pBotEnemy) &&
-          FInViewCone(v_enemy_aimpos, pEdict)) 
+      // only fire if aiming target circle with specific max radius
+      if((FVisible(v_enemy_aimpos, pEdict, &pHit) || pHit == pBot.pBotEnemy) && FInViewCone(v_enemy_aimpos, pEdict)) 
       {
          float shootcone_diameter = skill_settings[pBot.bot_skill].shootcone_diameter;
          float shootcone_minangle = skill_settings[pBot.bot_skill].shootcone_minangle;

@@ -103,8 +103,4 @@ inline void SET_LOCALINFO(char *key, char *value) {
 short FixedSigned16(float value, float scale);
 unsigned short FixedUnsigned16(float value, float scale);
 
-inline int fast_FNullEnt(const edict_t* pent) {
-	return(!pent || !(*g_engfuncs.pfnEntOffsetOfPEntity)(pent));
-}
-
 #endif /* SDK_UTIL_H */

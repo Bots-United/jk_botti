@@ -114,9 +114,15 @@ qboolean IsValidToFireAtTheMoment(bot_t &pBot, const bot_weapon_select_t &select
 qboolean IsValidWeaponChoose(bot_t &pBot, const bot_weapon_select_t &select) 
 {
    // Severians and Bubblemod checks, skip egon (bubblemod-egon is total conversion and severians-egon is selfkilling after time)
-   if ((submod_id == SUBMOD_SEVS || submod_id == SUBMOD_BUBBLEMOD) && select.iId == VALVE_WEAPON_EGON)
-      return(FALSE);
-
+   if (select.iId == VALVE_WEAPON_EGON)
+   {
+      if(submod_id == SUBMOD_SEVS)
+         return(FALSE);
+      
+      if(submod_id == SUBMOD_BUBBLEMOD && CVAR_GET_FLOAT("bm_gluon_mod") > 0)
+         return(FALSE);
+   }
+   
    // is the bot NOT skilled enough to use this weapon?
    if (!BotCanUseWeapon(pBot, select))
       return(FALSE);

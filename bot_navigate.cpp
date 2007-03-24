@@ -17,6 +17,7 @@
 #include "bot_func.h"
 #include "bot_weapons.h"
 #include "waypoint.h"
+#include "bot_skill.h"
 #include "bot_weapons.h"
 #include "bot_weapon_select.h"
 
@@ -326,7 +327,7 @@ int BotFindWaypointGoal( bot_t &pBot )
    
    // this forces to get more health if it's less than 25
    if (health_chance != 0) 
-   	health_chance += 25;
+      health_chance += 25;
    
    if (random < health_chance)
    {   // look for health if we're pretty dead
@@ -405,8 +406,7 @@ int BotFindWaypointGoal( bot_t &pBot )
          }
       }
 
-/*
-      if (!pBot.b_longjump)
+      if (!pBot.b_longjump && skill_settings[pBot.bot_skill].can_longjump)
       {   // find a longjump module
          temp_index = WaypointFindNearestGoal(pEdict, pBot.curr_waypoint_index, W_FL_LONGJUMP);
 
@@ -429,7 +429,7 @@ int BotFindWaypointGoal( bot_t &pBot )
             }
          }
       }
-*/
+
       // find new weapon if only have shitty weapons or running out of ammo on all weapons 
       if (BotGetGoodWeaponCount(pBot, 1) || BotAllWeaponsRunningOutOfAmmo(pBot))
       {
@@ -466,7 +466,7 @@ int BotFindWaypointGoal( bot_t &pBot )
       // get flags for all ammo that are low
       if ((ammoflags = BotGetLowAmmoFlags(pBot)) != 0)
       {
-      	 // find ammo for that we don't have enough yet
+         // find ammo for that we don't have enough yet
          temp_index = WaypointFindNearestGoal(pEdict, pBot.curr_waypoint_index, W_FL_AMMO, ammoflags);
                      
          if (temp_index != -1)
@@ -484,7 +484,7 @@ int BotFindWaypointGoal( bot_t &pBot )
       } 
    }
    else if (pBot.pBotEnemy != NULL)
-   {   // find a waypoint near our enemy
+   {  // find a waypoint near our enemy
       index = WaypointFindNearest(pBot.pBotEnemy, 512);
 
       if (index != -1)
@@ -506,33 +506,30 @@ int BotFindWaypointGoal( bot_t &pBot )
    if (index != -1)
    {
       /*
-      char msg[80];
       switch (pBot.wpt_goal_type)
       {
          case WPT_GOAL_HEALTH:
-            snprintf(msg, sizeof(msg), "[%s] %s", pBot.name, "I am going for some health!\n");
+            UTIL_ConsolePrintf("[%s] %s", pBot.name, "I am going for some health!\n");
             break;
          case WPT_GOAL_ARMOR:
-            snprintf(msg, sizeof(msg), "[%s] %s", pBot.name, "I am going for some armor!\n");
+            UTIL_ConsolePrintf("[%s] %s", pBot.name, "I am going for some armor!\n");
             break;
          case WPT_GOAL_WEAPON:
-            snprintf(msg, sizeof(msg), "[%s] %s", pBot.name, "I am going for a weapon!\n");
+            UTIL_ConsolePrintf("[%s] %s", pBot.name, "I am going for a weapon!\n");
             break;
          case WPT_GOAL_AMMO:
-            snprintf(msg, sizeof(msg), "[%s] %s", pBot.name, "I am going for some ammo!\n");
+            UTIL_ConsolePrintf("[%s] %s", pBot.name, "I am going for some ammo!\n");
             break;
          case WPT_GOAL_ITEM:
-            snprintf(msg, sizeof(msg), "[%s] %s", pBot.name, "I am going for an item!\n");
+            UTIL_ConsolePrintf("[%s] %s", pBot.name, "I am going for an item!\n");
             break;
          case WPT_GOAL_ENEMY:
-            snprintf(msg, sizeof(msg), "[%s] %s", pBot.name, "I am tracking/engaging an enemy!\n");
+            UTIL_ConsolePrintf("[%s] %s", pBot.name, "I am tracking/engaging an enemy!\n");
             break;
          default:
-            snprintf(msg, sizeof(msg), "[%s] %s", pBot.name, "I have an unknown goal!\n");
+            UTIL_ConsolePrintf("[%s] %s", pBot.name, "I have an unknown goal!\n");
             break;
       }
-      
-      SERVER_PRINT(msg);
       */
    }
 
@@ -597,6 +594,49 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
    }
    else
    {
+      if(pBot.b_longjump && skill_settings[pBot.bot_skill].can_longjump)
+      {         
+         Vector vecToWpt = waypoints[pBot.curr_waypoint_index].origin - pEdict->v.origin;
+         float max_lj_distance = LONGJUMP_DISTANCE * (800 / CVAR_GET_FLOAT("sv_gravity"));
+         
+         // longjump toward the waypoint
+         // we have to be out of water, on the ground, able to longjump, far enough away to longjump, and
+         // facing pretty close to the waypoint
+         if(pEdict->v.waterlevel == 0 && 
+            (pEdict->v.flags & FL_ONGROUND) == FL_ONGROUND && 
+            vecToWpt.Length() >= max_lj_distance * 0.6 && 
+            pEdict->v.velocity.Length() > 50 && 
+            DotProduct(UTIL_AnglesToForward(pEdict->v.v_angle), vecToWpt.Normalize()) > cos(deg2rad(10)))
+         {
+            // trace a hull toward the current waypoint the distance of a longjump (depending on gravity)
+            UTIL_TraceHull(
+               UTIL_GetOrigin(pEdict), 
+               UTIL_GetOrigin(pEdict) + vecToWpt.Normalize() * max_lj_distance,
+               dont_ignore_monsters, head_hull, pEdict, &tr
+            );
+            
+            // make sure it's clear
+            if (tr.flFraction >= 1.0)
+            {
+               // trace another hull straight down so we can get ground level here
+               UTIL_TraceHull(tr.vecEndPos, tr.vecEndPos - Vector(0,0,8192), dont_ignore_monsters, head_hull, pEdict, &tr);
+               
+               // make sure the point we found is about level with 
+               if (waypoints[pBot.curr_waypoint_index].origin.z - tr.vecEndPos.z < 52)
+               {
+                  // actually do the longjump
+                  pEdict->v.button |= IN_DUCK;
+                  pBot.b_longjump_do_jump = TRUE;
+                  
+                  // recognize we'll be in the air for a second most likely
+                  pBot.f_longjump_time = gpGlobals->time + 1.0;
+                  
+                  //UTIL_ConsolePrintf("%s doing longjump! -- wp\n", STRING(pEdict->v.netname));
+               }
+            }
+         }
+      }
+      
       // skip this part if bot is trying to get out of water...
       if (pBot.f_exit_water_time < globaltime)
       {
@@ -914,18 +954,12 @@ void BotOnLadder( bot_t &pBot, float moved_distance )
       while ((!done) && (angle < 180.0))
       {
          // try looking in one direction (forward + angle)
-         view_angles = pEdict->v.v_angle;
-         view_angles.y = pEdict->v.v_angle.y + angle;
-
-         if (view_angles.y < 0.0)
-            view_angles.y += 360.0;
-         if (view_angles.y > 360.0)
-            view_angles.y -= 360.0;
-
-         MAKE_VECTORS( view_angles );
-
+         view_angles.x = pEdict->v.v_angle.x;
+         view_angles.y = UTIL_WrapAngle(pEdict->v.v_angle.y + angle);
+         view_angles.z = 0;
+         
          v_src = pEdict->v.origin + pEdict->v.view_ofs;
-         v_dest = v_src + gpGlobals->v_forward * 30;
+         v_dest = v_src + UTIL_AnglesToForward(view_angles) * 30;
 
          UTIL_TraceMove( v_src, v_dest, dont_ignore_monsters, 
                          pEdict->v.pContainingEntity, &tr);
@@ -953,18 +987,12 @@ void BotOnLadder( bot_t &pBot, float moved_distance )
          else
          {
             // try looking in the other direction (forward - angle)
-            view_angles = pEdict->v.v_angle;
-            view_angles.y = pEdict->v.v_angle.y - angle;
-
-            if (view_angles.y < 0.0)
-               view_angles.y += 360.0;
-            if (view_angles.y > 360.0)
-               view_angles.y -= 360.0;
-
-            MAKE_VECTORS( view_angles );
+            view_angles.x = pEdict->v.v_angle.x;
+            view_angles.y = UTIL_WrapAngle(pEdict->v.v_angle.y - angle);
+            view_angles.z = 0;
 
             v_src = pEdict->v.origin + pEdict->v.view_ofs;
-            v_dest = v_src + gpGlobals->v_forward * 30;
+            v_dest = v_src + UTIL_AnglesToForward(view_angles) * 30;
 
             UTIL_TraceMove( v_src, v_dest, dont_ignore_monsters, 
                             pEdict->v.pContainingEntity, &tr);
@@ -1052,8 +1080,7 @@ void BotUnderWater( bot_t &pBot )
    edict_t *pEdict = pBot.pEdict;
 
    // are there waypoints in this level (and not trying to exit water)?
-   if ((num_waypoints > 0) &&
-       (pBot.f_exit_water_time < globaltime))
+   if (num_waypoints > 0 && pBot.f_exit_water_time < globaltime)
    {
       // head towards a waypoint
       found_waypoint = BotHeadTowardWaypoint(pBot);
@@ -1076,14 +1103,11 @@ void BotUnderWater( bot_t &pBot )
       // move forward (i.e. in the direction the bot is looking, up or down)
       pEdict->v.button |= IN_FORWARD;
    
-      // set gpGlobals angles based on current view angle (for TraceLine)
-      MAKE_VECTORS( pEdict->v.v_angle );
-   
       // look from eye position straight forward (remember: the bot is looking
       // upwards at a 60 degree angle so TraceLine will go out and up...
    
       v_src = pEdict->v.origin + pEdict->v.view_ofs;  // EyePosition()
-      v_forward = v_src + gpGlobals->v_forward * 90;
+      v_forward = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * 90;
    
       // trace from the bot's eyes straight forward...
       UTIL_TraceMove( v_src, v_forward, dont_ignore_monsters, 
@@ -1166,26 +1190,27 @@ void BotUseLift( bot_t &pBot, float moved_distance )
       TraceResult tr1, tr2;
       Vector v_src, v_forward, v_right, v_left;
       Vector v_down, v_forward_down, v_right_down, v_left_down;
-
+      Vector angle_v_forward, angle_v_right, angle_v_left;
+      
       pBot.b_use_button = FALSE;
 
       // TraceLines in 4 directions to find which way to go...
 
-      MAKE_VECTORS( pEdict->v.v_angle );
+      UTIL_MakeVectorsPrivate( pEdict->v.v_angle, angle_v_forward, angle_v_right, angle_v_left );
 
       v_src = pEdict->v.origin + pEdict->v.view_ofs;
-      v_forward = v_src + gpGlobals->v_forward * 90;
-      v_right = v_src + gpGlobals->v_right * 90;
-      v_left = v_src + gpGlobals->v_right * -90;
+      v_forward = v_src + angle_v_forward * 90;
+      v_right = v_src + angle_v_right * 90;
+      v_left = v_src + angle_v_right * -90;
 
       v_down = pEdict->v.v_angle;
       v_down.x = v_down.x + 45;  // look down at 45 degree angle
 
-      MAKE_VECTORS( v_down );
+      UTIL_MakeVectorsPrivate( v_down, angle_v_forward, angle_v_right, angle_v_left );
 
-      v_forward_down = v_src + gpGlobals->v_forward * 100;
-      v_right_down = v_src + gpGlobals->v_right * 100;
-      v_left_down = v_src + gpGlobals->v_right * -100;
+      v_forward_down = v_src + angle_v_forward * 100;
+      v_right_down = v_src + angle_v_right * 100;
+      v_left_down = v_src + angle_v_right * -100;
 
       // try tracing forward first...
       UTIL_TraceMove( v_src, v_forward, dont_ignore_monsters, 
@@ -1244,14 +1269,15 @@ qboolean BotStuckInCorner( bot_t &pBot )
    edict_t *pEdict = pBot.pEdict;
    const float offsets[1] = {0};
    int right_first = RANDOM_LONG2(0,1);
+   Vector v_forward, v_right, v_up;
    
-   MAKE_VECTORS( pEdict->v.v_angle );
+   UTIL_MakeVectorsPrivate(pEdict->v.v_angle, v_forward, v_right, v_up);
 
    for(int i = 0; i < 1; i++) {
      // trace 45 degrees to the right...
      v_src = pEdict->v.origin;
      v_src.z += offsets[i];
-     v_dest = v_src + gpGlobals->v_forward*20 + (gpGlobals->v_right*20) * (right_first?1:-1);
+     v_dest = v_src + v_forward*20 + (v_right*20) * (right_first?1:-1);
      
      UTIL_TraceMove( v_src, v_dest, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
      
@@ -1259,7 +1285,7 @@ qboolean BotStuckInCorner( bot_t &pBot )
         return FALSE;
      
      // trace 45 degrees to the left...
-     v_dest = v_src + gpGlobals->v_forward*20 - (gpGlobals->v_right*20) * (right_first?1:-1);
+     v_dest = v_src + v_forward*20 - (v_right*20) * (right_first?1:-1);
      
      UTIL_TraceMove( v_src, v_dest, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
      
@@ -1362,9 +1388,9 @@ qboolean BotCantMoveForward( bot_t &pBot, TraceResult *tr )
    // use some TraceLines to determine if anything is blocking the current
    // path of the bot.
 
-   Vector v_src, v_forward;
+   Vector v_src, v_forward, v_angle_forward;
 
-   MAKE_VECTORS( pEdict->v.v_angle );
+   v_angle_forward = UTIL_AnglesToForward( pEdict->v.v_angle );
 
    // first do a trace from the bot's eyes forward...
    // bot's head is clear, check at waist level...
@@ -1372,7 +1398,7 @@ qboolean BotCantMoveForward( bot_t &pBot, TraceResult *tr )
 
    for(int i = 0; i < 2; i++) {
       v_src = pEdict->v.origin + offsets[i];  // EyePosition()
-      v_forward = v_src + gpGlobals->v_forward * 40;
+      v_forward = v_src + v_angle_forward * 40;
 
       UTIL_TraceMove( v_src, v_forward, dont_ignore_monsters,  pEdict->v.pContainingEntity, tr);
 
@@ -1402,7 +1428,7 @@ qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump)
 
    TraceResult tr;
    qboolean check_duck = FALSE;
-   Vector v_jump, v_source, v_dest;
+   Vector v_jump, v_source, v_dest, v_forward, v_right, v_up;
    edict_t *pEdict = pBot.pEdict;
 
    *bDuckJump = FALSE;
@@ -1413,13 +1439,13 @@ qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump)
    v_jump.x = 0;  // reset pitch to 0 (level horizontally)
    v_jump.z = 0;  // reset roll to 0 (straight up and down)
 
-   MAKE_VECTORS( v_jump );
+   UTIL_MakeVectorsPrivate( v_jump, v_forward, v_right, v_up );
 
    // use center of the body first...
 
    // maximum normal jump height is 45, so check one unit above that (46)
    v_source = pEdict->v.origin + Vector(0, 0, -36 + 46);
-   v_dest = v_source + gpGlobals->v_forward * 24;
+   v_dest = v_source + v_forward * 24;
 
    // trace a line forward at maximum jump height...
    UTIL_TraceMove( v_source, v_dest, dont_ignore_monsters, 
@@ -1432,8 +1458,8 @@ qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump)
    if (!check_duck)
    {
       // now check same height to one side of the bot...
-      v_source = pEdict->v.origin + gpGlobals->v_right * 16 + Vector(0, 0, -36 + 46);
-      v_dest = v_source + gpGlobals->v_forward * 24;
+      v_source = pEdict->v.origin + v_right * 16 + Vector(0, 0, -36 + 46);
+      v_dest = v_source + v_forward * 24;
 
       // trace a line forward at maximum jump height...
       UTIL_TraceMove( v_source, v_dest, dont_ignore_monsters, 
@@ -1447,8 +1473,8 @@ qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump)
    if (!check_duck)
    {
       // now check same height on the other side of the bot...
-      v_source = pEdict->v.origin + gpGlobals->v_right * -16 + Vector(0, 0, -36 + 46);
-      v_dest = v_source + gpGlobals->v_forward * 24;
+      v_source = pEdict->v.origin + v_right * -16 + Vector(0, 0, -36 + 46);
+      v_dest = v_source + v_forward * 24;
 
       // trace a line forward at maximum jump height...
       UTIL_TraceMove( v_source, v_dest, dont_ignore_monsters, 
@@ -1463,7 +1489,7 @@ qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump)
    {
       // maximum crouch jump height is 63, so check one unit above that (64)
       v_source = pEdict->v.origin + Vector(0, 0, -36 + 64);
-      v_dest = v_source + gpGlobals->v_forward * 24;
+      v_dest = v_source + v_forward * 24;
 
       // trace a line forward at maximum jump height...
       UTIL_TraceMove( v_source, v_dest, dont_ignore_monsters, 
@@ -1474,8 +1500,8 @@ qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump)
          return FALSE;
 
       // now check same height on the other side of the bot...
-      v_source = pEdict->v.origin + gpGlobals->v_right * -16 + Vector(0, 0, -36 + 64);
-      v_dest = v_source + gpGlobals->v_forward * 24;
+      v_source = pEdict->v.origin + v_right * -16 + Vector(0, 0, -36 + 64);
+      v_dest = v_source + v_forward * 24;
 
       // trace a line forward at maximum jump height...
       UTIL_TraceMove( v_source, v_dest, dont_ignore_monsters, 
@@ -1486,8 +1512,8 @@ qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump)
          return FALSE;
 
       // now check same height on the other side of the bot...
-      v_source = pEdict->v.origin + gpGlobals->v_right * -16 + Vector(0, 0, -36 + 64);
-      v_dest = v_source + gpGlobals->v_forward * 24;
+      v_source = pEdict->v.origin + v_right * -16 + Vector(0, 0, -36 + 64);
+      v_dest = v_source + v_forward * 24;
 
       // trace a line forward at maximum jump height...
       UTIL_TraceMove( v_source, v_dest, dont_ignore_monsters, 
@@ -1501,7 +1527,7 @@ qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump)
    // now trace from head level downward to check for obstructions...
 
    // start of trace is 24 units in front of bot...
-   v_source = pEdict->v.origin + gpGlobals->v_forward * 24;
+   v_source = pEdict->v.origin + v_forward * 24;
 
    if (check_duck)
       // offset 36 units if crouch-jump (36 + 36)
@@ -1530,7 +1556,7 @@ qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump)
       return FALSE;
 
    // now check same height to one side of the bot...
-   v_source = pEdict->v.origin + gpGlobals->v_right * 16 + gpGlobals->v_forward * 24;
+   v_source = pEdict->v.origin + v_right * 16 + v_forward * 24;
 
    if (check_duck)
       v_source.z = v_source.z + 72;
@@ -1551,7 +1577,7 @@ qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump)
       return FALSE;
 
    // now check same height on the other side of the bot...
-   v_source = pEdict->v.origin + gpGlobals->v_right * -16 + gpGlobals->v_forward * 24;
+   v_source = pEdict->v.origin + v_right * -16 + v_forward * 24;
 
    if (check_duck)
       v_source.z = v_source.z + 72;
@@ -1586,7 +1612,7 @@ qboolean BotCanDuckUnder( bot_t &pBot )
    // we can duck under it.
 
    TraceResult tr;
-   Vector v_duck, v_source, v_dest;
+   Vector v_duck, v_source, v_dest, v_forward, v_right, v_up;
    edict_t *pEdict = pBot.pEdict;
 
    // convert current view angle to vectors for TraceLine math...
@@ -1595,13 +1621,13 @@ qboolean BotCanDuckUnder( bot_t &pBot )
    v_duck.x = 0;  // reset pitch to 0 (level horizontally)
    v_duck.z = 0;  // reset roll to 0 (straight up and down)
 
-   MAKE_VECTORS( v_duck );
+   UTIL_MakeVectorsPrivate( v_duck, v_forward, v_right, v_up );
 
    // use center of the body first...
 
    // duck height is 36, so check one unit above that (37)
    v_source = pEdict->v.origin + Vector(0, 0, -36 + 37);
-   v_dest = v_source + gpGlobals->v_forward * 24;
+   v_dest = v_source + v_forward * 24;
 
    // trace a line forward at duck height...
    UTIL_TraceMove( v_source, v_dest, dont_ignore_monsters, 
@@ -1612,8 +1638,8 @@ qboolean BotCanDuckUnder( bot_t &pBot )
       return FALSE;
 
    // now check same height to one side of the bot...
-   v_source = pEdict->v.origin + gpGlobals->v_right * 16 + Vector(0, 0, -36 + 37);
-   v_dest = v_source + gpGlobals->v_forward * 24;
+   v_source = pEdict->v.origin + v_right * 16 + Vector(0, 0, -36 + 37);
+   v_dest = v_source + v_forward * 24;
 
    // trace a line forward at duck height...
    UTIL_TraceMove( v_source, v_dest, dont_ignore_monsters, 
@@ -1624,8 +1650,8 @@ qboolean BotCanDuckUnder( bot_t &pBot )
       return FALSE;
 
    // now check same height on the other side of the bot...
-   v_source = pEdict->v.origin + gpGlobals->v_right * -16 + Vector(0, 0, -36 + 37);
-   v_dest = v_source + gpGlobals->v_forward * 24;
+   v_source = pEdict->v.origin + v_right * -16 + Vector(0, 0, -36 + 37);
+   v_dest = v_source + v_forward * 24;
 
    // trace a line forward at duck height...
    UTIL_TraceMove( v_source, v_dest, dont_ignore_monsters, 
@@ -1638,7 +1664,7 @@ qboolean BotCanDuckUnder( bot_t &pBot )
    // now trace from the ground up to check for object to duck under...
 
    // start of trace is 24 units in front of bot near ground...
-   v_source = pEdict->v.origin + gpGlobals->v_forward * 24;
+   v_source = pEdict->v.origin + v_forward * 24;
    v_source.z = v_source.z - 35;  // offset to feet + 1 unit up
 
    // end point of trace is 72 units straight up from start...
@@ -1653,7 +1679,7 @@ qboolean BotCanDuckUnder( bot_t &pBot )
       return FALSE;
 
    // now check same height to one side of the bot...
-   v_source = pEdict->v.origin + gpGlobals->v_right * 16 + gpGlobals->v_forward * 24;
+   v_source = pEdict->v.origin + v_right * 16 + v_forward * 24;
    v_source.z = v_source.z - 35;  // offset to feet + 1 unit up
    v_dest = v_source + Vector(0, 0, 72);
 
@@ -1666,7 +1692,7 @@ qboolean BotCanDuckUnder( bot_t &pBot )
       return FALSE;
 
    // now check same height on the other side of the bot...
-   v_source = pEdict->v.origin + gpGlobals->v_right * -16 + gpGlobals->v_forward * 24;
+   v_source = pEdict->v.origin + v_right * -16 + v_forward * 24;
    v_source.z = v_source.z - 35;  // offset to feet + 1 unit up
    v_dest = v_source + Vector(0, 0, 72);
 
@@ -1767,12 +1793,10 @@ qboolean BotCheckWallOnLeft( bot_t &pBot )
    Vector v_src, v_left;
    TraceResult tr;
 
-   MAKE_VECTORS( pEdict->v.v_angle );
-
    // do a trace to the left...
 
    v_src = pEdict->v.origin;
-   v_left = v_src + gpGlobals->v_right * -40;  // 40 units to the left
+   v_left = v_src + UTIL_AnglesToRight(pEdict->v.v_angle) * -40;  // 40 units to the left
 
    UTIL_TraceMove( v_src, v_left, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
 
@@ -1796,12 +1820,10 @@ qboolean BotCheckWallOnRight( bot_t &pBot )
    Vector v_src, v_right;
    TraceResult tr;
 
-   MAKE_VECTORS( pEdict->v.v_angle );
-
    // do a trace to the right...
 
    v_src = pEdict->v.origin;
-   v_right = v_src + gpGlobals->v_right * 40;  // 40 units to the right
+   v_right = v_src + UTIL_AnglesToRight(pEdict->v.v_angle) * 40;  // 40 units to the right
 
    UTIL_TraceMove( v_src, v_right, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
 
@@ -1834,10 +1856,9 @@ void BotLookForDrop( bot_t &pBot )
 
    v_ahead = pEdict->v.v_angle;
    v_ahead.x = 0;  // set pitch to level horizontally
-   MAKE_VECTORS(v_ahead);
 
    v_src = pEdict->v.origin;
-   v_dest = v_src + gpGlobals->v_forward * scale;
+   v_dest = v_src + UTIL_AnglesToForward(v_ahead) * scale;
 
    UTIL_TraceMove( v_src, v_dest, ignore_monsters,  pEdict->v.pContainingEntity, &tr );
 
@@ -1929,17 +1950,10 @@ void BotLookForDrop( bot_t &pBot )
 
             while (!done)
             {
-               v_ahead.y += 30.0 * direction;
-
-               if (v_ahead.y > 360.0f)
-                  v_ahead.y -= 360.0f;
-               if (v_ahead.y < -360.0f)
-                  v_ahead.y += 360.0f;
-
-               MAKE_VECTORS(v_ahead);
+               v_ahead.y = UTIL_WrapAngle(v_ahead.y + 30.0 * direction);
 
                v_src = pEdict->v.origin;
-               v_dest = v_src + gpGlobals->v_forward * scale;
+               v_dest = v_src + UTIL_AnglesToForward(v_ahead) * scale;
 
                UTIL_TraceMove( v_src, v_dest, ignore_monsters, 
                                pEdict->v.pContainingEntity, &tr );

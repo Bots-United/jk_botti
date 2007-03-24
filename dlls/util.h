@@ -211,11 +211,6 @@ extern float            UTIL_AngleDiff                  ( float destAngle, float
 #define UTIL_EntitiesInPVS(pent)                        (*g_engfuncs.pfnEntitiesInPVS)(pent)
 extern void                     UTIL_MakeVectors                (const Vector &vecAngles);
 
-inline void UTIL_MakeVectorsPrivate( Vector &vecAngles, float *p_vForward, float *p_vRight, float *p_vUp )
-{
-        g_engfuncs.pfnAngleVectors( vecAngles, p_vForward, p_vRight, p_vUp );
-}
-
 extern void                     UTIL_MakeAimVectors             ( const Vector &vecAngles ); // like MakeVectors, but assumes pitch isn't inverted
 extern void                     UTIL_MakeInvVectors             ( const Vector &vec, globalvars_t *pgv );
 

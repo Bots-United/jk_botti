@@ -234,6 +234,17 @@ void BotClient_Valve_WeaponPickup(void *p, int bot_index)
 // or a healthkit)
 void BotClient_Valve_ItemPickup(void *p, int bot_index)
 {
+   char itemname[64];
+   
+   strncpy(itemname, (char *)p, sizeof(itemname));
+   itemname[sizeof(itemname)-1]=0;
+
+   if (strcmp(itemname, "item_longjump") == 0)
+   {
+      bots[bot_index].b_longjump = TRUE;
+      bots[bot_index].f_combat_longjump = gpGlobals->time + 0.2;
+      bots[bot_index].b_combat_longjump = FALSE;
+   }
 }
 
 

@@ -11,7 +11,7 @@ endif
 TARGET = jk_botti_mm
 ARCHFLAG = i686
 BASEFLAGS = 
-OPTFLAGS = -O3 -ffast-math -fno-rtti -fno-exceptions #-fomit-frame-pointer
+OPTFLAGS = -O3 -ffast-math -fno-rtti -fno-exceptions -fomit-frame-pointer
 #OPTFLAGS = -O0 -g -fno-rtti -fno-exceptions
 INCLUDES = -I"./metamod" \
 	-I"./common" \
@@ -32,7 +32,6 @@ SRC = 	bot.cpp \
 	dll.cpp \
 	engine.cpp \
 	h_export.cpp \
-	mt19937ar-cok.cpp \
 	util.cpp \
 	waypoint.cpp
 

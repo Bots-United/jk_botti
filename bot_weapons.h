@@ -24,6 +24,8 @@
 #define VALVE_WEAPON_SATCHEL      14
 #define VALVE_WEAPON_SNARK        15
 
+// in normal gravity, how far the longjump hurls us
+#define LONGJUMP_DISTANCE	540
 
 #define VALVE_MAX_NORMAL_HEALTH    100
 #define VALVE_MAX_NORMAL_BATTERY   100

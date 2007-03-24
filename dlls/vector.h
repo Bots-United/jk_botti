@@ -29,7 +29,7 @@ public:
         inline Vector2D operator+(const Vector2D& v)    const   { return Vector2D(x+v.x, y+v.y);        }
         inline Vector2D operator-(const Vector2D& v)    const   { return Vector2D(x-v.x, y-v.y);        }
         inline Vector2D operator*(float fl)                             const   { return Vector2D(x*fl, y*fl);  }
-        inline Vector2D operator/(float fl)                             const   { fl=1/fl; return Vector2D(x*fl, y*fl);  }
+        inline Vector2D operator/(float fl)                             const   { return Vector2D(x/fl, y/fl);  }
         
         inline float Length(void)                                               const   { return (float)sqrt(x*x + y*y );              }
 
@@ -39,14 +39,9 @@ public:
 
                 float flLen = Length();
                 if ( flLen == 0 )
-                {
                         return Vector2D( 0, 0 );
-                }
                 else
-                {
-                        flLen = 1 / flLen;
-                        return Vector2D( x * flLen, y * flLen );
-                }
+                        return Vector2D( x / flLen, y / flLen );
         }
 
         vec_t   x, y;
@@ -78,6 +73,11 @@ public:
         inline Vector operator-(const Vector& v) const          { return Vector(x-v.x, y-v.y, z-v.z);   }
         inline Vector operator*(float fl) const                 { return Vector(x*fl, y*fl, z*fl);              }
         inline Vector operator/(float fl) const                 { fl=1/fl; return Vector(x*fl, y*fl, z*fl);              }
+        inline Vector operator=(const Vector& v) 		{ x=v.x; y=v.y; z=v.z; return *this; }
+        inline Vector operator+=(const Vector& v) 		{ x+=v.x; y+=v.y; z+=v.z; return *this; }
+        inline Vector operator-=(const Vector& v) 		{ x-=v.x; y-=v.y; z-=v.z; return *this; }
+        inline Vector operator*=(float fl) 			{ x*=fl; y*=fl; z*=fl; return *this; }
+        inline Vector operator/=(float fl) 			{ fl=1/fl; x*=fl; y*=fl; z*=fl; return *this; }
         
         // Methods
         inline void CopyToArray(float* rgfl) const              { rgfl[0] = x, rgfl[1] = y, rgfl[2] = z; }
