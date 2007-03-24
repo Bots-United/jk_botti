@@ -76,7 +76,7 @@ inline Vector GetGunPosition(edict_t *pEdict)
    return (pEdict->v.origin + pEdict->v.view_ofs);
 }
 
-inline void UTIL_SelectItem(edict_t *pEdict, char *item_name)
+inline void UTIL_SelectItem(edict_t *pEdict, const char *item_name)
 {
    FakeClientCommand(pEdict, item_name, NULL, NULL);
 }
@@ -144,6 +144,12 @@ inline edict_t *UTIL_FindEntityByTarget( edict_t *pentStart, const char *szName 
 inline edict_t *UTIL_FindEntityByTargetname( edict_t *pentStart, const char *szName )
 {
    return UTIL_FindEntityByString( pentStart, "targetname", szName );
+}
+
+inline void null_terminate_buffer(char *buf, const size_t maxlen)
+{
+   buf[maxlen-1] = 0;
+   buf[strlen(buf)] = 0;
 }
 
 inline double deg2rad(double deg) 
@@ -235,43 +241,58 @@ inline qboolean FInViewCone(const Vector & Origin, edict_t *pEdict)
    return(DotProduct((Origin - pEdict->v.origin).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle)) > cos(deg2rad(80)));
 }
 
-/* generates a random number on [0,0x7fffffff]-interval */
-inline long genrand_int31(void)
+extern unsigned int rnd_idnum[2];
+
+/* generates a random 32bit integer */
+inline unsigned int fast_generate_random(void)
 {
-   extern unsigned long minimalistic_randomness_idnum;
-   minimalistic_randomness_idnum = 1664525L * minimalistic_randomness_idnum + 1013904223L;
-   return(long)(minimalistic_randomness_idnum>>1);
+   extern unsigned int rnd_idnum[2];
+   
+   rnd_idnum[0] ^= rnd_idnum[1] << 5;
+   
+   rnd_idnum[0] *= 1664525L;
+   rnd_idnum[0] += 1013904223L;
+   
+   rnd_idnum[1] *= 1664525L;
+   rnd_idnum[1] += 1013904223L;
+   
+   rnd_idnum[1] ^= rnd_idnum[0] << 3;
+   
+   return rnd_idnum[0];
 }
 
-/* generates a random number on [0,1]-real-interval */
-inline double genrand_real1()
+inline void fast_random_seed(unsigned int seed)
 {
-   return (double)genrand_int31() * (1.0/2147483647.0); 
-   /* divided by 2^31-1 */ 
+   rnd_idnum[0] = seed;
+   rnd_idnum[1] = ~(seed + 6);
+   rnd_idnum[1] = fast_generate_random();
 }
 
+/* supports range INT_MIN, INT_MAX */
 inline int RANDOM_LONG2(int lLow, int lHigh) 
 {
-   double rnd_diff, add;
+   double rnd;
    
    if(lLow >= lHigh)
       return(lLow);
-
-   rnd_diff = genrand_real1() * (lHigh - lLow);
-   add = 0.5;
-      
-   if(rnd_diff < 0)
-      add = -0.5;
-      
-   return((int)(rnd_diff+add) + lLow);
+   
+   rnd = fast_generate_random();
+   rnd = (rnd + rnd * ((double)lHigh - lLow)) / 4294967296.0; // div by (1<<32)
+   
+   return (int)(rnd + lLow);
 }
 
 inline float RANDOM_FLOAT2(float flLow, float flHigh) 
 {
+   double rnd;
+   
    if(flLow >= flHigh)
       return(flLow);
-      
-   return(genrand_real1() * (flHigh - flLow) + flLow);
+   
+   rnd = fast_generate_random();
+   rnd = rnd * (flHigh - flLow) / 4294967295.0; // div by (1<<32)-1
+   
+   return (float)(rnd + flLow);
 }
 
 #endif /*BOT_INLINE_FUNCS*/

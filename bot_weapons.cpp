@@ -113,6 +113,10 @@ qboolean IsValidToFireAtTheMoment(bot_t &pBot, const bot_weapon_select_t &select
 //
 qboolean IsValidWeaponChoose(bot_t &pBot, const bot_weapon_select_t &select) 
 {
+   // iId == 0 is null terminator, don't allow
+   if(select.iId == 0 || select.weapon_name[0] == 0)
+      return(FALSE);
+   
    // Severians and Bubblemod checks, skip egon (bubblemod-egon is total conversion and severians-egon is selfkilling after time)
    if (select.iId == VALVE_WEAPON_EGON)
    {
@@ -122,11 +126,7 @@ qboolean IsValidWeaponChoose(bot_t &pBot, const bot_weapon_select_t &select)
       if(submod_id == SUBMOD_BUBBLEMOD && CVAR_GET_FLOAT("bm_gluon_mod") > 0)
          return(FALSE);
    }
-   
-   // is the bot NOT skilled enough to use this weapon?
-   if (!BotCanUseWeapon(pBot, select))
-      return(FALSE);
-   
+      
    return(TRUE);
 }
 
@@ -135,7 +135,7 @@ qboolean IsValidPrimaryAttack(bot_t &pBot, const bot_weapon_select_t &select, co
 {
    int weapon_index = select.iId;
    qboolean primary_in_range;
-   
+      
    primary_in_range = (always_in_range) || (distance >= select.primary_min_distance && distance <= select.primary_max_distance);
 
    // no ammo required for this weapon OR

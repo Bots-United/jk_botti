@@ -21,16 +21,10 @@
 #include "waypoint.h"
 
 #define VER_MAJOR 0
-#define VER_MINOR 29
-
-
-#define MENU_NONE  0
-#define MENU_1     1
-#define MENU_2     2
-#define MENU_3     3
-#define MENU_4     4
+#define VER_MINOR 30
 
 extern DLL_FUNCTIONS gFunctionTable;
+extern DLL_FUNCTIONS gFunctionTable_POST;
 extern enginefuncs_t g_engfuncs;
 extern globalvars_t  *gpGlobals;
 extern char g_argv[1024*3];
@@ -57,7 +51,6 @@ int submod_id = SUBMOD_HLDM;
 int m_spriteTexture = 0;
 int default_bot_skill = 2;
 int bot_add_level_tag = 0;   // use [lvl%d] for bots (where %d is skill level of bot)
-//int bot_strafe_percent = 20; // percent of time to strafe
 int bot_chat_percent = 10;   // percent of time to chat
 int bot_taunt_percent = 20;  // percent of time to taunt after kill
 int bot_whine_percent = 10;  // percent of time to whine after death
@@ -73,7 +66,6 @@ float bot_think_spf = 1/30; // == 1 / (30 fps)
 qboolean b_random_color = TRUE;
 qboolean isFakeClientCommand = FALSE;
 int fake_arg_count;
-int IsDedicatedServer;
 float bot_check_time = 60.0;
 int bot_reaction_time = 2;
 int min_bots = -1;
@@ -85,8 +77,6 @@ edict_t *clients[32];
 edict_t *listenserver_edict = NULL;
 float welcome_time = 0.0;
 qboolean welcome_sent = FALSE;
-int g_menu_waypoint;
-int g_menu_state = 0;
 int bot_stop = 0;
 int randomize_bots_on_mapchange = 0;
 
@@ -101,23 +91,7 @@ float gather_data_time = 0.0;
 qboolean spawn_time_reset = FALSE;
 float waypoint_time = 0.0;
 
-unsigned long minimalistic_randomness_idnum = 1;
-
-char *show_menu_none = {" "};
-char *show_menu_1 =
-   {"Waypoint Tags\n\n1. Team Specific\n2. Wait for Lift\n3. Door\n4. Sniper Spot\n5. More..."};
-char *show_menu_2 =
-   {"Waypoint Tags\n\n1. Team 1\n2. Team 2\n3. Team 3\n4. Team 4\n5. CANCEL"};
-char *show_menu_2_flf =
-   {"Waypoint Tags\n\n1. Attackers\n2. Defenders\n\n5. CANCEL"};
-char *show_menu_3 =
-   {"Waypoint Tags\n\n1. Flag Location\n2. Flag Goal Location\n3. Sentry gun\n4. Dispenser\n5. More"};
-char *show_menu_3_flf =
-   {"Waypoint Tags\n\n1. Capture Point\n2. Defend Point\n3. Prone\n\n5. CANCEL"};
-char *show_menu_3_hw =
-   {"Waypoint Tags\n\n1. Halo Location\n\n\n\n5. More"};
-char *show_menu_4 =
-   {"Waypoint Tags\n\n1. Health\n2. Armor\n3. Ammo\n4. Jump\n5. CANCEL"};
+unsigned int rnd_idnum[2] = {1, 1};
 
 
 void BotNameInit(void);
@@ -154,7 +128,7 @@ plugin_info_t Plugin_info = {
    META_INTERFACE_VERSION, // interface version
    "JK_Botti", // plugin name
    "", // plugin version
-   "22/03/07 (dd/mm/yy)", // date of creation
+   __DATE__, // date of creation
    "Jussi Kivilinna", // plugin author
    "http://koti.mbnet.fi/axh/", // plugin URL
    "JK_BOTTI", // plugin logtag
@@ -234,7 +208,7 @@ C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, 
    REG_SVR_COMMAND ("jk_botti", jk_botti_ServerCommand);
    
    // init random
-   minimalistic_randomness_idnum = time(0) ^ (unsigned long)&bots[0] ^ sizeof(bots);
+   fast_random_seed(time(0) ^ (unsigned long)&bots[0] ^ sizeof(bots));
    
    {
       static cvar_t jk_botti_version = { "jk_botti_version", "", FCVAR_EXTDLL|FCVAR_SERVER, 0, NULL};
@@ -288,8 +262,6 @@ C_DLLEXPORT int Meta_Detach (PLUG_LOADTIME now, PL_UNLOAD_REASON reason)
 void GameDLLInit( void )
 {
    int i;
-
-   IsDedicatedServer = IS_DEDICATED_SERVER();
 
    for (i=0; i<32; i++)
       clients[i] = NULL;
@@ -495,13 +467,8 @@ void ClientPutInServer( edict_t *pEntity )
 }
 
 
-static void print_to_client(void *arg, char *msg) {
-   ClientPrint((edict_t *)arg, HUD_PRINTNOTIFY, msg);
-}
-
 qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, const char * pcmd, const char * arg1, const char * arg2, const char * arg3, const char * arg4, const char * arg5, qboolean is_cfgcmd) 
 {
-   const float globaltime = gpGlobals->time;
    char msg[128];
    qboolean is_clientcmd;
    qboolean is_servercmd;
@@ -519,9 +486,9 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
    {
       BotCreate( (edict_t *)arg, arg1, arg2, arg3, arg4, arg5 );
 
-      bot_check_time = globaltime + 5.0;
+      bot_check_time = gpGlobals->time + 5.0;
       if(is_cfgcmd)
-         bot_cfg_pause_time = globaltime + 2.0;
+         bot_cfg_pause_time = gpGlobals->time + 2.0;
 
       return TRUE;
    }
@@ -829,7 +796,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
    {
       if ((arg1 != NULL) && (*arg1 != 0))
       {
-         bot_cfg_pause_time = globaltime + atoi( arg1 );
+         bot_cfg_pause_time = gpGlobals->time + atoi( arg1 );
       }
 
       return TRUE;
@@ -1002,20 +969,26 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
 }
 
 
+#if _DEBUG
+static void print_to_client(void *arg, char *msg) 
+{
+   ClientPrint((edict_t *)arg, HUD_PRINTNOTIFY, msg);
+}
+
 void ClientCommand( edict_t *pEntity )
 {
-   const char *pcmd = CMD_ARGV (0);
-   const char *arg1 = CMD_ARGV (1);
-   const char *arg2 = CMD_ARGV (2);
-   const char *arg3 = CMD_ARGV (3);
-   const char *arg4 = CMD_ARGV (4);
-   const char *arg5 = CMD_ARGV (5);
-
    // only allow custom commands if deathmatch mode and NOT dedicated server and
    // client sending command is the listen server client...
-
-   if ((gpGlobals->deathmatch) && (!IsDedicatedServer) && (pEntity == listenserver_edict))
+   
+   if ((gpGlobals->deathmatch))
    {
+      const char *pcmd = CMD_ARGV (0);
+      const char *arg1 = CMD_ARGV (1);
+      const char *arg2 = CMD_ARGV (2);
+      const char *arg3 = CMD_ARGV (3);
+      const char *arg4 = CMD_ARGV (4);
+      const char *arg5 = CMD_ARGV (5);
+   
       if(ProcessCommand(print_to_client, pEntity, pcmd, arg1, arg2, arg3, arg4, arg5, FALSE))
       {
          RETURN_META (MRES_SUPERCEDE);
@@ -1058,23 +1031,6 @@ void ClientCommand( edict_t *pEntity )
          {
             if (WaypointLoad(pEntity))
                ClientPrint(pEntity, HUD_PRINTNOTIFY, "waypoints loaded\n");
-         }
-         else if (FStrEq(arg1, "menu"))
-         {
-            int index;
-
-            if (num_waypoints < 1)
-               RETURN_META (MRES_SUPERCEDE);
-
-            index = WaypointFindNearest(pEntity, 50.0);
-
-            if (index == -1)
-               RETURN_META (MRES_SUPERCEDE);
-
-            g_menu_waypoint = index;
-            g_menu_state = MENU_1;
-
-            UTIL_ShowMenu(pEntity, 0x1F, -1, FALSE, show_menu_1);
          }
          else if (FStrEq(arg1, "info"))
          {
@@ -1144,113 +1100,6 @@ void ClientCommand( edict_t *pEntity )
 
          RETURN_META (MRES_SUPERCEDE);
       }
-      else if (FStrEq(pcmd, "menuselect") && (g_menu_state != MENU_NONE))
-      {
-         if (g_menu_state == MENU_1)  // main menu...
-         {
-            if (FStrEq(arg1, "1"))  // team specific...
-            {
-               g_menu_state = MENU_2;  // display team specific menu...
-
-               UTIL_ShowMenu(pEntity, 0x1F, -1, FALSE, show_menu_2);
-
-               RETURN_META (MRES_SUPERCEDE);
-            }
-            else if (FStrEq(arg1, "2"))  // wait for lift...
-            {
-               if (waypoints[g_menu_waypoint].flags & W_FL_LIFT)
-                  waypoints[g_menu_waypoint].flags &= ~W_FL_LIFT;  // off
-               else
-                  waypoints[g_menu_waypoint].flags |= W_FL_LIFT;  // on
-            }
-            else if (FStrEq(arg1, "3"))  // door waypoint
-            {
-               if (waypoints[g_menu_waypoint].flags & W_FL_DOOR)
-                  waypoints[g_menu_waypoint].flags &= ~W_FL_DOOR;  // off
-               else
-                  waypoints[g_menu_waypoint].flags |= W_FL_DOOR;  // on
-            }
-            else if (FStrEq(arg1, "4"))  // sniper spot
-            {
-               if (waypoints[g_menu_waypoint].flags & W_FL_SNIPER)
-                  waypoints[g_menu_waypoint].flags &= ~W_FL_SNIPER;  // off
-               else
-               {
-                  waypoints[g_menu_waypoint].flags |= W_FL_SNIPER;  // on
-
-                  // set the aiming waypoint...
-
-                  WaypointAddAiming(pEntity);
-               }
-            }
-            else if (FStrEq(arg1, "5"))  // more...
-            {
-               g_menu_state = MENU_3;
-
-               UTIL_ShowMenu(pEntity, 0x1F, -1, FALSE, show_menu_3);
-
-               RETURN_META (MRES_SUPERCEDE);
-            }
-         }
-         else if (g_menu_state == MENU_2)  // team specific menu
-         {
-                
-         }
-         else if (g_menu_state == MENU_3)  // third menu...
-         {
-            {
-               if (FStrEq(arg1, "5"))
-               {
-                  g_menu_state = MENU_4;
-
-                  UTIL_ShowMenu(pEntity, 0x1F, -1, FALSE, show_menu_4);
-
-                  RETURN_META (MRES_SUPERCEDE);
-               }
-            }
-         }
-         else if (g_menu_state == MENU_4)  // fourth menu...
-         {
-            if (FStrEq(arg1, "1"))  // health
-            {
-               if (waypoints[g_menu_waypoint].flags & W_FL_HEALTH)
-                  waypoints[g_menu_waypoint].flags &= ~W_FL_HEALTH;  // off
-               else
-                  waypoints[g_menu_waypoint].flags |= W_FL_HEALTH;  // on
-            }
-            else if (FStrEq(arg1, "2"))  // armor
-            {
-               if (waypoints[g_menu_waypoint].flags & W_FL_ARMOR)
-                  waypoints[g_menu_waypoint].flags &= ~W_FL_ARMOR;  // off
-               else
-                  waypoints[g_menu_waypoint].flags |= W_FL_ARMOR;  // on
-            }
-            else if (FStrEq(arg1, "3"))  // ammo
-            {
-               if (waypoints[g_menu_waypoint].flags & W_FL_AMMO)
-                  waypoints[g_menu_waypoint].flags &= ~W_FL_AMMO;  // off
-               else
-                  waypoints[g_menu_waypoint].flags |= W_FL_AMMO;  // on
-            }
-            else if (FStrEq(arg1, "4"))  // jump
-            {
-               if (waypoints[g_menu_waypoint].flags & W_FL_JUMP)
-                  waypoints[g_menu_waypoint].flags &= ~W_FL_JUMP;  // off
-               else
-               {
-                  waypoints[g_menu_waypoint].flags |= W_FL_JUMP;  // on
-
-                  // set the aiming waypoint...
-
-                  WaypointAddAiming(pEntity);
-               }
-            }
-         }
-
-         g_menu_state = MENU_NONE;
-
-         RETURN_META (MRES_SUPERCEDE);
-      }
       else if (FStrEq(pcmd, "search"))
       {
          edict_t *pent = NULL;
@@ -1292,13 +1141,12 @@ void ClientCommand( edict_t *pEntity )
 
    RETURN_META (MRES_IGNORED);
 }
-
+#endif
 
 static void (*old_PM_PlaySound)(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch);
 
 void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch) 
 {
-   const float globaltime = gpGlobals->time;
    edict_t * pPlayer;
    int idx;
    
@@ -1310,7 +1158,7 @@ void new_PM_PlaySound(int channel, const char *sample, float volume, float atten
    if(!pPlayer || pPlayer->free || FBitSet(pPlayer->v.flags, FL_PROXY))
       goto _exit;
    
-   SaveSound(pPlayer, globaltime, pPlayer->v.origin, volume, attenuation, 1);
+   SaveSound(pPlayer, gpGlobals->time, pPlayer->v.origin, volume, attenuation, 1);
       
 _exit:
    (*old_PM_PlaySound)(channel, sample, volume, attenuation, fFlags, pitch);
@@ -1338,7 +1186,6 @@ void PM_Move(struct playermove_s *ppmove, qboolean server)
 
 void StartFrame( void )
 {
-   const float globaltime = gpGlobals->time;
    edict_t *pPlayer;
    static int i, index, bot_index;
    static float previous_time = -1.0;
@@ -1348,7 +1195,7 @@ void StartFrame( void )
       RETURN_META (MRES_IGNORED);
    
    // if a new map has started then (MUST BE FIRST IN StartFrame)...
-   if (globaltime + 0.1 < previous_time)
+   if (gpGlobals->time + 0.1 < previous_time)
    {
       char filename[256];
       char mapname[64];
@@ -1370,10 +1217,7 @@ void StartFrame( void )
             bots[index].f_kick_time = 0.0;
          }
 
-         if (IsDedicatedServer)
-            bot_cfg_pause_time = globaltime + 5.0;
-         else
-            bot_cfg_pause_time = globaltime + 20.0;
+         bot_cfg_pause_time = gpGlobals->time + 5.0;
       }
       else
       {
@@ -1406,37 +1250,10 @@ void StartFrame( void )
          }
 
          // set the respawn time
-         if (IsDedicatedServer)
-            respawn_time = globaltime + 5.0;
-         else
-            respawn_time = globaltime + 20.0;
+         respawn_time = gpGlobals->time + 5.0;
       }
 
-      bot_check_time = globaltime + 60.0;
-   }
-
-   if (!IsDedicatedServer)
-   {
-      if ((listenserver_edict != NULL) && (welcome_sent == FALSE) &&
-          (welcome_time < 1.0))
-      {
-         // are they out of observer mode yet?
-         if (IsAlive(listenserver_edict))
-            welcome_time = globaltime + 5.0;  // welcome in 5 seconds
-      }
-
-      if ((welcome_time > 0.0) && (welcome_time < globaltime) &&
-          (welcome_sent == FALSE))
-      {
-         char version[80];
-
-         snprintf(version, sizeof(version), "%s Version %d.%d\n", welcome_msg, VER_MAJOR, VER_MINOR);
-
-         // let's send a welcome message to this client...
-         UTIL_SayText(version, listenserver_edict);
-
-         welcome_sent = TRUE;  // clear this so we only do it once
-      }
+      bot_check_time = gpGlobals->time + 60.0;
    }
    
    static char skip_think_frame = 0;
@@ -1444,9 +1261,9 @@ void StartFrame( void )
    {
       count = 0;
       
-      if (globaltime >= gather_data_time) {
+      if (gpGlobals->time >= gather_data_time) {
          GatherPlayerData();
-         gather_data_time = globaltime + (1.0 / 30); //30 fps
+         gather_data_time = gpGlobals->time + (1.0 / 30); //30 fps
       }
       
       if (bot_stop == 0)
@@ -1456,13 +1273,13 @@ void StartFrame( void )
             if ((bots[bot_index].is_used) &&  // is this slot used AND
                (bots[bot_index].respawn_state == RESPAWN_IDLE))  // not respawning
             {
-               if (globaltime >= bots[bot_index].bot_think_time)
+               if (gpGlobals->time >= bots[bot_index].bot_think_time)
                {
                   BotThink(bots[bot_index]);
                   
                   do {
-                     bots[bot_index].bot_think_time = globaltime + bot_think_spf * RANDOM_FLOAT2(0.95, 1.05);
-                  } while( globaltime + 1.0 < bots[bot_index].bot_think_time );
+                     bots[bot_index].bot_think_time = gpGlobals->time + bot_think_spf * RANDOM_FLOAT2(0.95, 1.05);
+                  } while( gpGlobals->time + 1.0 < bots[bot_index].bot_think_time );
                }
                
                count++;
@@ -1474,7 +1291,7 @@ void StartFrame( void )
          num_bots = count;
 
       // Autowaypointing engine and else, limit to half of botthink rate
-      if (globaltime >= waypoint_time)
+      if (gpGlobals->time >= waypoint_time)
       {
          int waypoint_player_count = 0;
          int waypoint_player_index = 1;
@@ -1482,7 +1299,7 @@ void StartFrame( void )
          WaypointAddSpawnObjects();
          
          // 10 times / sec, note: this is extremely slow, do checking only for max 4 players on one frame
-         waypoint_time = globaltime + (1.0/10.0);
+         waypoint_time = gpGlobals->time + (1.0/10.0);
          
          while(waypoint_player_index <= gpGlobals->maxClients)
          {
@@ -1508,7 +1325,7 @@ void StartFrame( void )
    }
 
    // are we currently respawning bots and is it time to spawn one yet?
-   if ((respawn_time > 1.0) && (respawn_time <= globaltime))
+   if ((respawn_time > 1.0) && (respawn_time <= gpGlobals->time))
    {
       int index = 0;
 
@@ -1571,9 +1388,9 @@ void StartFrame( void )
          bot_chat_lower_percent = lower;    // restore global chat percent
          bot_reaction_time = react;
 
-         respawn_time = globaltime + 2.0;  // set next respawn time
+         respawn_time = gpGlobals->time + 2.0;  // set next respawn time
 
-         bot_check_time = globaltime + 5.0;
+         bot_check_time = gpGlobals->time + 5.0;
       }
       else
       {
@@ -1615,31 +1432,11 @@ void StartFrame( void )
             }
          }
 
-         if (IsDedicatedServer)
-            bot_cfg_pause_time = globaltime + 5.0;
-         else
-            bot_cfg_pause_time = globaltime + 20.0;
-      }
-
-      if (!IsDedicatedServer && !spawn_time_reset)
-      {
-         if (listenserver_edict != NULL)
-         {
-            if (IsAlive(listenserver_edict))
-            {
-               spawn_time_reset = TRUE;
-
-               if (respawn_time >= 1.0)
-                  respawn_time = min(respawn_time, globaltime + (float)1.0);
-
-               if (bot_cfg_pause_time >= 1.0)
-                  bot_cfg_pause_time = min(bot_cfg_pause_time, globaltime + (float)1.0);
-            }
-         }
+         bot_cfg_pause_time = gpGlobals->time + 5.0;
       }
 
       if ((bot_cfg_fp) &&
-          (bot_cfg_pause_time >= 1.0) && (bot_cfg_pause_time <= globaltime))
+          (bot_cfg_pause_time >= 1.0) && (bot_cfg_pause_time <= gpGlobals->time))
       {
          // process jk_botti.cfg file options...
          ProcessBotCfgFile();
@@ -1648,11 +1445,11 @@ void StartFrame( void )
    }      
 
    // check if time to see if a bot needs to be created...
-   if (bot_check_time < globaltime)
+   if (bot_check_time < gpGlobals->time)
    {
       count = 0;
 
-      bot_check_time = globaltime + 5.0;
+      bot_check_time = gpGlobals->time + 5.0;
 
       for (i = 0; i < 32; i++)
       {
@@ -1668,55 +1465,63 @@ void StartFrame( void )
       }
    }
 
-   previous_time = globaltime;
+   previous_time = gpGlobals->time;
 
    RETURN_META (MRES_HANDLED);
 }
 
-
-void FakeClientCommand(edict_t *pBot, char *arg1, char *arg2, char *arg3)
+void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const char *arg3)
 {
-   int length;
-
    g_argv[0] = 0;
    g_arg1[0] = 0;
    g_arg2[0] = 0;
    g_arg3[0] = 0;
 
-   isFakeClientCommand = TRUE;
-
-   if ((arg1 == NULL) || (*arg1 == 0))
-      return;
-
-   if ((arg2 == NULL) || (*arg2 == 0))
+   if (!arg1 || !*arg1)
    {
-      length = snprintf(g_argv, sizeof(g_argv), "%s", arg1);
+      return;
+   }
+
+   if (!arg2 || !*arg2)
+   {
+      snprintf(g_argv, sizeof(g_argv), "%s", arg1);
+      null_terminate_buffer(g_argv, sizeof(g_argv));
+      
       fake_arg_count = 1;
    }
-   else if ((arg3 == NULL) || (*arg3 == 0))
+   else if (!arg3 || !*arg3)
    {
-      length = snprintf(g_argv, sizeof(g_argv), "%s %s", arg1, arg2);
+      snprintf(g_argv, sizeof(g_argv), "%s %s", arg1, arg2);
+      null_terminate_buffer(g_argv, sizeof(g_argv));
+      
       fake_arg_count = 2;
    }
    else
    {
-      length = snprintf(g_argv, sizeof(g_argv), "%s %s %s", arg1, arg2, arg3);
+      snprintf(g_argv, sizeof(g_argv), "%s %s %s", arg1, arg2, arg3);
+      null_terminate_buffer(g_argv, sizeof(g_argv));
+      
       fake_arg_count = 3;
    }
-
-   g_argv[length] = 0;  // null terminate just in case
-
-   g_arg1[snprintf(g_arg1, sizeof(g_arg1), "%s", arg1)] = 0;
    
-   if (arg2)
-      g_arg2[snprintf(g_arg2, sizeof(g_arg2), "%s", arg2)] = 0;
+   snprintf(g_arg1, sizeof(g_arg1), "%s", arg1);
+   null_terminate_buffer(g_arg1, sizeof(g_arg1));
    
-   if (arg3)
-      g_arg3[snprintf(g_arg3, sizeof(g_arg3), "%s", arg3)] = 0;
-
+   if (arg2 && *arg2)
+   {
+      snprintf(g_arg2, sizeof(g_arg2), "%s", arg2);
+      null_terminate_buffer(g_arg2, sizeof(g_arg2));
+   }
+   
+   if (arg3 && *arg3)
+   {
+      snprintf(g_arg3, sizeof(g_arg3), "%s", arg3);
+      null_terminate_buffer(g_arg3, sizeof(g_arg3));
+   }
+   
    // allow the MOD DLL to execute the ClientCommand...
+   isFakeClientCommand = TRUE;
    MDLL_ClientCommand(pBot);
-
    isFakeClientCommand = FALSE;
 }
 
@@ -1728,14 +1533,13 @@ static void print_to_null(void *, char *)
 
 void ProcessBotCfgFile(void)
 {
-   const float globaltime = gpGlobals->time;
    int ch;
    char cmd_line[256];
    int cmd_index;
    static char server_cmd[80];
    char *cmd, *arg1, *arg2, *arg3, *arg4, *arg5;
 
-   if (bot_cfg_pause_time > globaltime)
+   if (bot_cfg_pause_time > gpGlobals->time)
       return;
 
    if (bot_cfg_fp == NULL)
@@ -1899,7 +1703,9 @@ C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVers
    gFunctionTable.pfnClientConnect = ClientConnect;
    gFunctionTable.pfnClientDisconnect = ClientDisconnect;
    gFunctionTable.pfnClientPutInServer = ClientPutInServer;
+#if _DEBUG
    gFunctionTable.pfnClientCommand = ClientCommand;
+#endif
    gFunctionTable.pfnStartFrame = StartFrame;
    gFunctionTable.pfnServerDeactivate = ServerDeactivate;
 
@@ -1907,7 +1713,6 @@ C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVers
    return (TRUE);
 }
 
-DLL_FUNCTIONS gFunctionTable_POST;
 C_DLLEXPORT int GetEntityAPI2_POST (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion)
 {
    gFunctionTable_POST.pfnSpawn = Spawn_Post;

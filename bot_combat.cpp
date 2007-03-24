@@ -305,7 +305,6 @@ qboolean FPredictedVisible(bot_t &pBot)
 #define AHEAD_MULTIPLIER 1.5
 Vector GetPredictedPlayerPosition(bot_t &pBot, qboolean without_velocity) 
 {
-   const float globaltime = gpGlobals->time;
    edict_t * pPlayer = pBot.pBotEnemy;
    posdata_t * newer;
    posdata_t * older;
@@ -321,7 +320,7 @@ Vector GetPredictedPlayerPosition(bot_t &pBot, qboolean without_velocity)
    
    // get prediction time based on bot skill
    time = skill_settings[pBot.bot_skill].prediction_latency;
-   time = globaltime - RANDOM_FLOAT2(time * 90.0 / 100.0, time * 100.0 / 90.0); // with tint of randomness
+   time = gpGlobals->time - RANDOM_FLOAT2(time * 90.0 / 100.0, time * 100.0 / 90.0); // with tint of randomness
    
    // find position data slots that are around 'time'
    newer = pos_latest[idx];
@@ -336,7 +335,7 @@ Vector GetPredictedPlayerPosition(bot_t &pBot, qboolean without_velocity)
       }
       if(newer->time == time) 
       {
-         return(TracePredictedMovement(pBot, newer->origin, newer->velocity, fabs(globaltime - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity)); 
+         return(TracePredictedMovement(pBot, newer->origin, newer->velocity, fabs(gpGlobals->time - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity)); 
       }
       
       //this time is older than previous..
@@ -347,7 +346,7 @@ Vector GetPredictedPlayerPosition(bot_t &pBot, qboolean without_velocity)
    
    if(!older) 
    {
-      return(TracePredictedMovement(pBot, pos_oldest[idx]->origin, pos_oldest[idx]->velocity, fabs(globaltime - pos_oldest[idx]->time) * AHEAD_MULTIPLIER, pos_oldest[idx]->ducking, without_velocity)); 
+      return(TracePredictedMovement(pBot, pos_oldest[idx]->origin, pos_oldest[idx]->velocity, fabs(gpGlobals->time - pos_oldest[idx]->time) * AHEAD_MULTIPLIER, pos_oldest[idx]->ducking, without_velocity)); 
    }
    
    if(!newer) 
@@ -365,11 +364,11 @@ Vector GetPredictedPlayerPosition(bot_t &pBot, qboolean without_velocity)
    // don't mix dead data with alive data
    if(!newer->was_alive && older->was_alive) 
    {
-      return(TracePredictedMovement(pBot, newer->origin, newer->velocity, fabs(globaltime - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity)); 
+      return(TracePredictedMovement(pBot, newer->origin, newer->velocity, fabs(gpGlobals->time - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity)); 
    }
    if(!older->was_alive && newer->was_alive) 
    {
-      return(TracePredictedMovement(pBot, older->origin, older->velocity, fabs(globaltime - older->time) * AHEAD_MULTIPLIER, older->ducking, without_velocity)); 
+      return(TracePredictedMovement(pBot, older->origin, older->velocity, fabs(gpGlobals->time - older->time) * AHEAD_MULTIPLIER, older->ducking, without_velocity)); 
    }
    
    float newer_diff = fabs(newer->time - time);
@@ -380,7 +379,7 @@ Vector GetPredictedPlayerPosition(bot_t &pBot, qboolean without_velocity)
    {
       // zero div would crash server.. 
       // zero diff means that both data are from same time
-      return(TracePredictedMovement(pBot, newer->origin, newer->velocity, fabs(globaltime - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity)); 
+      return(TracePredictedMovement(pBot, newer->origin, newer->velocity, fabs(gpGlobals->time - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity)); 
    }
    
    // make weighted average
@@ -390,11 +389,12 @@ Vector GetPredictedPlayerPosition(bot_t &pBot, qboolean without_velocity)
       pred_velocity = (older_diff/total_diff) * newer->velocity + (newer_diff/total_diff) * older->velocity;
    
    // use old origin and use old velocity to predict current position
-   return(TracePredictedMovement(pBot, pred_origin, pred_velocity, fabs(globaltime - time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity)); 
+   return(TracePredictedMovement(pBot, pred_origin, pred_velocity, fabs(gpGlobals->time - time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity)); 
 }
 
 //
-qboolean GetPredictedIsAlive(edict_t * pPlayer, float time) {
+qboolean GetPredictedIsAlive(edict_t * pPlayer, float time) 
+{
    posdata_t * newer;
    int idx;
    
@@ -404,13 +404,16 @@ qboolean GetPredictedIsAlive(edict_t * pPlayer, float time) {
    
    // find position data slots that are around 'time'
    newer = pos_latest[idx];
-   while(newer) {
-      if(newer->time > time) {
+   while(newer) 
+   {
+      if(newer->time > time) 
+      {
          //this is too new for us.. proceed
          newer = newer->older;
          continue;
       }
-      if(newer->time == time) {
+      if(newer->time == time) 
+      {
          return(newer->was_alive);
       }
       
@@ -419,7 +422,8 @@ qboolean GetPredictedIsAlive(edict_t * pPlayer, float time) {
       break;
    }
    
-   if(!newer) {
+   if(!newer) 
+   {
       return(!!IsAlive(pPlayer));
    }
    
@@ -427,7 +431,8 @@ qboolean GetPredictedIsAlive(edict_t * pPlayer, float time) {
 }
 
 //
-qboolean HaveSameModels(edict_t * pEnt1, edict_t * pEnt2) {
+qboolean HaveSameModels(edict_t * pEnt1, edict_t * pEnt2) 
+{
    char *infobuffer;
    char model_name1[32];
    char model_name2[32];
@@ -442,8 +447,8 @@ qboolean HaveSameModels(edict_t * pEnt1, edict_t * pEnt2) {
 }
 
 // Can pEdict hear pPlayer
-qboolean FHearable(bot_t &pBot, edict_t *pPlayer) {
-   const float globaltime = gpGlobals->time;
+qboolean FHearable(bot_t &pBot, edict_t *pPlayer) 
+{
    float distance;
    trigger_sound_t * sound;
    
@@ -459,20 +464,23 @@ qboolean FHearable(bot_t &pBot, edict_t *pPlayer) {
    if(!sound || !sound->used)
       return(FALSE);
    
-   if(sound->attenuation == 0.0) {
+   if(sound->attenuation == 0.0) 
+   {
       sound->used = 0;
       return(FALSE);
    }
    
    // check time between sound time and current time
-   if(sound->time + 2.0 >= globaltime) {
+   if(sound->time + 2.0 >= gpGlobals->time) 
+   {
       sound->used = 0;
       return(FALSE);
    }
    
    // check distance between sound and player
    Vector v_sound_to_player = pPlayer->v.origin - sound->origin;
-   if(v_sound_to_player.Length() > 250) {
+   if(v_sound_to_player.Length() > 250) 
+   {
       sound->used = 0;
       return(FALSE);
    }
@@ -482,7 +490,8 @@ qboolean FHearable(bot_t &pBot, edict_t *pPlayer) {
    distance = v_sound.Length();
    
    // is the bot close enough to hear this sound?
-   if(distance < (sound->volume * (1024 / sound->attenuation))) {
+   if(distance < (sound->volume * (1024 / sound->attenuation))) 
+   {
       return(TRUE);
    }
    
@@ -522,7 +531,6 @@ qboolean FCanShootInHead(edict_t * pEdict, edict_t * pTarget, const Vector & v_d
 
 edict_t *BotFindEnemy( bot_t &pBot )
 {
-   const float globaltime = gpGlobals->time;
    edict_t *pent = NULL;
    edict_t *pNewEnemy; 
    float nearestdistance;
@@ -534,7 +542,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
    {
       // if the enemy is dead?
       // is the enemy dead?, assume bot killed it
-      if (!GetPredictedIsAlive(pBot.pBotEnemy, globaltime - skill_settings[pBot.bot_skill].prediction_latency)) 
+      if (!GetPredictedIsAlive(pBot.pBotEnemy, gpGlobals->time - skill_settings[pBot.bot_skill].prediction_latency)) 
       {
          // the enemy is dead, jump for joy about 10% of the time
          if (RANDOM_LONG2(1, 100) <= 10)
@@ -572,12 +580,12 @@ edict_t *BotFindEnemy( bot_t &pBot )
             BotFixIdealYaw(pEdict);
 
             // keep track of when we last saw an enemy
-            pBot.f_bot_see_enemy_time = globaltime;
+            pBot.f_bot_see_enemy_time = gpGlobals->time;
 
             return (pBot.pBotEnemy);
          }
          else if( (pBot.f_bot_see_enemy_time > 0) && 
-                  (pBot.f_bot_see_enemy_time + 2.0 >= globaltime) ) // enemy has gone out of bot's line of sight, remember enemy for 2 sec
+                  (pBot.f_bot_see_enemy_time + 2.0 >= gpGlobals->time) ) // enemy has gone out of bot's line of sight, remember enemy for 2 sec
          {
             // we remember this enemy.. keep tracking
             
@@ -647,7 +655,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
                continue;
             
             // skip this player if not alive (i.e. dead or dying)
-            if (!GetPredictedIsAlive(pPlayer, globaltime - skill_settings[pBot.bot_skill].prediction_latency))
+            if (!GetPredictedIsAlive(pPlayer, gpGlobals->time - skill_settings[pBot.bot_skill].prediction_latency))
                continue;
 
             // don't target teammates
@@ -683,14 +691,14 @@ edict_t *BotFindEnemy( bot_t &pBot )
       BotFixIdealYaw(pEdict);
 
       // keep track of when we last saw an enemy
-      pBot.f_bot_see_enemy_time = globaltime;
+      pBot.f_bot_see_enemy_time = gpGlobals->time;
 
       BotResetReactionTime(pBot);
    }
 
    // has the bot NOT seen an ememy for at least 5 seconds (time to reload)?
    if ((pBot.f_bot_see_enemy_time > 0) &&
-       ((pBot.f_bot_see_enemy_time + 5.0) <= globaltime))
+       ((pBot.f_bot_see_enemy_time + 5.0) <= gpGlobals->time))
    {
       pBot.f_bot_see_enemy_time = -1;  // so we won't keep reloading
 
@@ -707,7 +715,6 @@ edict_t *BotFindEnemy( bot_t &pBot )
 //
 qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, const bot_fire_delay_t &delay, qboolean use_primary, qboolean use_secondary)
 {
-   const float globaltime = gpGlobals->time;
    edict_t *pEdict = pBot.pEdict;
    const int iId = select.iId;
 
@@ -722,7 +729,7 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, 
    {
       // check if bot needs to duck down to hit enemy...
       if (pBot.pBotEnemy->v.origin.z < (pEdict->v.origin.z - 30))
-         pBot.f_duck_time = globaltime + 1.0;
+         pBot.f_duck_time = gpGlobals->time + 1.0;
 
       extern int bot_stop;
       if (bot_stop == 2)
@@ -738,16 +745,16 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, 
          pBot.charging_weapon_id = iId;
 
          // release primary fire after the appropriate delay...
-         pBot.f_primary_charging = globaltime +
+         pBot.f_primary_charging = gpGlobals->time +
                         select.primary_charge_delay;
 
-         pBot.f_shoot_time = globaltime;  // keep charging
+         pBot.f_shoot_time = gpGlobals->time;  // keep charging
       }
       else
       {
          // set next time to shoot
          if (select.primary_fire_hold)
-            pBot.f_shoot_time = globaltime;  // don't let button up
+            pBot.f_shoot_time = gpGlobals->time;  // don't let button up
          else
          {
             int skill = pBot.bot_skill;
@@ -758,9 +765,9 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, 
             max_delay = delay.primary_max_delay[skill];
             
             if(min_delay == 0 && max_delay == 0)
-               pBot.f_shoot_time = globaltime + base_delay;
+               pBot.f_shoot_time = gpGlobals->time + base_delay;
             else
-               pBot.f_shoot_time = globaltime + base_delay + RANDOM_FLOAT2(min_delay, max_delay);
+               pBot.f_shoot_time = gpGlobals->time + base_delay + RANDOM_FLOAT2(min_delay, max_delay);
          }
       }
    }
@@ -773,16 +780,16 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, 
          pBot.charging_weapon_id = iId;
 
          // release secondary fire after the appropriate delay...
-         pBot.f_secondary_charging = globaltime +
+         pBot.f_secondary_charging = gpGlobals->time +
                         select.secondary_charge_delay;
 
-         pBot.f_shoot_time = globaltime;  // keep charging
+         pBot.f_shoot_time = gpGlobals->time;  // keep charging
       }
       else
       {
          // set next time to shoot
          if (select.secondary_fire_hold)
-            pBot.f_shoot_time = globaltime;  // don't let button up
+            pBot.f_shoot_time = gpGlobals->time;  // don't let button up
          else
          {
             int skill = pBot.bot_skill;
@@ -793,9 +800,9 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, 
             max_delay = delay.secondary_max_delay[skill];
 
             if(min_delay == 0 && max_delay == 0)
-               pBot.f_shoot_time = globaltime + base_delay;
+               pBot.f_shoot_time = gpGlobals->time + base_delay;
             else
-               pBot.f_shoot_time = globaltime + base_delay + RANDOM_FLOAT2(min_delay, max_delay);
+               pBot.f_shoot_time = gpGlobals->time + base_delay + RANDOM_FLOAT2(min_delay, max_delay);
          }
       }
    }
@@ -806,24 +813,24 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, 
 
 //
 qboolean TrySelectWeapon(bot_t &pBot, const int select_index, const bot_weapon_select_t &select, const bot_fire_delay_t &delay)
-{
+{   
    // select this weapon if it isn't already selected
    if (pBot.current_weapon.iId != select.iId)
    {
-      UTIL_SelectItem(pBot.pEdict, (char*)select.weapon_name);
-      pBot.zooming = FALSE;
+      UTIL_SelectItem(pBot.pEdict, select.weapon_name);
    }
    
    if (delay.iId != select.iId)
    {
-      UTIL_ConsolePrintf("fire_delay mismatch for weapon id=%d\n", select.iId);
-      
       pBot.current_weapon_index = -1;
       
       return FALSE;
    }
    
    pBot.current_weapon_index = select_index;
+   pBot.f_weaponchange_time = gpGlobals->time + 
+      RANDOM_FLOAT2(skill_settings[pBot.bot_skill].weaponchange_rate[0], 
+                    skill_settings[pBot.bot_skill].weaponchange_rate[1]);
    
    return TRUE;
 }
@@ -834,7 +841,6 @@ qboolean TrySelectWeapon(bot_t &pBot, const int select_index, const bot_weapon_s
 // BotFireWeapon will return TRUE if weapon was fired, FALSE otherwise
 qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
 {
-   const float globaltime = gpGlobals->time;
    bot_weapon_select_t *pSelect;
    bot_fire_delay_t *pDelay;
    int select_index, better_index;
@@ -844,6 +850,8 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
    float distance;
    int min_skill;
    int min_index;
+   qboolean min_use_primary;
+   qboolean min_use_secondary;
    
    distance = v_enemy.Length();  // how far away is the enemy?
 
@@ -869,7 +877,7 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       iId = pBot.charging_weapon_id;
 
       // is it time to fire the charged weapon?
-      if (pBot.f_primary_charging <= globaltime)
+      if (pBot.f_primary_charging <= gpGlobals->time)
       {
          // we DON'T set pEdict->v.button here to release the
          // fire button which will fire the charged weapon
@@ -891,7 +899,7 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
          min_delay = pDelay[select_index].primary_min_delay[skill];
          max_delay = pDelay[select_index].primary_max_delay[skill];
 
-         pBot.f_shoot_time = globaltime + base_delay +
+         pBot.f_shoot_time = gpGlobals->time + base_delay +
             RANDOM_FLOAT2(min_delay, max_delay);
 
          return TRUE;
@@ -899,7 +907,7 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       else
       {
          pBot.pEdict->v.button |= IN_ATTACK;   // charge the weapon
-         pBot.f_shoot_time = globaltime;  // keep charging
+         pBot.f_shoot_time = gpGlobals->time;  // keep charging
 
          return TRUE;
       }
@@ -911,7 +919,7 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       iId = pBot.charging_weapon_id;
 
       // is it time to fire the charged weapon?
-      if (pBot.f_secondary_charging <= globaltime)
+      if (pBot.f_secondary_charging <= gpGlobals->time)
       {
          // we DON'T set pEdict->v.button here to release the
          // fire button which will fire the charged weapon
@@ -933,7 +941,7 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
          min_delay = pDelay[select_index].secondary_min_delay[skill];
          max_delay = pDelay[select_index].secondary_max_delay[skill];
 
-         pBot.f_shoot_time = globaltime + base_delay +
+         pBot.f_shoot_time = gpGlobals->time + base_delay +
             RANDOM_FLOAT2(min_delay, max_delay);
 
          return TRUE;
@@ -941,7 +949,7 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       else
       {
          pBot.pEdict->v.button |= IN_ATTACK2;  // charge the weapon
-         pBot.f_shoot_time = globaltime;  // keep charging
+         pBot.f_shoot_time = gpGlobals->time;  // keep charging
 
          return TRUE;
       }
@@ -955,13 +963,14 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       // Check if we can use this weapon
       if ((weapon_choice == pSelect[select_index].iId || weapon_choice == 0) || 
       	  (IsValidWeaponChoose(pBot, pSelect[select_index]) && 
+      	   BotCanUseWeapon(pBot, pSelect[select_index]) &&
       	   IsValidToFireAtTheMoment(pBot, pSelect[select_index])))
       {
       	 better_index = -1;
       	 
       	 if(weapon_choice == 0)
       	 {
-            // Check if we REALLY want to change to other weapon (aka current gun == shit)
+            // Check if we REALLY want to change to other weapon (aka current gun IS shit)
             better_index = BotGetBetterWeaponChoice(pBot, pSelect[select_index], pSelect, distance, &use_primary, &use_secondary);
             if(better_index > -1) 
                select_index = better_index;
@@ -985,6 +994,10 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
          }
       }
    }
+   
+   // don't change weapon too fast
+   if(pBot.f_weaponchange_time >= gpGlobals->time && pBot.current_weapon_index >= 0 && weapon_choice == 0)
+      return FALSE;
 
    // loop through all the weapons until terminator is found...
    select_index = -1;
@@ -1001,11 +1014,10 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       if(!(weapon_choice == pSelect[select_index].iId || weapon_choice == 0))
          continue;
 
-      if(!IsValidWeaponChoose(pBot, pSelect[select_index]))
+      if(!IsValidWeaponChoose(pBot, pSelect[select_index]) ||
+         !BotCanUseWeapon(pBot, pSelect[select_index]) ||
+         !IsValidToFireAtTheMoment(pBot, pSelect[select_index]))
       	 continue;
-
-      if(!IsValidToFireAtTheMoment(pBot, pSelect[select_index]))
-         continue;
 
       // is use percent greater than weapon use percent?
       if (RANDOM_LONG2(1, 100) > pSelect[select_index].use_percent)
@@ -1029,6 +1041,8 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
    // We didn't find good weapon, now try find least skilled weapon that bot has, but avoid avoidable weapons
    min_index = -1;
    min_skill = -1;
+   min_use_primary = FALSE;
+   min_use_secondary = FALSE;
    
    select_index = -1;
    while (pSelect[++select_index].iId)
@@ -1064,16 +1078,19 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
          {
             min_skill = max(pSelect[select_index].primary_skill_level, pSelect[select_index].secondary_skill_level);
             min_index = select_index;
+            min_use_primary = use_primary;
+            min_use_secondary = use_secondary;
          }
       }
    }
-   
+
+
    if(min_index > -1 && min_skill > -1)
    {
-      if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
+      if(!TrySelectWeapon(pBot, min_index, pSelect[min_index], pDelay[min_index]))
          return FALSE; //error
       
-      return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], use_primary, use_secondary));
+      return(BotFireSelectedWeapon(pBot, pSelect[min_index], pDelay[min_index], min_use_primary, min_use_secondary));
    }
    
    // didn't have any available weapons or ammo, return FALSE
@@ -1100,7 +1117,6 @@ qboolean AreTeamMates(edict_t * pOther, edict_t * pEdict) {
 
 void BotShootAtEnemy( bot_t &pBot )
 {
-   const float globaltime = gpGlobals->time;
    float f_distance;
    Vector v_enemy;
    Vector v_enemy_aimpos;
@@ -1109,7 +1125,7 @@ void BotShootAtEnemy( bot_t &pBot )
    
    edict_t *pEdict = pBot.pEdict;
 
-   if (pBot.f_reaction_target_time > globaltime)
+   if (pBot.f_reaction_target_time > gpGlobals->time)
       return;
 
    v_predicted_pos = GetPredictedPlayerPosition(pBot);
@@ -1197,7 +1213,7 @@ void BotShootAtEnemy( bot_t &pBot )
       pBot.f_move_speed =10.0;
    
    // is it time to shoot yet?
-   if (pBot.f_shoot_time <= globaltime)
+   if (pBot.f_shoot_time <= gpGlobals->time)
    {
       pHit = 0;
             
@@ -1214,7 +1230,7 @@ void BotShootAtEnemy( bot_t &pBot )
             if(!BotFireWeapon(v_enemy, pBot, 0))
             {
                pBot.pBotEnemy = NULL;
-               pBot.f_bot_find_enemy_time = globaltime + 3.0;
+               pBot.f_bot_find_enemy_time = gpGlobals->time + 3.0;
                
                // level look
                pEdict->v.idealpitch = 0;

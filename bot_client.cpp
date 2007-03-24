@@ -331,7 +331,6 @@ void BotClient_Valve_Damage(void *p, int bot_index)
 // This message gets sent when the bots get killed
 void BotClient_Valve_DeathMsg(void *p, int bot_index)
 {
-   const float globaltime = gpGlobals->time;
    static int state = 0;   // current state machine state
    static int killer_index;
    static int victim_index;
@@ -372,7 +371,7 @@ void BotClient_Valve_DeathMsg(void *p, int bot_index)
             if ((RANDOM_LONG2(1, 100) <= bots[index].logo_percent) && (num_logos))
             {
                bots[index].b_spray_logo = TRUE;  // this bot should spray logo now
-               bots[index].f_spray_logo_time = globaltime;
+               bots[index].f_spray_logo_time = gpGlobals->time;
             }
          }
 
@@ -388,7 +387,7 @@ void BotClient_Valve_DeathMsg(void *p, int bot_index)
 
                // set chat flag and time to chat...
                bots[index].b_bot_say = TRUE;
-               bots[index].f_bot_say = globaltime + 5.0 + RANDOM_FLOAT2(0.0, 5.0);
+               bots[index].f_bot_say = gpGlobals->time + 5.0 + RANDOM_FLOAT2(0.0, 5.0);
 
                recent_count = 0;
 
@@ -460,7 +459,6 @@ void BotClient_Valve_DeathMsg(void *p, int bot_index)
 
 void BotClient_Valve_ScreenFade(void *p, int bot_index)
 {
-   const float globaltime = gpGlobals->time;
    static int state = 0;   // current state machine state
    static int duration;
    static int hold_time;
@@ -487,7 +485,7 @@ void BotClient_Valve_ScreenFade(void *p, int bot_index)
       state = 0;
 
       length = (duration + hold_time) / 4096;
-      bots[bot_index].blinded_time = globaltime + length - 2.0;
+      bots[bot_index].blinded_time = gpGlobals->time + length - 2.0;
    }
    else
    {

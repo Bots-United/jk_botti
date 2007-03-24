@@ -189,7 +189,6 @@ float BotChangeYaw( bot_t &pBot, float speed )
 
 qboolean BotFindWaypoint( bot_t &pBot )
 {
-   const float globaltime = gpGlobals->time;
    int index, select_index;
    PATH *pPath = NULL;
    int path_index;
@@ -255,9 +254,9 @@ qboolean BotFindWaypoint( bot_t &pBot )
    // (don't do this any more often than every 10 seconds)
 
    if ((RANDOM_LONG2(1, 100) <= 20) &&
-       (pBot.f_random_waypoint_time <= globaltime))
+       (pBot.f_random_waypoint_time <= gpGlobals->time))
    {
-      pBot.f_random_waypoint_time = globaltime + 10.0;
+      pBot.f_random_waypoint_time = gpGlobals->time + 10.0;
 
       if (min_index[2] != -1)
          index = RANDOM_LONG2(0, 2);
@@ -287,7 +286,7 @@ qboolean BotFindWaypoint( bot_t &pBot )
       pBot.curr_waypoint_index = select_index;
       pBot.waypoint_origin = waypoints[select_index].origin;
 
-      pBot.f_waypoint_time = globaltime;
+      pBot.f_waypoint_time = gpGlobals->time;
 
       return TRUE;
    }
@@ -539,7 +538,6 @@ int BotFindWaypointGoal( bot_t &pBot )
 
 qboolean BotHeadTowardWaypoint( bot_t &pBot )
 {
-   const float globaltime = gpGlobals->time;
    int i;
    Vector v_src, v_dest;
    TraceResult tr;
@@ -552,14 +550,14 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
 
 
    // check if the bot has been trying to get to this waypoint for a while...
-   if ((pBot.f_waypoint_time + 5.0) < globaltime)
+   if ((pBot.f_waypoint_time + 5.0) < gpGlobals->time)
    {
       pBot.curr_waypoint_index = -1;  // forget about this waypoint
       pBot.waypoint_goal = -1;  // also forget about a goal
    }
 
    // no goal, no goal time
-   if ((pBot.waypoint_goal == -1) && (pBot.f_waypoint_goal_time > globaltime + 2) &&
+   if ((pBot.waypoint_goal == -1) && (pBot.f_waypoint_goal_time > gpGlobals->time + 2) &&
        (pBot.f_waypoint_goal_time != 0.0))
       pBot.f_waypoint_goal_time = 0.0;
 
@@ -569,7 +567,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
       pBot.waypoint_top_of_ladder = FALSE;
 
       // did we just come off of a ladder or are we underwater?
-      if (((pBot.f_end_use_ladder_time + 2.0) > globaltime) ||
+      if (((pBot.f_end_use_ladder_time + 2.0) > gpGlobals->time) ||
           (pBot.pEdict->v.waterlevel == 3))
       {
          // find the nearest visible waypoint
@@ -590,7 +588,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
       pBot.curr_waypoint_index = i;
       pBot.waypoint_origin = waypoints[i].origin;
 
-      pBot.f_waypoint_time = globaltime;
+      pBot.f_waypoint_time = gpGlobals->time;
    }
    else
    {
@@ -638,7 +636,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
       }
       
       // skip this part if bot is trying to get out of water...
-      if (pBot.f_exit_water_time < globaltime)
+      if (pBot.f_exit_water_time < gpGlobals->time)
       {
          // check if we can still see our target waypoint...
 
@@ -653,7 +651,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
          if (tr.flFraction < 1.0)
          {
             // did we just come off of a ladder or are we under water?
-            if (((pBot.f_end_use_ladder_time + 2.0) > globaltime) ||
+            if (((pBot.f_end_use_ladder_time + 2.0) > gpGlobals->time) ||
                 (pBot.pEdict->v.waterlevel == 3))
             {
                // find the nearest visible waypoint
@@ -674,7 +672,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
             pBot.curr_waypoint_index = i;
             pBot.waypoint_origin = waypoints[i].origin;
 
-            pBot.f_waypoint_time = globaltime;
+            pBot.f_waypoint_time = gpGlobals->time;
          }
       }
    }
@@ -701,7 +699,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
       min_distance = 20.0;
 
    // if trying to get out of water, need to get very close to waypoint...
-   if (pBot.f_exit_water_time >= globaltime)
+   if (pBot.f_exit_water_time >= gpGlobals->time)
       min_distance = 20.0;
 
    touching = FALSE;
@@ -730,7 +728,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
       // check if the waypoint is a door waypoint
       if (waypoints[pBot.curr_waypoint_index].flags & W_FL_DOOR)
       {
-         pBot.f_dont_avoid_wall_time = globaltime + 5.0;
+         pBot.f_dont_avoid_wall_time = gpGlobals->time + 5.0;
       }
 
       // check if the next waypoint is a jump waypoint...
@@ -758,7 +756,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
                BotFixIdealYaw(pEdict);
             }
 
-            pBot.f_pause_time = globaltime + RANDOM_FLOAT2(20.0, 30.0);
+            pBot.f_pause_time = gpGlobals->time + RANDOM_FLOAT2(20.0, 30.0);
 
             // fix f_waypoint_time so bot won't think it is stuck
             pBot.f_waypoint_time = pBot.f_pause_time;
@@ -826,10 +824,10 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
                   pBot.curr_waypoint_index = i;
                   pBot.waypoint_origin = waypoints[i].origin;
 
-                  pBot.f_waypoint_time = globaltime;
+                  pBot.f_waypoint_time = gpGlobals->time;
 
                   // keep trying to exit water for next 3 seconds
-                  pBot.f_exit_water_time = globaltime + 3.0;
+                  pBot.f_exit_water_time = gpGlobals->time + 3.0;
                }
             }
          }
@@ -837,7 +835,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
       
       // if the bot doesn't have a goal waypoint then pick one...
       if ((pBot.waypoint_goal == -1 || pBot.pBotEnemy != NULL) &&
-          (pBot.f_waypoint_goal_time < globaltime))
+          (pBot.f_waypoint_goal_time < gpGlobals->time))
       {
          // tracking something, pick goal much more often
          if (pBot.pBotEnemy != NULL)
@@ -871,7 +869,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
             pBot.curr_waypoint_index = i;
             pBot.waypoint_origin = waypoints[i].origin;
 
-            pBot.f_waypoint_time = globaltime;
+            pBot.f_waypoint_time = gpGlobals->time;
          }
       }
 
@@ -1074,13 +1072,12 @@ void BotOnLadder( bot_t &pBot, float moved_distance )
 
 void BotUnderWater( bot_t &pBot )
 {
-   const float globaltime = gpGlobals->time;
    qboolean found_waypoint = FALSE;
 
    edict_t *pEdict = pBot.pEdict;
 
    // are there waypoints in this level (and not trying to exit water)?
-   if (num_waypoints > 0 && pBot.f_exit_water_time < globaltime)
+   if (num_waypoints > 0 && pBot.f_exit_water_time < gpGlobals->time)
    {
       // head towards a waypoint
       found_waypoint = BotHeadTowardWaypoint(pBot);
@@ -1151,11 +1148,10 @@ void BotUnderWater( bot_t &pBot )
 
 void BotUseLift( bot_t &pBot, float moved_distance )
 {
-   const float globaltime = gpGlobals->time;
    edict_t *pEdict = pBot.pEdict;
 
    // just need to press the button once, when the flag gets set...
-   if (pBot.f_use_button_time == globaltime)
+   if (pBot.f_use_button_time == gpGlobals->time)
    {
       pEdict->v.button = IN_USE;
 
@@ -1166,7 +1162,7 @@ void BotUseLift( bot_t &pBot, float moved_distance )
    }
 
    // check if the bot has waited too long for the lift to move...
-   if (((pBot.f_use_button_time + 2.0) < globaltime) &&
+   if (((pBot.f_use_button_time + 2.0) < gpGlobals->time) &&
        (!pBot.b_lift_moving))
    {
       // clear use button flag
@@ -1732,7 +1728,6 @@ void BotRandomTurn( bot_t &pBot )
 
 qboolean BotFollowUser( bot_t &pBot )
 {
-   const float globaltime = gpGlobals->time;
    qboolean user_visible;
    float f_distance;
    edict_t *pEdict = pBot.pEdict;
@@ -1752,10 +1747,10 @@ qboolean BotFollowUser( bot_t &pBot )
    // check if the "user" is still visible or if the user has been visible
    // in the last 5 seconds (or the player just starting "using" the bot)
 
-   if (user_visible || (pBot.f_bot_use_time + 5 > globaltime))
+   if (user_visible || (pBot.f_bot_use_time + 5 > gpGlobals->time))
    {
       if (user_visible)
-         pBot.f_bot_use_time = globaltime;  // reset "last visible time"
+         pBot.f_bot_use_time = gpGlobals->time;  // reset "last visible time"
 
       // face the user
       Vector v_user = pBot.pBotUser->v.origin - pEdict->v.origin;
@@ -1788,7 +1783,6 @@ qboolean BotFollowUser( bot_t &pBot )
 
 qboolean BotCheckWallOnLeft( bot_t &pBot )
 {
-   const float globaltime = gpGlobals->time;
    edict_t *pEdict = pBot.pEdict;
    Vector v_src, v_left;
    TraceResult tr;
@@ -1804,7 +1798,7 @@ qboolean BotCheckWallOnLeft( bot_t &pBot )
    if (tr.flFraction < 1.0)
    {
       if (pBot.f_wall_on_left < 1.0)
-         pBot.f_wall_on_left = globaltime;
+         pBot.f_wall_on_left = gpGlobals->time;
 
       return TRUE;
    }
@@ -1815,7 +1809,6 @@ qboolean BotCheckWallOnLeft( bot_t &pBot )
 
 qboolean BotCheckWallOnRight( bot_t &pBot )
 {
-   const float globaltime = gpGlobals->time;
    edict_t *pEdict = pBot.pEdict;
    Vector v_src, v_right;
    TraceResult tr;
@@ -1831,7 +1824,7 @@ qboolean BotCheckWallOnRight( bot_t &pBot )
    if (tr.flFraction < 1.0)
    {
       if (pBot.f_wall_on_right < 1.0)
-         pBot.f_wall_on_right = globaltime;
+         pBot.f_wall_on_right = gpGlobals->time;
 
       return TRUE;
    }
@@ -1842,7 +1835,6 @@ qboolean BotCheckWallOnRight( bot_t &pBot )
 
 void BotLookForDrop( bot_t &pBot )
 {
-   const float globaltime = gpGlobals->time;
    edict_t *pEdict = pBot.pEdict;
 
    Vector v_src, v_dest, v_ahead;
@@ -1900,14 +1892,14 @@ void BotLookForDrop( bot_t &pBot )
          if (pBot.pBotEnemy)
          {
             pBot.pBotEnemy = NULL;
-            pBot.f_bot_find_enemy_time = globaltime + 1.0;
+            pBot.f_bot_find_enemy_time = gpGlobals->time + 1.0;
             
             // level look
             pEdict->v.idealpitch = 0;
          }
 
          // don't look for items for a while...
-         pBot.f_find_item = globaltime + 1.0;
+         pBot.f_find_item = gpGlobals->time + 1.0;
 
          // change the bot's ideal yaw by finding surface normal
          // slightly below where the bot is standing

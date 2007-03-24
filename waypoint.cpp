@@ -29,7 +29,6 @@
 
 
 extern int m_spriteTexture;
-extern int IsDedicatedServer;
 
 
 // waypoints with information bits (flags)
@@ -1166,7 +1165,6 @@ edict_t *WaypointFindItem( int wpt_index )
 
 void WaypointAdd(edict_t *pEntity)
 {
-   const float globaltime = gpGlobals->time;
    int index;
    int player_index = ENTINDEX(pEntity) - 1;
    
@@ -1200,7 +1198,7 @@ void WaypointAdd(edict_t *pEntity)
       last_waypoint[player_index] = index;
 
    // set the time that this waypoint was originally displayed...
-   wp_display_time[index] = globaltime;
+   wp_display_time[index] = gpGlobals->time;
 
 
    Vector start, end;
@@ -1264,7 +1262,6 @@ void WaypointAdd(edict_t *pEntity)
 
 void WaypointAddAiming(edict_t *pEntity)
 {
-   const float globaltime = gpGlobals->time;
    int index;
 
    index = 0;
@@ -1299,7 +1296,7 @@ void WaypointAddAiming(edict_t *pEntity)
    waypoints[index].origin = pEntity->v.origin + UTIL_AnglesToForward(v_angle) * 25;
 
    // set the time that this waypoint was originally displayed...
-   wp_display_time[index] = globaltime;
+   wp_display_time[index] = gpGlobals->time;
 
 
    Vector start, end;
@@ -1647,8 +1644,7 @@ qboolean WaypointLoad(edict_t *pEntity)
          ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
       }
 
-      if (IsDedicatedServer)
-         UTIL_ConsolePrintf("waypoint file %s not found!\n", filename);
+      UTIL_ConsolePrintf("waypoint file %s not found!\n", filename);
 
       return FALSE;
    }
@@ -1955,7 +1951,6 @@ void WaypointPrintInfo(edict_t *pEntity)
 
 void WaypointThink(edict_t *pEntity)
 {
-   const float globaltime = gpGlobals->time;
    float distance, min_distance;
    Vector start, end;
    int i, idx, index=0;
@@ -2058,7 +2053,7 @@ void WaypointThink(edict_t *pEntity)
                min_distance = distance;
             }
 
-            if ((wp_display_time[i] + 1.0) < globaltime)
+            if ((wp_display_time[i] + 1.0) < gpGlobals->time)
             {
                if (waypoints[i].flags & W_FL_CROUCH)
                {
@@ -2079,7 +2074,7 @@ void WaypointThink(edict_t *pEntity)
                // draw a blue waypoint
                WaypointDrawBeam(pEntity, start, end, 30, 0, 0, 0, 255, 250, 5);
 
-               wp_display_time[i] = globaltime;
+               wp_display_time[i] = gpGlobals->time;
             }
          }
       }
@@ -2088,11 +2083,11 @@ void WaypointThink(edict_t *pEntity)
       if (g_path_waypoint)
       {
          // check if player is close enough to a waypoint and time to draw path...
-         if ((min_distance <= 50) && (f_path_time <= globaltime))
+         if ((min_distance <= 50) && (f_path_time <= gpGlobals->time))
          {
             PATH *p;
 
-            f_path_time = globaltime + 1.0;
+            f_path_time = gpGlobals->time + 1.0;
 
             p = paths[index];
 

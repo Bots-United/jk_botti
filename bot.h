@@ -36,7 +36,7 @@ typedef int BOOL;
 
 
 // define some function prototypes...
-void FakeClientCommand(edict_t *pBot, char *arg1, char *arg2, char *arg3);
+void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const char *arg3);
 
 
 #define LADDER_UNKNOWN  0
@@ -264,6 +264,8 @@ typedef struct
 
    int   reaction_time;
    float f_reaction_target_time;  // time when enemy targeting starts
+   
+   float f_weaponchange_time;
 
    bot_current_weapon_t current_weapon;  // one current weapon for each bot
    int m_rgAmmo[MAX_AMMO_SLOTS];  // total ammo amounts (1 array for each bot)
@@ -358,7 +360,6 @@ Vector Center(edict_t *pEdict);
 Vector GetGunPosition(edict_t *pEdict);
 void UTIL_SelectItem(edict_t *pEdict, char *item_name);
 void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index);
-void UTIL_ShowMenu( edict_t *pEdict, int slots, int displaytime, qboolean needmore, char *pText );
 void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2);
 void GetGameDir (char *game_dir);
 void UTIL_PrintBotInfo(void(*printfunc)(void *, char*), void * arg);

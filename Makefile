@@ -1,3 +1,12 @@
+##
+## Compiling jk_botti under CYGWIN:
+##
+## Get linux crosscompiler for cygwin: http://metamod-p.sourceforge.net/cross-compiling.on.windows.for.linux.html
+##
+##  for compiling linux: make OS=linux
+##  for compiling win32: make
+##
+
 ifeq ($(OS),Windows_NT)
 	CPP = gcc -mno-cygwin
 	LINKFLAGS = -mdll -Xlinker --add-stdcall-alias -s
@@ -11,14 +20,16 @@ endif
 TARGET = jk_botti_mm
 ARCHFLAG = i686
 BASEFLAGS = 
-OPTFLAGS = -O3 -ffast-math -fno-rtti -fno-exceptions -fomit-frame-pointer
-#OPTFLAGS = -O0 -g -fno-rtti -fno-exceptions
+OPTFLAGS = -O3 -fomit-frame-pointer -ffast-math
+#OPTFLAGS = -O0 -g
 INCLUDES = -I"./metamod" \
 	-I"./common" \
 	-I"./dlls" \
 	-I"./engine" \
 	-I"./pm_shared"
-CPPFLAGS = -Wall ${BASEFLAGS} ${OPTFLAGS} -march=${ARCHFLAG} ${INCLUDES}
+
+CFLAGS = -Wall ${BASEFLAGS} ${OPTFLAGS} -march=${ARCHFLAG} ${INCLUDES}
+CPPFLAGS = -fno-rtti -fno-exceptions ${CFLAGS} 
 
 SRC = 	bot.cpp \
 	bot_chat.cpp \
@@ -39,20 +50,19 @@ OBJ = $(SRC:%.cpp=%.o)
 
 ${TARGET}${DLLEND}: ${OBJ}
 	${CPP} -o $@ ${OBJ} ${LINKFLAGS}
-	cp $@ Release
+	cp $@ addons/jk_botti/dlls/
 
 clean:
-	rm -f *.o
+	rm -f *.o ${TARGET}${DLLEND}
 
 distclean:
-	rm -rf Release
-	mkdir Release	
+	rm -f Rules.depend ${TARGET}.dll ${TARGET}_i386.so addons/jk_botti/dlls/*
 
 %.o: %.cpp
 	${CPP} ${CPPFLAGS} -c $< -o $@
 
 %.o: %.c
-	${CPP} ${CPPFLAGS} -c $< -o $@
+	${CPP} ${CFLAGS} -c $< -o $@
 
 depend: Rules.depend
 

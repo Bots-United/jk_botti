@@ -35,6 +35,7 @@ void (*botMsgFunction)(void *, int) = NULL;
 void (*botMsgEndFunction)(void *, int) = NULL;
 int botMsgIndex;
 
+
 void pfnSetSize(edict_t *e, const float *rgflMin, const float *rgflMax) {
    int index = UTIL_GetBotIndex(e);
    if(index == -1)
@@ -45,10 +46,9 @@ void pfnSetSize(edict_t *e, const float *rgflMin, const float *rgflMax) {
    RETURN_META (MRES_IGNORED);
 }
 
-void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 ) {
-   const float globaltime = gpGlobals->time;
-   
-   SaveSound((edict_t*)pInvoker, globaltime, pInvoker->v.origin, 1.0, ATTN_NORM, 1);
+void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 ) 
+{
+   SaveSound((edict_t*)pInvoker, gpGlobals->time, pInvoker->v.origin, 1.0, ATTN_NORM, 1);
    
    RETURN_META (MRES_IGNORED);
 }
@@ -93,7 +93,8 @@ void pfnClientCommand(edict_t* pEdict, char* szFmt, ...)
    RETURN_META (MRES_IGNORED);
 }
 
-int FAST_GET_USER_MSG_ID(plid_t plindex, int & value, const char * name, int * size) {
+int FAST_GET_USER_MSG_ID(plid_t plindex, int & value, const char * name, int * size) 
+{
    return(value ? value : (value = GET_USER_MSG_ID(plindex, name, size)));
 }
 

@@ -271,21 +271,6 @@ void SaveSound(edict_t * pPlayer, float time, const Vector & origin, float volum
    trigger_sounds[i].used = used;
 }
 
-void UTIL_ShowMenu( edict_t *pEdict, int slots, int displaytime, qboolean needmore, char *pText )
-{
-   if (GET_USER_MSG_ID (PLID, "ShowMenu", NULL) <= 0)
-      REG_USER_MSG ("ShowMenu", -1);
-
-   MESSAGE_BEGIN( MSG_ONE, GET_USER_MSG_ID (PLID, "ShowMenu", NULL), NULL, pEdict );
-
-   WRITE_SHORT( slots );
-   WRITE_CHAR( displaytime );
-   WRITE_BYTE( needmore );
-   WRITE_STRING( pText );
-
-   MESSAGE_END();
-}
-
 void UTIL_PrintBotInfo(void(*printfunc)(void *, char*), void * arg) {
    //print out bot info
    char msg[80];
