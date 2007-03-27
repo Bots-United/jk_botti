@@ -28,17 +28,11 @@ extern qboolean is_team_play;
 extern qboolean checked_teamplay;
 extern bot_weapon_t weapon_defs[MAX_WEAPONS];
 
-
 // SET THIS UP BASED ON MOD!!!
 const int max_drop_height = 800;
 
 
-char welcome_msg[80] = "Kiitos kun kaytat JK botti <3\nThank you for using JK botti <3\n";
-int x_welcome_msg_len = 42;
-
-
 extern void BotCheckTeamplay(void);
-
 
 // returns the number of degrees left to turn toward ideal pitch...
 float BotChangePitch( bot_t &pBot, float speed )

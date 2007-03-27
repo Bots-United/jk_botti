@@ -35,6 +35,8 @@ void (*botMsgFunction)(void *, int) = NULL;
 void (*botMsgEndFunction)(void *, int) = NULL;
 int botMsgIndex;
 
+qboolean g_in_intermission = FALSE;
+
 
 void pfnSetSize(edict_t *e, const float *rgflMin, const float *rgflMax) {
    int index = UTIL_GetBotIndex(e);
@@ -159,7 +161,9 @@ void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, edict_t *
          botMsgIndex = -1;       // index of bot receiving message (none)
 
          {
-            if (msg_type == FAST_GET_USER_MSG_ID (PLID, DeathMsg, "DeathMsg", NULL))
+            if (msg_type == SVC_INTERMISSION)
+               g_in_intermission = TRUE;
+            else if (msg_type == FAST_GET_USER_MSG_ID (PLID, DeathMsg, "DeathMsg", NULL))
                botMsgFunction = BotClient_Valve_DeathMsg;
          }
       }

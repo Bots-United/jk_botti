@@ -264,11 +264,32 @@ void SaveSound(edict_t * pPlayer, float time, const Vector & origin, float volum
    if(i < 0 || i >= gpGlobals->maxClients)
       return;
    
-   trigger_sounds[i].time = time;
-   trigger_sounds[i].origin = origin;
-   trigger_sounds[i].volume = volume;
-   trigger_sounds[i].attenuation = attenuation;
-   trigger_sounds[i].used = used;
+   // importance value for new sound
+   float importance = 0.0;
+   
+   if(attenuation > 0)
+   {
+      importance = volume * (1024 / attenuation);
+   }
+   
+   if(trigger_sounds[i].used && importance < trigger_sounds[i].importance)
+   {
+      //decrease remembered volume over time
+      if((time - trigger_sounds[i].time) >= 0.1)
+      {
+         trigger_sounds[i].time += 0.1;
+         trigger_sounds[i].importance *= 0.95;
+      }
+   }
+   else
+   {
+      trigger_sounds[i].time = time;
+      trigger_sounds[i].origin = origin;
+      trigger_sounds[i].volume = volume;
+      trigger_sounds[i].attenuation = attenuation;
+      trigger_sounds[i].used = used;
+      trigger_sounds[i].importance = importance;
+   }
 }
 
 void UTIL_PrintBotInfo(void(*printfunc)(void *, char*), void * arg) {

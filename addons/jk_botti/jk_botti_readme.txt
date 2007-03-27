@@ -1,5 +1,5 @@
 jk_botti - Be More Human
---------------------------------0.30
+--------------------------------0.31
 
 1. Intro
 2. What's new
@@ -10,7 +10,7 @@ jk_botti - Be More Human
 1. Intro
 --------------------
 
-This is 0.30 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+This is 0.31 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
 You are free to use code for any of your needs.
 
 Credits:
@@ -61,6 +61,9 @@ CPU intensive operation this can only really be done on map change.
 --------------------
 2. What's new
 --------------------
+0.31:
+ * Improvements to aiming and combat movements
+
 0.30:
  * HUGE amount of bug fixes, most aim related.
  * Better readme.

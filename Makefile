@@ -9,16 +9,17 @@
 
 ifeq ($(OS),Windows_NT)
 	CPP = gcc -mno-cygwin
+	ARCHFLAG = -march=i686 -mtune=pentium4
 	LINKFLAGS = -mdll -Xlinker --add-stdcall-alias -s
 	DLLEND = .dll
 else
 	CPP = gcc-linux
+	ARCHFLAG = -march=i686 -mcpu=pentium4 -fPIC
 	LINKFLAGS = -fPIC -shared -ldl -s
 	DLLEND = _i386.so
 endif
 
 TARGET = jk_botti_mm
-ARCHFLAG = i686
 BASEFLAGS = 
 OPTFLAGS = -O3 -fomit-frame-pointer -ffast-math
 #OPTFLAGS = -O0 -g
@@ -28,7 +29,7 @@ INCLUDES = -I"./metamod" \
 	-I"./engine" \
 	-I"./pm_shared"
 
-CFLAGS = -Wall ${BASEFLAGS} ${OPTFLAGS} -march=${ARCHFLAG} ${INCLUDES}
+CFLAGS = -Wall ${BASEFLAGS} ${OPTFLAGS} ${ARCHFLAG} ${INCLUDES}
 CPPFLAGS = -fno-rtti -fno-exceptions ${CFLAGS} 
 
 SRC = 	bot.cpp \

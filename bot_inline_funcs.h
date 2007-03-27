@@ -9,22 +9,29 @@
 
 #include <inttypes.h>
 
+#ifdef __GNUC__
+inline void fsincos(double x, double &s, double &c)
+{
+   __asm__ ("fsincos;" : "=t" (c), "=u" (s) : "0" (x) : "st(7)");
+}
+#else
+inline void fsincos(double x, double &s, double &c)
+{
+   s = sin(x);
+   c = cos(x);
+}
+#endif
+
 inline Vector UTIL_AnglesToForward(const Vector &angles)
 {
    // from pm_shared/pm_math.h
-   float /*sr, cr, roll,*/ sp, cp, pitch, sy, cy, yaw;
+   double sp, cp, pitch, sy, cy, yaw;
 
    pitch = angles.x * (M_PI*2 / 360);
-   sp = sin(pitch);
-   cp = cos(pitch);
+   fsincos(pitch, sp, cp);
 
    yaw = angles.y * (M_PI*2 / 360);
-   sy = sin(yaw);
-   cy = cos(yaw);
-
-   //roll = angles.z * (M_PI*2 / 360);
-   //sr = sin(roll);
-   //cr = cos(roll);
+   fsincos(yaw, sy, cy);
 
    return(Vector(cp*cy, cp*sy, -sp));
 }
@@ -32,19 +39,16 @@ inline Vector UTIL_AnglesToForward(const Vector &angles)
 inline Vector UTIL_AnglesToRight(const Vector &angles)
 {
    // from pm_shared/pm_math.h
-   float sr, cr, roll, sp, cp, pitch, sy, cy, yaw;
+   double sr, cr, roll, sp, cp, pitch, sy, cy, yaw;
 
    pitch = angles.x * (M_PI*2 / 360);
-   sp = sin(pitch);
-   cp = cos(pitch);
+   fsincos(pitch, sp, cp);
 
    yaw = angles.y * (M_PI*2 / 360);
-   sy = sin(yaw);
-   cy = cos(yaw);
+   fsincos(yaw, sy, cy);
 
    roll = angles.z * (M_PI*2 / 360);
-   sr = sin(roll);
-   cr = cos(roll);
+   fsincos(roll, sr, cr);
 
    return(Vector(-1*sr*sp*cy+-1*cr*-sy, -1*sr*sp*sy+-1*cr*cy, -1*sr*cp));
 }
@@ -52,23 +56,41 @@ inline Vector UTIL_AnglesToRight(const Vector &angles)
 inline void UTIL_MakeVectorsPrivate( const Vector &angles, Vector &v_forward, Vector &v_right, Vector &v_up )
 {
    // from pm_shared/pm_math.h
-   float sr, cr, roll, sp, cp, pitch, sy, cy, yaw;
+   double sr, cr, roll, sp, cp, pitch, sy, cy, yaw;
 
    pitch = angles.x * (M_PI*2 / 360);
-   sp = sin(pitch);
-   cp = cos(pitch);
+   fsincos(pitch, sp, cp);
 
    yaw = angles.y * (M_PI*2 / 360);
-   sy = sin(yaw);
-   cy = cos(yaw);
+   fsincos(yaw, sy, cy);
 
    roll = angles.z * (M_PI*2 / 360);
-   sr = sin(roll);
-   cr = cos(roll);
+   fsincos(roll, sr, cr);
 
    v_forward = Vector(cp*cy, cp*sy, -sp);
    v_right   = Vector(-1*sr*sp*cy+-1*cr*-sy, -1*sr*sp*sy+-1*cr*cy, -1*sr*cp);
    v_up      = Vector(cr*sp*cy+-sr*-sy, cr*sp*sy+-sr*cy, cr*cp);
+}
+
+inline Vector UTIL_VecToAngles(const Vector &forward)
+{
+   // from pm_shared/pm_math.h
+   float tmp, yaw, pitch;
+   
+   if (forward.y == 0 && forward.x == 0)
+   {
+      yaw = 0;
+      pitch = (forward.z > 0) ? 90 : -90;
+   }
+   else
+   {
+      // atan2 returns values in range [-pi < x < +pi]
+      yaw = (atan2(forward.y, forward.x) * 180 / M_PI);
+      tmp = sqrt(forward.x * forward.x + forward.y * forward.y);
+      pitch = (atan2(forward.z, tmp) * 180 / M_PI);
+   }
+   
+   return(Vector(pitch, yaw, 0));
 }
 
 inline Vector GetGunPosition(edict_t *pEdict)
@@ -187,13 +209,6 @@ inline Vector UTIL_WrapAngles(const Vector & angles)
 {
    // check for wraparound of angles
    return Vector( UTIL_WrapAngle(angles.x), UTIL_WrapAngle(angles.y), UTIL_WrapAngle(angles.z) );
-}
-
-inline Vector UTIL_VecToAngles( const Vector & vec )
-{
-   Vector VecOut;
-   VEC_TO_ANGLES(vec, VecOut);
-   return UTIL_WrapAngles(VecOut);
 }
 
 inline void BotFixIdealPitch(edict_t *pEdict)

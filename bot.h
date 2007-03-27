@@ -82,11 +82,12 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
 
 
 typedef struct trigger_sound_s {
-	int used;
-	Vector origin;
-	float volume;
-	float attenuation;
-	float time;
+   int used;
+   Vector origin;
+   float volume;
+   float attenuation;
+   float time;
+   float importance;
 } trigger_sound_t;
 
 typedef struct
@@ -205,8 +206,8 @@ typedef struct
    float f_random_jump_duck_time;
    float f_random_jump_duck_end;
    float f_random_duck_time;
+   int prev_random_type;
    
-   qboolean b_was_longjump_lasttime;
    qboolean b_longjump;
    float f_combat_longjump;
    qboolean b_combat_longjump;
@@ -331,7 +332,7 @@ extern bot_t bots[32];
 
 extern void SaveSound(edict_t * pPlayer, float time, const Vector & origin, float volume, float attenuation, int empty);
 
-Vector GetPredictedPlayerPosition(bot_t &pBot, qboolean without_velocity = FALSE);
+Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean without_velocity = FALSE);
 qboolean FPredictedVisible(bot_t &pBot);
 qboolean GetPredictedIsAlive(edict_t * pPlayer, float time);
 void GatherPlayerData(void);
@@ -375,8 +376,6 @@ void BotChatName(char *original_name, char *out_name);
 void BotChatText(char *in_text, char *out_text);
 void BotChatFillInName(char *bot_say_msg, char *chat_text, char *chat_name, const char *bot_name);
 void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distance);
-
-qboolean UpdateSounds(bot_t &pBot, edict_t *pPlayer);
 
 #include "bot_inline_funcs.h"
 

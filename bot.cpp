@@ -41,6 +41,8 @@ extern int bot_chat_lower_percent;
 extern qboolean b_random_color;
 extern int bot_reaction_time;
 
+extern qboolean g_in_intermission;
+
 extern bot_chat_t bot_chat[MAX_BOT_CHAT];
 extern bot_chat_t bot_whine[MAX_BOT_CHAT];
 extern int bot_chat_count;
@@ -141,12 +143,12 @@ void BotSpawnInit( bot_t &pBot )
    pBot.f_random_jump_duck_time = 0.0;
    pBot.f_random_jump_duck_end = 0.0;
    pBot.f_random_duck_time = 0.0;
+   pBot.prev_random_type = 0;
    
    pBot.f_sniper_aim_time = 0.0;
    
    pBot.zooming = 0;
    
-   pBot.b_was_longjump_lasttime = FALSE;
    pBot.b_longjump_do_jump = FALSE;
    pBot.b_longjump = FALSE;
    pBot.f_combat_longjump = 0.0;
@@ -1401,19 +1403,25 @@ void BotThink( bot_t &pBot )
    {
       BotStartGame( pBot );
       
-      BotAim( pBot );
       g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot.f_move_speed,
                                    0, 0, pEdict->v.button, 0, (byte)pBot.msecval);
 
       return;
    }
 
-// does bot need to say a message and time to say a message?
+   // does bot need to say a message and time to say a message?
    if ((pBot.b_bot_say) && (pBot.f_bot_say < gpGlobals->time))
    {
       pBot.b_bot_say = FALSE;
 
       UTIL_HostSay(pEdict, 0, pBot.bot_say_msg);
+   }
+   
+   // in intermission.. don't do anything, freeze bot
+   if(g_in_intermission)
+   {
+      g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, 0, 0, 0, 0, 0, (byte)pBot.msecval);
+      return;
    }
 
    // if the bot is dead, randomly press fire to respawn...
@@ -1587,40 +1595,6 @@ void BotThink( bot_t &pBot )
    else
    {
       pBot.idle_angle = pEdict->v.v_angle.y;
-   }
-
-   // check if time to check for player sounds (if don't already have enemy)
-   if ((pBot.f_sound_update_time <= gpGlobals->time) && (pBot.pBotEnemy == NULL))
-   {
-      int ind;
-      edict_t *pPlayer;
-
-      pBot.f_sound_update_time = gpGlobals->time + 0.1;
-
-      for (ind = 1; ind <= gpGlobals->maxClients; ind++)
-      {
-         pPlayer = INDEXENT(ind);
-
-         // is this player slot is valid and it's not this bot...
-         if ((pPlayer) && (!pPlayer->free) && (pPlayer != pEdict) && !FBitSet(pPlayer->v.flags, FL_PROXY))
-         {
-            // if observer mode enabled, don't listen to this player...
-            if ((b_observer_mode) && !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
-               continue;
-
-            if (GetPredictedIsAlive(pPlayer, gpGlobals->time - skill_settings[pBot.bot_skill].prediction_latency))
-            {
-               // check for sounds being made by other players...
-               if (UpdateSounds(pBot, pPlayer))
-               {
-                  pBot.pBotEnemy = pPlayer;
-
-                  // don't check for sounds for another 0.33*(bot_skill+1) seconds
-                  pBot.f_sound_update_time = gpGlobals->time + (0.33 * (pBot.bot_skill + 1));
-               }
-            }
-         }
-      }
    }
 
    pBot.f_move_speed = pBot.f_max_speed;  // set to max speed
@@ -2364,8 +2338,10 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
        {
           pBot.f_random_jump_duck_time = 0.0;
           pBot.f_random_jump_duck_end = 0.0;
-          pBot.f_random_jump_time = gpGlobals->time + RANDOM_FLOAT2(0.3, 0.75);
+          pBot.f_random_jump_time = gpGlobals->time + RANDOM_FLOAT2(0.2, 0.4);
        }
+       
+       return;
    }
 
    // stop trying to longjump after half a second
@@ -2395,6 +2371,7 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
       pBot.b_longjump_do_jump = TRUE;
       
       //UTIL_ConsolePrintf("%s doing longjump! - combat\n", STRING(pEdict->v.netname));
+      return;
    }
 
    //
@@ -2424,18 +2401,18 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
    qboolean jump, duck, lj;
    
    // if in combat mode jump more
-   jump = (pBot.f_random_jump_time <= gpGlobals->time &&
+   jump = (pBot.prev_random_type != 1 && pBot.f_random_jump_time <= gpGlobals->time &&
            (moved_distance >= 10.0 || pBot.pBotEnemy != NULL) && pBot.f_move_speed > 1 &&
             RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_jump_frequency);
    
-   duck = (pBot.f_random_duck_time <= gpGlobals->time &&
+   duck = (pBot.prev_random_type != 2 && pBot.f_random_duck_time <= gpGlobals->time &&
            pBot.pBotEnemy != NULL && 
            RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_duck_frequency);
    
-   lj = (pBot.b_longjump && pBot.f_combat_longjump <= gpGlobals->time && !pBot.b_combat_longjump && 
+   lj = (pBot.prev_random_type != 3 && pBot.b_longjump && pBot.f_combat_longjump <= gpGlobals->time && !pBot.b_combat_longjump && 
          skill_settings[pBot.bot_skill].can_longjump &&
          pBot.pBotEnemy != NULL && fabs(pEdict->v.v_angle.y - pEdict->v.ideal_yaw) <= 30 &&
-         1/*RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_longjump_frequency*/);
+         RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_longjump_frequency);
    
    if(lj)
    {
@@ -2446,37 +2423,38 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
    }
    
    // ofcourse if we get multiple matches here we need to select
-   if(lj && !pBot.b_was_longjump_lasttime)
+   if(lj)
    {
       // lj happens so rarely that it overrides others
       jump = FALSE;
       duck = FALSE;
-      
-      pBot.b_was_longjump_lasttime = TRUE;
    }
-   else if(lj && (jump || duck))
+   else if(jump || duck)
    {
       if(jump && duck)
       {
          jump = RANDOM_FLOAT2(0, 100) <= 50.0;
          duck = !jump;
       }
-      
-      lj = FALSE;
-      
-      pBot.b_was_longjump_lasttime = FALSE;
    }
-   else if(jump && duck)
+   else if(!jump && !duck && !lj)
    {
-      jump = RANDOM_FLOAT2(0, 100) <= 50.0;
-      duck = !jump;
+      switch(pBot.prev_random_type)
+      {
+      case 1:
+         pBot.f_random_jump_time = gpGlobals->time + RANDOM_FLOAT2(0.3,0.5);
+         break;
+      case 2:
+         pBot.f_random_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.3,0.5);
+         break;
+      case 3:
+         pBot.f_combat_longjump = gpGlobals->time + RANDOM_FLOAT2(0.3,0.5);
+         break;
+      default:
+         break;
+      }
       
-      pBot.b_was_longjump_lasttime = FALSE;
-   }
-   else if(jump && duck && lj)
-   {
-      pBot.b_was_longjump_lasttime = FALSE;
-      
+      pBot.prev_random_type = 0;
       return;
    }
    
@@ -2485,18 +2463,19 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
    {
       pEdict->v.button |= IN_JUMP;
       
+      pBot.prev_random_type = 1;
       //UTIL_ConsolePrintf("%s - Random jump\n", STRING(pBot.pEdict->v.netname));
       
       // duck mid-air?
       if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_jump_duck_frequency)
       {
          //UTIL_ConsolePrintf("%s - Random duck-jump\n", STRING(pBot.pEdict->v.netname));
-         pBot.f_random_jump_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.2, 0.3);
-         pBot.f_random_jump_duck_end = pBot.f_random_jump_duck_time + RANDOM_FLOAT2(0.6, 0.8);
-         pBot.f_random_jump_time = pBot.f_random_jump_duck_end + RANDOM_FLOAT2(0.3, 0.9); // don't try too often
+         pBot.f_random_jump_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.15, 0.25);
+         pBot.f_random_jump_duck_end = pBot.f_random_jump_duck_time + RANDOM_FLOAT2(0.3, 0.5);
+         pBot.f_random_jump_time = pBot.f_random_jump_duck_end + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
       }
       else
-         pBot.f_random_jump_time = pBot.f_random_jump_duck_end + RANDOM_FLOAT2(0.6, 1.2); // don't try too often
+         pBot.f_random_jump_time = pBot.f_random_jump_duck_end + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
       
       return;
    }
@@ -2505,9 +2484,12 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
    if(duck)
    {
       pEdict->v.button |= IN_DUCK;
+      
+      pBot.prev_random_type = 2;
       //UTIL_ConsolePrintf("%s - Random duck\n", STRING(pBot.pEdict->v.netname));
-      pBot.f_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.4, 0.8);
-      pBot.f_random_duck_time = pBot.f_duck_time + RANDOM_FLOAT2(0.6, 1.2); // don't try too often
+      
+      pBot.f_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.3, 0.45);
+      pBot.f_random_duck_time = pBot.f_duck_time + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
       
       return;
    }
@@ -2521,7 +2503,7 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
          
       vecSrc = pEdict->v.origin;
       mod = RANDOM_LONG2(1, 100) <= 50 ? -1 : 1;
-         
+      
       // get a random angle (-30 or 30)
       for (int i = 1; i >= -1; i-=2)
       {
@@ -2546,13 +2528,13 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
          }
       }
          
-      pBot.f_combat_longjump = gpGlobals->time + 0.2;
+      pBot.f_combat_longjump = gpGlobals->time + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
          
       if(pBot.b_combat_longjump)
+      {
+         pBot.prev_random_type = 3;
          return;
+      }
    }
-   
-   // time for next try
-   pBot.f_random_jump_time = gpGlobals->time + RANDOM_FLOAT2(0.5, 0.7);
 }
 

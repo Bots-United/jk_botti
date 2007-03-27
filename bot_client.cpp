@@ -308,7 +308,7 @@ void BotClient_Valve_Damage(void *p, int bot_index)
 
          // if the bot doesn't have an enemy and someone is shooting at it then
          // turn in the attacker's direction...
-         if (bots[bot_index].pBotEnemy == NULL)
+         if (bots[bot_index].pBotEnemy == NULL || !FPredictedVisible(bots[bot_index]))
          {
             // face the attacker...
             Vector v_enemy = damage_origin - bots[bot_index].pEdict->v.origin;

@@ -21,7 +21,7 @@
 #include "waypoint.h"
 
 #define VER_MAJOR 0
-#define VER_MINOR 30
+#define VER_MINOR 31
 
 extern DLL_FUNCTIONS gFunctionTable;
 extern DLL_FUNCTIONS gFunctionTable_POST;
@@ -42,7 +42,7 @@ extern float wp_display_time[MAX_WAYPOINTS];
 extern bot_t bots[32];
 extern qboolean b_observer_mode;
 extern qboolean b_botdontshoot;
-extern char welcome_msg[80];
+extern qboolean g_in_intermission;
 
 #include "bot_weapon_select.h"
 
@@ -323,6 +323,7 @@ int Spawn( edict_t *pent )
          m_spriteTexture = PRECACHE_MODEL( "sprites/lgtning.spr");
 
          g_GameRules = TRUE;
+         g_in_intermission = FALSE;
 
          is_team_play = FALSE;
          checked_teamplay = FALSE;
