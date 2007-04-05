@@ -64,7 +64,7 @@ void pfnChangeLevel(char* s1, char* s2)
       {
          char cmd[40];
 
-         snprintf(cmd, sizeof(cmd), "kick \"%s\"\n", bots[index].name);
+         safevoid_snprintf(cmd, sizeof(cmd), "kick \"%s\"\n", bots[index].name);
 
          bots[index].respawn_state = RESPAWN_NEED_TO_RESPAWN;
          bots[index].is_used = false;

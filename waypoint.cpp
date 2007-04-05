@@ -59,15 +59,16 @@ float f_path_time = 0.0;
 unsigned int route_num_waypoints;
 unsigned short *shortest_path = NULL;
 unsigned short *from_to = NULL;
+BOOL wp_matrix_initialized = FALSE;
+BOOL wp_matrix_save_on_mapend = FALSE;
 
-static FILE *fp;
 
 
 void WaypointDebug(void)
 {
    int y = 1, x = 1;
 
-   fp=fopen("jk_botti.txt","a");
+   FILE *fp=fopen("jk_botti.txt","a");
    fprintf(fp,"WaypointDebug: LINKED LIST ERROR!!!\n");
    fclose(fp);
 
@@ -141,6 +142,7 @@ void WaypointInit(void)
 
    shortest_path = NULL;
    from_to = NULL;
+   wp_matrix_initialized = FALSE;
    
    memset(&spawnpoints, 0, sizeof(spawnpoints));
    num_spawnpoints = 0;
@@ -181,7 +183,7 @@ void WaypointAddPath(short int add_index, short int path_index)
 #endif
    }
 
-   p = (PATH *)malloc(sizeof(PATH));
+   p = (PATH *)calloc(1, sizeof(PATH));
 
    if (p == NULL)
    {
@@ -403,7 +405,8 @@ void WaypointAddSpawnObjects(void)
    int i,j,k;
    qboolean done;
    int count = 0;
-   int updated_count = 0;
+   int flags_updated = 0;
+   int itemflags_updated = 0;
 
    if (!g_auto_waypoint || num_spawnpoints == 0)
       return;
@@ -419,8 +422,10 @@ void WaypointAddSpawnObjects(void)
             if((waypoints[j].origin - spawnpoints[i].origin).Length() < 50.0) 
             {
                // just add flags and return
-               if(waypoints[j].flags != spawnpoints[i].flags || waypoints[j].itemflags != spawnpoints[i].itemflags)
-               	  updated_count++;
+               if(waypoints[j].flags != spawnpoints[i].flags)
+                  flags_updated++;
+               if(waypoints[j].itemflags != spawnpoints[i].itemflags)
+                  itemflags_updated++;
                
                waypoints[j].flags |= spawnpoints[i].flags;
                waypoints[j].itemflags |= spawnpoints[i].itemflags;
@@ -487,11 +492,11 @@ void WaypointAddSpawnObjects(void)
       }
    }
    
-   if(count || updated_count) 
+   if(count || flags_updated || itemflags_updated) 
    {
-      UTIL_ConsolePrintf("Added total %d map-object based waypoints and updated flags for %d!\n", count, updated_count);
+      UTIL_ConsolePrintf("Added total %d map-object based waypoints and updated flags for %d!\n", count, flags_updated + itemflags_updated);
       
-      g_waypoint_updated = TRUE;
+      g_waypoint_updated = !!(count || flags_updated);
    }
    
    num_spawnpoints = 0;
@@ -593,7 +598,7 @@ int WaypointFindNearest(Vector v_src, edict_t *pEntity, float range)
 int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags)
 {
    int index, min_index;
-   int distance, min_distance;
+   float distance, min_distance;
 
    if (num_waypoints < 1)
       return -1;
@@ -640,7 +645,7 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags)
 int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags)
 {
    int index, min_index;
-   int distance, min_distance;
+   float distance, min_distance;
 
    if (num_waypoints < 1)
       return -1;
@@ -690,7 +695,7 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags)
 int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int exclude[])
 {
    int index, min_index;
-   int distance, min_distance;
+   float distance, min_distance;
    int exclude_index;
 
    if (num_waypoints < 1)
@@ -1106,10 +1111,11 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
       }
    }
    
-   if(flags_before != waypoints[wpt_index].flags || itemflags_before != waypoints[wpt_index].itemflags)
+   // don't check flags, they can be rechecked on next mapload
+   /*if(flags_before != waypoints[wpt_index].flags || itemflags_before != waypoints[wpt_index].itemflags)
    {  // save on mapchange
       g_waypoint_updated = TRUE;
-   }
+   }*/
 }
 
 
@@ -1425,6 +1431,7 @@ void WaypointUpdate(edict_t *pEntity)
 
       WaypointSearchItems(NULL, waypoints[index].origin, index);
       
+      // flags can be recheck on mapchange
       if(oldflags != waypoints[index].flags)
          g_waypoint_updated = TRUE;
    }
@@ -1612,7 +1619,7 @@ qboolean WaypointLoad(edict_t *pEntity)
          {
             if (pEntity)
             {
-               snprintf(msg, sizeof(msg), "%s jk_botti waypoints are not for this map!\n", filename);
+               safevoid_snprintf(msg, sizeof(msg), "%s jk_botti waypoints are not for this map!\n", filename);
                ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
             }
 
@@ -1624,7 +1631,7 @@ qboolean WaypointLoad(edict_t *pEntity)
       {
          if (pEntity)
          {
-            snprintf(msg, sizeof(msg), "%s is not a jk_botti waypoint file!\n", filename);
+            safevoid_snprintf(msg, sizeof(msg), "%s is not a jk_botti waypoint file!\n", filename);
             ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
          }
 
@@ -1640,7 +1647,7 @@ qboolean WaypointLoad(edict_t *pEntity)
    {
       if (pEntity)
       {
-         snprintf(msg, sizeof(msg), "Waypoint file %s does not exist!\n", filename);
+         safevoid_snprintf(msg, sizeof(msg), "Waypoint file %s does not exist!\n", filename);
          ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
       }
 
@@ -1915,7 +1922,7 @@ void WaypointPrintInfo(edict_t *pEntity)
    if (index == -1)
       return;
 
-   snprintf(msg, sizeof(msg), "Waypoint %d of %d total\n", index, num_waypoints);
+   safevoid_snprintf(msg, sizeof(msg), "Waypoint %d of %d total\n", index, num_waypoints);
    ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
 
    flags = waypoints[index].flags;
@@ -2117,51 +2124,230 @@ void WaypointThink(edict_t *pEntity)
 }
 
 
-void WaypointFloyds(unsigned short *shortest_path, unsigned short *from_to)
+void WaypointSaveFloydsMatrix(void)
 {
-   unsigned int x, y, z;
-   int changed = 1;
-   int distance;
+   return WaypointSaveFloydsMatrix(shortest_path, from_to);
+}
 
-   for (y=0; y < route_num_waypoints; y++)
+
+void WaypointSaveFloydsMatrix(unsigned short *shortest_path, unsigned short *from_to)
+{
+   char filename[256];
+   char mapname[64];
+   int num_items;
+   FILE *bfp;
+   int array_size;
+   
+   array_size = route_num_waypoints * route_num_waypoints;
+   
+   //
+   strcpy(mapname, STRING(gpGlobals->mapname));
+   strcat(mapname, ".matrix");
+   UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/waypoints", mapname);
+   
+   bfp = fopen(filename, "wb");
+
+   if (bfp != NULL)
    {
-      for (z=0; z < route_num_waypoints; z++)
+      num_items = fwrite("jkbotti_matrixA\0", 1, 16, bfp);
+      if (num_items != 16)
       {
-         from_to[y * route_num_waypoints + z] = z;
+         // if couldn't write enough data, close file and delete it
+         fclose(bfp);
+         unlink(filename);
+         
+         UTIL_ConsolePrintf("[matrix save] - Error writing waypoint matrix (code: %d)!\n", 1);
       }
-   }
-
-   while (changed)
-   {
-      changed = 0;
-
-      for (x=0; x < route_num_waypoints; x++)
+      else
       {
-         for (y=0; y < route_num_waypoints; y++)
+         num_items = fwrite(shortest_path, sizeof(unsigned short), array_size, bfp);
+
+         if (num_items != array_size)
          {
-            for (z=0; z < route_num_waypoints; z++)
+            // if couldn't write enough data, close file and delete it
+            fclose(bfp);
+            unlink(filename);
+            
+            UTIL_ConsolePrintf("[matrix save] - Error writing waypoint matrix (code: %d)!\n", 2);
+         }
+         else
+         {
+            num_items = fwrite("jkbotti_matrixB\0", 1, 16, bfp);
+            if (num_items != 16)
             {
-               if ((shortest_path[y * route_num_waypoints + x] == WAYPOINT_UNREACHABLE) ||
-                   (shortest_path[x * route_num_waypoints + z] == WAYPOINT_UNREACHABLE))
-                  continue;
+               // if couldn't write enough data, close file and delete it
+               fclose(bfp);
+               unlink(filename);
+               
+               UTIL_ConsolePrintf("[matrix save] - Error writing waypoint matrix (code: %d)!\n", 3);
+            }
+            else
+            {            	
+               num_items = fwrite(from_to, sizeof(unsigned short), array_size, bfp);
 
-               distance = shortest_path[y * route_num_waypoints + x] +
-                          shortest_path[x * route_num_waypoints + z];
+               fclose(bfp);
 
-               if (distance > WAYPOINT_MAX_DISTANCE)
-                  distance = WAYPOINT_MAX_DISTANCE;
-
-               if ((distance < shortest_path[y * route_num_waypoints + z]) ||
-                   (shortest_path[y * route_num_waypoints + z] == WAYPOINT_UNREACHABLE))
+               if (num_items != array_size)
                {
-                  shortest_path[y * route_num_waypoints + z] = distance;
-                  from_to[y * route_num_waypoints + z] = from_to[y * route_num_waypoints + x];
-                  changed = 1;
+                  // if couldn't write enough data, delete file
+                  unlink(filename);
+                  
+                  UTIL_ConsolePrintf("[matrix save] - Error writing waypoint matrix (code: %d)!\n", 4);
+               }
+               else
+               {
+                  UTIL_ConsolePrintf("[matrix save] Waypoint matrix '%s' saved.\n", filename);
                }
             }
          }
       }
    }
+   else
+   {
+      UTIL_ConsolePrintf("[matrix save] - Error writing waypoint matrix (code: %d)!\n", 0);
+   }
+}
+
+
+int WaypointSlowFloyds(void)
+{
+   return WaypointSlowFloyds(shortest_path, from_to);
+}
+
+
+static struct {
+   int state;
+   unsigned int x, y, z;
+   int changed;
+   int escaped;
+} slow_floyds = {-1,0,0,0,0,0};
+
+int WaypointSlowFloydsState(void)
+{
+   return(slow_floyds.state);
+}
+
+int WaypointSlowFloyds(unsigned short *shortest_path, unsigned short *from_to)
+{
+   unsigned int x, y, z;
+   int changed;
+   int distance;
+   
+   if(slow_floyds.state == -1)
+      return -1;
+   
+   if(slow_floyds.state == 0)
+   {
+      // the begining
+      wp_matrix_initialized = FALSE;
+      slow_floyds.x = 0;
+      slow_floyds.y = 0;
+      slow_floyds.z = 0;
+      slow_floyds.changed = 1;
+      slow_floyds.escaped = 0;
+      
+      slow_floyds.state = 1;
+      
+      for (y=0; y < route_num_waypoints; y++)
+      {
+         for (z=0; z < route_num_waypoints; z++)
+         {
+            from_to[y * route_num_waypoints + z] = z;
+         }
+      }
+      
+      return 1;
+   }
+   
+   if(slow_floyds.state == 1)
+   {
+      // middle, the slowest part
+      int max_count = 500;
+      
+      x = slow_floyds.x;
+      y = slow_floyds.y;
+      z = slow_floyds.z;
+      changed = slow_floyds.changed;
+      
+      if(slow_floyds.escaped)
+      {
+         slow_floyds.escaped = 0;
+         goto escape_return;
+      }
+      
+      while(changed)
+      {
+         changed = 0;
+
+         for (x=0; x < route_num_waypoints; x++)
+         {
+            for (y=0; y < route_num_waypoints; y++)
+            {
+               if(max_count-- < 0)
+               {
+                  slow_floyds.x = x;
+                  slow_floyds.y = y;
+                  slow_floyds.z = z;
+                  slow_floyds.changed = changed;
+                  slow_floyds.escaped = 1;
+                  return 1;
+               }
+escape_return:
+
+               for (z=0; z < route_num_waypoints; z++)
+               {
+                  if ((shortest_path[y * route_num_waypoints + x] == WAYPOINT_UNREACHABLE) ||
+                      (shortest_path[x * route_num_waypoints + z] == WAYPOINT_UNREACHABLE))
+                     continue;
+
+                  distance = shortest_path[y * route_num_waypoints + x] +
+                             shortest_path[x * route_num_waypoints + z];
+
+                  if (distance > WAYPOINT_MAX_DISTANCE)
+                     distance = WAYPOINT_MAX_DISTANCE;
+
+                  if ((distance < shortest_path[y * route_num_waypoints + z]) ||
+                      (shortest_path[y * route_num_waypoints + z] == WAYPOINT_UNREACHABLE))
+                  {
+                     shortest_path[y * route_num_waypoints + z] = distance;
+                     from_to[y * route_num_waypoints + z] = from_to[y * route_num_waypoints + x];
+                     changed = 1;
+                  }
+               }
+            }
+         }
+      }
+      
+      if(changed == 0)
+      {
+         // we have hit the end
+         slow_floyds.state = -1;
+
+         for (x=0; x < route_num_waypoints; x++)
+         {
+            for (y=0; y < route_num_waypoints; y++)
+               if (shortest_path[x * route_num_waypoints + y] == WAYPOINT_UNREACHABLE)
+                  from_to[x * route_num_waypoints + y] = WAYPOINT_UNREACHABLE;
+         }
+         
+         wp_matrix_initialized = TRUE;
+         wp_matrix_save_on_mapend = TRUE;
+         
+         UTIL_ConsolePrintf("[matrix calc] - waypoint path calculations complete!\n");
+         
+         return -1;
+      }
+      
+      slow_floyds.x = x;
+      slow_floyds.y = y;
+      slow_floyds.z = z;
+      slow_floyds.changed = changed;
+      
+      return 1;
+   }
+   
+   slow_floyds.state = -1;
+   return -1;
 }
 
 
@@ -2171,7 +2357,6 @@ void WaypointRouteInit(void)
    unsigned int array_size;
    unsigned int row;
    int i, offset;
-   unsigned int a, b;
    float distance;
    unsigned short *pShortestPath, *pFromTo;
    unsigned int num_items;
@@ -2181,6 +2366,9 @@ void WaypointRouteInit(void)
    int file1, file2;
    struct stat stat1, stat2;
    char header[16];
+
+   wp_matrix_initialized = FALSE;
+   wp_matrix_save_on_mapend = FALSE;
 
    if (num_waypoints == 0)
       return;
@@ -2216,12 +2404,12 @@ void WaypointRouteInit(void)
       {
          UTIL_ConsolePrintf("[matrix load] - loading jk_botti waypoint path matrix\n");
 
-         shortest_path = (unsigned short *)malloc(sizeof(unsigned short) * array_size);
+         shortest_path = (unsigned short *)calloc(1, sizeof(unsigned short) * array_size);
 
          if (shortest_path == NULL)
             UTIL_ConsolePrintf("[matrix load] - Error allocating memory for shortest path!\n");
 
-         from_to = (unsigned short *)malloc(sizeof(unsigned short) * array_size);
+         from_to = (unsigned short *)calloc(1, sizeof(unsigned short) * array_size);
 
          if (from_to == NULL)
             UTIL_ConsolePrintf("[matrix load] - Error allocating memory for from to matrix!\n");
@@ -2288,6 +2476,9 @@ void WaypointRouteInit(void)
                         free(from_to);
                         from_to = NULL;
                      }
+                     
+                     wp_matrix_initialized = TRUE;
+                     wp_matrix_save_on_mapend = FALSE;
                   }
                }
             }
@@ -2315,12 +2506,12 @@ void WaypointRouteInit(void)
    {
       UTIL_ConsolePrintf("[matrix calc] - calculating jk_botti waypoint path matrix\n");
 
-      shortest_path = (unsigned short *)malloc(sizeof(unsigned short) * array_size);
+      shortest_path = (unsigned short *)calloc(1, sizeof(unsigned short) * array_size);
 
       if (shortest_path == NULL)
          UTIL_ConsolePrintf("[matrix calc] - Error allocating memory for shortest path!\n");
 
-      from_to = (unsigned short *)malloc(sizeof(unsigned short) * array_size);
+      from_to = (unsigned short *)calloc(1, sizeof(unsigned short) * array_size);
 
       if (from_to == NULL)
          UTIL_ConsolePrintf("[matrix calc] - Error allocating memory for from to matrix!\n");
@@ -2375,86 +2566,31 @@ void WaypointRouteInit(void)
          }
       }
 
-      // run Floyd's Algorithm to generate the from_to matrix...
-      WaypointFloyds(pShortestPath, pFromTo);
-
-      for (a=0; a < route_num_waypoints; a++)
-      {
-         for (b=0; b < route_num_waypoints; b++)
-            if (pShortestPath[a * route_num_waypoints + b] == WAYPOINT_UNREACHABLE)
-              pFromTo[a * route_num_waypoints + b] = WAYPOINT_UNREACHABLE;
-      }
-
-      bfp = fopen(filename2, "wb");
-
-      if (bfp != NULL)
-      {
-      	 num_items = fwrite("jkbotti_matrixA\0", 1, 16, bfp);
-      	 if (num_items != 16)
-      	 {
-            // if couldn't write enough data, close file and delete it
-            fclose(bfp);
-            unlink(filename2);
-         }
-         else
-         {
-            num_items = fwrite(shortest_path, sizeof(unsigned short), array_size, bfp);
-
-            if (num_items != array_size)
-            {
-               // if couldn't write enough data, close file and delete it
-               fclose(bfp);
-               unlink(filename2);
-            }
-            else
-            {
-               num_items = fwrite("jkbotti_matrixB\0", 1, 16, bfp);
-               if (num_items != 16)
-      	       {
-                  // if couldn't write enough data, close file and delete it
-                  fclose(bfp);
-                  unlink(filename2);
-               }
-               else
-               {            	
-                  num_items = fwrite(from_to, sizeof(unsigned short), array_size, bfp);
-
-                  fclose(bfp);
-
-                  if (num_items != array_size)
-                  {
-                     // if couldn't write enough data, delete file
-                     unlink(filename2);
-                  }
-               }
-            }
-         }
-      }
-      else
-      {
-         UTIL_ConsolePrintf("[matrix calc] - Error writing waypoint paths!\n");
-      }
-
-      UTIL_ConsolePrintf("[matrix calc] - waypoint path calculations complete!\n");
+      // Initialize run of Floyd's Algorithm to generate the from_to matrix...
+      wp_matrix_save_on_mapend = FALSE;
+      wp_matrix_initialized = FALSE;
+      
+      // activate state machine
+      slow_floyds.state = 0; 
    }
 }
 
 
-unsigned short WaypointRouteFromTo(int src, int dest)
+int WaypointRouteFromTo(int src, int dest)
 {
    // new waypoints come effective on mapchange
-   if(from_to == NULL || src >= (int)route_num_waypoints || dest >= (int)route_num_waypoints)
+   if(!wp_matrix_initialized || from_to == NULL || src >= (int)route_num_waypoints || dest >= (int)route_num_waypoints)
       return WAYPOINT_UNREACHABLE;
    
-   return from_to[src * route_num_waypoints + dest];
+   return (int)from_to[src * route_num_waypoints + dest];
 }
 
 
-int WaypointDistanceFromTo(int src, int dest)
+float WaypointDistanceFromTo(int src, int dest)
 {
    // new waypoints come effective on mapchange
-   if(shortest_path == NULL || src >= (int)route_num_waypoints || dest >= (int)route_num_waypoints)
-      return WAYPOINT_MAX_DISTANCE;
+   if(!wp_matrix_initialized || shortest_path == NULL || src >= (int)route_num_waypoints || dest >= (int)route_num_waypoints)
+      return (float)WAYPOINT_MAX_DISTANCE;
    
-   return (int)(shortest_path[src * route_num_waypoints + dest]);
+   return (float)(shortest_path[src * route_num_waypoints + dest]);
 }

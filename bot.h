@@ -8,6 +8,7 @@
 #define BOT_H
 
 #include <ctype.h>
+#include "safe_snprintf.h"
 
 // stuff for Win32 vs. Linux builds
 
@@ -267,6 +268,9 @@ typedef struct
    float f_reaction_target_time;  // time when enemy targeting starts
    
    float f_weaponchange_time;
+   
+   qboolean set_special_shoot_angle;
+   float special_shoot_angle;
 
    bot_current_weapon_t current_weapon;  // one current weapon for each bot
    int m_rgAmmo[MAX_AMMO_SLOTS];  // total ammo amounts (1 array for each bot)

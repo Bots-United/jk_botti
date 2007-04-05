@@ -14,15 +14,15 @@ typedef struct
    
    int keep_optimal_distance; // how often bot (out of 1000 times) the bot try to keep at optimum distance of weapon when attacking
    
-   float react_delay_min[3]; // reaction delay settings
+   float react_delay_min[3]; // reaction delay settings (first is for bot_reaction 1, second for 2, etc)
    float react_delay_max[3]; 
    
-   float weaponchange_rate[2]; // how fast changing weapons
+   float weaponchange_rate[2]; // how fast changing weapons (min, max)
    
-   float shootcone_diameter; // bot tries to fire when crosshair is within width of this setting
-   float shootcone_minangle; // OR bot aim angle is less than angle set here
+   float shootcone_diameter; // bot tries to fire when aim line is less than [diameter / 2] apart from target 
+   float shootcone_minangle; // OR angle between bot aim line and line to target is less than angle set here
       
-   // (min/max) Bot doesn't use real origin of target player but instead use data from earlier
+   // Bot doesn't use real origin of target player but instead use data from earlier
    // and does latency prediction based on this data to get player origin. These settings
    // specify ammount of latency used at this skill level.
    float prediction_latency;

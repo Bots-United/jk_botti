@@ -19,9 +19,11 @@
 #include "bot.h"
 #include "bot_func.h"
 #include "waypoint.h"
+#include "bot_skill.h"
+#include "bot_weapon_select.h"
 
 #define VER_MAJOR 0
-#define VER_MINOR 31
+#define VER_MINOR 40
 
 extern DLL_FUNCTIONS gFunctionTable;
 extern DLL_FUNCTIONS gFunctionTable_POST;
@@ -43,8 +45,7 @@ extern bot_t bots[32];
 extern qboolean b_observer_mode;
 extern qboolean b_botdontshoot;
 extern qboolean g_in_intermission;
-
-#include "bot_weapon_select.h"
+extern BOOL wp_matrix_save_on_mapend;
 
 int submod_id = SUBMOD_HLDM;
 
@@ -99,6 +100,7 @@ void BotLogoInit(void);
 void UpdateClientData(const struct edict_s *ent, int sendweapons, struct clientdata_s *cd);
 void ProcessBotCfgFile(void);
 void jk_botti_ServerCommand (void);
+void CheckSubMod(void);
 
 
 
@@ -130,7 +132,7 @@ plugin_info_t Plugin_info = {
    "", // plugin version
    __DATE__, // date of creation
    "Jussi Kivilinna", // plugin author
-   "http://koti.mbnet.fi/axh/", // plugin URL
+   "http://forums.bots-united.com/forumdisplay.php?f=83", // plugin URL
    "JK_BOTTI", // plugin logtag
    PT_STARTUP, // when loadable
    PT_ANYTIME, // when unloadable
@@ -147,7 +149,7 @@ C_DLLEXPORT int Meta_Query (char *ifvers, plugin_info_t **pPlugInfo, mutil_funcs
    gpMetaUtilFuncs = pMetaUtilFuncs;
    *pPlugInfo = &Plugin_info;
 
-   snprintf(plugver, sizeof(plugver), "%d.%d", VER_MAJOR, VER_MINOR);
+   safevoid_snprintf(plugver, sizeof(plugver), "%d.%d", VER_MAJOR, VER_MINOR);
    Plugin_info.version = plugver;
 
    // check for interface version compatibility
@@ -216,9 +218,13 @@ C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, 
       
       CVAR_REGISTER(&jk_botti_version);
       
-      snprintf(ver, sizeof(ver), "%d.%d", VER_MAJOR, VER_MINOR);
+      safevoid_snprintf(ver, sizeof(ver), "%d.%d", VER_MAJOR, VER_MINOR);
       CVAR_SET_STRING("jk_botti_version", ver);
    }
+   
+   //weapon select init
+   CheckSubMod();
+   InitWeaponSelect(submod_id);
    
    return (TRUE); // returning TRUE enables metamod to attach this plugin
 }
@@ -244,7 +250,7 @@ C_DLLEXPORT int Meta_Detach (PLUG_LOADTIME now, PL_UNLOAD_REASON reason)
       {
          char cmd[40];
 
-         snprintf(cmd, sizeof(cmd), "kick \"%s\"\n", bots[index].name);
+         safevoid_snprintf(cmd, sizeof(cmd), "kick \"%s\"\n", bots[index].name);
 
          bots[index].respawn_state = RESPAWN_NEED_TO_RESPAWN;
          bots[index].is_used = false;
@@ -252,7 +258,12 @@ C_DLLEXPORT int Meta_Detach (PLUG_LOADTIME now, PL_UNLOAD_REASON reason)
          SERVER_COMMAND(cmd);  // kick the bot using (kick "name")
       }
    }
-
+   
+   // free memory
+   WaypointInit();
+   for(int i = 0; i < 32; i++)
+      free_posdata_list(i);
+   
    return (TRUE); // returning TRUE enables metamod to unload this plugin
 }
 
@@ -292,6 +303,22 @@ void CheckSubMod(void)
       submod_id = SUBMOD_BUBBLEMOD;
    else
       submod_id = SUBMOD_HLDM;
+   
+   switch(submod_id)
+   {
+   case SUBMOD_SEVS:
+      UTIL_ConsolePrintf("Severians MOD detected.");
+      break;
+   case SUBMOD_XDM:
+      UTIL_ConsolePrintf("Xtreme Deathmatch MOD detected.");
+      break;
+   case SUBMOD_BUBBLEMOD:
+      UTIL_ConsolePrintf("BubbleMod MOD detected.");
+      break;
+   case SUBMOD_HLDM:
+      UTIL_ConsolePrintf("Standard HL1DM assumed.");
+      break;
+   }
 }
 
 
@@ -303,8 +330,6 @@ int Spawn( edict_t *pent )
 
       if (strcmp(pClassname, "worldspawn") == 0)
       {
-         CheckSubMod();
-      	
          // do level initialization stuff here...
          for(int i = 0; i < 32; i++)
             free_posdata_list(i);
@@ -400,7 +425,7 @@ BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddres
                {
                   char cmd[80];
 
-                  snprintf(cmd, sizeof(cmd), "kick \"%s\"\n", bots[i].name);
+                  safevoid_snprintf(cmd, sizeof(cmd), "kick \"%s\"\n", bots[i].name);
 
                   SERVER_COMMAND(cmd);  // kick the bot using (kick "name")
 
@@ -523,7 +548,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             default_bot_skill = temp;
       }
 
-      snprintf(msg, sizeof(msg), "botskill is %d\n", default_bot_skill);
+      safevoid_snprintf(msg, sizeof(msg), "botskill is %d\n", default_bot_skill);
       printfunc(arg, msg);
 
       return TRUE;
@@ -535,7 +560,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          randomize_bots_on_mapchange = !!atoi(arg1);
       }
 
-      snprintf(msg, sizeof(msg), "randomize_bots_on_mapchange is %s\n", (randomize_bots_on_mapchange?"on":"off"));
+      safevoid_snprintf(msg, sizeof(msg), "randomize_bots_on_mapchange is %s\n", (randomize_bots_on_mapchange?"on":"off"));
       printfunc(arg, msg);
 
       return TRUE;
@@ -547,7 +572,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          bot_add_level_tag = !!atoi(arg1);
       }
 
-      snprintf(msg, sizeof(msg), "bot_add_level_tag is %s\n", (bot_add_level_tag?"on":"off"));
+      safevoid_snprintf(msg, sizeof(msg), "bot_add_level_tag is %s\n", (bot_add_level_tag?"on":"off"));
       printfunc(arg, msg);
 
       return TRUE;
@@ -564,7 +589,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             bot_think_spf = 1.0 / temp;
       }
 
-      snprintf(msg, sizeof(msg), "botthinkfps is %.2f\n", 1.0 / bot_think_spf);
+      safevoid_snprintf(msg, sizeof(msg), "botthinkfps is %.2f\n", 1.0 / bot_think_spf);
       printfunc(arg, msg);
 
       return TRUE;
@@ -581,7 +606,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             bot_chat_percent = temp;
       }
 
-      snprintf(msg, sizeof(msg), "bot_chat_percent is %d\n", bot_chat_percent);
+      safevoid_snprintf(msg, sizeof(msg), "bot_chat_percent is %d\n", bot_chat_percent);
       printfunc(arg, msg);
 
       return TRUE;
@@ -598,7 +623,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             bot_taunt_percent = temp;
       }
 
-      snprintf(msg, sizeof(msg), "bot_taunt_percent is %d\n", bot_taunt_percent);
+      safevoid_snprintf(msg, sizeof(msg), "bot_taunt_percent is %d\n", bot_taunt_percent);
       printfunc(arg, msg);
 
       return TRUE;
@@ -615,7 +640,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             bot_whine_percent = temp;
       }
 
-      snprintf(msg, sizeof(msg), "bot_whine_percent is %d\n", bot_whine_percent);
+      safevoid_snprintf(msg, sizeof(msg), "bot_whine_percent is %d\n", bot_whine_percent);
       printfunc(arg, msg);
 
       return TRUE;
@@ -632,7 +657,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             bot_chat_tag_percent = temp;
       }
 
-      snprintf(msg, sizeof(msg), "bot_chat_tag_percent is %d\n", bot_chat_tag_percent);
+      safevoid_snprintf(msg, sizeof(msg), "bot_chat_tag_percent is %d\n", bot_chat_tag_percent);
       printfunc(arg, msg);
 
       return TRUE;
@@ -649,7 +674,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             bot_chat_drop_percent = temp;
       }
 
-      snprintf(msg, sizeof(msg), "bot_chat_drop_percent is %d\n", bot_chat_drop_percent);
+      safevoid_snprintf(msg, sizeof(msg), "bot_chat_drop_percent is %d\n", bot_chat_drop_percent);
       printfunc(arg, msg);
 
       return TRUE;
@@ -666,7 +691,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             bot_chat_swap_percent = temp;
       }
 
-      snprintf(msg, sizeof(msg), "bot_chat_swap_percent is %d\n", bot_chat_swap_percent);
+      safevoid_snprintf(msg, sizeof(msg), "bot_chat_swap_percent is %d\n", bot_chat_swap_percent);
       printfunc(arg, msg);
 
       return TRUE;
@@ -683,7 +708,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             bot_chat_lower_percent = temp;
       }
 
-      snprintf(msg, sizeof(msg), "bot_chat_lower_percent is %d\n", bot_chat_lower_percent);
+      safevoid_snprintf(msg, sizeof(msg), "bot_chat_lower_percent is %d\n", bot_chat_lower_percent);
       printfunc(arg, msg);
 
       return TRUE;
@@ -700,7 +725,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             bot_logo_percent = temp;
       }
 
-      snprintf(msg, sizeof(msg), "bot_logo_percent is %d\n", bot_logo_percent);
+      safevoid_snprintf(msg, sizeof(msg), "bot_logo_percent is %d\n", bot_logo_percent);
       printfunc(arg, msg);
 
       return TRUE;
@@ -718,9 +743,9 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
       }
 
       if (bot_reaction_time)
-         snprintf(msg, sizeof(msg), "bot_reaction_time is %d\n", bot_reaction_time);
+         safevoid_snprintf(msg, sizeof(msg), "bot_reaction_time is %d\n", bot_reaction_time);
       else
-         snprintf(msg, sizeof(msg), "bot_reaction_time is DISABLED\n");
+         safevoid_snprintf(msg, sizeof(msg), "bot_reaction_time is DISABLED\n");
 
       printfunc(arg, msg);
 
@@ -773,7 +798,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             min_bots = 1;
       }
       
-      snprintf(msg, sizeof(msg), "min_bots is set to %d\n", min_bots);
+      safevoid_snprintf(msg, sizeof(msg), "min_bots is set to %d\n", min_bots);
       printfunc(arg, msg);
 
       return TRUE;
@@ -788,7 +813,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             max_bots = 1;
       }
       
-      snprintf(msg, sizeof(msg), "max_bots is set to %d\n", max_bots);
+      safevoid_snprintf(msg, sizeof(msg), "max_bots is set to %d\n", max_bots);
       printfunc(arg, msg);
 
       return TRUE;
@@ -838,113 +863,76 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          int select_index = -1;
          bot_weapon_select_t *pSelect = &weapon_select[0];
          
-         while ((arg2 != NULL) && (*arg2 != 0) && pSelect[++select_index].iId)
+         while (pSelect[++select_index].iId)
             if (FStrEq(pSelect[select_index].weapon_name, arg1))
                break;
          
-         if((arg2 != NULL) && (*arg2 != 0) && pSelect[select_index].iId)
+         if((arg2 == NULL) || (*arg2 == 0) || pSelect[select_index].iId)
          {
+            qboolean got_match = FALSE;
+            
 #define CHECK_AND_SET_BOTWEAPON_INT(setting) \
-   if (FStrEq(arg2, #setting)) { \
+   if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
+      got_match = TRUE; \
       if ((arg3 != NULL) && (*arg3 != 0)) { \
          int temp = atoi(arg3); \
          pSelect[select_index].setting = temp; \
-         snprintf(msg, sizeof(msg), "%s for weapon %s is now %i.\n", arg2, arg1, temp); \
+         safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%i'.\n", #setting, arg1, "now ", temp); \
       } else \
-         snprintf(msg, sizeof(msg), "%s for weapon %s is %i.\n", arg2, arg1, pSelect[select_index].setting); \
+         safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%i'.\n", #setting, arg1, "", pSelect[select_index].setting); \
+      printfunc(arg, msg); \
    }
 #define CHECK_AND_SET_BOTWEAPON_QBOOLEAN(setting) \
-   if (FStrEq(arg2, #setting)) { \
+   if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
+      got_match = TRUE; \
       if ((arg3 != NULL) && (*arg3 != 0)) { \
-         qboolean temp = atoi(arg3) ? TRUE : FALSE; \
+         qboolean temp; \
+         if(!stricmp(arg3, "on") || !stricmp(arg3, "true")) \
+            temp = TRUE; \
+         else if(!stricmp(arg3, "off") || !stricmp(arg3, "false")) \
+            temp = FALSE; \
+         else \
+            temp = atoi(arg3) ? TRUE : FALSE; \
          pSelect[select_index].setting = temp; \
-         snprintf(msg, sizeof(msg), "%s for weapon %s is now %s.\n", arg2, arg1, temp ? "TRUE" : "FALSE"); \
+         safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%s'.\n", #setting, arg1, "now ", temp ? "on" : "off"); \
       } else \
-         snprintf(msg, sizeof(msg), "%s for weapon %s is %s.\n", arg2, arg1, pSelect[select_index].setting ? "TRUE" : "FALSE"); \
+         safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%s'.\n", #setting, arg1, "", pSelect[select_index].setting ? "on" : "off"); \
+      printfunc(arg, msg); \
    }
 #define CHECK_AND_SET_BOTWEAPON_FLOAT(setting) \
-   if (FStrEq(arg2, #setting)) { \
+   if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
+      got_match = TRUE; \
       if ((arg3 != NULL) && (*arg3 != 0)) { \
          float temp = atof(arg3); \
          pSelect[select_index].setting = temp; \
-         snprintf(msg, sizeof(msg), "%s for weapon %s is now %f.\n", arg2, arg1, temp); \
+         safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%.4f'.\n", #setting, arg1, "now ", temp); \
       } else \
-         snprintf(msg, sizeof(msg), "%s for weapon %s is %f.\n", arg2, arg1, pSelect[select_index].setting); \
+         safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%.4f'.\n", #setting, arg1, "", pSelect[select_index].setting); \
+      printfunc(arg, msg); \
    }
-                 CHECK_AND_SET_BOTWEAPON_INT(primary_skill_level)   // bot skill must be less than or equal to this value
-            else CHECK_AND_SET_BOTWEAPON_INT(secondary_skill_level) // bot skill must be less than or equal to this value
-            else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(avoid_this_gun)  // bot avoids using this weapon if possible
-            else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(prefer_higher_skill_attack) // bot uses better of primary and secondary attacks if both avaible
-            else CHECK_AND_SET_BOTWEAPON_FLOAT(primary_min_distance)   // 0 = no minimum
-            else CHECK_AND_SET_BOTWEAPON_FLOAT(primary_max_distance)   // 9999 = no maximum
-            else CHECK_AND_SET_BOTWEAPON_FLOAT(secondary_min_distance) // 0 = no minimum    
-            else CHECK_AND_SET_BOTWEAPON_FLOAT(secondary_max_distance) // 9999 = no maximum
-            else CHECK_AND_SET_BOTWEAPON_FLOAT(opt_distance) // optimal distance from target
-            else CHECK_AND_SET_BOTWEAPON_INT(use_percent)   // times out of 100 to use this weapon when available
-            else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(can_use_underwater)     // can use this weapon underwater
-            else CHECK_AND_SET_BOTWEAPON_INT(primary_fire_percent)   // times out of 100 to use primary fire
-            else CHECK_AND_SET_BOTWEAPON_INT(min_primary_ammo)       // minimum ammout of primary ammo needed to fire
-            else CHECK_AND_SET_BOTWEAPON_INT(min_secondary_ammo)     // minimum ammout of seconday ammo needed to fire
-            else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(primary_fire_hold)      // hold down primary fire button to use?
-            else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(secondary_fire_hold)    // hold down secondary fire button to use?
-            else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(primary_fire_charge)    // charge weapon using primary fire?
-            else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(secondary_fire_charge)  // charge weapon using secondary fire?
-            else CHECK_AND_SET_BOTWEAPON_FLOAT(primary_charge_delay)   // time to charge weapon
-            else CHECK_AND_SET_BOTWEAPON_FLOAT(secondary_charge_delay) // time to charge weapon
-            else CHECK_AND_SET_BOTWEAPON_INT(low_ammo_primary)        // low ammo level
-            else CHECK_AND_SET_BOTWEAPON_INT(low_ammo_secondary)      // low ammo level
-            //else CHECK_AND_SET_BOTWEAPON_QBOOLEAN(secondary_use_primary_ammo; //does secondary fire use primary ammo?
-            else {
-              snprintf(msg, sizeof(msg), "unknown weapon setting %s.\n", arg2);
-              printfunc(arg, msg);
+            CHECK_AND_SET_BOTWEAPON_INT(primary_skill_level)   // bot skill must be less than or equal to this value
+            CHECK_AND_SET_BOTWEAPON_INT(secondary_skill_level) // bot skill must be less than or equal to this value
+            CHECK_AND_SET_BOTWEAPON_QBOOLEAN(avoid_this_gun)  // bot avoids using this weapon if possible
+            CHECK_AND_SET_BOTWEAPON_QBOOLEAN(prefer_higher_skill_attack) // bot uses better of primary and secondary attacks if both avaible
+            CHECK_AND_SET_BOTWEAPON_FLOAT(primary_min_distance)   // 0 = no minimum
+            CHECK_AND_SET_BOTWEAPON_FLOAT(primary_max_distance)   // 9999 = no maximum
+            CHECK_AND_SET_BOTWEAPON_FLOAT(secondary_min_distance) // 0 = no minimum    
+            CHECK_AND_SET_BOTWEAPON_FLOAT(secondary_max_distance) // 9999 = no maximum
+            CHECK_AND_SET_BOTWEAPON_FLOAT(opt_distance) // optimal distance from target
+            CHECK_AND_SET_BOTWEAPON_INT(use_percent)   // times out of 100 to use this weapon when available
+            CHECK_AND_SET_BOTWEAPON_QBOOLEAN(can_use_underwater)     // can use this weapon underwater
+            CHECK_AND_SET_BOTWEAPON_INT(primary_fire_percent)   // times out of 100 to use primary fire
+            CHECK_AND_SET_BOTWEAPON_INT(low_ammo_primary)        // low ammo level
+            CHECK_AND_SET_BOTWEAPON_INT(low_ammo_secondary)      // low ammo level
+            if(!got_match) 
+            {
+               snprintf(msg, sizeof(msg), "unknown weapon setting %s.\n", arg2);
+               printfunc(arg, msg);
+               printfunc(arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
+               printfunc(arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
+               printfunc(arg, "       botweapon <weapon-name> - shows all setting values\n");
+               printfunc(arg, "       botweapon weapons - shows weapon-names\n");
             }
-         }
-         else if(FStrEq("list", arg1)) {
-            printfunc(arg, "List of available settings:\n");
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "primary_skill_level", "int", "primary", "bot skill must be less than or equal to this value");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "secondary_skill_level", "int", "secondary", "bot skill must be less than or equal to this value");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   %s\n", "avoid_this_gun", "0/1", "bot avoids using this weapon if possible");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   %s\n", "prefer_higher_skill_attack", "0/1", "bot uses higher skill attack of primary and secondary attacks if both available");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "primary_min_distance", "float", "primary", "minimum distance for using this weapon; 0 = no minimum");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "primary_max_distance", "float", "primary", "maximum distance for using this weapon; 9999 = no maximum");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "secondary_min_distance", "float", "secondary", "minimum distance for using this weapon; 0 = no minimum");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "secondary_max_distance", "float", "secondary", "maximum distance for using this weapon; 9999 = no maximum");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   %s\n", "opt_distance", "float", "optimal distance from target");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   %s\n", "use_percent", "int", "times out of 100 to use this weapon when available");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   %s\n", "can_use_underwater", "0/1", "can use this weapon underwater");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   %s\n", "primary_fire_percent", "int", "times out of 100 to use primary fire");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "min_primary_ammo", "int", "primary", "minimum ammouth of ammo needed to fire");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "min_secondary_ammo", "int", "secondary", "minimum ammouth of ammo needed to fire");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "primary_fire_hold", "0/1", "primary", "hold down fire button to use?");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "secondary_fire_hold", "0/1", "secondary", "hold down fire button to use?");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "primary_fire_charge", "0/1", "primary", "charge weapon using fire?");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "secondary_fire_charge", "0/1", "secondary", "charge weapon using fire?");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "primary_charge_delay", "float", "primary", "time to charge weapon");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "secondary_charge_delay", "float", "secondary", "time to charge weapon");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "low_ammo_primary", "int", "primary", "running out of ammo level");
-            printfunc(arg, msg);
-            snprintf(msg, sizeof(msg), " %s(%s):\n   [%s] %s\n", "low_ammo_secondary", "int", "secondary", "secondary out of ammo level");
-            printfunc(arg, msg);
          }
          else if(FStrEq("weapons", arg1)) {
             printfunc(arg, "List of available weapons:\n");
@@ -953,15 +941,121 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             pSelect = &weapon_select[0];
 
             while (pSelect[++select_index].iId) {
-               snprintf(msg, sizeof(msg), "  %s\n", pSelect[select_index].weapon_name);
+               safevoid_snprintf(msg, sizeof(msg), "  %s\n", pSelect[select_index].weapon_name);
                printfunc(arg, msg);
             }
          }
-         else 
-            printfunc(arg, "Could not complete request! (unknown arg1)\n");
+         else
+         { 
+            snprintf(msg, sizeof(msg), "Could not complete request! (unknown arg1: '%s')\n", arg1);
+            printfunc(arg, msg);
+            printfunc(arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
+            printfunc(arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
+            printfunc(arg, "       botweapon <weapon-name> - shows all setting values\n");
+            printfunc(arg, "       botweapon weapons - shows weapon-names\n");
+         }
       }
       else
-         printfunc(arg, "Could not complete request! (arg1 not given)\n");
+      {
+      	 printfunc(arg, "Could not complete request! (arg1 not given)\n");
+      	 printfunc(arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
+         printfunc(arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
+         printfunc(arg, "       botweapon <weapon-name> - shows all setting values\n");
+         printfunc(arg, "       botweapon weapons - shows weapon-names\n");
+      }
+      
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_skill_setup"))
+   {  // this command allows editing of botskill settings, 
+      // bot_skill_setup <skill>, bot_skill_setup <skill> <setting>, bot_skill_setup <skill> <setting> <value>
+      if ((arg1 != NULL) && (*arg1 != 0) && atoi(arg1) >= 1 && atoi(arg1) <= 5)
+      {
+         int skill_idx = atoi(arg1)-1;
+         qboolean got_match = FALSE;
+         
+#define CHECK_AND_SET_BOTSKILL_INT(setting) \
+   if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
+      got_match = TRUE; \
+      if ((arg3 != NULL) && (*arg3 != 0)) { \
+         int temp = atoi(arg3); \
+         skill_settings[skill_idx].setting = temp; \
+         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%i'.\n", #setting, skill_idx+1, "now ", temp); \
+      } else \
+         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%i'.\n", #setting, skill_idx+1, "", skill_settings[skill_idx].setting); \
+      printfunc(arg, msg); \
+   }
+#define CHECK_AND_SET_BOTSKILL_QBOOLEAN(setting) \
+   if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
+      got_match = TRUE; \
+      if ((arg3 != NULL) && (*arg3 != 0)) { \
+         qboolean temp; \
+         if(!stricmp(arg3, "on") || !stricmp(arg3, "true")) \
+            temp = TRUE; \
+         else if(!stricmp(arg3, "off") || !stricmp(arg3, "false")) \
+            temp = FALSE; \
+         else \
+            temp = atoi(arg3) ? TRUE : FALSE; \
+         skill_settings[skill_idx].setting = temp; \
+         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%s'.\n", #setting, skill_idx+1, "now ", temp ? "on" : "off"); \
+      } else \
+         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%s'.\n", #setting, skill_idx+1, "", skill_settings[skill_idx].setting ? "on" : "off"); \
+      printfunc(arg, msg); \
+   }
+#define CHECK_AND_SET_BOTSKILL_FLOAT(setting) \
+   if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
+      got_match = TRUE; \
+      if ((arg3 != NULL) && (*arg3 != 0)) { \
+         float temp = atof(arg3); \
+         skill_settings[skill_idx].setting = temp; \
+         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%.4f'.\n", #setting, skill_idx+1, "now ", temp); \
+      } else \
+         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%.4f'.\n", #setting, skill_idx+1, "", skill_settings[skill_idx].setting); \
+      printfunc(arg, msg); \
+   }
+#define CHECK_AND_SET_BOTSKILL_FLOAT100(setting) \
+   if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
+      got_match = TRUE; \
+      if ((arg3 != NULL) && (*arg3 != 0)) { \
+         float temp = atof(arg3)/100; \
+         skill_settings[skill_idx].setting = temp; \
+         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%.0f'.\n", #setting, skill_idx+1, "now ", temp*100); \
+      } else \
+         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%.0f'.\n", #setting, skill_idx+1, "", skill_settings[skill_idx].setting*100); \
+      printfunc(arg, msg); \
+   }
+         CHECK_AND_SET_BOTSKILL_INT(pause_frequency) // how often (out of 1000 times) the bot will pause, based on bot skill
+         CHECK_AND_SET_BOTSKILL_FLOAT100(normal_strafe) // how much bot straifes when walking around
+         CHECK_AND_SET_BOTSKILL_FLOAT100(battle_strafe) // how much bot straifes when attacking enemy
+         CHECK_AND_SET_BOTSKILL_INT(keep_optimal_distance) // how often bot (out of 1000 times) the bot try to keep at optimum distance of weapon when attacking
+         CHECK_AND_SET_BOTSKILL_FLOAT(shootcone_diameter) // bot tries to fire when aim line is less than [diameter / 2] apart from target 
+         CHECK_AND_SET_BOTSKILL_FLOAT(shootcone_minangle) // OR angle between bot aim line and line to target is less than angle set here
+         CHECK_AND_SET_BOTSKILL_FLOAT(turn_skill) // BotAim turn_skill, how good bot is at aiming on enemy origin.
+         CHECK_AND_SET_BOTSKILL_INT(hear_frequency) // how often (out of 100 times) the bot will hear what happens around it.
+         CHECK_AND_SET_BOTSKILL_QBOOLEAN(can_longjump) // and can longjump.
+         CHECK_AND_SET_BOTSKILL_INT(random_jump_frequency) // how often (out of 100 times) the bot will do random jump
+         CHECK_AND_SET_BOTSKILL_INT(random_jump_duck_frequency) // how often (out of 100 times) the bot will do random duck when random jumping
+         CHECK_AND_SET_BOTSKILL_INT(random_duck_frequency) // how often (out of 100 times) the bot will do random duck jumping in combat mode
+         CHECK_AND_SET_BOTSKILL_INT(random_longjump_frequency) // how often (out of 100 times) the bot will do random longjump instead of random jump
+         if(!got_match) 
+         {
+            snprintf(msg, sizeof(msg), "unknown skill setting %s.\n", arg2);
+            printfunc(arg, msg);
+      	    printfunc(arg, "Usage: bot_skill_setup <skill> <setting> <value> - set value\n");
+            printfunc(arg, "       bot_skill_setup <skill> <setting> - shows setting value\n");
+            printfunc(arg, "       bot_skill_setup <skill> - shows all setting values\n");
+         }
+      }
+      else
+      {
+         if((arg1 != NULL) && (*arg1 != 0))
+      	    printfunc(arg, "Could not complete request! (arg1 not given)\n");
+      	 else
+      	    printfunc(arg, "Could not complete request! (invalid skill, use 1-5)\n");
+      	 printfunc(arg, "Usage: bot_skill_setup <skill> <setting> <value> - set value\n");
+         printfunc(arg, "       bot_skill_setup <skill> <setting> - shows setting value\n");
+         printfunc(arg, "       bot_skill_setup <skill> - shows all setting values\n");
+      }
       
       return TRUE;
    }
@@ -1111,7 +1205,7 @@ void ClientCommand( edict_t *pEntity )
 
          while ((pent = UTIL_FindEntityInSphere( pent, pEntity->v.origin, radius )) != NULL)
          {
-            snprintf(str, sizeof(str), "Found %s at %5.2f %5.2f %5.2f\n",
+            safevoid_snprintf(str, sizeof(str), "Found %s at %5.2f %5.2f %5.2f\n",
                        STRING(pent->v.classname),
                        pent->v.origin.x, pent->v.origin.y,
                        pent->v.origin.z);
@@ -1191,9 +1285,12 @@ void StartFrame( void )
    static int i, index, bot_index;
    static float previous_time = -1.0;
    int count;
+   double begin_time;
    
    if (!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
+   
+   begin_time = UTIL_GetSecs();
    
    // if a new map has started then (MUST BE FIRST IN StartFrame)...
    if (gpGlobals->time + 0.1 < previous_time)
@@ -1368,9 +1465,9 @@ void StartFrame( void )
             char c_topcolor[4];
             char c_bottomcolor[4];
 
-            snprintf(c_skill, sizeof(c_skill), "%d", bots[index].bot_skill+1);
-            snprintf(c_topcolor, sizeof(c_topcolor), "%d", bots[index].top_color);
-            snprintf(c_bottomcolor, sizeof(c_bottomcolor), "%d", bots[index].bottom_color);
+            safevoid_snprintf(c_skill, sizeof(c_skill), "%d", bots[index].bot_skill+1);
+            safevoid_snprintf(c_topcolor, sizeof(c_topcolor), "%d", bots[index].top_color);
+            safevoid_snprintf(c_bottomcolor, sizeof(c_bottomcolor), "%d", bots[index].bottom_color);
 //UTIL_ServerPrintf("c_skill: %s\n", c_skill);               
             if(randomize_bots_on_mapchange)
                BotCreate(NULL, NULL, NULL, c_skill, NULL, NULL);
@@ -1467,7 +1564,21 @@ void StartFrame( void )
    }
 
    previous_time = gpGlobals->time;
-
+   
+   // -- Run Floyds for creating waypoint path matrix
+   //
+   //    keep going for 10ms (hlds sleeps 10ms after every frame on win32, thus 10ms+10ms = 20ms -> 50fps
+   if(WaypointSlowFloydsState() != -1)
+   {
+      count=0;
+      while(begin_time + 0.010 >= UTIL_GetSecs())
+      {
+         count++;
+         if(WaypointSlowFloyds() == -1)
+            break;
+      }
+   }
+   
    RETURN_META (MRES_HANDLED);
 }
 
@@ -1485,38 +1596,38 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
 
    if (!arg2 || !*arg2)
    {
-      snprintf(g_argv, sizeof(g_argv), "%s", arg1);
+      safevoid_snprintf(g_argv, sizeof(g_argv), "%s", arg1);
       null_terminate_buffer(g_argv, sizeof(g_argv));
       
       fake_arg_count = 1;
    }
    else if (!arg3 || !*arg3)
    {
-      snprintf(g_argv, sizeof(g_argv), "%s %s", arg1, arg2);
+      safevoid_snprintf(g_argv, sizeof(g_argv), "%s %s", arg1, arg2);
       null_terminate_buffer(g_argv, sizeof(g_argv));
       
       fake_arg_count = 2;
    }
    else
    {
-      snprintf(g_argv, sizeof(g_argv), "%s %s %s", arg1, arg2, arg3);
+      safevoid_snprintf(g_argv, sizeof(g_argv), "%s %s %s", arg1, arg2, arg3);
       null_terminate_buffer(g_argv, sizeof(g_argv));
       
       fake_arg_count = 3;
    }
    
-   snprintf(g_arg1, sizeof(g_arg1), "%s", arg1);
+   safevoid_snprintf(g_arg1, sizeof(g_arg1), "%s", arg1);
    null_terminate_buffer(g_arg1, sizeof(g_arg1));
    
    if (arg2 && *arg2)
    {
-      snprintf(g_arg2, sizeof(g_arg2), "%s", arg2);
+      safevoid_snprintf(g_arg2, sizeof(g_arg2), "%s", arg2);
       null_terminate_buffer(g_arg2, sizeof(g_arg2));
    }
    
    if (arg3 && *arg3)
    {
-      snprintf(g_arg3, sizeof(g_arg3), "%s", arg3);
+      safevoid_snprintf(g_arg3, sizeof(g_arg3), "%s", arg3);
       null_terminate_buffer(g_arg3, sizeof(g_arg3));
    }
    
@@ -1676,6 +1787,11 @@ void ServerDeactivate(void)
       RETURN_META (MRES_IGNORED);
    
    // automatic saving in autowaypoint mode, only if there are changes!
+   if(wp_matrix_save_on_mapend)
+   {
+      WaypointSaveFloydsMatrix();
+      wp_matrix_save_on_mapend = FALSE;
+   }
    if(g_auto_waypoint && g_waypoint_updated)
       WaypointSave();
    

@@ -45,6 +45,7 @@ typedef struct
    int  iFlags;     // flags???
 } bot_weapon_t;
 
+float ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(float distance, float height);
 
 #endif // BOT_WEAPONS_H
 

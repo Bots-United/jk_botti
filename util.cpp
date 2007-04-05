@@ -88,9 +88,9 @@ void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
 
    // turn on color set 2  (color on,  no sound)
    if ( teamonly )
-      snprintf( text, sizeof(text), "%c(TEAM) %s: ", 2, STRING( pEntity->v.netname ) );
+      safevoid_snprintf( text, sizeof(text), "%c(TEAM) %s: ", 2, STRING( pEntity->v.netname ) );
    else
-      snprintf( text, sizeof(text), "%c%s: ", 2, STRING( pEntity->v.netname ) );
+      safevoid_snprintf( text, sizeof(text), "%c%s: ", 2, STRING( pEntity->v.netname ) );
 
    j = sizeof(text) - 2 - strlen(text);  // -2 for /n and null terminator
    if ( (int)strlen(message) > j )
@@ -301,22 +301,22 @@ void UTIL_PrintBotInfo(void(*printfunc)(void *, char*), void * arg) {
    {
       if (bots[bot_index].is_used) {
          count++;
-         snprintf(msg, sizeof(msg), "Bot #%d\n", count);
+         safevoid_snprintf(msg, sizeof(msg), "Bot #%d\n", count);
          printfunc(arg, msg);
-         snprintf(msg, sizeof(msg), " name: %s\n", bots[bot_index].name);
+         safevoid_snprintf(msg, sizeof(msg), " name: %s\n", bots[bot_index].name);
          printfunc(arg, msg);
-         snprintf(msg, sizeof(msg), " skin: %s\n", bots[bot_index].skin);
+         safevoid_snprintf(msg, sizeof(msg), " skin: %s\n", bots[bot_index].skin);
          printfunc(arg, msg);
-         snprintf(msg, sizeof(msg), " skill: %d\n", bots[bot_index].bot_skill + 1);
+         safevoid_snprintf(msg, sizeof(msg), " skill: %d\n", bots[bot_index].bot_skill + 1);
          printfunc(arg, msg);
-         snprintf(msg, sizeof(msg), " got enemy: %s\n", (bots[bot_index].pBotEnemy != 0) ? "true" : "false"); 
+         safevoid_snprintf(msg, sizeof(msg), " got enemy: %s\n", (bots[bot_index].pBotEnemy != 0) ? "true" : "false"); 
          printfunc(arg, msg);
-         snprintf(msg, sizeof(msg), "---\n"); 
+         safevoid_snprintf(msg, sizeof(msg), "---\n"); 
          printfunc(arg, msg);
       }
    }
       
-   snprintf(msg, sizeof(msg), "Total Bots: %d\n", count);
+   safevoid_snprintf(msg, sizeof(msg), "Total Bots: %d\n", count);
    printfunc(arg, msg);
 }
 
@@ -326,7 +326,7 @@ void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2)
    {
       if (*arg1 && *arg2)
       {
-         snprintf(filename, size, "valve/%s/%s", arg1, arg2);
+         safevoid_snprintf(filename, size, "valve/%s/%s", arg1, arg2);
          return;
       }
    }
@@ -335,12 +335,12 @@ void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2)
    {
       if (*arg1)
       {
-         snprintf(filename, size, "valve/%s", arg1);
+         safevoid_snprintf(filename, size, "valve/%s", arg1);
          return;
       }
    }
    
-   snprintf(filename, size, "valve/");
+   safevoid_snprintf(filename, size, "valve/");
    return;
 }
 
@@ -355,7 +355,7 @@ void UTIL_LogPrintf( char *fmt, ... )
    char string[1024];
 
    va_start( argptr, fmt );
-   vsnprintf( string, sizeof(string), fmt, argptr );
+   safevoid_vsnprintf( string, sizeof(string), fmt, argptr );
    va_end( argptr );
 
    // Print to server console
@@ -368,7 +368,7 @@ void UTIL_ServerPrintf( char *fmt, ... )
    char string[512];
    
    va_start( argptr, fmt );
-   vsnprintf( string, sizeof(string), fmt, argptr );
+   safevoid_vsnprintf( string, sizeof(string), fmt, argptr );
    va_end( argptr );
 
    // Print to server console
@@ -385,7 +385,7 @@ void UTIL_ConsolePrintf( char *fmt, ... )
    len = strlen(string);
    
    va_start( argptr, fmt );
-   vsnprintf( string+len, sizeof(string)-len, fmt, argptr );
+   safevoid_vsnprintf( string+len, sizeof(string)-len, fmt, argptr );
    va_end( argptr );
 
    // end msg with newline if not already
@@ -408,7 +408,7 @@ char* UTIL_VarArgs( char *format, ... )
    static char string[1024];
 	
    va_start (argptr, format);
-   vsnprintf (string, sizeof(string), format,argptr);
+   safevoid_vsnprintf (string, sizeof(string), format,argptr);
    va_end (argptr);
 
    return string;	

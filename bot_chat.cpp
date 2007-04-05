@@ -16,12 +16,12 @@
 #include "bot.h"
 
 
-#define NUM_TAGS 22
-
+#define NUM_TAGS 24
 char *tag1[NUM_TAGS]={
-"-=","-[","-]","-}","-{","<[","<]","[-","]-","{-","}-","[[","[","{","]","}","<",">","-","|","=","+"};
+"[", "*[", "-=","-[","-]","-}","-{","<[","<]","[-","]-","{-","}-","[[","[","{","]","}","<",">","-","|","=","+"};
 char *tag2[NUM_TAGS]={
-"=-","]-","[-","{-","}-","]>","[>","-]","-[","-}","-{","]]","]","}","[","{",">","<","-","|","=","+"};
+"]*", "]*", "=-","]-","[-","{-","}-","]>","[>","-]","-[","-}","-{","]]","]","}","[","{",">","<","-","|","=","+"};
+
 
 int bot_chat_count;
 int bot_taunt_count;
@@ -164,13 +164,27 @@ void LoadBotChat(void)
 }
 
 
+static int strcharmatch(char c, const char *str)
+{
+   while(str)
+   {
+      if(*str==c)
+      	 return 1;
+      str++;
+   }
+   
+   return 0;
+}
+
+
 void BotTrimBlanks(char *in_string, char *out_string)
 {
    int i, pos;
    char *dest;
+   const char *blanks = " _.-=+*|[](){}";
 
    pos=0;
-   while ((pos < 80) && (in_string[pos] == ' '))  // skip leading blanks
+   while ((pos < 80) && strcharmatch(in_string[pos], blanks))  // skip leading blanks
       pos++;
 
    dest=&out_string[0];
@@ -183,7 +197,7 @@ void BotTrimBlanks(char *in_string, char *out_string)
    *dest = 0;  // store the null
 
    i = strlen(out_string) - 1;
-   while ((i > 0) && (out_string[i] == ' '))  // remove trailing blanks
+   while ((i > 0) && strcharmatch(in_string[i], blanks))  // remove trailing blanks
    {
       out_string[i] = 0;
       i--;
@@ -198,8 +212,8 @@ int BotChatTrimTag(char *original_name, char *out_name)
    char in_name[80];
    int result = 0;
 
-   strncpy(in_name, original_name, 31);
-   in_name[32] = 0;
+   strncpy(in_name, original_name, 32);
+   in_name[31] = 0;
 
    for (i=0; i < NUM_TAGS; i++)
    {
@@ -227,8 +241,8 @@ int BotChatTrimTag(char *original_name, char *out_name)
 
    if (strlen(in_name) == 0)  // is name just a tag?
    {
-      strncpy(in_name, original_name, 31);
-      in_name[32] = 0;
+      strncpy(in_name, original_name, 32);
+      in_name[31] = 0;
 
       // strip just the tag part...
       for (i=0; i < NUM_TAGS; i++)

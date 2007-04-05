@@ -44,40 +44,48 @@ to lowercase).  The '!' will be removed from the chat message before it
 gets send to other players.
 
 [bot_chat]
-Hey, where is everybody?
-I think I'll just camp here and wait for some llamas to come by.
-!OH MAN!  Come check this out...
-Hello?  Is anybody else out there?
-LOL!  I almost blew myself up!
-Hey %r, come over here so I can kill you.
-!COOL!  Did you see that?
+It's 9am here, ..need sleep Z_z
+%r, what time is there? almost 11am here.
+i'm drunk
+Whats your mouse sensitivity %r? Mine is set on 2.
+!mmmm.. whiskey
+!mmm.. beer
+!mm.. pepsi
+!cocacola.. yuk.. pepsi is better :D
+so.. how long you have been playing this game, %r?
+%r, are you new to this server?
+Hey, whats your fps in this map %r? Mine sux, must be the BOTS!
+Did you get that new STEAM update today?
+!lol
+hahahaha
+!rofl
+!gf
+!n1
 
 [bot_taunt]
-Man, did you see that shot!
-Hey %n, I killed you without even trying!
-!%n - you suck!  LOL!
-Hah!  Got another one!
-%n, you need to go back and practice on the hazard course firing range!!!
-Hey %n, my grandma can play this game better than you can!
-%n, maybe you should try aiming for the head!
-!%n, I KICKED YOUR ASS!
-Man %n, you suck worse than %r does!
+!gf, yeah right, lol!
+Aww, I'm sorry %n, were you facing wall?
+Oh stop whining %n, you act like you never got killed by a BOT b4!
+So, you think you're l33t with that xbow %n? Bring it on buddy!
+!LOL, man you suck %n!
+My 8 yr old sister has more skillz then you %n!
+Get a grip you loser!
+neener neener, you got killed by a BOT! lmao
+Don't you have a life %n? You're always playing HL.
+!Oh yeah, you're l33t %n.......NOT!
+Nice ping %n, where's your connection? Mars?
+You should use another weapon %n, you suck with that tau! LOL
+!ns.. by me
 
 [bot_whine]
-CHEATER ALERT!  CHEATER ALERT!  %n is cheating!
-Hey! What the...  %n is using a HEAD SHOT script!
-%n you are sooooo good... NOT!
-Ok %n, now I'm coming after YOU!!!
-Hey everybody, %n is cheating.  I vote we get the admin to kick him off!
-We got a CAMPER over here!  %n is CAMPING!!!
-Where's the admin?  Can somebody kick %n off of this server?
-Oh Man!  I got killed again?  Let's see... sv_cheats 1, impulse 101, right?
-!Doooooooh!  %n why do you keep killing me?
-Alright %n, you're gonna be SOOOO dead!
-Who dares mess with my l33t shooting skills!  %n you're gonna die!
-%n if you kill me ONE MORE TIME...
-Hey %n, I let you have that one.  I was resting my mouse hand.
-%n, why don't you pick on someone else for a change?
-Hey %n, you should kill somebody else once in a while!
-!%n! STOP KILLING ME!!!
-Ok %n, now I'm going to HAVE to kill you!
+i'm drunk lol
+I WAS CHATTING %n!!
+damn mousepad slipped again
+!<---rolls eye...nice shot!
+mouse broke.. I need a new one
+mouse sensitivity messed up, I need to restart, brb!
+Dead AGAIN? Sheesh, I'm gonna go play pool!
+argh! dropped pepsi on kboard
+!n1, %r
+hahahaha, %n??? hahaha!!! good name there.. lol
+%n .. hacker as usual :P

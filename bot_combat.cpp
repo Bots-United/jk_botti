@@ -54,6 +54,8 @@ qboolean BotAimsAtSomething (bot_t &pBot)
 //
 void BotPointGun(bot_t &pBot)
 {
+   edict_t *pEdict = pBot.pEdict;
+   
    // this function is called every frame for every bot. Its purpose is to make the bot
    // move its crosshair to the direction where it wants to look. There is some kind of
    // filtering for the view, to make it human-like.
@@ -62,7 +64,9 @@ void BotPointGun(bot_t &pBot)
    Vector v_deviation;
    float turn_skill = skill_settings[pBot.bot_skill].turn_skill;
    
-   edict_t *pEdict = pBot.pEdict;
+   //tweak turn_skill down if zooming
+   if(pEdict->v.fov < 80 && pEdict->v.fov != 0)
+      turn_skill *= pEdict->v.fov/80.0;
 
    v_deviation = UTIL_WrapAngles (Vector (pEdict->v.idealpitch, pEdict->v.ideal_yaw, 0) - pEdict->v.v_angle);
 
@@ -104,8 +108,8 @@ void BotPointGun(bot_t &pBot)
    pEdict->v.angles.z = 0;
 }
 
-//
-void BotAim( bot_t &pBot ) 
+// Called before g_engfuncs.pfnRunPlayerMove
+void BotAimPre( bot_t &pBot ) 
 {   
    // make bot aim and turn
    BotPointGun(pBot); // update and save this bot's view angles
@@ -113,6 +117,31 @@ void BotAim( bot_t &pBot )
    // wrap angles that were not wrapped in pointgun
    pBot.pEdict->v.idealpitch = UTIL_WrapAngle(pBot.pEdict->v.idealpitch);
    pBot.pEdict->v.ideal_yaw = UTIL_WrapAngle(pBot.pEdict->v.ideal_yaw);
+   
+   // special aiming angle for mp5 grenade
+   if(pBot.set_special_shoot_angle)
+   {
+      float old_angle = pBot.pEdict->v.v_angle.z;
+      
+      pBot.pEdict->v.v_angle.z = pBot.special_shoot_angle;
+      pBot.pEdict->v.angles.x = UTIL_WrapAngle (-pBot.pEdict->v.v_angle.x / 3);
+      
+      pBot.special_shoot_angle = old_angle;
+   }
+}
+
+// Called after g_engfuncs.pfnRunPlayerMove
+void BotAimPost( bot_t &pBot )
+{
+   // special aiming angle for mp5 grenade
+   if(pBot.set_special_shoot_angle)
+   {
+      pBot.pEdict->v.v_angle.z = pBot.special_shoot_angle;
+      pBot.pEdict->v.angles.x = UTIL_WrapAngle (-pBot.pEdict->v.v_angle.x / 3);
+      
+      pBot.set_special_shoot_angle = FALSE;
+      pBot.special_shoot_angle = 0.0;
+   }
 }
 
 //
@@ -171,7 +200,7 @@ void add_next_posdata(int idx, edict_t *pEdict)
 {
    posdata_t * curr_latest = pos_latest[idx];
    
-   pos_latest[idx] = (posdata_t*)malloc(sizeof(posdata_t));
+   pos_latest[idx] = (posdata_t*)calloc(1, sizeof(posdata_t));
    
    if(curr_latest) 
    {
@@ -767,6 +796,22 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, 
       if (bot_stop == 2)
          bot_stop = 1;
    }
+   else if (iId == VALVE_WEAPON_MP5)
+   {
+      // setup bot aim angle by distance and height to enemy
+      Vector v_enemy = pBot.pBotEnemy->v.origin - (pEdict->v.origin + GetGunPosition(pEdict));
+      
+      float angle = ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(v_enemy.Length(), v_enemy.z);
+      if(angle >= -89.0 && angle <= 89.0)
+      {
+         pBot.set_special_shoot_angle = TRUE;
+         pBot.special_shoot_angle = angle;
+      }
+   }
+   
+   // use secondary once.
+   if(use_primary && select.type == WEAPON_FIRE_ZOOM && pEdict->v.fov == 0)
+      use_primary = !(use_secondary = TRUE);
    
    if (use_primary)
    {
@@ -879,12 +924,14 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
    qboolean use_primary;
    qboolean use_secondary;
    float distance;
+   float height;
    int min_skill;
    int min_index;
    qboolean min_use_primary;
    qboolean min_use_secondary;
    
    distance = v_enemy.Length();  // how far away is the enemy?
+   height = v_enemy.z; // how high is enemy?
 
    pSelect = &weapon_select[0];
    pDelay = &fire_delay[0];
@@ -1002,7 +1049,7 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       	 if(weapon_choice == 0)
       	 {
             // Check if we REALLY want to change to other weapon (aka current gun IS shit)
-            better_index = BotGetBetterWeaponChoice(pBot, pSelect[select_index], pSelect, distance, &use_primary, &use_secondary);
+            better_index = BotGetBetterWeaponChoice(pBot, pSelect[select_index], pSelect, distance, height, &use_primary, &use_secondary);
             if(better_index > -1) 
                select_index = better_index;
          }
@@ -1012,8 +1059,8 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
          if(better_index == -1)
          {
             // Check if this weapon is ok for current contitions
-            use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, weapon_choice != 0);
-            use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, weapon_choice != 0);
+            use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
+            use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
          }
          
          if(use_primary || use_secondary)
@@ -1057,8 +1104,8 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       iId = pSelect[select_index].iId;
 
       // Check if this weapon is ok for current contitions
-      use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, weapon_choice != 0);
-      use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, weapon_choice != 0);
+      use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
+      use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
       if(use_primary || use_secondary)
       {
          if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
@@ -1101,8 +1148,8 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       iId = pSelect[select_index].iId;
 
       // Check if this weapon is ok for current contitions
-      use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, weapon_choice != 0);
-      use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, weapon_choice != 0);
+      use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
+      use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
       if(use_primary || use_secondary)
       {
          if(pSelect[select_index].primary_skill_level > min_skill || pSelect[select_index].secondary_skill_level > min_skill)

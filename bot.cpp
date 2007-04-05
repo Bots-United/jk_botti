@@ -188,7 +188,10 @@ void BotSpawnInit( bot_t &pBot )
 
    pBot.f_reaction_target_time = 0.0;
    pBot.ducking = 0;
-   
+
+   pBot.set_special_shoot_angle = FALSE;
+   pBot.special_shoot_angle = 0.0;
+
    pBot.f_weaponchange_time = 0.0;
 
    memset(&(pBot.current_weapon), 0, sizeof(pBot.current_weapon));
@@ -391,11 +394,11 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 
          GetGameDir(dir_name);
 
-         snprintf(filename, sizeof(filename), "%s/models/player/%s", dir_name, c_skin);
+         safevoid_snprintf(filename, sizeof(filename), "%s/models/player/%s", dir_name, c_skin);
 
          if (stat(filename, &stat_str) != 0)
          {
-            snprintf(filename, sizeof(filename), "valve/models/player/%s", c_skin);
+            safevoid_snprintf(filename, sizeof(filename), "valve/models/player/%s", c_skin);
 
             if (stat(filename, &stat_str) != 0)
             {
@@ -443,7 +446,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
       if ((top_color < 0) || (top_color > 255))
          top_color = -1;
       else
-         snprintf(c_topcolor, sizeof(c_topcolor), "%d", top_color);
+         safevoid_snprintf(c_topcolor, sizeof(c_topcolor), "%d", top_color);
 
       if ((arg5 != NULL) && (*arg5 != 0))
          bottom_color = atoi(arg5);
@@ -451,15 +454,15 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
       if ((bottom_color < 0) || (bottom_color > 255))
          bottom_color = -1;
       else
-         snprintf(c_bottomcolor, sizeof(c_bottomcolor), "%d", bottom_color);
+         safevoid_snprintf(c_bottomcolor, sizeof(c_bottomcolor), "%d", bottom_color);
 
       if ((top_color == -1) && (bottom_color == -1) && (b_random_color))
       {
          top_color = RANDOM_LONG2(0, 255);
-         snprintf(c_topcolor, sizeof(c_topcolor), "%d", top_color);
+         safevoid_snprintf(c_topcolor, sizeof(c_topcolor), "%d", top_color);
 
          bottom_color = RANDOM_LONG2(0, 255);
-         snprintf(c_bottomcolor, sizeof(c_bottomcolor), "%d", bottom_color);
+         safevoid_snprintf(c_bottomcolor, sizeof(c_bottomcolor), "%d", bottom_color);
       }
    }
 
@@ -506,7 +509,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
    {
       char tmp[sizeof(c_name)];
       
-      snprintf(tmp, sizeof(tmp), "[lvl%d]%s", skill, c_name);
+      safevoid_snprintf(tmp, sizeof(tmp), "[lvl%d]%s", skill, c_name);
       tmp[sizeof(tmp)-1] = 0;  // make sure c_name is null terminated
       strcpy(c_name, tmp);
       c_name[sizeof(c_name)-1] = 0;  // make sure c_name is null terminated
@@ -1498,9 +1501,10 @@ void BotThink( bot_t &pBot )
       if (RANDOM_LONG2(1, 100) <= 50)
          pEdict->v.button = IN_ATTACK;
       
-      BotAim(pBot);
+      BotAimPre(pBot);
       g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot.f_move_speed,
                                    0, 0, pEdict->v.button, 0, (byte)pBot.msecval);
+      BotAimPost(pBot);
 
       return;
    }
@@ -1586,9 +1590,10 @@ void BotThink( bot_t &pBot )
       // turn towards ideal_yaw by yaw_speed degrees (slower than normal)
       BotChangeYaw( pBot, pEdict->v.yaw_speed / 2 );
       
-      BotAim(pBot);
+      BotAimPre(pBot);
       g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot.f_move_speed,
                                    0, 0, pEdict->v.button, 0, (byte)pBot.msecval);
+      BotAimPost(pBot);
 
       return;
    }
@@ -2101,6 +2106,16 @@ void BotThink( bot_t &pBot )
             }
          }
       }
+   
+      // if has zoom weapon and zooming click off zoom
+      if(pBot.pBotEnemy == NULL && 
+         pBot.current_weapon_index != -1 && 
+         weapon_select[pBot.current_weapon_index].type == WEAPON_FIRE_ZOOM && 
+         pEdict->v.fov != 0 &&
+         !(pEdict->v.button & (IN_ATTACK|IN_ATTACK2)))
+      {
+         pEdict->v.button |= IN_ATTACK2;
+      }
    }
 
    if (pBot.curr_waypoint_index != -1)  // does the bot have a waypoint?
@@ -2180,10 +2195,11 @@ void BotThink( bot_t &pBot )
 
                f_strafe_speed = 0.0;
                
-               BotAim(pBot);
+               BotAimPre(pBot);
                g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot.f_move_speed,
                                             f_strafe_speed, 0, pEdict->v.button, 0, (byte)pBot.msecval);
-                              
+               BotAimPost(pBot);
+               
                return;
             }
 
@@ -2301,10 +2317,11 @@ void BotThink( bot_t &pBot )
       pBot.f_move_speed = calc.y;
    }
               
-   BotAim(pBot);
+   BotAimPre(pBot);
    g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot.f_move_speed,
                                 f_strafe_speed, 0, pEdict->v.button, 0, (byte)pBot.msecval);
-      
+   BotAimPost(pBot);
+   
    return;
 }
 

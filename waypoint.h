@@ -99,10 +99,15 @@ void WaypointPrintInfo(edict_t *pEntity);
 void WaypointThink(edict_t *pEntity);
 void WaypointFloyds(short *shortest_path, short *from_to);
 void WaypointRouteInit(void);
-unsigned short WaypointRouteFromTo(int src, int dest);
-int  WaypointDistanceFromTo(int src, int dest);
 void CollectMapSpawnItems(edict_t *pSpawn);
 void WaypointAddSpawnObjects(void);
 edict_t *WaypointFindItem( int wpt_index );
+int WaypointRouteFromTo(int src, int dest);
+float WaypointDistanceFromTo(int src, int dest);
+void WaypointSaveFloydsMatrix(unsigned short *shortest_path, unsigned short *from_to);
+void WaypointSaveFloydsMatrix(void);
+int WaypointSlowFloydsState(void);
+int WaypointSlowFloyds(void);
+int WaypointSlowFloyds(unsigned short *shortest_path, unsigned short *from_to);
 
 #endif // WAYPOINT_H

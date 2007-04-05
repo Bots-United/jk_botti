@@ -26,7 +26,8 @@ qboolean BotLookForMedic( bot_t &pBot );
 qboolean BotLookForGrenades( bot_t &pBot );
 void BotThink( bot_t &pBot );
 void BotPointGun(bot_t &pBot);
-void BotAim( bot_t &pBot );
+void BotAimPre( bot_t &pBot );
+void BotAimPost( bot_t &pBot );
 void LoadBotModels(void);
 
 float BotChangePitch( bot_t &pBot, float speed );

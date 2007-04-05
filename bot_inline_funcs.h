@@ -8,6 +8,28 @@
 #define BOT_INLINE_FUNCS
 
 #include <inttypes.h>
+#include <sys/time.h>
+
+inline double UTIL_GetSecs(void) 
+{
+#ifdef _WIN32
+   LARGE_INTEGER count, freq;
+
+   count.QuadPart = 0;
+   freq.QuadPart = 0;
+
+   QueryPerformanceFrequency(&freq);
+   QueryPerformanceCounter(&count);
+
+   return (double)count.QuadPart / (double)freq.QuadPart;
+#else
+   struct timeval tv;
+   
+   gettimeofday (&tv, NULL);
+   
+   return (double) tv.tv_sec + ((double) tv.tv_usec) / 1000000.0;
+#endif
+}
 
 #ifdef __GNUC__
 inline void fsincos(double x, double &s, double &c)
@@ -242,18 +264,19 @@ inline int UTIL_GetBotIndex(edict_t *pEdict)
 
 inline bot_t *UTIL_GetBotPointer(edict_t *pEdict)
 {
-   int index;
-
-   for (index=0; index < 32; index++)
-      if (bots[index].pEdict == pEdict)
-         return (&bots[index]);
+   int index = UTIL_GetBotIndex(pEdict);
    
-   return NULL;  // return NULL if edict is not a bot
+   if(index == -1)
+      return NULL; // return NULL if edict is not a bot
+   
+   return(&bots[index]);
 }
 
 inline qboolean FInViewCone(const Vector & Origin, edict_t *pEdict)
 {
-   return(DotProduct((Origin - pEdict->v.origin).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle)) > cos(deg2rad(80)));
+   float fov_angle = 80;
+   
+   return(DotProduct((Origin - pEdict->v.origin).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle)) > cos(deg2rad(fov_angle)));
 }
 
 extern unsigned int rnd_idnum[2];
