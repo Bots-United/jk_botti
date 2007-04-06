@@ -163,28 +163,13 @@ void LoadBotChat(void)
    }
 }
 
-
-static int strcharmatch(char c, const char *str)
-{
-   while(str)
-   {
-      if(*str==c)
-      	 return 1;
-      str++;
-   }
-   
-   return 0;
-}
-
-
 void BotTrimBlanks(char *in_string, char *out_string)
 {
    int i, pos;
    char *dest;
-   const char *blanks = " _.-=+*|[](){}";
 
    pos=0;
-   while ((pos < 80) && strcharmatch(in_string[pos], blanks))  // skip leading blanks
+   while ((pos < 80) && (in_string[pos] == ' '))  // skip leading blanks
       pos++;
 
    dest=&out_string[0];
@@ -197,7 +182,7 @@ void BotTrimBlanks(char *in_string, char *out_string)
    *dest = 0;  // store the null
 
    i = strlen(out_string) - 1;
-   while ((i > 0) && strcharmatch(in_string[i], blanks))  // remove trailing blanks
+   while ((i > 0) && (out_string[i] == ' '))  // remove trailing blanks
    {
       out_string[i] = 0;
       i--;

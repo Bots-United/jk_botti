@@ -23,7 +23,7 @@
 #include "bot_weapon_select.h"
 
 #define VER_MAJOR 0
-#define VER_MINOR 40
+#define VER_MINOR 41
 
 extern DLL_FUNCTIONS gFunctionTable;
 extern DLL_FUNCTIONS gFunctionTable_POST;

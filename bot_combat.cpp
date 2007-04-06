@@ -47,7 +47,7 @@ qboolean BotAimsAtSomething (bot_t &pBot)
 {
    if(!pBot.pBotEnemy)
       return FALSE;
-   
+
    return(FPredictedVisible(pBot));
 }
 
@@ -325,7 +325,7 @@ qboolean FPredictedVisible(bot_t &pBot)
    Vector v_enemy = GetPredictedPlayerPosition(pBot, pBot.pBotEnemy, TRUE); //only get position
    edict_t * pHit = 0;
    
-   return(FVisible(v_enemy, pBot.pEdict, &pHit) || pHit == pBot.pBotEnemy);
+   return(FVisible(v_enemy, pBot.pEdict));
 }
 
 // used instead of using pBotEnemy->v.origin in aim code.
