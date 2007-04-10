@@ -40,6 +40,170 @@ extern qboolean is_team_play;
 
 trigger_sound_t trigger_sounds[32];
 
+float last_time_not_facing_wall[32];
+
+breakable_list_t *g_breakable_list = NULL;
+
+
+// 
+breakable_list_t * UTIL_AddFuncBreakable(edict_t *pEdict)
+{
+   // get end of list
+   breakable_list_t *prev = NULL;
+   breakable_list_t *next = g_breakable_list;
+   while(next)
+   {
+      prev = next;
+      next = next->next;
+   }
+   
+   // malloc memory
+   next = (breakable_list_t*)calloc(1, sizeof(breakable_list_t));
+   
+   // fill in data
+   next->next = NULL;
+   next->material_breakable = FALSE;
+   next->pEdict = pEdict;
+   
+   //link end of list next
+   if(prev)
+      prev->next = next;
+   else
+      g_breakable_list = next;
+   
+   return(next);
+}
+
+typedef enum { matGlass = 0, matWood, matMetal, matFlesh, matCinderBlock, matCeilingTile, matComputer, matUnbreakableGlass, matRocks, matNone, matLastMaterial } Materials;
+
+// called on DispatchKeyValue
+void UTIL_UpdateFuncBreakable(edict_t *pEdict, const char * setting, const char * value)
+{
+   // find breakable
+   breakable_list_t *plist = g_breakable_list;
+   
+   while(plist)
+   {
+      if(plist->pEdict == pEdict)
+         break;
+      plist = plist->next;
+   }
+   
+   // not found?
+   if(!plist)
+   {
+      // add new
+      plist = UTIL_AddFuncBreakable(pEdict);
+   }
+   
+   // check if interesting setting
+   if(FStrEq(setting, "material"))
+   {
+      // update data value
+      plist->material_breakable = atoi(value) != matUnbreakableGlass;
+   }
+}
+
+// called on ServerDeactivate
+void UTIL_FreeFuncBreakables(void)
+{
+   // free linked list
+   breakable_list_t *next = g_breakable_list;
+   while(next)
+   {
+      breakable_list_t *pfree = next;
+      next = next->next;
+      
+      free(pfree);
+   }
+   
+   g_breakable_list = NULL;
+}
+
+//
+breakable_list_t * UTIL_FindBreakable(breakable_list_t * pbreakable)
+{
+   return(pbreakable?pbreakable->next:g_breakable_list);
+}
+
+
+//
+qboolean IsPlayerFacingWall(edict_t * pPlayer)
+{
+   TraceResult tr;
+   Vector v_forward, EyePosition;
+	
+   EyePosition = pPlayer->v.origin + pPlayer->v.view_ofs;
+   v_forward = UTIL_AnglesToForward(pPlayer->v.v_angle);
+   
+   UTIL_TraceLine(EyePosition, EyePosition + gpGlobals->v_forward * 48, ignore_monsters, ignore_glass, pPlayer, &tr);
+   
+   if (tr.flFraction >= 1.0) 
+      return(FALSE);
+
+   if (DotProduct(gpGlobals->v_forward, tr.vecPlaneNormal) > -0.5f) //60deg
+      return(FALSE);
+
+   return(TRUE);
+}
+
+//
+void CheckPlayerChatProtection(edict_t * pPlayer)
+{
+   int idx;
+   
+   idx = ENTINDEX(pPlayer) - 1;
+   if(idx < 0 || idx >= gpGlobals->maxClients)
+      return;
+   
+   // skip bots
+   if (FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT))
+   {
+      last_time_not_facing_wall[idx] = gpGlobals->time;
+      return;
+   }
+   
+   // use of any buttons will reset protection
+   if((pPlayer->v.button & ~(IN_SCORE | IN_DUCK)) != 0)
+   {
+      last_time_not_facing_wall[idx] = gpGlobals->time;
+      return;
+   }
+   
+   // is not facing wall?
+   if(!IsPlayerFacingWall(pPlayer))
+   {
+      last_time_not_facing_wall[idx] = gpGlobals->time;
+      return;
+   }
+   
+   // This cannot be checked, because if someone accidentally shoots chatter, chatter will move abit -> resets protection
+   /*
+   // is moving
+   if(pPlayer->v.velocity.Length() > 1.0)
+   {
+      last_time_not_facing_wall[idx] = gpGlobals->time;
+      return;
+   }*/
+}
+
+//
+qboolean IsPlayerChatProtected(edict_t * pPlayer)
+{
+   int idx;
+   
+   idx = ENTINDEX(pPlayer) - 1;
+   if(idx < 0 || idx >= gpGlobals->maxClients)
+      return(FALSE);
+   
+   if(last_time_not_facing_wall[idx] + 3.0 < gpGlobals->time)
+   {
+      return TRUE;
+   }
+   
+   return FALSE;
+}
+
 
 void ClientPrint( edict_t *pEntity, int msg_dest, const char *msg_name)
 {       
@@ -53,6 +217,7 @@ void ClientPrint( edict_t *pEntity, int msg_dest, const char *msg_name)
    MESSAGE_END();
 }
 
+
 void UTIL_SayText( const char *pText, edict_t *pEdict )
 {
    if (GET_USER_MSG_ID (PLID, "SayText", NULL) <= 0)
@@ -63,6 +228,7 @@ void UTIL_SayText( const char *pText, edict_t *pEdict )
       WRITE_STRING( pText );
    MESSAGE_END();
 }
+
 
 void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
 {
@@ -134,6 +300,29 @@ void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
 
    // echo to server console
    SERVER_PRINT( text );
+
+   // write to log file
+   // team match?
+   if ( is_team_play )
+   {
+      UTIL_LogPrintf( "\"%s<%i><%s><%s>\" %s \"%s\"\n", 
+         STRING( pEntity->v.netname ), 
+         GETPLAYERUSERID( pEntity ),
+         (*g_engfuncs.pfnGetPlayerAuthId)( pEntity ),
+         sender_teamstr,
+         teamonly ? "say_team" : "say",
+         message );
+   }
+   else
+   {
+      UTIL_LogPrintf( "\"%s<%i><%s><%i>\" %s \"%s\"\n", 
+         STRING( pEntity->v.netname ), 
+         GETPLAYERUSERID( pEntity ),
+         (*g_engfuncs.pfnGetPlayerAuthId)( pEntity ),
+         GETPLAYERUSERID( pEntity ),
+         teamonly ? "say_team" : "say",
+         message );
+   }
 }
 
 #ifdef   DEBUG
@@ -165,7 +354,7 @@ char * UTIL_GetTeam(edict_t *pEntity, char teamstr[32])
    return(teamstr);
 }
 
-qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit )
+qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t * pHit )
 {
    TraceResult tr;
    Vector      vecLookerOrigin;
@@ -182,18 +371,15 @@ qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit )
 
    UTIL_TraceLine(vecLookerOrigin, vecOrigin, ignore_monsters, ignore_glass, pEdict, &tr);
 
-   if (tr.flFraction != 1.0)
+   if (tr.flFraction < 1.0)
    {
-      if(pHit)
-         *pHit = 0;
+      if(pHit == tr.pHit)
+         return TRUE; // Line of sight is blocked by target
          
       return FALSE;  // Line of sight is not established
    }
    else
-   {
-      if(pHit)
-         *pHit = tr.pHit;
-         
+   {         
       return TRUE;  // line of sight is valid.
    }
 }
@@ -378,7 +564,7 @@ void UTIL_ServerPrintf( char *fmt, ... )
 void UTIL_ConsolePrintf( char *fmt, ... )
 {
    va_list argptr;
-   char string[1024];
+   char string[512];
    size_t len;
    
    strcpy(string, "[jk_botti] ");
@@ -402,16 +588,16 @@ void UTIL_ConsolePrintf( char *fmt, ... )
    SERVER_PRINT( string );
 }
 
-char* UTIL_VarArgs( char *format, ... )
+
+char* UTIL_VarArgs2( char * string, size_t strlen, char *format, ... )
 {
-   va_list	    argptr;
-   static char string[1024];
-	
+   va_list argptr;
+   
    va_start (argptr, format);
-   safevoid_vsnprintf (string, sizeof(string), format,argptr);
+   safevoid_vsnprintf (string, strlen, format, argptr);
    va_end (argptr);
 
-   return string;	
+   return string;   
 }
 
 

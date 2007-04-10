@@ -32,8 +32,7 @@ INCLUDES = -I"./metamod" \
 CFLAGS = -Wall ${BASEFLAGS} ${OPTFLAGS} ${ARCHFLAG} ${INCLUDES}
 CPPFLAGS = -fno-rtti -fno-exceptions ${CFLAGS} 
 
-SRC = 	safe_snprintf.cpp \
-	bot.cpp \
+SRC = 	bot.cpp \
 	bot_chat.cpp \
 	bot_client.cpp \
 	bot_combat.cpp \
@@ -42,9 +41,11 @@ SRC = 	safe_snprintf.cpp \
 	bot_skill.cpp \
 	bot_start.cpp \
 	bot_weapons.cpp \
+	commands.cpp \
 	dll.cpp \
 	engine.cpp \
 	h_export.cpp \
+	safe_snprintf.cpp \
 	util.cpp \
 	waypoint.cpp
 

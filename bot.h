@@ -82,7 +82,8 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
 #define MAX_BOT_CHAT 100
 
 
-typedef struct trigger_sound_s {
+typedef struct trigger_sound_s 
+{
    int used;
    Vector origin;
    float volume;
@@ -90,6 +91,13 @@ typedef struct trigger_sound_s {
    float time;
    float importance;
 } trigger_sound_t;
+
+typedef struct breakable_list_s 
+{
+   struct breakable_list_s * next;
+   qboolean material_breakable;
+   edict_t *pEdict;
+} breakable_list_t;
 
 typedef struct
 {
@@ -102,9 +110,10 @@ typedef struct
 typedef struct
 {
    qboolean is_used;
-   int respawn_state;
+   
    edict_t *pEdict;
    qboolean need_to_initialize;
+   
    char name[BOT_NAME_LEN+1];
    char skin[BOT_SKIN_LEN+1];
    int bot_skill;
@@ -360,7 +369,7 @@ char* UTIL_GetTeam(edict_t *pEntity, char teamstr[32]);
 qboolean FHearable(bot_t &pBot, edict_t *pPlayer);
 qboolean FInViewCone( const Vector & Origin, edict_t *pEdict);
 qboolean FInShootCone( const Vector & Origin, edict_t *pEdict, float distance, float target_radius, float min_angle);
-qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit = 0);
+qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t * pHit);
 Vector Center(edict_t *pEdict);
 Vector GetGunPosition(edict_t *pEdict);
 void UTIL_SelectItem(edict_t *pEdict, char *item_name);
@@ -370,6 +379,14 @@ void GetGameDir (char *game_dir);
 void UTIL_PrintBotInfo(void(*printfunc)(void *, char*), void * arg);
 void UTIL_ServerPrintf( char *fmt, ... );
 void UTIL_ConsolePrintf( char *fmt, ... );
+char* UTIL_VarArgs2( char * string, size_t strlen, char *format, ... );
+
+breakable_list_t * UTIL_FindBreakable(breakable_list_t * pbreakable);
+void UTIL_FreeFuncBreakables(void);
+void UTIL_UpdateFuncBreakable(edict_t *pEdict, const char * setting, const char * value);
+
+void CheckPlayerChatProtection(edict_t * pPlayer);
+qboolean IsPlayerChatProtected(edict_t * pPlayer);
 
 void LoadBotChat(void);
 void BotTrimBlanks(char *in_string, char *out_string);

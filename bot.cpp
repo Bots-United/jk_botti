@@ -28,7 +28,6 @@ extern edict_t *clients[32];
 extern WAYPOINT waypoints[MAX_WAYPOINTS];
 extern int num_waypoints;  // number of waypoints currently in use
 extern int default_bot_skill;
-//extern int bot_strafe_percent;
 extern int bot_add_level_tag;
 extern int bot_chat_percent;
 extern int bot_taunt_percent;
@@ -549,9 +548,6 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
       infobuffer = GET_INFOKEYBUFFER( BotEnt );
       clientIndex = ENTINDEX( BotEnt );
 
-      if (!checked_teamplay)  // check for team play...
-         BotCheckTeamplay();
-
       // is this a MOD that supports model colors AND it's not teamplay?
       SET_CLIENT_KEYVALUE( clientIndex, infobuffer, "model", c_skin );
 
@@ -589,7 +585,6 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
       memset(&pBot, 0, sizeof(pBot));
 
       pBot.is_used = TRUE;
-      pBot.respawn_state = RESPAWN_IDLE;
       pBot.f_create_time = gpGlobals->time;
       pBot.name[0] = 0;  // name not set by server yet
 
@@ -934,7 +929,7 @@ void BotFindItem( bot_t &pBot )
                             pEdict->v.pContainingEntity, &tr);
 
             // check if traced all the way up to the entity (didn't hit wall)
-            if (strcmp(item_name, STRING(tr.pHit->v.classname)) == 0)
+            if (FIsClassname(item_name, tr.pHit))
             {
                // find distance to item for later use...
                float distance = (vecEnd - vecStart).Length( );
@@ -1269,30 +1264,30 @@ void BotFindItem( bot_t &pBot )
 qboolean BotLookForGrenades( bot_t &pBot )
 {
    static const char * grenade_names[] = {
-      "grenade", "monster_satchel", "monster_snark", "rpg_rocket", "hvr_rocket",
+      "grenade", "monster_satchel", /*"monster_snark",*/ "rpg_rocket", "hvr_rocket",
       NULL,
    };
+
+   // not run in corners when have enemy
+   if(pBot.pBotEnemy)
+      return(FALSE);
 
    edict_t *pent;
    Vector entity_origin;
    float radius = 500;
-   char classname[40];
    edict_t *pEdict = pBot.pEdict;
 
    pent = NULL;
    while ((pent = UTIL_FindEntityInSphere( pent, pEdict->v.origin, radius )) != NULL)
    {
-      strcpy(classname, STRING(pent->v.classname));
-
       entity_origin = pent->v.origin;
 
-      if (FInViewCone( entity_origin, pEdict ) &&
-          FVisible( entity_origin, pEdict ))
+      if (FInViewCone( entity_origin, pEdict ) && FVisible( entity_origin, pEdict, pent ))
       {
-          const char ** p_grna = grenade_names;
+         const char ** p_grna = grenade_names;
           
          while(*p_grna) {
-            if (strcmp(*p_grna, classname) == 0)
+            if (FIsClassname(*p_grna, pent))
                return TRUE;
             p_grna++;
          }
@@ -2241,7 +2236,7 @@ void BotThink( bot_t &pBot )
       if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].battle_strafe) 
       {
          if(pBot.f_strafe_time <= gpGlobals->time) {
-            pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(1.0, 2.0);
+            pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.5, 2.0);
             pBot.f_strafe_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
          }
          
@@ -2282,10 +2277,8 @@ void BotThink( bot_t &pBot )
    if (pBot.f_grenade_found_time + 1.0 > gpGlobals->time)
    {
       // move backwards for 1.0 second after seeing a grenade...
-      if(pBot.f_move_speed <= 0.1)
-         pBot.f_move_speed = (-2.0/3.0) * pBot.f_max_speed;
-      else
-         pBot.f_move_speed = -pBot.f_move_speed;
+      pBot.f_move_speed = -pBot.f_move_speed;
+      pBot.f_strafe_direction = RANDOM_FLOAT2(0, 1) * (pBot.f_strafe_direction>=0?1:-1);
    }
 
    // is the bot "paused"? or longjumping?

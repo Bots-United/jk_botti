@@ -11,3 +11,8 @@
 #include "bot_weapons.h"
 
 #include "bot_skill.h"
+
+void ResetSkillsToDefault(void)
+{
+   memcpy(skill_settings, default_skill_settings, sizeof(skill_settings));
+}

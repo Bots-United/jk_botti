@@ -121,6 +121,9 @@ Usage:
 
  - bot_skill_setup <skill>
       Shows all setting values for skill.
+ 
+ - bot_skill_setup reset
+      Reset all skill settings to default.
 
 List of available settings:
 
@@ -193,6 +196,9 @@ Usage:
 
  - botweapon <weapon-name>
       Shows all setting values for weapon.
+      
+ - botweapon reset
+      Reset all weapon settings to default.
 
 List of weapon-namess:
 
@@ -220,6 +226,12 @@ List of available settings:
       Bot skill must be less than or equal to this value for bot to use 
       secondary attack.
       Value: 0-5 (0 = disabled, 1 highest level, 5 lowest)
+
+ - aim_speed
+      Aim speed that will be used for this gun. This is relative to bot's
+      aim_skill. 1.0 = use bot's highest turn skill, 0.0 = lowest. 1.0
+      equals to version v0.41 default.
+      Value: 0.0-1.0
 
  - avoid_this_gun
       Bot avoids using this weapon if possible.

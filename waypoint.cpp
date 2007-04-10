@@ -1073,24 +1073,26 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
 
    if (nearest_name[0])  // found an entity name
    {
+      char buf[128];
+      
       if (strncmp("item_health", nearest_name, 11) == 0)
       {
          if (pEntity)
-            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs("found a healthkit! (%s)\n", nearest_name));
+            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs2(buf, sizeof(buf), "found a healthkit! (%s)\n", nearest_name));
          waypoints[wpt_index].flags |= W_FL_HEALTH;
       }
 
       if (strncmp("item_armor", nearest_name, 10) == 0)
       {
          if (pEntity)
-            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs("found some armor! (%s)\n", nearest_name));
+            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs2(buf, sizeof(buf), "found some armor! (%s)\n", nearest_name));
          waypoints[wpt_index].flags |= W_FL_ARMOR;
       }
 
       if ((itemflag = GetAmmoItemFlag(nearest_name)) != 0)
       {
          if (pEntity)
-            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs("found some ammo! (%s)\n", nearest_name));
+            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs2(buf, sizeof(buf), "found some ammo! (%s)\n", nearest_name));
          waypoints[wpt_index].flags |= W_FL_AMMO;
          waypoints[wpt_index].itemflags |= itemflag;
       }
@@ -1098,7 +1100,7 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
       if ((itemflag = GetWeaponItemFlag(nearest_name)) != 0 && nearest_pent->v.owner == NULL)
       {
          if (pEntity)
-            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs("found a weapon! (%s)\n", nearest_name));
+            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs2(buf, sizeof(buf), "found a weapon! (%s)\n", nearest_name));
          waypoints[wpt_index].flags |= W_FL_WEAPON;
          waypoints[wpt_index].itemflags |= itemflag;
       }
@@ -1106,7 +1108,7 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
       if ((strcmp("item_longjump", nearest_name) == 0))
       {
          if (pEntity)
-            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs("found a longjump! (%s)\n", nearest_name));
+            ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs2(buf, sizeof(buf), "found a longjump! (%s)\n", nearest_name));
          waypoints[wpt_index].flags |= W_FL_LONGJUMP;
       }
    }
@@ -1212,7 +1214,7 @@ void WaypointAdd(edict_t *pEntity)
    start = pEntity->v.origin - Vector(0, 0, 34);
    end = start + Vector(0, 0, 68);
 
-   if ((pEntity->v.flags & FL_DUCKING) == FL_DUCKING)
+   if ((pEntity->v.flags & FL_DUCKING) == FL_DUCKING && (pEntity->v.flags & FL_ONGROUND) == FL_ONGROUND)
    {
       waypoints[index].flags |= W_FL_CROUCH;  // crouching waypoint
 

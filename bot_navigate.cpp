@@ -958,7 +958,7 @@ void BotOnLadder( bot_t &pBot, float moved_distance )
 
          if (tr.flFraction < 1.0)  // hit something?
          {
-            if (strcmp("func_wall", STRING(tr.pHit->v.classname)) == 0)
+            if (FIsClassname("func_wall", tr.pHit))
             {
                // square up to the wall...
                view_angles = UTIL_VecToAngles(tr.vecPlaneNormal);
@@ -991,7 +991,7 @@ void BotOnLadder( bot_t &pBot, float moved_distance )
 
             if (tr.flFraction < 1.0)  // hit something?
             {
-               if (strcmp("func_wall", STRING(tr.pHit->v.classname)) == 0)
+               if (FIsClassname("func_wall", tr.pHit))
                {
                   // square up to the wall...
                   view_angles = UTIL_VecToAngles(tr.vecPlaneNormal);
@@ -1735,8 +1735,7 @@ qboolean BotFollowUser( bot_t &pBot )
       return FALSE;
    }
 
-   user_visible = FInViewCone( vecEnd, pEdict ) &&
-                  FVisible( vecEnd, pEdict );
+   user_visible = FInViewCone( vecEnd, pEdict ) && FVisible( vecEnd, pEdict, pBot.pBotUser );
 
    // check if the "user" is still visible or if the user has been visible
    // in the last 5 seconds (or the player just starting "using" the bot)

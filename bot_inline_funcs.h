@@ -274,9 +274,19 @@ inline bot_t *UTIL_GetBotPointer(edict_t *pEdict)
 
 inline qboolean FInViewCone(const Vector & Origin, edict_t *pEdict)
 {
-   float fov_angle = 80;
+   const float fov_angle = 80;
    
    return(DotProduct((Origin - pEdict->v.origin).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle)) > cos(deg2rad(fov_angle)));
+}
+
+inline qboolean FIsClassname(edict_t * pent, const char * cname)
+{
+   return(pent?FStrEq(STRING(pent->v.classname), cname):FALSE);
+}
+
+inline qboolean FIsClassname(const char * cname, edict_t * pent)
+{
+   return(FIsClassname(pent, cname));
 }
 
 extern unsigned int rnd_idnum[2];

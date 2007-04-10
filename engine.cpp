@@ -66,9 +66,6 @@ void pfnChangeLevel(char* s1, char* s2)
 
          safevoid_snprintf(cmd, sizeof(cmd), "kick \"%s\"\n", bots[index].name);
 
-         bots[index].respawn_state = RESPAWN_NEED_TO_RESPAWN;
-         bots[index].is_used = false;
-
          SERVER_COMMAND(cmd);  // kick the bot using (kick "name")
       }
    }

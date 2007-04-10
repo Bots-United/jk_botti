@@ -46,6 +46,8 @@ typedef struct
    char  weapon_name[64];  // name of the weapon when selecting it
    int type;
    
+   float aim_speed; // aim speed, 0.0 worst, 1.0 best.
+   
    int   primary_skill_level;   // bot skill must be less than or equal to this value
    int   secondary_skill_level; // bot skill must be less than or equal to this value
    qboolean  avoid_this_gun; // bot avoids using this weapon if possible
@@ -120,4 +122,4 @@ extern qboolean BotGetGoodWeaponCount(bot_t &pBot, const int stop_count);
 extern int BotGetLowAmmoFlags(bot_t &pBot);
 extern int BotGetBetterWeaponChoice(bot_t &pBot, const bot_weapon_select_t &current, const bot_weapon_select_t *pSelect, const float distance, const float height, qboolean *use_primary, qboolean *use_secondary);
 extern qboolean BotAllWeaponsRunningOutOfAmmo(bot_t &pBot);
-extern qboolean IsValidToFireAtTheMoment(bot_t &pBot, const bot_weapon_select_t &select) ;
+extern qboolean IsValidToFireAtTheMoment(bot_t &pBot, const bot_weapon_select_t &select);
