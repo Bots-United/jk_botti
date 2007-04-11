@@ -82,16 +82,6 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
 #define MAX_BOT_CHAT 100
 
 
-typedef struct trigger_sound_s 
-{
-   int used;
-   Vector origin;
-   float volume;
-   float attenuation;
-   float time;
-   float importance;
-} trigger_sound_t;
-
 typedef struct breakable_list_s 
 {
    struct breakable_list_s * next;
@@ -137,6 +127,9 @@ typedef struct
    float msecval;
 // TheFatal - END
 
+   float f_aim_think_frame_time;
+   float f_prev_aim_think_time;
+
    // things from pev in CBasePlayer...
    int bot_team;
    int bot_class;
@@ -146,7 +139,7 @@ typedef struct
    float blinded_time;
 
    float bot_think_time;
-
+   
    float f_max_speed;
    float f_prev_speed;
    float f_speed_check_time;
@@ -341,10 +334,7 @@ typedef struct
    char name[16];				// must be null terminated
 } lumpinfo_t;
 
-extern trigger_sound_t trigger_sounds[32];
 extern bot_t bots[32];
-
-extern void SaveSound(edict_t * pPlayer, float time, const Vector & origin, float volume, float attenuation, int empty);
 
 Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean without_velocity = FALSE);
 qboolean FPredictedVisible(bot_t &pBot);

@@ -273,7 +273,13 @@ void BotPickName( char *name_buffer )
 
          if (pPlayer && !pPlayer->free && !FBitSet(pPlayer->v.flags, FL_PROXY))
          {
-            if (strcmp(bot_names[name_index], STRING(pPlayer->v.netname)) == 0)
+            const char * netname = STRING(pPlayer->v.netname);
+            
+            //check if bot name is [lvlX]name format...
+            if (strncmp(netname, "[lvl", 4) == 0 && netname[4] >= '1' && netname[4] <= '5' && netname[5] == ']')
+               netname += 6;
+            
+            if (strcmp(bot_names[name_index], netname) == 0)
             {
                used = TRUE;
                break;
@@ -585,6 +591,9 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 
       bot_t &pBot = bots[index];
       memset(&pBot, 0, sizeof(pBot));
+
+      pBot.f_aim_think_frame_time = 0;
+      pBot.f_prev_aim_think_time = gpGlobals->time - 0.001;
 
       pBot.is_used = TRUE;
       pBot.f_create_time = gpGlobals->time;
@@ -1346,6 +1355,23 @@ static void HandleWallOnRight( bot_t &pBot )
 }
 
 
+void BotRunPlayerMove(bot_t &pBot, const float *viewangles, float forwardmove, float sidemove, float upmove, unsigned short buttons, byte impulse, byte msec )
+{
+   /*
+      Calling sequence after calling g_engfuncs.pfnRunPlayerMove:
+      
+         1. CmdStart
+         2. PlayerPreThink
+         3. PM_Move
+         4. PlayerPostThink
+         5. CmdEnd
+   */
+   BotAimPre(pBot);
+   g_engfuncs.pfnRunPlayerMove( pBot.pEdict, viewangles, forwardmove, sidemove, upmove, buttons, impulse, msec);
+   BotAimPost(pBot);
+}
+
+
 void BotThink( bot_t &pBot )
 {
    Vector v_diff;             // vector from previous to current location
@@ -1387,13 +1413,13 @@ void BotThink( bot_t &pBot )
    if (pBot.msecval < 1)    // don't allow msec to be less than 1...
       pBot.msecval = 1;
 
-   if (pBot.msecval > 100)  // ...or greater than 100
-      pBot.msecval = 100;
+   if (pBot.msecval > 250)  // ...or greater than 250
+      pBot.msecval = 250;
 
 // TheFatal - END
 
    pBot.f_frame_time = pBot.msecval / 1000;  // calculate frame time
-
+   
    
    pEdict->v.button = 0;
    pBot.f_move_speed = 0.0;
@@ -1403,7 +1429,7 @@ void BotThink( bot_t &pBot )
    {
       BotStartGame( pBot );
       
-      g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot.f_move_speed,
+      BotRunPlayerMove(pBot, pEdict->v.v_angle, pBot.f_move_speed,
                                    0, 0, pEdict->v.button, 0, (byte)pBot.msecval);
 
       return;
@@ -1420,7 +1446,7 @@ void BotThink( bot_t &pBot )
    // in intermission.. don't do anything, freeze bot
    if(g_in_intermission)
    {
-      g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, 0, 0, 0, 0, 0, (byte)pBot.msecval);
+      BotRunPlayerMove(pBot, pEdict->v.v_angle, 0, 0, 0, 0, 0, (byte)pBot.msecval);
       return;
    }
 
@@ -1498,10 +1524,8 @@ void BotThink( bot_t &pBot )
       if (RANDOM_LONG2(1, 100) <= 50)
          pEdict->v.button = IN_ATTACK;
       
-      BotAimPre(pBot);
-      g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot.f_move_speed,
+      BotRunPlayerMove(pBot, pEdict->v.v_angle, pBot.f_move_speed,
                                    0, 0, pEdict->v.button, 0, (byte)pBot.msecval);
-      BotAimPost(pBot);
 
       return;
    }
@@ -1587,10 +1611,8 @@ void BotThink( bot_t &pBot )
       // turn towards ideal_yaw by yaw_speed degrees (slower than normal)
       BotChangeYaw( pBot, pEdict->v.yaw_speed / 2 );
       
-      BotAimPre(pBot);
-      g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot.f_move_speed,
+      BotRunPlayerMove(pBot, pEdict->v.v_angle, pBot.f_move_speed,
                                    0, 0, pEdict->v.button, 0, (byte)pBot.msecval);
-      BotAimPost(pBot);
 
       return;
    }
@@ -2192,10 +2214,8 @@ void BotThink( bot_t &pBot )
 
                f_strafe_speed = 0.0;
                
-               BotAimPre(pBot);
-               g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot.f_move_speed,
+               BotRunPlayerMove(pBot, pEdict->v.v_angle, pBot.f_move_speed,
                                             f_strafe_speed, 0, pEdict->v.button, 0, (byte)pBot.msecval);
-               BotAimPost(pBot);
                
                return;
             }
@@ -2364,11 +2384,9 @@ void BotThink( bot_t &pBot )
       f_strafe_speed = calc.x;
       pBot.f_move_speed = calc.y;
    }
-              
-   BotAimPre(pBot);
-   g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot.f_move_speed,
+   
+   BotRunPlayerMove(pBot, pEdict->v.v_angle, pBot.f_move_speed,
                                 f_strafe_speed, 0, pEdict->v.button, 0, (byte)pBot.msecval);
-   BotAimPost(pBot);
    
    return;
 }

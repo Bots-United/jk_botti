@@ -79,7 +79,7 @@ bot_weapon_select_t valve_weapon_select[13] =
     45, FALSE, 70, 1, 1, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, 50, 2,
     W_IFL_MP5, W_IFL_AMMO_9MM, 0 },
 
-   {VALVE_WEAPON_CROSSBOW, "weapon_crossbow", WEAPON_FIRE_ZOOM, 1.0,
+   {VALVE_WEAPON_CROSSBOW, "weapon_crossbow", WEAPON_FIRE_ZOOM, 0.8,
     SKILL2, NOSKILL, FALSE, FALSE,
     800.0, 4000.0, 0, 0, 1000.0,
     55, TRUE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, 5, -1,

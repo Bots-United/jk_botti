@@ -16,6 +16,7 @@
 #include "bot.h"
 #include "bot_client.h"
 #include "bot_func.h"
+#include "bot_sound.h"
 
 extern enginefuncs_t g_engfuncs;
 extern bot_t bots[32];
@@ -38,7 +39,11 @@ int botMsgIndex;
 qboolean g_in_intermission = FALSE;
 
 
-void pfnSetSize(edict_t *e, const float *rgflMin, const float *rgflMax) {
+void pfnSetSize(edict_t *e, const float *rgflMin, const float *rgflMax) 
+{
+   if (!gpGlobals->deathmatch)
+      RETURN_META (MRES_IGNORED);
+
    int index = UTIL_GetBotIndex(e);
    if(index == -1)
       RETURN_META (MRES_IGNORED);
@@ -50,13 +55,19 @@ void pfnSetSize(edict_t *e, const float *rgflMin, const float *rgflMax) {
 
 void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 ) 
 {
-   SaveSound((edict_t*)pInvoker, gpGlobals->time, pInvoker->v.origin, 1.0, ATTN_NORM, 1);
+   if (gpGlobals->deathmatch)
+   {
+      SaveSound((edict_t*)pInvoker, pInvoker->v.origin, (int)(400*1.0), CHAN_WEAPON);
+   }
    
    RETURN_META (MRES_IGNORED);
 }
 
 void pfnChangeLevel(char* s1, char* s2)
 {
+   if (!gpGlobals->deathmatch)
+      RETURN_META (MRES_IGNORED);
+   
    // kick any bot off of the server after time/frag limit...
    for (int index = 0; index < 32; index++)
    {
@@ -77,7 +88,7 @@ void pfnEmitSound(edict_t *entity, int channel, const char *sample, /*int*/float
 {
    if (gpGlobals->deathmatch)
    {
-      SaveSound((edict_t*)entity, gpGlobals->time, entity->v.origin, volume, attenuation, 1);
+      SaveSound((edict_t*)entity, entity->v.origin, (int)(100*volume), channel);
    }
 
    RETURN_META (MRES_IGNORED);

@@ -21,9 +21,10 @@
 #include "waypoint.h"
 #include "bot_skill.h"
 #include "bot_weapon_select.h"
+#include "bot_sound.h"
 
 #define VER_MAJOR 0
-#define VER_MINOR 44
+#define VER_MINOR 45
 #define VER_NOTE "beta"
 
 extern DLL_FUNCTIONS gFunctionTable;
@@ -324,7 +325,10 @@ int Spawn( edict_t *pent )
 
          WaypointInit();
          WaypointLoad(NULL);
-
+         
+         // init sound system
+         pSoundEnt->Spawn();
+         
          PRECACHE_SOUND("weapons/xbow_hit1.wav");      // waypoint add
          PRECACHE_SOUND("weapons/mine_activate.wav");  // waypoint delete
          PRECACHE_SOUND("common/wpn_hudoff.wav");      // path add/delete start
@@ -348,7 +352,9 @@ int Spawn( edict_t *pent )
          spawn_time_reset = FALSE;
 
          for(int i = 0; i < 32; i++)
+         {
             bots[i].is_used = 0;
+         }
          
          num_bots = 0;
          need_to_open_cfg = TRUE;
@@ -437,7 +443,7 @@ BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddres
          }
       }
       
-      SaveSound(pEntity, 0, Vector(0,0,0), 0, 0, 0);
+      ResetSound(pEntity);
    }
 
    RETURN_META_VALUE (MRES_IGNORED, 0);
@@ -471,7 +477,7 @@ void ClientDisconnect( edict_t *pEntity )
          }
       }
       
-      SaveSound(pEntity, 0, Vector(0,0,0), 0, 0, 0);
+      ResetSound(pEntity);
    }
 
    RETURN_META (MRES_IGNORED);
@@ -488,7 +494,7 @@ void ClientPutInServer( edict_t *pEntity )
    if (i < 32)
       clients[i] = pEntity;  // store this clients edict in the clients array
    
-   SaveSound(pEntity, 0, Vector(0,0,0), 0, 0, 0);
+   ResetSound(pEntity);
    
    RETURN_META (MRES_IGNORED);
 }
@@ -536,40 +542,45 @@ static void (*old_PM_PlaySound)(int channel, const char *sample, float volume, f
 
 void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch) 
 {
-   edict_t * pPlayer;
-   int idx;
+   if (gpGlobals->deathmatch)
+   {
+      edict_t * pPlayer;
+      int idx;
    
-   idx = ENGINE_CURRENT_PLAYER();
-   if(idx < 0 || idx >= gpGlobals->maxClients)
-      goto _exit;
+      idx = ENGINE_CURRENT_PLAYER();
    
-   pPlayer = INDEXENT(idx+1);
-   if(!pPlayer || pPlayer->free || FBitSet(pPlayer->v.flags, FL_PROXY))
-      goto _exit;
+      if(idx >= 0 && idx < gpGlobals->maxClients)
+      {
+         pPlayer = INDEXENT(idx+1);
    
-   SaveSound(pPlayer, gpGlobals->time, pPlayer->v.origin, volume, attenuation, 1);
-      
-_exit:
+         if(pPlayer && !pPlayer->free)
+         {
+            SaveSound(pPlayer, pPlayer->v.origin, (int)(100*volume), CHAN_BODY);
+         }
+      }
+   }
+   
    (*old_PM_PlaySound)(channel, sample, volume, attenuation, fFlags, pitch);
 }
 
 
 void PM_Move(struct playermove_s *ppmove, qboolean server) 
 {
+   if (!gpGlobals->deathmatch) 
+      RETURN_META(MRES_IGNORED);
+      
    //
-   if(ppmove && gpGlobals->deathmatch) 
+   if(ppmove) 
    {
       //hook footstep sound function
       if(ppmove->PM_PlaySound != &new_PM_PlaySound) 
       {
          old_PM_PlaySound = ppmove->PM_PlaySound;
          ppmove->PM_PlaySound = &new_PM_PlaySound;
-         
-         RETURN_META (MRES_HANDLED);
       }
    }
    
-   RETURN_META (MRES_IGNORED);
+   RETURN_META (MRES_HANDLED);
 }
 
 
@@ -584,6 +595,10 @@ void StartFrame( void )
       RETURN_META (MRES_IGNORED);
    
    begin_time = UTIL_GetSecs();
+   
+   // sound system
+   if (pSoundEnt->m_nextthink <= gpGlobals->time)
+      pSoundEnt->Think();
    
    // Don't allow BotThink and WaypointThink run on same frame,
    // because this would KILL bot aim (for reasons still unknown)
@@ -600,7 +615,8 @@ void StartFrame( void )
                if (gpGlobals->time >= bots[bot_index].bot_think_time)
                {
                   BotThink(bots[bot_index]);
-               
+                  
+                  // randomness prevents all bots to run on same frame -> less laggy server
                   bots[bot_index].bot_think_time = gpGlobals->time + bot_think_spf * RANDOM_FLOAT2(0.95, 1.05);
                }
             

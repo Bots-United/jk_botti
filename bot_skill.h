@@ -29,7 +29,7 @@ typedef struct
    float turn_skill; // BotAim turn_skill, how good bot is at aiming on enemy origin.
    float prediction_velocity_varitation;
    
-   int hear_frequency; // how often (out of 100 times) the bot will hear what happens around it.
+   float hearing_sensitivity; // how well bot hears sounds
    
    qboolean can_longjump; // and can longjump.
    

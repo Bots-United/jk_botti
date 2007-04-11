@@ -613,7 +613,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          CHECK_AND_SET_BOTSKILL_FLOAT(shootcone_diameter) // bot tries to fire when aim line is less than [diameter / 2] apart from target 
          CHECK_AND_SET_BOTSKILL_FLOAT(shootcone_minangle) // OR angle between bot aim line and line to target is less than angle set here
          CHECK_AND_SET_BOTSKILL_FLOAT(turn_skill) // BotAim turn_skill, how good bot is at aiming on enemy origin.
-         CHECK_AND_SET_BOTSKILL_INT(hear_frequency) // how often (out of 100 times) the bot will hear what happens around it.
+         CHECK_AND_SET_BOTSKILL_FLOAT(hearing_sensitivity) // how well bot hears sounds
 
          CHECK_AND_SET_BOTSKILL_QBOOLEAN(can_longjump) // and can longjump.
          CHECK_AND_SET_BOTSKILL_INT(random_jump_frequency) // how often (out of 100 times) the bot will do random jump

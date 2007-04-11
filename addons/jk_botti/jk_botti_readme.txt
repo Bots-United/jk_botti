@@ -61,6 +61,25 @@ CPU intensive operation this can only really be done on map change.
 --------------------
 2. What's new
 --------------------
+0.50:
+ * Config file is now reloaded on EVERY map change.
+ * Fixed bot strafing, and other minor changes to movement.
+ * Fixed xbow shooting.
+ * Remake of sound/bot-hear system, based on hlsdk/CSoundEnt. Bot skill
+   setting 'hear_frequency' replaced by 'hearing_sensitivity'.
+ * Bots attack func_breakables and func_pushables.
+ * Bots don't attack players facing wall (chatting/writing). Player
+   must face wall 2 seconds to protection to activate.
+ * Bots ignore snarks/grenades/ect when fighting.
+ * Tweaked down MP5 and crossbow aiming.
+ * New setting to tweak down aim skill for specific weapons (aim_speed).
+ * Bot chat is logged to server logs now.
+ * Fixed weapon selection bug (from HPB). Bot randomized weapons in 
+   for loop causing weapons last in list to be used a lot less than
+   weapon first in the list.
+ * Added separate frame timer for aiming.
+ * Multiple bots don't get same name anymore when using [lvlX] tags.
+
 0.40:
  * Bots now use crossbow (with zoom).
  * Bots now know how to fire MP5 grenades at right angle depending target's
@@ -160,9 +179,9 @@ List of available settings:
       BotAim turn_skill, how good bot is at aiming on enemy.
       Value: 0.5-10 (0.5 = bad, 5 = good, 10 = god)
 
- - hear_frequency
-      How often out of 100 times the bot will hear what happens around it.
-      Value: 0-100
+ - hearing_sensitivity
+      How far away bot will hear. bot_skill 1 default: 4.0, bot_skill 2 default: 1.0
+      Value: 0.0-5.0
       
  - can_longjump
       Can bot at this skill level use longjump.

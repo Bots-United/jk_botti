@@ -39,6 +39,7 @@ SRC = 	bot.cpp \
 	bot_models.cpp \
 	bot_navigate.cpp \
 	bot_skill.cpp \
+	bot_sound.cpp \
 	bot_start.cpp \
 	bot_weapons.cpp \
 	commands.cpp \
