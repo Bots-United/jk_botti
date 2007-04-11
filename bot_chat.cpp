@@ -327,6 +327,16 @@ void BotSwapCharacter(char *in_string, char *out_string)
 void BotChatName(char *original_name, char *out_name)
 {
    int pos;
+   char temp_lvlXless_name[80];
+   
+   //remove [lvlX] tag always
+   if(strncmp(original_name, "[lvl", 4) == 0 && original_name[4] >= '0' && original_name[4] <= '5' && original_name[5] == ']')
+   {
+      strncpy(temp_lvlXless_name, &original_name[6], 31);
+      temp_lvlXless_name[31] = 0;
+      
+      original_name = temp_lvlXless_name;
+   }
 
    if (RANDOM_LONG2(1, 100) <= bot_chat_tag_percent)
    {

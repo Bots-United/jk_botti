@@ -22,10 +22,7 @@
 #include "bot_skill.h"
 #include "bot_weapon_select.h"
 #include "bot_sound.h"
-
-#define VER_MAJOR 0
-#define VER_MINOR 45
-#define VER_NOTE "beta"
+#include "version.h"
 
 extern DLL_FUNCTIONS gFunctionTable;
 extern DLL_FUNCTIONS gFunctionTable_POST;
