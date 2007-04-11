@@ -21,8 +21,8 @@ endif
 
 TARGET = jk_botti_mm
 BASEFLAGS = 
-OPTFLAGS = -O3 -fomit-frame-pointer -ffast-math
-#OPTFLAGS = -O0 -g
+#OPTFLAGS = -O3 -fomit-frame-pointer -ffast-math
+OPTFLAGS = -O0 -g
 INCLUDES = -I"./metamod" \
 	-I"./common" \
 	-I"./dlls" \
@@ -39,6 +39,7 @@ SRC = 	bot.cpp \
 	bot_models.cpp \
 	bot_navigate.cpp \
 	bot_skill.cpp \
+	bot_sound.cpp \
 	bot_start.cpp \
 	bot_weapons.cpp \
 	commands.cpp \

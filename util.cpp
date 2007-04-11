@@ -37,10 +37,8 @@
 
 extern bot_t bots[32];
 extern qboolean is_team_play;
-
-trigger_sound_t trigger_sounds[32];
-
 float last_time_not_facing_wall[32];
+
 
 breakable_list_t *g_breakable_list = NULL;
 
@@ -442,40 +440,6 @@ void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index)
 
    MDLL_CmdStart(pEdict, &user, 0);
    MDLL_CmdEnd(pEdict);
-}
-
-void SaveSound(edict_t * pPlayer, float time, const Vector & origin, float volume, float attenuation, int used) 
-{
-   int i = ENTINDEX(pPlayer) - 1;
-   if(i < 0 || i >= gpGlobals->maxClients)
-      return;
-   
-   // importance value for new sound
-   float importance = 0.0;
-   
-   if(attenuation > 0)
-   {
-      importance = volume * (1024 / attenuation);
-   }
-   
-   if(trigger_sounds[i].used && importance < trigger_sounds[i].importance)
-   {
-      //decrease remembered volume over time
-      if((time - trigger_sounds[i].time) >= 0.1)
-      {
-         trigger_sounds[i].time += 0.1;
-         trigger_sounds[i].importance *= 0.95;
-      }
-   }
-   else
-   {
-      trigger_sounds[i].time = time;
-      trigger_sounds[i].origin = origin;
-      trigger_sounds[i].volume = volume;
-      trigger_sounds[i].attenuation = attenuation;
-      trigger_sounds[i].used = used;
-      trigger_sounds[i].importance = importance;
-   }
 }
 
 void UTIL_PrintBotInfo(void(*printfunc)(void *, char*), void * arg) {

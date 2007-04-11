@@ -203,10 +203,11 @@ inline double deg2rad(double deg)
 
 inline qboolean IsAlive(edict_t *pEdict) 
 {
-   return ((pEdict->v.deadflag == DEAD_NO) &&
-           (pEdict->v.health > 0) &&
-           !(pEdict->v.flags & FL_NOTARGET) &&
-           (pEdict->v.takedamage != 0));
+   return ((pEdict->v.deadflag == DEAD_NO) && 
+           (pEdict->v.health > 0) && 
+           !(pEdict->v.flags & FL_NOTARGET) && 
+           (pEdict->v.takedamage != 0) &&
+           (pEdict->v.solid != SOLID_NOT));
 }
 
 inline float UTIL_WrapAngle360(float angle)

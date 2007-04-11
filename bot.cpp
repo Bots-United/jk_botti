@@ -164,7 +164,6 @@ void BotSpawnInit( bot_t &pBot )
    pBot.current_opt_distance = 99999.0;
 
    pBot.f_pause_time = 0.0;
-   pBot.f_sound_update_time = 0.0;
 
    pBot.b_see_tripmine = FALSE;
    pBot.b_shoot_tripmine = FALSE;
@@ -1248,13 +1247,7 @@ void BotFindItem( bot_t &pBot )
    if (pPickupEntity != NULL)
    {
       // let's head off toward that item...
-      Vector v_item = pickup_origin - pEdict->v.origin;
-
-      Vector bot_angles = UTIL_VecToAngles( v_item );
-
-      pEdict->v.ideal_yaw = bot_angles.y;
-
-      BotFixIdealYaw(pEdict);
+      BotSetAimAt(pBot, pickup_origin);
 
       pBot.pBotPickupItem = pPickupEntity;  // save the item bot is trying to get
    }

@@ -21,9 +21,10 @@
 #include "waypoint.h"
 #include "bot_skill.h"
 #include "bot_weapon_select.h"
+#include "bot_sound.h"
 
 #define VER_MAJOR 0
-#define VER_MINOR 42
+#define VER_MINOR 43
 #define VER_NOTE "beta"
 
 extern DLL_FUNCTIONS gFunctionTable;
@@ -276,7 +277,7 @@ void GameDLLInit( void )
 
    LoadBotChat();
    LoadBotModels();
-
+   
    RETURN_META (MRES_IGNORED);
 }
 
@@ -336,6 +337,9 @@ int Spawn( edict_t *pent )
 
          m_spriteTexture = PRECACHE_MODEL( "sprites/lgtning.spr");
 
+         // init sound system
+         pSoundEnt->Spawn();
+
          g_in_intermission = FALSE;
 
          is_team_play = FALSE;
@@ -383,8 +387,15 @@ void DispatchKeyValue( edict_t *pentKeyvalue, KeyValueData *pkvd )
    if(!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
    
-   if(pkvd && pkvd->szKeyName && pkvd->szValue && FIsClassname(pentKeyvalue, "func_breakable"))
-      UTIL_UpdateFuncBreakable(pentKeyvalue, pkvd->szKeyName, pkvd->szValue);
+   if(pkvd && pkvd->szKeyName && pkvd->szValue)
+   {
+      if(FIsClassname(pentKeyvalue, "func_breakable") || 
+      	 (FIsClassname(pentKeyvalue, "func_pushable") && 
+      	  pentKeyvalue->v.spawnflags & SF_PUSH_BREAKABLE))
+      {
+         UTIL_UpdateFuncBreakable(pentKeyvalue, pkvd->szKeyName, pkvd->szValue);
+      }
+   }
    
    RETURN_META (MRES_HANDLED);
 }
@@ -436,7 +447,7 @@ BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddres
          }
       }
       
-      SaveSound(pEntity, 0, Vector(0,0,0), 0, 0, 0);
+      ResetSound(pEntity);
    }
 
    RETURN_META_VALUE (MRES_IGNORED, 0);
@@ -470,7 +481,7 @@ void ClientDisconnect( edict_t *pEntity )
          }
       }
       
-      SaveSound(pEntity, 0, Vector(0,0,0), 0, 0, 0);
+      ResetSound(pEntity);
    }
 
    RETURN_META (MRES_IGNORED);
@@ -479,6 +490,9 @@ void ClientDisconnect( edict_t *pEntity )
 
 void ClientPutInServer( edict_t *pEntity )
 {
+   if (!gpGlobals->deathmatch) 
+      RETURN_META(MRES_IGNORED);
+      
    int i = 0;
 
    while ((i < 32) && (clients[i] != NULL))
@@ -487,7 +501,7 @@ void ClientPutInServer( edict_t *pEntity )
    if (i < 32)
       clients[i] = pEntity;  // store this clients edict in the clients array
    
-   SaveSound(pEntity, 0, Vector(0,0,0), 0, 0, 0);
+   ResetSound(pEntity);
    
    RETURN_META (MRES_IGNORED);
 }
@@ -515,11 +529,17 @@ void ServerDeactivate(void)
 
 void PlayerPostThink( edict_t *pEdict )
 {
-   if (!gpGlobals->deathmatch || FNullEnt(pEdict)) 
+   if (!gpGlobals->deathmatch) 
       RETURN_META(MRES_IGNORED);
    
-   //check if player is facing wall
-   CheckPlayerChatProtection(pEdict);
+   if(!FNullEnt(pEdict))
+   {
+      //check if player is facing wall
+      CheckPlayerChatProtection(pEdict);
+      
+      //update sounds
+      UpdatePlayerSound(pEdict);
+   }
    
    RETURN_META (MRES_HANDLED);
 }
@@ -529,40 +549,45 @@ static void (*old_PM_PlaySound)(int channel, const char *sample, float volume, f
 
 void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch) 
 {
-   edict_t * pPlayer;
-   int idx;
+   if (gpGlobals->deathmatch)
+   {
+      edict_t * pPlayer;
+      int idx;
    
-   idx = ENGINE_CURRENT_PLAYER();
-   if(idx < 0 || idx >= gpGlobals->maxClients)
-      goto _exit;
+      idx = ENGINE_CURRENT_PLAYER();
    
-   pPlayer = INDEXENT(idx+1);
-   if(!pPlayer || pPlayer->free || FBitSet(pPlayer->v.flags, FL_PROXY))
-      goto _exit;
+      if(idx >= 0 && idx < gpGlobals->maxClients)
+      {
+         pPlayer = INDEXENT(idx+1);
    
-   SaveSound(pPlayer, gpGlobals->time, pPlayer->v.origin, volume, attenuation, 1);
-      
-_exit:
+         if(pPlayer && !pPlayer->free)
+         {
+            SaveSound(pPlayer, pPlayer->v.origin, (int)(100*volume), CHAN_BODY);
+         }
+      }
+   }
+   
    (*old_PM_PlaySound)(channel, sample, volume, attenuation, fFlags, pitch);
 }
 
 
 void PM_Move(struct playermove_s *ppmove, qboolean server) 
 {
+   if (!gpGlobals->deathmatch) 
+      RETURN_META(MRES_IGNORED);
+      
    //
-   if(ppmove && gpGlobals->deathmatch) 
+   if(ppmove) 
    {
       //hook footstep sound function
       if(ppmove->PM_PlaySound != &new_PM_PlaySound) 
       {
          old_PM_PlaySound = ppmove->PM_PlaySound;
          ppmove->PM_PlaySound = &new_PM_PlaySound;
-         
-         RETURN_META (MRES_HANDLED);
       }
    }
    
-   RETURN_META (MRES_IGNORED);
+   RETURN_META (MRES_HANDLED);
 }
 
 
@@ -587,6 +612,11 @@ void StartFrame( void )
       gather_data_time = gpGlobals->time + (1.0 / 30); //30 fps
    }
    
+   // sound system
+   if (pSoundEnt->m_nextthink <= gpGlobals->time)
+      pSoundEnt->Think();
+   
+   // bot brain
    if (bot_stop == 0)
    {            
       for (bot_index = 0; bot_index < gpGlobals->maxClients; bot_index++)

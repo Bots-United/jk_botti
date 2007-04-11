@@ -16,6 +16,7 @@
 #include "bot.h"
 #include "bot_client.h"
 #include "bot_func.h"
+#include "bot_sound.h"
 
 extern enginefuncs_t g_engfuncs;
 extern bot_t bots[32];
@@ -38,7 +39,11 @@ int botMsgIndex;
 qboolean g_in_intermission = FALSE;
 
 
-void pfnSetSize(edict_t *e, const float *rgflMin, const float *rgflMax) {
+void pfnSetSize(edict_t *e, const float *rgflMin, const float *rgflMax) 
+{
+   if (!gpGlobals->deathmatch)
+      RETURN_META (MRES_IGNORED);
+
    int index = UTIL_GetBotIndex(e);
    if(index == -1)
       RETURN_META (MRES_IGNORED);
@@ -50,13 +55,19 @@ void pfnSetSize(edict_t *e, const float *rgflMin, const float *rgflMax) {
 
 void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 ) 
 {
-   SaveSound((edict_t*)pInvoker, gpGlobals->time, pInvoker->v.origin, 1.0, ATTN_NORM, 1);
+   if (gpGlobals->deathmatch)
+   {
+      SaveSound((edict_t*)pInvoker, pInvoker->v.origin, (int)(400*1.0), CHAN_WEAPON);
+   }
    
    RETURN_META (MRES_IGNORED);
 }
 
 void pfnChangeLevel(char* s1, char* s2)
 {
+   if (!gpGlobals->deathmatch)
+      RETURN_META (MRES_IGNORED);
+   
    // kick any bot off of the server after time/frag limit...
    for (int index = 0; index < 32; index++)
    {
@@ -77,7 +88,7 @@ void pfnEmitSound(edict_t *entity, int channel, const char *sample, /*int*/float
 {
    if (gpGlobals->deathmatch)
    {
-      SaveSound((edict_t*)entity, gpGlobals->time, entity->v.origin, volume, attenuation, 1);
+      SaveSound((edict_t*)entity, entity->v.origin, (int)(100*volume), channel);
    }
 
    RETURN_META (MRES_IGNORED);
@@ -86,6 +97,9 @@ void pfnEmitSound(edict_t *entity, int channel, const char *sample, /*int*/float
 
 void pfnClientCommand(edict_t* pEdict, char* szFmt, ...)
 {
+   if (!gpGlobals->deathmatch)
+      RETURN_META (MRES_IGNORED);
+   
    if ((FBitSet(pEdict->v.flags, FL_FAKECLIENT) || FBitSet(pEdict->v.flags, FL_THIRDPARTYBOT)))
       RETURN_META (MRES_SUPERCEDE);
       
@@ -304,6 +318,9 @@ void pfnWriteEntity(int iValue)
 
 void pfnClientPrintf( edict_t* pEdict, PRINT_TYPE ptype, const char *szMsg )
 {
+   if (!gpGlobals->deathmatch)
+      RETURN_META (MRES_IGNORED);
+      
    if ((FBitSet(pEdict->v.flags, FL_FAKECLIENT) || FBitSet(pEdict->v.flags, FL_THIRDPARTYBOT)))
       RETURN_META (MRES_SUPERCEDE);
       
@@ -313,6 +330,9 @@ void pfnClientPrintf( edict_t* pEdict, PRINT_TYPE ptype, const char *szMsg )
 
 const char *pfnCmd_Args( void )
 {
+   if (!gpGlobals->deathmatch)
+      RETURN_META_VALUE (MRES_IGNORED, NULL);
+      
    if (isFakeClientCommand)
       RETURN_META_VALUE (MRES_SUPERCEDE, &g_argv[0]);
 
@@ -322,6 +342,9 @@ const char *pfnCmd_Args( void )
 
 const char *pfnCmd_Argv( int argc )
 {
+   if (!gpGlobals->deathmatch)
+      RETURN_META_VALUE (MRES_IGNORED, NULL);
+      
    if (isFakeClientCommand)
    {
       if (argc == 0)
@@ -340,6 +363,9 @@ const char *pfnCmd_Argv( int argc )
 
 int pfnCmd_Argc( void )
 {
+   if (!gpGlobals->deathmatch)
+      RETURN_META_VALUE (MRES_IGNORED, 0);
+
    if (isFakeClientCommand)
       RETURN_META_VALUE (MRES_SUPERCEDE, fake_arg_count);
 
@@ -349,6 +375,9 @@ int pfnCmd_Argc( void )
 
 void pfnSetClientMaxspeed(const edict_t *pEdict, float fNewMaxspeed)
 {
+   if (!gpGlobals->deathmatch)
+      RETURN_META (MRES_IGNORED);
+      
    int index;
 
    index = UTIL_GetBotIndex((edict_t *)pEdict);

@@ -1747,11 +1747,7 @@ qboolean BotFollowUser( bot_t &pBot )
 
       // face the user
       Vector v_user = pBot.pBotUser->v.origin - pEdict->v.origin;
-      Vector bot_angles = UTIL_VecToAngles( v_user );
-
-      pEdict->v.ideal_yaw = bot_angles.y;
-
-      BotFixIdealYaw(pEdict);
+      BotSetAimAt(pBot, pBot.pBotUser->v.origin);
 
       f_distance = v_user.Length( );  // how far away is the "user"?
 

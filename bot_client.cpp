@@ -311,12 +311,7 @@ void BotClient_Valve_Damage(void *p, int bot_index)
          if (bots[bot_index].pBotEnemy == NULL || !FPredictedVisible(bots[bot_index]))
          {
             // face the attacker...
-            Vector v_enemy = damage_origin - bots[bot_index].pEdict->v.origin;
-            Vector bot_angles = UTIL_VecToAngles( v_enemy );
-
-            bots[bot_index].pEdict->v.ideal_yaw = bot_angles.y;
-
-            BotFixIdealYaw(bots[bot_index].pEdict);
+            BotSetAimAt(bots[bot_index], damage_origin);
          
             // stop using health or HEV stations...
             bots[bot_index].b_use_health_station = FALSE;
