@@ -117,6 +117,8 @@ void BotSpawnInit( bot_t &pBot )
    // pick a wander direction (50% of the time to the left, 50% to the right)
    pBot.wander_dir = (RANDOM_LONG2(1, 100) <= 50) ? WANDER_LEFT : WANDER_RIGHT;
 
+   pBot.f_move_direction = 1;
+
    pBot.f_exit_water_time = 0.0;
 
    pBot.pBotEnemy = NULL;
@@ -164,6 +166,7 @@ void BotSpawnInit( bot_t &pBot )
    pBot.current_opt_distance = 99999.0;
 
    pBot.f_pause_time = 0.0;
+   pBot.f_sound_update_time = 0.0;
 
    pBot.b_see_tripmine = FALSE;
    pBot.b_shoot_tripmine = FALSE;
@@ -1247,7 +1250,13 @@ void BotFindItem( bot_t &pBot )
    if (pPickupEntity != NULL)
    {
       // let's head off toward that item...
-      BotSetAimAt(pBot, pickup_origin);
+      Vector v_item = pickup_origin - pEdict->v.origin;
+
+      Vector bot_angles = UTIL_VecToAngles( v_item );
+
+      pEdict->v.ideal_yaw = bot_angles.y;
+
+      BotFixIdealYaw(pEdict);
 
       pBot.pBotPickupItem = pPickupEntity;  // save the item bot is trying to get
    }
@@ -2220,25 +2229,66 @@ void BotThink( bot_t &pBot )
    
    // don't go too close to enemy
    // strafe instead
-   if(pBot.pBotEnemy != NULL && 
-      FInViewCone(pBot.pBotEnemy->v.origin, pEdict) && 
-      (pBot.pBotEnemy->v.origin - pEdict->v.origin).Length() < pBot.current_opt_distance *
-       RANDOM_FLOAT2((1000-skill_settings[pBot.bot_skill].keep_optimal_distance) / -1000.0, 
-                     (1000-skill_settings[pBot.bot_skill].keep_optimal_distance) / 1000.0))
+   if(pBot.pBotEnemy != NULL && FInViewCone(pBot.pBotEnemy->v.origin, pEdict))
    {
       if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].battle_strafe) 
       {
-         if(pBot.f_strafe_time <= gpGlobals->time) {
-            pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.5, 2.0);
+         if(pBot.f_strafe_time <= gpGlobals->time) 
+         {
+            pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.5, 1.2);
             pBot.f_strafe_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
+            pBot.f_move_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
          }
          
          pBot.f_move_speed = 1.0;
       }
       else
       {
+         if(pBot.f_strafe_time <= gpGlobals->time) 
+         {
+            pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.5, 1.2);
+            pBot.f_strafe_direction = RANDOM_FLOAT(-0.3, 0.3);
+            
+            if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].keep_optimal_dist)
+            {
+               if((pBot.pBotEnemy->v.origin - pEdict->v.origin).Length() < pBot.current_opt_distance)
+                  pBot.f_move_direction = -1;
+               else
+                  pBot.f_move_direction = 1;
+            }
+            else
+               pBot.f_move_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
+         }
+         
          pBot.f_move_speed = 32.0;
       }
+         
+      // check for walls, left and right
+      if(pBot.f_strafe_direction > 0.0)
+      {
+         if(BotCheckWallOnRight(pBot))
+            pBot.f_strafe_direction = -pBot.f_strafe_direction;
+      }
+      else if(pBot.f_strafe_direction < 0.0)
+      {
+         if(BotCheckWallOnLeft(pBot))
+            pBot.f_strafe_direction = -pBot.f_strafe_direction;
+      }
+      
+      // check for walls, back and forward
+      if(pBot.f_move_direction > 0.0)
+      {
+         if(BotCheckWallOnForward(pBot))
+            pBot.f_move_direction = -pBot.f_move_direction;
+      }
+      else if(pBot.f_move_direction < 0.0)
+      {
+         if(BotCheckWallOnBack(pBot))
+            pBot.f_move_direction = -pBot.f_move_direction;
+      }
+      
+      // set move direction
+      pBot.f_move_speed *= pBot.f_move_direction;
    }
    else if (pBot.f_strafe_time < gpGlobals->time)  // time to strafe yet?
    {
@@ -2253,6 +2303,18 @@ void BotThink( bot_t &pBot )
       }
       else
          pBot.f_strafe_direction = 0.0 * RANDOM_FLOAT2(-0.005, 0.005);
+
+      // check for walls, left and right
+      if(pBot.f_strafe_direction > 0.0)
+      {
+         if(BotCheckWallOnRight(pBot))
+            pBot.f_strafe_direction = -pBot.f_strafe_direction;
+      }
+      else if(pBot.f_strafe_direction < 0.0)
+      {
+         if(BotCheckWallOnLeft(pBot))
+            pBot.f_strafe_direction = -pBot.f_strafe_direction;
+      }
    }
         
    if (pBot.f_duck_time > gpGlobals->time)

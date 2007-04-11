@@ -203,9 +203,9 @@ inline double deg2rad(double deg)
 
 inline qboolean IsAlive(edict_t *pEdict) 
 {
-   return ((pEdict->v.deadflag == DEAD_NO) && 
-           (pEdict->v.health > 0) && 
-           !(pEdict->v.flags & FL_NOTARGET) && 
+   return ((pEdict->v.deadflag == DEAD_NO) &&
+           (pEdict->v.health > 0) &&
+           !(pEdict->v.flags & FL_NOTARGET) &&
            (pEdict->v.takedamage != 0) &&
            (pEdict->v.solid != SOLID_NOT));
 }
@@ -342,6 +342,48 @@ inline float RANDOM_FLOAT2(float flLow, float flHigh)
    rnd = rnd * (flHigh - flLow) / 4294967295.0; // div by (1<<32)-1
    
    return (float)(rnd + flLow);
+}
+
+
+inline qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t * pOrigin )
+{
+   edict_t * pHit = NULL;
+   return(FVisible(vecOrigin, pEdict, &pHit) || (pOrigin != NULL && pHit == pOrigin));
+}
+
+inline qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict )
+{
+   return(FVisible(vecOrigin, pEdict, (edict_t **)NULL));
+}
+
+inline qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnemy )
+{
+   edict_t * pHit = NULL;
+   
+   if(FVisible(vecOrigin, pEdict, &pHit) || (pEnemy != NULL && pHit == pEnemy))
+      return(TRUE);
+   
+   if(FNullEnt(pHit))
+      return(FALSE);
+   
+   if(!FIsClassname(pHit, "player"))
+   {
+      if(!(pHit->v.flags & FL_MONSTER))
+         return(FALSE);
+      else
+      {
+         if (FIsClassname(pHit, "hornet"))
+            return(FALSE);
+      
+         if (FIsClassname(pHit, "monster_snark"))
+            return(FALSE);
+      }
+   }
+   
+   if(!IsAlive (pHit))
+      return(FALSE);
+   
+   return(TRUE);
 }
 
 #endif /*BOT_INLINE_FUNCS*/

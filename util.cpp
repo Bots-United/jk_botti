@@ -37,8 +37,10 @@
 
 extern bot_t bots[32];
 extern qboolean is_team_play;
-float last_time_not_facing_wall[32];
 
+trigger_sound_t trigger_sounds[32];
+
+float last_time_not_facing_wall[32];
 
 breakable_list_t *g_breakable_list = NULL;
 
@@ -352,34 +354,30 @@ char * UTIL_GetTeam(edict_t *pEntity, char teamstr[32])
    return(teamstr);
 }
 
-qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t * pHit )
+qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit )
 {
    TraceResult tr;
    Vector      vecLookerOrigin;
-
+   
+   if(pHit)
+      *pHit = NULL;
+   
    // look through caller's eyes
    vecLookerOrigin = pEdict->v.origin + pEdict->v.view_ofs;
 
    int bInWater = (POINT_CONTENTS (vecOrigin) == CONTENTS_WATER);
    int bLookerInWater = (POINT_CONTENTS (vecLookerOrigin) == CONTENTS_WATER);
-
+   
    // don't look through water
    if (bInWater != bLookerInWater)
       return FALSE;
 
    UTIL_TraceLine(vecLookerOrigin, vecOrigin, ignore_monsters, ignore_glass, pEdict, &tr);
 
-   if (tr.flFraction < 1.0)
-   {
-      if(pHit == tr.pHit)
-         return TRUE; // Line of sight is blocked by target
-         
-      return FALSE;  // Line of sight is not established
-   }
-   else
-   {         
-      return TRUE;  // line of sight is valid.
-   }
+   if(pHit)
+      *pHit = tr.pHit;
+
+   return(tr.flFraction > 0.9999);
 }
 
 qboolean FInShootCone(const Vector & Origin, edict_t *pEdict, float distance, float diameter, float min_angle)
@@ -440,6 +438,40 @@ void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index)
 
    MDLL_CmdStart(pEdict, &user, 0);
    MDLL_CmdEnd(pEdict);
+}
+
+void SaveSound(edict_t * pPlayer, float time, const Vector & origin, float volume, float attenuation, int used) 
+{
+   int i = ENTINDEX(pPlayer) - 1;
+   if(i < 0 || i >= gpGlobals->maxClients)
+      return;
+   
+   // importance value for new sound
+   float importance = 0.0;
+   
+   if(attenuation > 0)
+   {
+      importance = volume * (1024 / attenuation);
+   }
+   
+   if(trigger_sounds[i].used && importance < trigger_sounds[i].importance)
+   {
+      //decrease remembered volume over time
+      if((time - trigger_sounds[i].time) >= 0.1)
+      {
+         trigger_sounds[i].time += 0.1;
+         trigger_sounds[i].importance *= 0.95;
+      }
+   }
+   else
+   {
+      trigger_sounds[i].time = time;
+      trigger_sounds[i].origin = origin;
+      trigger_sounds[i].volume = volume;
+      trigger_sounds[i].attenuation = attenuation;
+      trigger_sounds[i].used = used;
+      trigger_sounds[i].importance = importance;
+   }
 }
 
 void UTIL_PrintBotInfo(void(*printfunc)(void *, char*), void * arg) {

@@ -7,10 +7,6 @@
 #ifndef BOT_FUNC_H
 #define BOT_FUNC_H
 
-
-#define AIM_RACC_OLD 1
-#define AIM_RACC 2
-
 //prototypes of bot functions...
 
 void BotSpawnInit( bot_t &pBot );
@@ -46,6 +42,8 @@ void BotRandomTurn( bot_t &pBot );
 qboolean BotFollowUser( bot_t &pBot );
 qboolean BotCheckWallOnLeft( bot_t &pBot );
 qboolean BotCheckWallOnRight( bot_t &pBot );
+qboolean BotCheckWallOnBack( bot_t &pBot );
+qboolean BotCheckWallOnForward( bot_t &pBot );
 void BotLookForDrop( bot_t &pBot );
 
 void BotCheckTeamplay(void);

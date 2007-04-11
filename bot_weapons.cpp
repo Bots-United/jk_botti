@@ -25,32 +25,32 @@ extern int submod_id;
 
 bot_weapon_select_t valve_weapon_select[13] = 
 {
-   {VALVE_WEAPON_CROWBAR, "weapon_crowbar", WEAPON_MELEE, 0.7,
+   {VALVE_WEAPON_CROWBAR, "weapon_crowbar", WEAPON_MELEE, 1.0,
     SKILL4, NOSKILL, FALSE, FALSE,
     0.0, 64.0, 0, 0, 1.0,
     20, TRUE, 100, 0, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
     W_IFL_CROWBAR, 0, 0 },
 
-   {VALVE_WEAPON_HANDGRENADE, "weapon_handgrenade", WEAPON_THROW, 0.6,
+   {VALVE_WEAPON_HANDGRENADE, "weapon_handgrenade", WEAPON_THROW, 1.0,
     SKILL4, NOSKILL, TRUE, FALSE,
     300.0, 800.0, 0.0, 0.0, 300.0,
     10, TRUE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, -1, -1,
     W_IFL_HANDGRENADE, 0, 0 },
 
-   {VALVE_WEAPON_SNARK, "weapon_snark", WEAPON_THROW, 0.6,
+   {VALVE_WEAPON_SNARK, "weapon_snark", WEAPON_THROW, 1.0,
     SKILL3, NOSKILL, FALSE, FALSE,
     200.0, 800.0, 0, 0, 300.0,
     20, FALSE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
     W_IFL_SNARK, 0, 0 },
 
-   {VALVE_WEAPON_EGON, "weapon_egon", WEAPON_FIRE, 0.8,
+   {VALVE_WEAPON_EGON, "weapon_egon", WEAPON_FIRE, 1.0,
     SKILL3, NOSKILL, FALSE, FALSE,
     200.0, 2000.0, 0, 0, 350.0,
     50, FALSE, 100, 1, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, 20, -1,
     W_IFL_EGON, W_IFL_AMMO_GAUSS, 0 },
 
    {VALVE_WEAPON_GAUSS, "weapon_gauss", WEAPON_FIRE, 1.0,
-    SKILL4, SKILL3, FALSE, TRUE,
+    SKILL4, SKILL2, FALSE, TRUE,
     100.0, 500.0, 50.0, 3000.0, 500.0,
     20, FALSE, 80, 1, 10, TRUE, FALSE, FALSE, TRUE, 0.0, 0.8, TRUE, 30, 30,
     W_IFL_GAUSS, W_IFL_AMMO_GAUSS, 0 },
@@ -61,13 +61,13 @@ bot_weapon_select_t valve_weapon_select[13] =
     55, FALSE, 70, 1, 2, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, 12, 12,
     W_IFL_SHOTGUN, W_IFL_AMMO_BUCKSHOT, 0 },
 
-   {VALVE_WEAPON_PYTHON, "weapon_357", WEAPON_FIRE, 0.9,
+   {VALVE_WEAPON_PYTHON, "weapon_357", WEAPON_FIRE, 1.0,
     SKILL3, NOSKILL, FALSE, FALSE,
     50.0, 4000, 0, 0, 750.0,
     15, FALSE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, 12, 12,
     W_IFL_PYTHON, W_IFL_AMMO_357, 0 },
 
-   {VALVE_WEAPON_HORNETGUN, "weapon_hornetgun", WEAPON_FIRE, 0.8,
+   {VALVE_WEAPON_HORNETGUN, "weapon_hornetgun", WEAPON_FIRE, 1.0,
     SKILL4, SKILL3, FALSE, FALSE,
     200.0, 1500.0, 50.0, 250.0, 300.0,
     10, TRUE, 50, 1, 4, TRUE, TRUE, FALSE, FALSE, 0.0, 0.0, TRUE, -1, -1,
@@ -79,19 +79,19 @@ bot_weapon_select_t valve_weapon_select[13] =
     45, FALSE, 70, 1, 1, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, 50, 2,
     W_IFL_MP5, W_IFL_AMMO_9MM, 0 },
 
-   {VALVE_WEAPON_CROSSBOW, "weapon_crossbow", WEAPON_FIRE_ZOOM, 0.7,
-    SKILL3, NOSKILL, FALSE, FALSE,
+   {VALVE_WEAPON_CROSSBOW, "weapon_crossbow", WEAPON_FIRE_ZOOM, 1.0,
+    SKILL2, NOSKILL, FALSE, FALSE,
     800.0, 4000.0, 0, 0, 1000.0,
     55, TRUE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, 5, -1,
     W_IFL_CROSSBOW, W_IFL_AMMO_CROSSBOW, 0 },
    
-   {VALVE_WEAPON_RPG, "weapon_rpg", WEAPON_FIRE, 0.8,
+   {VALVE_WEAPON_RPG, "weapon_rpg", WEAPON_FIRE, 1.0,
     SKILL3, NOSKILL, FALSE, FALSE,
     400.0, 5000.0, 0.0, 0.0, 700.0,
     60, TRUE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, 2, -1,
     W_IFL_RPG, W_IFL_AMMO_RPG, 0 },
     
-   {VALVE_WEAPON_GLOCK, "weapon_9mmhandgun", WEAPON_FIRE, 0.9,
+   {VALVE_WEAPON_GLOCK, "weapon_9mmhandgun", WEAPON_FIRE, 1.0,
     SKILL5, SKILL3, TRUE, TRUE,
     250.0, 1500.0, 50.0, 300.0, 300.0,
     20, TRUE, 70, 1, 1, TRUE, TRUE, FALSE, FALSE, 0.0, 0.0, TRUE, 30, -1,

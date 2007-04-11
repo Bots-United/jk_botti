@@ -1747,7 +1747,11 @@ qboolean BotFollowUser( bot_t &pBot )
 
       // face the user
       Vector v_user = pBot.pBotUser->v.origin - pEdict->v.origin;
-      BotSetAimAt(pBot, pBot.pBotUser->v.origin);
+      Vector bot_angles = UTIL_VecToAngles( v_user );
+
+      pEdict->v.ideal_yaw = bot_angles.y;
+
+      BotFixIdealYaw(pEdict);
 
       f_distance = v_user.Length( );  // how far away is the "user"?
 
@@ -1806,6 +1810,58 @@ qboolean BotCheckWallOnRight( bot_t &pBot )
 
    v_src = pEdict->v.origin;
    v_right = v_src + UTIL_AnglesToRight(pEdict->v.v_angle) * 40;  // 40 units to the right
+
+   UTIL_TraceMove( v_src, v_right, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
+
+   // check if the trace hit something...
+   if (tr.flFraction < 1.0)
+   {
+      if (pBot.f_wall_on_right < 1.0)
+         pBot.f_wall_on_right = gpGlobals->time;
+
+      return TRUE;
+   }
+
+   return FALSE;
+}
+
+
+qboolean BotCheckWallOnForward( bot_t &pBot )
+{
+   edict_t *pEdict = pBot.pEdict;
+   Vector v_src, v_right;
+   TraceResult tr;
+
+   // do a trace to the right...
+
+   v_src = pEdict->v.origin;
+   v_right = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * 40;  // 40 units to the forawrd
+
+   UTIL_TraceMove( v_src, v_right, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
+
+   // check if the trace hit something...
+   if (tr.flFraction < 1.0)
+   {
+      if (pBot.f_wall_on_right < 1.0)
+         pBot.f_wall_on_right = gpGlobals->time;
+
+      return TRUE;
+   }
+
+   return FALSE;
+}
+
+
+qboolean BotCheckWallOnBack( bot_t &pBot )
+{
+   edict_t *pEdict = pBot.pEdict;
+   Vector v_src, v_right;
+   TraceResult tr;
+
+   // do a trace to the right...
+
+   v_src = pEdict->v.origin;
+   v_right = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * -40;  // 40 units to the back
 
    UTIL_TraceMove( v_src, v_right, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
 

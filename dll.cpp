@@ -21,10 +21,9 @@
 #include "waypoint.h"
 #include "bot_skill.h"
 #include "bot_weapon_select.h"
-#include "bot_sound.h"
 
 #define VER_MAJOR 0
-#define VER_MINOR 43
+#define VER_MINOR 44
 #define VER_NOTE "beta"
 
 extern DLL_FUNCTIONS gFunctionTable;
@@ -78,7 +77,7 @@ edict_t *listenserver_edict = NULL;
 float welcome_time = 0.0;
 qboolean welcome_sent = FALSE;
 int bot_stop = 0;
-int skip_think_frame = 0;
+int frame_count = 0;
 int randomize_bots_on_mapchange = 0;
 
 qboolean is_team_play = FALSE;
@@ -87,7 +86,6 @@ qboolean checked_teamplay = FALSE;
 FILE *bot_cfg_fp = NULL;
 qboolean need_to_open_cfg = TRUE;
 float bot_cfg_pause_time = 0.0;
-float gather_data_time = 0.0;
 qboolean spawn_time_reset = FALSE;
 float waypoint_time = 0.0;
 
@@ -277,7 +275,7 @@ void GameDLLInit( void )
 
    LoadBotChat();
    LoadBotModels();
-   
+
    RETURN_META (MRES_IGNORED);
 }
 
@@ -336,17 +334,16 @@ int Spawn( edict_t *pent )
          PRECACHE_SOUND("player/sprayer.wav");         // logo spray sound
 
          m_spriteTexture = PRECACHE_MODEL( "sprites/lgtning.spr");
-
-         // init sound system
-         pSoundEnt->Spawn();
+         PRECACHE_MODEL( "models/w_chainammo.mdl");
 
          g_in_intermission = FALSE;
 
          is_team_play = FALSE;
          checked_teamplay = FALSE;
 
+         frame_count = 0;
+
          bot_cfg_pause_time = 0.0;
-         gather_data_time = 0.0;
          waypoint_time = -1.0;
          spawn_time_reset = FALSE;
 
@@ -355,7 +352,6 @@ int Spawn( edict_t *pent )
          
          num_bots = 0;
          need_to_open_cfg = TRUE;
-         skip_think_frame = 0;
 
          bot_check_time = gpGlobals->time + 5.0;
       }
@@ -388,14 +384,8 @@ void DispatchKeyValue( edict_t *pentKeyvalue, KeyValueData *pkvd )
       RETURN_META (MRES_IGNORED);
    
    if(pkvd && pkvd->szKeyName && pkvd->szValue)
-   {
-      if(FIsClassname(pentKeyvalue, "func_breakable") || 
-      	 (FIsClassname(pentKeyvalue, "func_pushable") && 
-      	  pentKeyvalue->v.spawnflags & SF_PUSH_BREAKABLE))
-      {
+      if(FIsClassname(pentKeyvalue, "func_breakable") || (FIsClassname(pentKeyvalue, "func_pushable") && pentKeyvalue->v.spawnflags & SF_PUSH_BREAKABLE))
          UTIL_UpdateFuncBreakable(pentKeyvalue, pkvd->szKeyName, pkvd->szValue);
-      }
-   }
    
    RETURN_META (MRES_HANDLED);
 }
@@ -447,7 +437,7 @@ BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddres
          }
       }
       
-      ResetSound(pEntity);
+      SaveSound(pEntity, 0, Vector(0,0,0), 0, 0, 0);
    }
 
    RETURN_META_VALUE (MRES_IGNORED, 0);
@@ -481,7 +471,7 @@ void ClientDisconnect( edict_t *pEntity )
          }
       }
       
-      ResetSound(pEntity);
+      SaveSound(pEntity, 0, Vector(0,0,0), 0, 0, 0);
    }
 
    RETURN_META (MRES_IGNORED);
@@ -490,9 +480,6 @@ void ClientDisconnect( edict_t *pEntity )
 
 void ClientPutInServer( edict_t *pEntity )
 {
-   if (!gpGlobals->deathmatch) 
-      RETURN_META(MRES_IGNORED);
-      
    int i = 0;
 
    while ((i < 32) && (clients[i] != NULL))
@@ -501,7 +488,7 @@ void ClientPutInServer( edict_t *pEntity )
    if (i < 32)
       clients[i] = pEntity;  // store this clients edict in the clients array
    
-   ResetSound(pEntity);
+   SaveSound(pEntity, 0, Vector(0,0,0), 0, 0, 0);
    
    RETURN_META (MRES_IGNORED);
 }
@@ -537,8 +524,8 @@ void PlayerPostThink( edict_t *pEdict )
       //check if player is facing wall
       CheckPlayerChatProtection(pEdict);
       
-      //update sounds
-      UpdatePlayerSound(pEdict);
+      //Gather player positions for ping prediction
+      GatherPlayerData(pEdict);
    }
    
    RETURN_META (MRES_HANDLED);
@@ -549,45 +536,40 @@ static void (*old_PM_PlaySound)(int channel, const char *sample, float volume, f
 
 void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch) 
 {
-   if (gpGlobals->deathmatch)
-   {
-      edict_t * pPlayer;
-      int idx;
+   edict_t * pPlayer;
+   int idx;
    
-      idx = ENGINE_CURRENT_PLAYER();
+   idx = ENGINE_CURRENT_PLAYER();
+   if(idx < 0 || idx >= gpGlobals->maxClients)
+      goto _exit;
    
-      if(idx >= 0 && idx < gpGlobals->maxClients)
-      {
-         pPlayer = INDEXENT(idx+1);
+   pPlayer = INDEXENT(idx+1);
+   if(!pPlayer || pPlayer->free || FBitSet(pPlayer->v.flags, FL_PROXY))
+      goto _exit;
    
-         if(pPlayer && !pPlayer->free)
-         {
-            SaveSound(pPlayer, pPlayer->v.origin, (int)(100*volume), CHAN_BODY);
-         }
-      }
-   }
-   
+   SaveSound(pPlayer, gpGlobals->time, pPlayer->v.origin, volume, attenuation, 1);
+      
+_exit:
    (*old_PM_PlaySound)(channel, sample, volume, attenuation, fFlags, pitch);
 }
 
 
 void PM_Move(struct playermove_s *ppmove, qboolean server) 
 {
-   if (!gpGlobals->deathmatch) 
-      RETURN_META(MRES_IGNORED);
-      
    //
-   if(ppmove) 
+   if(ppmove && gpGlobals->deathmatch) 
    {
       //hook footstep sound function
       if(ppmove->PM_PlaySound != &new_PM_PlaySound) 
       {
          old_PM_PlaySound = ppmove->PM_PlaySound;
          ppmove->PM_PlaySound = &new_PM_PlaySound;
+         
+         RETURN_META (MRES_HANDLED);
       }
    }
    
-   RETURN_META (MRES_HANDLED);
+   RETURN_META (MRES_IGNORED);
 }
 
 
@@ -603,71 +585,64 @@ void StartFrame( void )
    
    begin_time = UTIL_GetSecs();
    
-   count = 0;
-   
-   // for ping prediction   
-   if (gpGlobals->time >= gather_data_time) 
+   // Don't allow BotThink and WaypointThink run on same frame,
+   // because this would KILL bot aim (for reasons still unknown)
+   if(frame_count++ & 1)
    {
-      GatherPlayerData();
-      gather_data_time = gpGlobals->time + (1.0 / 30); //30 fps
-   }
-   
-   // sound system
-   if (pSoundEnt->m_nextthink <= gpGlobals->time)
-      pSoundEnt->Think();
-   
-   // bot brain
-   if (bot_stop == 0)
-   {            
-      for (bot_index = 0; bot_index < gpGlobals->maxClients; bot_index++)
-      {
-         if (bots[bot_index].is_used)   // is this slot used 
+      if (bot_stop == 0)
+      {            
+         count = 0;
+         
+         for (bot_index = 0; bot_index < gpGlobals->maxClients; bot_index++)
          {
-            if (gpGlobals->time >= bots[bot_index].bot_think_time)
+            if (bots[bot_index].is_used)   // is this slot used 
             {
-               BotThink(bots[bot_index]);
+               if (gpGlobals->time >= bots[bot_index].bot_think_time)
+               {
+                  BotThink(bots[bot_index]);
                
-               do {
                   bots[bot_index].bot_think_time = gpGlobals->time + bot_think_spf * RANDOM_FLOAT2(0.95, 1.05);
-               } while( gpGlobals->time + 1.0 < bots[bot_index].bot_think_time );
-            }
+               }
             
-            count++;
+               count++;
+            }
          }
+         
+         if (count > num_bots)
+            num_bots = count;
       }
    }
-
-   if (count > num_bots)
-      num_bots = count;
-
-   // Autowaypointing engine and else, limit to half of botthink rate
-   if (gpGlobals->time >= waypoint_time)
+   else
    {
-      int waypoint_player_count = 0;
-      int waypoint_player_index = 1;
-      
-      WaypointAddSpawnObjects();
-      
-      // 10 times / sec, note: this is extremely slow, do checking only for max 4 players on one frame
-      waypoint_time = gpGlobals->time + (1.0/10.0);
-      
-      while(waypoint_player_index <= gpGlobals->maxClients)
+      // Autowaypointing engine and else, limit to half of botthink rate
+      if (gpGlobals->time >= waypoint_time)
       {
-         pPlayer = INDEXENT(waypoint_player_index++);
-
-         if (pPlayer && !pPlayer->free && !FBitSet(pPlayer->v.flags, FL_PROXY))
+         int waypoint_player_count = 0;
+         int waypoint_player_index = 1;
+      
+         WaypointAddSpawnObjects();
+      
+         // 10 times / sec, note: this is extremely slow, do checking only for max 4 players on one frame
+         waypoint_time = gpGlobals->time + (1.0/10.0);
+      
+         while(waypoint_player_index <= gpGlobals->maxClients)
          {
-            // Is player alive?
-            if(!IsAlive(pPlayer))
-               continue;
-            
-            if (FBitSet(pPlayer->v.flags, FL_CLIENT) && !FBitSet(pPlayer->v.flags, FL_PROXY) && 
-            	   !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
+            pPlayer = INDEXENT(waypoint_player_index++);
+
+            if (pPlayer && !pPlayer->free && !FBitSet(pPlayer->v.flags, FL_PROXY))
             {
-               WaypointThink(pPlayer);
+               // Is player alive?
+               if(!IsAlive(pPlayer))
+                  continue;
+            
+               if (FBitSet(pPlayer->v.flags, FL_CLIENT) && !FBitSet(pPlayer->v.flags, FL_PROXY) && 
+                  !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
+               {
+                  WaypointThink(pPlayer);
                
-               if(++waypoint_player_count >= 4)
-                  break;
+                  if(++waypoint_player_count >= 2)
+                     break;
+               }
             }
          }
       }
