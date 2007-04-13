@@ -21,7 +21,7 @@ inline double UTIL_GetSecs(void)
    QueryPerformanceFrequency(&freq);
    QueryPerformanceCounter(&count);
 
-   return (double)count.QuadPart / (double)freq.QuadPart;
+   return (double)(count.QuadPart / freq.QuadPart);
 #else
    struct timeval tv;
    
@@ -192,8 +192,10 @@ inline edict_t *UTIL_FindEntityByTargetname( edict_t *pentStart, const char *szN
 
 inline void null_terminate_buffer(char *buf, const size_t maxlen)
 {
+   for(size_t i = 0; i < maxlen; i++)
+      if(buf[i] == 0)
+         return;
    buf[maxlen-1] = 0;
-   buf[strlen(buf)] = 0;
 }
 
 inline double deg2rad(double deg) 
@@ -201,13 +203,17 @@ inline double deg2rad(double deg)
    return(deg * (M_PI / 180));
 }
 
-inline qboolean IsAlive(edict_t *pEdict) 
+inline qboolean IsAlive(const edict_t *pEdict) 
 {
-   return ((pEdict->v.deadflag == DEAD_NO) &&
-           (pEdict->v.health > 0) &&
-           !(pEdict->v.flags & FL_NOTARGET) &&
-           (pEdict->v.takedamage != 0) &&
-           (pEdict->v.solid != SOLID_NOT));
+   qboolean ret0,ret1,ret2,ret3,ret4;
+   
+   ret0 = (pEdict->v.deadflag == DEAD_NO);
+   ret1 = (pEdict->v.health > 0);
+   ret2 = !(pEdict->v.flags & FL_NOTARGET);
+   ret3 = (pEdict->v.takedamage != 0);
+   ret4 = (pEdict->v.solid != SOLID_NOT);
+   
+   return(ret0 & ret1 & ret2 & ret3 & ret4);
 }
 
 inline float UTIL_WrapAngle360(float angle)
@@ -250,6 +256,11 @@ inline Vector UTIL_GetOrigin(edict_t *pEdict)
            return VecBModelOrigin(pEdict);
 
    return pEdict->v.origin; 
+}
+
+inline void UTIL_ParticleEffect( const Vector &vecOrigin, const Vector &vecDirection, ULONG ulColor, ULONG ulCount )
+{
+   PARTICLE_EFFECT( vecOrigin, vecDirection, (float)ulColor, (float)ulCount );
 }
 
 inline int UTIL_GetBotIndex(edict_t *pEdict)
@@ -366,19 +377,8 @@ inline qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t
    if(FNullEnt(pHit))
       return(FALSE);
    
-   if(!FIsClassname(pHit, "player"))
-   {
-      if(!(pHit->v.flags & FL_MONSTER))
-         return(FALSE);
-      else
-      {
-         if (FIsClassname(pHit, "hornet"))
-            return(FALSE);
-      
-         if (FIsClassname(pHit, "monster_snark"))
-            return(FALSE);
-      }
-   }
+   if(!(pHit->v.flags & FL_MONSTER) && !FIsClassname(pHit, "player"))
+      return(FALSE);
    
    if(!IsAlive (pHit))
       return(FALSE);

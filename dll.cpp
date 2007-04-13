@@ -522,14 +522,14 @@ void PlayerPostThink( edict_t *pEdict )
    if (!gpGlobals->deathmatch) 
       RETURN_META(MRES_IGNORED);
    
-   if(!FNullEnt(pEdict))
-   {
-      //check if player is facing wall
-      CheckPlayerChatProtection(pEdict);
+   //check if player is facing wall
+   CheckPlayerChatProtection(pEdict);
       
-      //Gather player positions for ping prediction
-      GatherPlayerData(pEdict);
-   }
+   //Gather player positions for ping prediction
+   GatherPlayerData(pEdict);
+      
+   //Sound update
+   UpdatePlayerSound(pEdict);
    
    RETURN_META (MRES_HANDLED);
 }
@@ -552,14 +552,14 @@ void new_PM_PlaySound(int channel, const char *sample, float volume, float atten
    
          if(pPlayer && !pPlayer->free)
          {
-            SaveSound(pPlayer, pPlayer->v.origin, (int)(100*volume), CHAN_BODY);
+            int ivolume = (int)(1000*volume);
+            SaveSound(pPlayer, pPlayer->v.origin, ivolume, CHAN_BODY);
          }
       }
    }
    
    (*old_PM_PlaySound)(channel, sample, volume, attenuation, fFlags, pitch);
 }
-
 
 void PM_Move(struct playermove_s *ppmove, qboolean server) 
 {
@@ -756,6 +756,7 @@ C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVers
    gFunctionTable.pfnStartFrame = StartFrame;
    gFunctionTable.pfnServerDeactivate = ServerDeactivate;
    gFunctionTable.pfnPlayerPostThink = PlayerPostThink;
+   gFunctionTable.pfnPM_Move = PM_Move;
 
    memcpy (pFunctionTable, &gFunctionTable, sizeof (DLL_FUNCTIONS));
    return (TRUE);

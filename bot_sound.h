@@ -24,7 +24,7 @@
 // bot_sound.h
 //
 
-#define	MAX_WORLD_SOUNDS	64 // maximum number of sounds handled by the world at one time.
+#define	MAX_WORLD_SOUNDS	128 // maximum number of sounds handled by the world at one time.
 
 #define bits_SOUND_NONE		0
 #define	bits_SOUND_COMBAT	( 1 << 0 )// gunshots, explosions

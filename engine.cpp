@@ -55,11 +55,26 @@ void pfnSetSize(edict_t *e, const float *rgflMin, const float *rgflMax)
 
 void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 ) 
 {
+   //TODO:
+   float volume = /*GetEventIndexVolume(eventindex)*/1.0;
+   
    if (gpGlobals->deathmatch)
    {
-      SaveSound((edict_t*)pInvoker, pInvoker->v.origin, (int)(400*1.0), CHAN_WEAPON);
+      int ivolume = (int)(1000*volume);
+      SaveSound((edict_t*)pInvoker, pInvoker->v.origin, ivolume, CHAN_WEAPON);
    }
    
+   RETURN_META (MRES_IGNORED);
+}
+
+void pfnEmitSound(edict_t *entity, int channel, const char *sample, /*int*/float volume, float attenuation, int fFlags, int pitch)
+{
+   if (gpGlobals->deathmatch)
+   {
+      int ivolume = (int)(1000*volume);
+      SaveSound((edict_t*)entity, entity->v.origin, ivolume, channel);
+   }
+
    RETURN_META (MRES_IGNORED);
 }
 
@@ -79,16 +94,6 @@ void pfnChangeLevel(char* s1, char* s2)
 
          SERVER_COMMAND(cmd);  // kick the bot using (kick "name")
       }
-   }
-
-   RETURN_META (MRES_IGNORED);
-}
-
-void pfnEmitSound(edict_t *entity, int channel, const char *sample, /*int*/float volume, float attenuation, int fFlags, int pitch)
-{
-   if (gpGlobals->deathmatch)
-   {
-      SaveSound((edict_t*)entity, entity->v.origin, (int)(100*volume), channel);
    }
 
    RETURN_META (MRES_IGNORED);

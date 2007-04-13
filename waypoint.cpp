@@ -982,7 +982,7 @@ int WaypointFindNearestAiming(Vector v_origin)
 }
 
 
-void WaypointDrawBeam(edict_t *pEntity, Vector start, Vector end, int width,
+void WaypointDrawBeam(edict_t *pEntity, const Vector &start, const Vector &end, int width,
         int noise, int red, int green, int blue, int brightness, int speed)
 {
    // should waypoints be visible?

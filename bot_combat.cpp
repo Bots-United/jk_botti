@@ -51,6 +51,7 @@ typedef struct posdata_s
 posdata_t * pos_latest[32];
 posdata_t * pos_oldest[32];
 
+
 //
 qboolean BotAimsAtSomething (bot_t &pBot)
 {
@@ -58,17 +59,10 @@ qboolean BotAimsAtSomething (bot_t &pBot)
       return FALSE;
    
    qboolean visible = FPredictedVisible(pBot);
-   /*
-   static int vis_c = 0;
-   static int novis_c = 0;
-   
-   vis_c += visible;
-   novis_c += !visible;
-   
-   UTIL_ConsolePrintf("%d, %d -> %f\n", vis_c, novis_c, (novis_c)?(vis_c/(float)novis_c):0);
-   */
+
    return(visible);
 }
+
 
 //
 void BotPointGun(bot_t &pBot)
@@ -138,6 +132,7 @@ void BotPointGun(bot_t &pBot)
    pEdict->v.angles.z = 0;
 }
 
+
 // Called before g_engfuncs.pfnRunPlayerMove
 void BotAimPre( bot_t &pBot ) 
 {   
@@ -160,6 +155,7 @@ void BotAimPre( bot_t &pBot )
    }
 }
 
+
 // Called after g_engfuncs.pfnRunPlayerMove
 void BotAimPost( bot_t &pBot )
 {
@@ -174,8 +170,10 @@ void BotAimPost( bot_t &pBot )
    }
 }
 
+
 //
-void BotResetReactionTime(bot_t &pBot) {
+void BotResetReactionTime(bot_t &pBot) 
+{
    if (pBot.reaction_time)
    {
       float react_delay;
@@ -191,6 +189,7 @@ void BotResetReactionTime(bot_t &pBot) {
    }
 }
 
+
 //
 void BotCheckTeamplay(void)
 {
@@ -205,6 +204,7 @@ void BotCheckTeamplay(void)
 
    checked_teamplay = TRUE;
 }
+
 
 // called in clientdisconnect
 void free_posdata_list(int idx) 
@@ -224,6 +224,7 @@ void free_posdata_list(int idx)
    pos_latest[idx] = 0;
    pos_oldest[idx] = 0;
 }
+
 
 //
 void add_next_posdata(int idx, edict_t *pEdict)
@@ -251,6 +252,7 @@ void add_next_posdata(int idx, edict_t *pEdict)
    if(!pos_oldest[idx])
       pos_oldest[idx] = pos_latest[idx];
 }
+
 
 // remove data older than max + 100ms
 void timetrim_posdata(int idx) 
@@ -288,6 +290,7 @@ void timetrim_posdata(int idx)
    }
 }
 
+
 // called every PlayerPostThink
 void GatherPlayerData(edict_t * pEdict) 
 {
@@ -302,6 +305,7 @@ void GatherPlayerData(edict_t * pEdict)
    add_next_posdata(idx, pEdict);
    timetrim_posdata(idx);
 }
+
 
 //
 Vector AddPredictionVelocityVaritation(bot_t &pBot, const Vector & velocity)
@@ -318,6 +322,7 @@ Vector AddPredictionVelocityVaritation(bot_t &pBot, const Vector & velocity)
    
    return Vector(flat.x, flat.y, velocity.z);
 }
+
 
 // Prevent bots from shooting at on ground when aiming on falling player that hits ground (Z axis fixup only)
 Vector TracePredictedMovement(bot_t &pBot, edict_t *pPlayer, Vector v_src, Vector v_velocity, float time, qboolean ducking, qboolean without_velocity)
@@ -339,6 +344,7 @@ Vector TracePredictedMovement(bot_t &pBot, edict_t *pPlayer, Vector v_src, Vecto
    return(v_dest);
 }
 
+
 //
 qboolean FPredictedVisible(bot_t &pBot)
 {
@@ -349,6 +355,7 @@ qboolean FPredictedVisible(bot_t &pBot)
 
    return(FVisibleEnemy(v_enemy, pBot.pEdict, pBot.pBotEnemy));
 }
+
 
 // used instead of using pBotEnemy->v.origin in aim code.
 //  if bot's aim lags behind moving target increase value of AHEAD_MULTIPLIER.
@@ -441,6 +448,7 @@ Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean witho
    return(TracePredictedMovement(pBot, pPlayer, pred_origin, pred_velocity, fabs(gpGlobals->time - time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity)); 
 }
 
+
 //
 qboolean GetPredictedIsAlive(edict_t * pPlayer, float time) 
 {
@@ -479,6 +487,7 @@ qboolean GetPredictedIsAlive(edict_t * pPlayer, float time)
    return(newer->was_alive);
 }
 
+
 //
 qboolean HaveSameModels(edict_t * pEnt1, edict_t * pEnt2) 
 {
@@ -495,6 +504,8 @@ qboolean HaveSameModels(edict_t * pEnt1, edict_t * pEnt2)
    return(!stricmp(model_name1, model_name2));
 }
 
+
+//
 qboolean FCanShootInHead(edict_t * pEdict, edict_t * pTarget, const Vector & v_dest)
 {
    if(!FIsClassname("player", pTarget))
@@ -515,6 +526,7 @@ qboolean FCanShootInHead(edict_t * pEdict, edict_t * pTarget, const Vector & v_d
 }
 
 
+//
 edict_t *FindEnemyNearestToPoint(Vector v_point, float radius, edict_t * pBotEdict)
 {
    float nearestdistance = radius + 1;
@@ -598,6 +610,7 @@ edict_t *FindEnemyNearestToPoint(Vector v_point, float radius, edict_t * pBotEdi
 }
 
 
+//
 edict_t *BotFindEnemy( bot_t &pBot )
 {
    edict_t *pent = NULL;
@@ -838,12 +851,19 @@ edict_t *BotFindEnemy( bot_t &pBot )
                   v_newenemy = v_monsterplayer;
                      
                   pBot.pBotUser = NULL;  // don't follow user when enemy found
+                  
+                  //draw red beam
+                  //UTIL_DrawBeam(pNewEnemy, v_newenemy, pEdict->v.origin, 10, 2, 250, 50, 50, 200, 10);
                }
             }
          }
          
          iSound = pCurrentSound->m_iNext;
       }
+
+      // draw green beam
+      /*if(pNewEnemy)
+         UTIL_DrawBeam(pNewEnemy, v_newenemy, pEdict->v.origin, 10, 2, 50, 250, 50, 200, 10);*/
    }
 
    if (pNewEnemy)
@@ -1247,8 +1267,6 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
    if(pBot.f_weaponchange_time >= gpGlobals->time && pBot.current_weapon_index >= 0 && weapon_choice == 0)
       return FALSE;
 
-#if 1
-
    //
    // 1. check which weapons are available and with which percents
    //
@@ -1339,46 +1357,6 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
          return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], use_primary, use_secondary));
       }
    }
-
-#else /* old code */
-
-   // loop through all the weapons until terminator is found...
-   select_index = -1;
-   while (pSelect[++select_index].iId)
-   {
-      // skip currently selected weapon.. it wasn't good enough earlier so it isn't now either
-      if(pBot.current_weapon_index >= 0 && pBot.current_weapon_index == select_index)
-      {
-         pBot.current_weapon_index = -1; // forget current weapon
-         continue;
-      }
-         
-      // Check if we can use this weapon
-      if(!(weapon_choice == pSelect[select_index].iId || weapon_choice == 0))
-         continue;
-
-      if(!IsValidWeaponChoose(pBot, pSelect[select_index]) ||
-         !BotCanUseWeapon(pBot, pSelect[select_index]) ||
-         !IsValidToFireAtTheMoment(pBot, pSelect[select_index]))
-      	 continue;
-
-      // is use percent greater than weapon use percent?
-      if (RANDOM_LONG2(1, 100) > pSelect[select_index].use_percent)
-         continue;
-
-      // Check if this weapon is ok for current contitions
-      use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
-      use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
-      if(use_primary || use_secondary)
-      {
-         if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
-            return FALSE; //error
-
-         return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], use_primary, use_secondary));
-      }
-   }
-
-#endif
 
    // AT THIS POINT:
    // We didn't find good weapon, now try find least skilled weapon that bot has, but avoid avoidable weapons

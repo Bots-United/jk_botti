@@ -1726,14 +1726,14 @@ qboolean BotFollowUser( bot_t &pBot )
    float f_distance;
    edict_t *pEdict = pBot.pEdict;
 
-   Vector vecEnd = pBot.pBotUser->v.origin + pBot.pBotUser->v.view_ofs;
-
    if (!IsAlive( pBot.pBotUser ))
    {
       // the bot's user is dead!
       pBot.pBotUser = NULL;
       return FALSE;
    }
+
+   Vector vecEnd = pBot.pBotUser->v.origin + pBot.pBotUser->v.view_ofs;
 
    user_visible = FInViewCone( vecEnd, pEdict ) && FVisible( vecEnd, pEdict, pBot.pBotUser );
 

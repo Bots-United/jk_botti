@@ -43,6 +43,43 @@ float last_time_not_facing_wall[32];
 breakable_list_t *g_breakable_list = NULL;
 
 
+//
+void UTIL_DrawBeam(edict_t *pEnemy, const Vector &start, const Vector &end, int width,
+    int noise, int red, int green, int blue, int brightness, int speed)
+{
+   if(pEnemy && (ENTINDEX(pEnemy)-1 < 0 || ENTINDEX(pEnemy)-1 >= gpGlobals->maxClients))
+      return;
+   
+   if(pEnemy == NULL)
+      MESSAGE_BEGIN(MSG_ALL, SVC_TEMPENTITY);
+   else
+      MESSAGE_BEGIN(MSG_ONE, SVC_TEMPENTITY, NULL, pEnemy);
+   
+   WRITE_BYTE( TE_BEAMPOINTS);
+   WRITE_COORD(start.x);
+   WRITE_COORD(start.y);
+   WRITE_COORD(start.z);
+   WRITE_COORD(end.x);
+   WRITE_COORD(end.y);
+   WRITE_COORD(end.z);
+   WRITE_SHORT( m_spriteTexture );
+   WRITE_BYTE( 1 ); // framestart
+   WRITE_BYTE( 10 ); // framerate
+   WRITE_BYTE( 10 ); // life in 0.1's
+   WRITE_BYTE( width ); // width
+   WRITE_BYTE( noise );  // noise
+
+   WRITE_BYTE( red );   // r, g, b
+   WRITE_BYTE( green );   // r, g, b
+   WRITE_BYTE( blue );   // r, g, b
+
+   WRITE_BYTE( brightness );   // brightness
+   WRITE_BYTE( speed );    // speed
+   
+   MESSAGE_END();
+}
+
+
 // 
 breakable_list_t * UTIL_AddFuncBreakable(edict_t *pEdict)
 {

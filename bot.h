@@ -335,6 +335,7 @@ typedef struct
 } lumpinfo_t;
 
 extern bot_t bots[32];
+extern int m_spriteTexture;
 
 Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean without_velocity = FALSE);
 qboolean FPredictedVisible(bot_t &pBot);
@@ -371,7 +372,8 @@ void UTIL_PrintBotInfo(void(*printfunc)(void *, char*), void * arg);
 void UTIL_ServerPrintf( char *fmt, ... );
 void UTIL_ConsolePrintf( char *fmt, ... );
 char* UTIL_VarArgs2( char * string, size_t strlen, char *format, ... );
-
+void UTIL_DrawBeam(edict_t *pEnemy, const Vector &start, const Vector &end, int width, int noise, int red, int green, int blue, int brightness, int speed);
+    
 breakable_list_t * UTIL_FindBreakable(breakable_list_t * pbreakable);
 void UTIL_FreeFuncBreakables(void);
 void UTIL_UpdateFuncBreakable(edict_t *pEdict, const char * setting, const char * value);
