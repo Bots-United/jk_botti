@@ -1,5 +1,5 @@
 jk_botti - Be More Human
---------------------------------0.40
+--------------------------------0.50
 
 1. Intro
 2. What's new
@@ -10,7 +10,7 @@ jk_botti - Be More Human
 1. Intro
 --------------------
 
-This is 0.40 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+This is 0.50 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
 You are free to use code for any of your needs.
 
 Credits:
@@ -45,7 +45,7 @@ Tricks used to lower CPU usage:
 
 Aiming system on jk_botti does not use currently available and latest player
 locations for tracking and shooting enemy but instead use old data (level 1
-bot 100ms, level 5 bot 500ms old) to guess position of player. This makes 
+bot 125ms, level 5 bot 225ms old) to guess position of player. This makes 
 aiming worser when player changes movement vector rapidly (jump, duck,
 change strafe direction rapidly). 
 
@@ -177,11 +177,11 @@ List of available settings:
       
  - turn_skill
       BotAim turn_skill, how good bot is at aiming on enemy.
-      Value: 0.5-10 (0.5 = bad, 5 = good, 10 = god)
+      Value: 0.5-4 (0.5 = bad, 4 = very fast)
 
  - hearing_sensitivity
-      How far away bot will hear. bot_skill 1 default: 4.0, bot_skill 2 default: 1.0
-      Value: 0.0-5.0
+      How far away bot will hear. 0.0 hear nothing, 1.5 used for skill 1.
+      Value: 0.0-1.5
       
  - can_longjump
       Can bot at this skill level use longjump.
@@ -248,8 +248,7 @@ List of available settings:
 
  - aim_speed
       Aim speed that will be used for this gun. This is relative to bot's
-      aim_skill. 1.0 = use bot's highest turn skill, 0.0 = lowest. 1.0
-      equals to version v0.41 default.
+      aim_skill. 1.0 = use bot's highest turn skill, 0.0 = lowest.
       Value: 0.0-1.0
 
  - avoid_this_gun
