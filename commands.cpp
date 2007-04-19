@@ -65,15 +65,58 @@ extern int bot_reaction_time;
 qboolean isFakeClientCommand = FALSE;
 int fake_arg_count;
 
+#define CFGCMD_TYPE 1
+#define SRVCMD_TYPE 2
+#define CLICMD_TYPE 3
 
-qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, const char * pcmd, const char * arg1, const char * arg2, const char * arg3, const char * arg4, const char * arg5, qboolean is_cfgcmd) 
+#define PRINTFUNC_INFO 1
+#define PRINTFUNC_ERROR 2
+
+typedef void (*printfunc_t)(int printtype, void *arg, char *msg);
+
+
+void UTIL_PrintBotInfo(const printfunc_t printfunc, void * arg) 
+{
+   //print out bot info
+   char msg[80];
+   int bot_index, count = 0;
+   
+   for (bot_index = 0; bot_index < gpGlobals->maxClients; bot_index++)
+   {
+      if (bots[bot_index].is_used) {
+         count++;
+         safevoid_snprintf(msg, sizeof(msg), "Bot #%d\n", count);
+         printfunc(PRINTFUNC_INFO, arg, msg);
+         safevoid_snprintf(msg, sizeof(msg), " name: %s\n", bots[bot_index].name);
+         printfunc(PRINTFUNC_INFO, arg, msg);
+         safevoid_snprintf(msg, sizeof(msg), " skin: %s\n", bots[bot_index].skin);
+         printfunc(PRINTFUNC_INFO, arg, msg);
+         safevoid_snprintf(msg, sizeof(msg), " skill: %d\n", bots[bot_index].bot_skill + 1);
+         printfunc(PRINTFUNC_INFO, arg, msg);
+         safevoid_snprintf(msg, sizeof(msg), " got enemy: %s\n", (bots[bot_index].pBotEnemy != 0) ? "true" : "false"); 
+         printfunc(PRINTFUNC_INFO, arg, msg);
+         safevoid_snprintf(msg, sizeof(msg), "---\n"); 
+         printfunc(PRINTFUNC_INFO, arg, msg);
+      }
+   }
+   
+   safevoid_snprintf(msg, sizeof(msg), "Total Bots: %d\n", count);
+   printfunc(PRINTFUNC_INFO, arg, msg);
+}
+
+
+qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * arg, const char * pcmd, const char * arg1, const char * arg2, const char * arg3, const char * arg4, const char * arg5) 
 {
    char msg[128];
-   qboolean is_clientcmd;
-   qboolean is_servercmd;
-   
-   is_clientcmd = !is_cfgcmd && !!arg; //arg is pEntity on clientcmd
-   is_servercmd = !is_clientcmd && !is_cfgcmd;
+
+   switch(cmdtype) {
+      default:
+         return FALSE;
+      case CFGCMD_TYPE:
+      case SRVCMD_TYPE:
+      case CLICMD_TYPE:
+         break;
+   }
    
    if (FStrEq(pcmd, "info"))
    {
@@ -86,7 +129,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
       BotCreate( (edict_t *)arg, arg1, arg2, arg3, arg4, arg5 );
 
       bot_check_time = gpGlobals->time + 5.0;
-      if(is_cfgcmd)
+      if(cmdtype == CFGCMD_TYPE)
          bot_cfg_pause_time = gpGlobals->time + 2.0;
 
       return TRUE;
@@ -103,9 +146,9 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
       }
 
       if (b_observer_mode)
-         printfunc(arg, "observer mode ENABLED\n");
+         printfunc(PRINTFUNC_INFO, arg, "observer mode ENABLED\n");
       else
-         printfunc(arg, "observer mode DISABLED\n");
+         printfunc(PRINTFUNC_INFO, arg, "observer mode DISABLED\n");
 
       return TRUE;
    }
@@ -116,13 +159,13 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          int temp = atoi(arg1);
 
          if ((temp < 1) || (temp > 5))
-            printfunc(arg, "invalid botskill value!\n");
+            printfunc(PRINTFUNC_ERROR, arg, "invalid botskill value!\n");
          else
             default_bot_skill = temp;
       }
 
       safevoid_snprintf(msg, sizeof(msg), "botskill is %d\n", default_bot_skill);
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
@@ -134,7 +177,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
       }
 
       safevoid_snprintf(msg, sizeof(msg), "randomize_bots_on_mapchange is %s\n", (randomize_bots_on_mapchange?"on":"off"));
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
@@ -146,7 +189,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
       }
 
       safevoid_snprintf(msg, sizeof(msg), "bot_add_level_tag is %s\n", (bot_add_level_tag?"on":"off"));
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
@@ -157,13 +200,13 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          int temp = atoi(arg1);
 
          if ((temp < 1) || (temp > 100))
-            printfunc(arg, "invalid botthinkfps value!\n");
+            printfunc(PRINTFUNC_ERROR, arg, "invalid botthinkfps value!\n");
          else
             bot_think_spf = 1.0 / temp;
       }
 
       safevoid_snprintf(msg, sizeof(msg), "botthinkfps is %.2f\n", 1.0 / bot_think_spf);
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
@@ -174,13 +217,13 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          int temp = atoi(arg1);
 
          if ((temp < 0) || (temp > 100))
-            printfunc(arg, "invalid bot_chat_percent value!\n");
+            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_chat_percent value!\n");
          else
             bot_chat_percent = temp;
       }
 
       safevoid_snprintf(msg, sizeof(msg), "bot_chat_percent is %d\n", bot_chat_percent);
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
@@ -191,13 +234,13 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          int temp = atoi(arg1);
 
          if ((temp < 0) || (temp > 100))
-            printfunc(arg, "invalid bot_taunt_percent value!\n");
+            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_taunt_percent value!\n");
          else
             bot_taunt_percent = temp;
       }
 
       safevoid_snprintf(msg, sizeof(msg), "bot_taunt_percent is %d\n", bot_taunt_percent);
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
@@ -208,13 +251,13 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          int temp = atoi(arg1);
 
          if ((temp < 0) || (temp > 100))
-            printfunc(arg, "invalid bot_whine_percent value!\n");
+            printfunc(PRINTFUNC_INFO, arg, "invalid bot_whine_percent value!\n");
          else
             bot_whine_percent = temp;
       }
 
       safevoid_snprintf(msg, sizeof(msg), "bot_whine_percent is %d\n", bot_whine_percent);
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
@@ -225,13 +268,13 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          int temp = atoi(arg1);
 
          if ((temp < 0) || (temp > 100))
-            printfunc(arg, "invalid bot_chat_tag_percent value!\n");
+            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_chat_tag_percent value!\n");
          else
             bot_chat_tag_percent = temp;
       }
 
       safevoid_snprintf(msg, sizeof(msg), "bot_chat_tag_percent is %d\n", bot_chat_tag_percent);
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
@@ -242,13 +285,13 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          int temp = atoi(arg1);
 
          if ((temp < 0) || (temp > 100))
-            printfunc(arg, "invalid bot_chat_drop_percent value!\n");
+            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_chat_drop_percent value!\n");
          else
             bot_chat_drop_percent = temp;
       }
 
       safevoid_snprintf(msg, sizeof(msg), "bot_chat_drop_percent is %d\n", bot_chat_drop_percent);
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
@@ -259,13 +302,13 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          int temp = atoi(arg1);
 
          if ((temp < 0) || (temp > 100))
-            printfunc(arg, "invalid bot_chat_swap_percent value!\n");
+            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_chat_swap_percent value!\n");
          else
             bot_chat_swap_percent = temp;
       }
 
       safevoid_snprintf(msg, sizeof(msg), "bot_chat_swap_percent is %d\n", bot_chat_swap_percent);
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
@@ -276,13 +319,13 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          int temp = atoi(arg1);
 
          if ((temp < 0) || (temp > 100))
-            printfunc(arg, "invalid bot_chat_lower_percent value!\n");
+            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_chat_lower_percent value!\n");
          else
             bot_chat_lower_percent = temp;
       }
 
       safevoid_snprintf(msg, sizeof(msg), "bot_chat_lower_percent is %d\n", bot_chat_lower_percent);
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
@@ -293,13 +336,13 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          int temp = atoi(arg1);
 
          if ((temp < 0) || (temp > 100))
-            printfunc(arg, "invalid bot_logo_percent value!\n");
+            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_logo_percent value!\n");
          else
             bot_logo_percent = temp;
       }
 
       safevoid_snprintf(msg, sizeof(msg), "bot_logo_percent is %d\n", bot_logo_percent);
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
@@ -310,7 +353,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          int temp = atoi(arg1);
 
          if ((temp < 0) || (temp > 3))
-            printfunc(arg, "invalid bot_reaction_time value!\n");
+            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_reaction_time value!\n");
          else
             bot_reaction_time = temp;
       }
@@ -320,7 +363,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
       else
          safevoid_snprintf(msg, sizeof(msg), "bot_reaction_time is DISABLED\n");
 
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
@@ -337,9 +380,9 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
       }
 
       if (b_random_color)
-         printfunc(arg, "random_color ENABLED\n");
+         printfunc(PRINTFUNC_INFO, arg, "random_color ENABLED\n");
       else
-         printfunc(arg, "random_color DISABLED\n");
+         printfunc(PRINTFUNC_INFO, arg, "random_color DISABLED\n");
 
       return TRUE;
    }
@@ -355,9 +398,9 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
       }
 
       if (b_botdontshoot)
-         printfunc(arg, "botdontshoot ENABLED\n");
+         printfunc(PRINTFUNC_INFO, arg, "botdontshoot ENABLED\n");
       else
-         printfunc(arg, "botdontshoot DISABLED\n");
+         printfunc(PRINTFUNC_INFO, arg, "botdontshoot DISABLED\n");
 
       return TRUE;
    }
@@ -372,7 +415,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
       }
       
       safevoid_snprintf(msg, sizeof(msg), "min_bots is set to %d\n", min_bots);
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
@@ -387,11 +430,11 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
       }
       
       safevoid_snprintf(msg, sizeof(msg), "max_bots is set to %d\n", max_bots);
-      printfunc(arg, msg);
+      printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
    }
-   else if (FStrEq(pcmd, "pause") && is_cfgcmd)
+   else if (FStrEq(pcmd, "pause") && cmdtype == CFGCMD_TYPE)
    {
       if ((arg1 != NULL) && (*arg1 != 0))
       {
@@ -419,12 +462,12 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
 
          if (g_auto_waypoint)
          {
-            if(is_clientcmd)
+            if(cmdtype == CLICMD_TYPE)
                g_waypoint_on = TRUE; //just in case
-            printfunc(arg, "autowaypoint is ON\n");
+            printfunc(PRINTFUNC_INFO, arg, "autowaypoint is ON\n");
          }
          else
-            printfunc(arg, "autowaypoint is OFF\n");
+            printfunc(PRINTFUNC_INFO, arg, "autowaypoint is OFF\n");
       }
       
       return TRUE;
@@ -453,7 +496,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%i'.\n", #setting, arg1, "now ", temp); \
       } else \
          safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%i'.\n", #setting, arg1, "", pSelect[select_index].setting); \
-      printfunc(arg, msg); \
+      printfunc(PRINTFUNC_INFO, arg, msg); \
    }
 #define CHECK_AND_SET_BOTWEAPON_QBOOLEAN(setting) \
    if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
@@ -470,7 +513,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%s'.\n", #setting, arg1, "now ", temp ? "on" : "off"); \
       } else \
          safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%s'.\n", #setting, arg1, "", pSelect[select_index].setting ? "on" : "off"); \
-      printfunc(arg, msg); \
+      printfunc(PRINTFUNC_INFO, arg, msg); \
    }
 #define CHECK_AND_SET_BOTWEAPON_FLOAT(setting) \
    if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
@@ -481,7 +524,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%.4f'.\n", #setting, arg1, "now ", temp); \
       } else \
          safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%.4f'.\n", #setting, arg1, "", pSelect[select_index].setting); \
-      printfunc(arg, msg); \
+      printfunc(PRINTFUNC_INFO, arg, msg); \
    }
             CHECK_AND_SET_BOTWEAPON_INT(primary_skill_level)   // bot skill must be less than or equal to this value
             CHECK_AND_SET_BOTWEAPON_INT(secondary_skill_level) // bot skill must be less than or equal to this value
@@ -501,49 +544,58 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
             if(!got_match) 
             {
                snprintf(msg, sizeof(msg), "unknown weapon setting %s.\n", arg2);
-               printfunc(arg, msg);
-               printfunc(arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
-               printfunc(arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
-               printfunc(arg, "       botweapon <weapon-name> - shows all setting values\n");
-               printfunc(arg, "       botweapon weapons - shows weapon-names\n");
+               printfunc(PRINTFUNC_ERROR, arg, msg);
+               if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
+               {
+                  printfunc(PRINTFUNC_INFO, arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
+                  printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
+                  printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> - shows all setting values\n");
+                  printfunc(PRINTFUNC_INFO, arg, "       botweapon weapons - shows weapon-names\n");
+               }
             }
          }
          else if(FStrEq("weapons", arg1)) {
-            printfunc(arg, "List of available weapons:\n");
+            printfunc(PRINTFUNC_INFO, arg, "List of available weapons:\n");
             
             select_index = -1;
             pSelect = &weapon_select[0];
 
             while (pSelect[++select_index].iId) {
                safevoid_snprintf(msg, sizeof(msg), "  %s\n", pSelect[select_index].weapon_name);
-               printfunc(arg, msg);
+               printfunc(PRINTFUNC_INFO, arg, msg);
             }
          }
          else
          { 
             snprintf(msg, sizeof(msg), "Could not complete request! (unknown arg1: '%s')\n", arg1);
-            printfunc(arg, msg);
-            printfunc(arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
-            printfunc(arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
-            printfunc(arg, "       botweapon <weapon-name> - shows all setting values\n");
-            printfunc(arg, "       botweapon weapons - shows weapon-names\n");
-            printfunc(arg, "       botweapon reset - reset values back to defaults for all skills\n");
+            printfunc(PRINTFUNC_ERROR, arg, msg);
+            if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
+            {
+               printfunc(PRINTFUNC_INFO, arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
+               printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
+               printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> - shows all setting values\n");
+               printfunc(PRINTFUNC_INFO, arg, "       botweapon weapons - shows weapon-names\n");
+               printfunc(PRINTFUNC_INFO, arg, "       botweapon reset - reset values back to defaults for all skills\n");
+            }
          }
       }
       else if((arg1 != NULL) && (*arg1 != 0) && FStrEq(arg1, "reset"))
       {
          //weapon select init
          InitWeaponSelect(submod_id);
-         printfunc(arg, "Bot weapon settings reset default.\n");
+         printfunc(PRINTFUNC_INFO, arg, "Bot weapon settings reset default.\n");
       }
       else
       {
-      	 printfunc(arg, "Could not complete request! (arg1 not given)\n");
-      	 printfunc(arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
-         printfunc(arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
-         printfunc(arg, "       botweapon <weapon-name> - shows all setting values\n");
-         printfunc(arg, "       botweapon weapons - shows weapon-names\n");
-         printfunc(arg, "       botweapon reset - reset values back to defaults for all skills\n");
+      	 printfunc(PRINTFUNC_ERROR, arg, "Could not complete request! (arg1 not given)\n");
+         if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
+         {
+      	    printfunc(PRINTFUNC_INFO, arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
+            printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
+            printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> - shows all setting values\n");
+            printfunc(PRINTFUNC_INFO, arg, "       botweapon weapons - shows weapon-names\n");
+            printfunc(PRINTFUNC_INFO, arg, "       botweapon reset - reset values back to defaults for all skills\n");
+         }
       }
       
       return TRUE;
@@ -565,7 +617,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%i'.\n", #setting, skill_idx+1, "now ", temp); \
       } else \
          safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%i'.\n", #setting, skill_idx+1, "", skill_settings[skill_idx].setting); \
-      printfunc(arg, msg); \
+      printfunc(PRINTFUNC_INFO, arg, msg); \
    }
 #define CHECK_AND_SET_BOTSKILL_QBOOLEAN(setting) \
    if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
@@ -582,7 +634,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%s'.\n", #setting, skill_idx+1, "now ", temp ? "on" : "off"); \
       } else \
          safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%s'.\n", #setting, skill_idx+1, "", skill_settings[skill_idx].setting ? "on" : "off"); \
-      printfunc(arg, msg); \
+      printfunc(PRINTFUNC_INFO, arg, msg); \
    }
 #define CHECK_AND_SET_BOTSKILL_FLOAT(setting) \
    if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
@@ -593,7 +645,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%.4f'.\n", #setting, skill_idx+1, "now ", temp); \
       } else \
          safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%.4f'.\n", #setting, skill_idx+1, "", skill_settings[skill_idx].setting); \
-      printfunc(arg, msg); \
+      printfunc(PRINTFUNC_INFO, arg, msg); \
    }
 #define CHECK_AND_SET_BOTSKILL_FLOAT100(setting) \
    if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
@@ -604,7 +656,7 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%.0f'.\n", #setting, skill_idx+1, "now ", temp*100); \
       } else \
          safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%.0f'.\n", #setting, skill_idx+1, "", skill_settings[skill_idx].setting*100); \
-      printfunc(arg, msg); \
+      printfunc(PRINTFUNC_INFO, arg, msg); \
    }
          CHECK_AND_SET_BOTSKILL_INT(pause_frequency) // how often (out of 1000 times) the bot will pause, based on bot skill
          CHECK_AND_SET_BOTSKILL_FLOAT100(normal_strafe) // how much bot straifes when walking around
@@ -635,31 +687,38 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
          if(!got_match) 
          {
             snprintf(msg, sizeof(msg), "unknown skill setting %s.\n", arg2);
-            printfunc(arg, msg);
-      	    printfunc(arg, "Usage: bot_skill_setup <skill> <setting> <value> - set value\n");
-            printfunc(arg, "       bot_skill_setup <skill> <setting> - shows setting value\n");
-            printfunc(arg, "       bot_skill_setup <skill> - shows all setting values\n");
-            printfunc(arg, "       bot_skill_setup reset - reset values back to defaults for all skills\n");
+            printfunc(PRINTFUNC_ERROR, arg, msg);
+            if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
+            {
+      	       printfunc(PRINTFUNC_INFO, arg, "Usage: bot_skill_setup <skill> <setting> <value> - set value\n");
+               printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> <setting> - shows setting value\n");
+               printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> - shows all setting values\n");
+               printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup reset - reset values back to defaults for all skills\n");
+            }
          }
       }
       else if((arg1 != NULL) && (*arg1 != 0) && FStrEq(arg1, "reset"))
       {
          ResetSkillsToDefault();
-         printfunc(arg, "Bot skill settings reset default.\n");
+         printfunc(PRINTFUNC_INFO, arg, "Bot skill settings reset default.\n");
       }
       else
       {
          if((arg1 == NULL) || (*arg1 == 0))
-      	    printfunc(arg, "Could not complete request! (arg1 not given)\n");
+      	    printfunc(PRINTFUNC_ERROR, arg, "Could not complete request! (arg1 not given)\n");
       	 else
       	 {
       	    snprintf(msg, sizeof(msg), "Could not complete request! (invalid skill %d, use 1-5)\n", atoi(arg1));
-      	    printfunc(arg, msg);
+      	    printfunc(PRINTFUNC_ERROR, arg, msg);
       	 }
-      	 printfunc(arg, "Usage: bot_skill_setup <skill> <setting> <value> - set value\n");
-         printfunc(arg, "       bot_skill_setup <skill> <setting> - shows setting value\n");
-         printfunc(arg, "       bot_skill_setup <skill> - shows all setting values\n");
-         printfunc(arg, "       bot_skill_setup reset - reset values back to defaults for all skills\n");
+         
+         if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
+         {
+      	    printfunc(PRINTFUNC_INFO, arg, "Usage: bot_skill_setup <skill> <setting> <value> - set value\n");
+            printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> <setting> - shows setting value\n");
+            printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> - shows all setting values\n");
+            printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup reset - reset values back to defaults for all skills\n");
+         }
       }
       
       return TRUE;
@@ -668,8 +727,8 @@ qboolean ProcessCommand(void (*printfunc)(void *arg, char *msg), void * arg, con
    return FALSE;
 }
 
-#if _DEBUG  
-static void print_to_client(void *arg, char *msg) 
+#if _DEBUG
+static void print_to_client(int, void *arg, char *msg) 
 {
    ClientPrint((edict_t *)arg, HUD_PRINTNOTIFY, msg);
 }
@@ -680,7 +739,7 @@ void ClientCommand( edict_t *pEntity )
    // only allow custom commands if deathmatch mode and NOT dedicated server and
    // client sending command is the listen server client...
 
-#if _DEBUG   
+#if _DEBUG
    if ((gpGlobals->deathmatch))
    {
       const char *pcmd = CMD_ARGV (0);
@@ -689,8 +748,8 @@ void ClientCommand( edict_t *pEntity )
       const char *arg3 = CMD_ARGV (3);
       const char *arg4 = CMD_ARGV (4);
       const char *arg5 = CMD_ARGV (5);
-   
-      if(ProcessCommand(print_to_client, pEntity, pcmd, arg1, arg2, arg3, arg4, arg5, FALSE))
+      
+      if(ProcessCommand(CLICMD_TYPE, print_to_client, pEntity, pcmd, arg1, arg2, arg3, arg4, arg5))
       {
          RETURN_META (MRES_SUPERCEDE);
       }
@@ -899,8 +958,10 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
 }
 
 
-static void print_to_null(void *, char *) 
+static void print_to_console_config(int printtype, void *, char * msg) 
 {
+   if(printtype == PRINTFUNC_ERROR)
+      UTIL_ConsolePrintf("config error: %s", msg);
 }
 
 
@@ -1033,7 +1094,7 @@ void ProcessBotCfgFile(void)
    if(arg5 && !strcmp(arg5, "\"\""))
       *arg5=0;
 
-   if(ProcessCommand(print_to_null, NULL, cmd, arg1, arg2, arg3, arg4, arg5, TRUE))
+   if(ProcessCommand(CFGCMD_TYPE, print_to_console_config, NULL, cmd, arg1, arg2, arg3, arg4, arg5))
       return;
    
    UTIL_ConsolePrintf("executing server command: %s\n", server_cmd);
@@ -1042,15 +1103,15 @@ void ProcessBotCfgFile(void)
 }
 
 
-static void print_to_server_output(void *, char * msg) 
+static void print_to_server_output(int, void *, char * msg) 
 {
-   UTIL_ConsolePrintf(msg);
+   UTIL_ConsolePrintf("%s", msg);
 }
 
 
 void jk_botti_ServerCommand (void)
 {
-   if(!ProcessCommand(print_to_server_output, NULL, CMD_ARGV (1), CMD_ARGV (2), CMD_ARGV (3), CMD_ARGV (4), CMD_ARGV (5), CMD_ARGV (6), FALSE)) {
+   if(!ProcessCommand(SRVCMD_TYPE, print_to_server_output, NULL, CMD_ARGV (1), CMD_ARGV (2), CMD_ARGV (3), CMD_ARGV (4), CMD_ARGV (5), CMD_ARGV (6))) {
       UTIL_ConsolePrintf("%s: Unknown command \'%s\'\n", CMD_ARGV(1), CMD_ARGV(2));
    }
 }

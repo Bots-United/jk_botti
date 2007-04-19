@@ -476,34 +476,6 @@ void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index)
 }
 
 
-void UTIL_PrintBotInfo(void(*printfunc)(void *, char*), void * arg) {
-   //print out bot info
-   char msg[80];
-   int bot_index, count = 0;
-   
-   for (bot_index = 0; bot_index < gpGlobals->maxClients; bot_index++)
-   {
-      if (bots[bot_index].is_used) {
-         count++;
-         safevoid_snprintf(msg, sizeof(msg), "Bot #%d\n", count);
-         printfunc(arg, msg);
-         safevoid_snprintf(msg, sizeof(msg), " name: %s\n", bots[bot_index].name);
-         printfunc(arg, msg);
-         safevoid_snprintf(msg, sizeof(msg), " skin: %s\n", bots[bot_index].skin);
-         printfunc(arg, msg);
-         safevoid_snprintf(msg, sizeof(msg), " skill: %d\n", bots[bot_index].bot_skill + 1);
-         printfunc(arg, msg);
-         safevoid_snprintf(msg, sizeof(msg), " got enemy: %s\n", (bots[bot_index].pBotEnemy != 0) ? "true" : "false"); 
-         printfunc(arg, msg);
-         safevoid_snprintf(msg, sizeof(msg), "---\n"); 
-         printfunc(arg, msg);
-      }
-   }
-      
-   safevoid_snprintf(msg, sizeof(msg), "Total Bots: %d\n", count);
-   printfunc(arg, msg);
-}
-
 void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2)
 {
    if ((arg1 != NULL) && (arg2 != NULL))

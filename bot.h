@@ -368,7 +368,6 @@ void UTIL_SelectItem(edict_t *pEdict, char *item_name);
 void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index);
 void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2);
 void GetGameDir (char *game_dir);
-void UTIL_PrintBotInfo(void(*printfunc)(void *, char*), void * arg);
 void UTIL_ServerPrintf( char *fmt, ... );
 void UTIL_ConsolePrintf( char *fmt, ... );
 char* UTIL_VarArgs2( char * string, size_t strlen, char *format, ... );
