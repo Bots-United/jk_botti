@@ -558,7 +558,6 @@ void UTIL_ConsolePrintf( char *fmt, ... )
    SERVER_PRINT( string );
 }
 
-
 char* UTIL_VarArgs2( char * string, size_t strlen, char *format, ... )
 {
    va_list argptr;
@@ -569,7 +568,6 @@ char* UTIL_VarArgs2( char * string, size_t strlen, char *format, ... )
 
    return string;   
 }
-
 
 void GetGameDir (char *game_dir)
 {

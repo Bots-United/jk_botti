@@ -47,6 +47,7 @@ extern float bot_think_spf;
 extern int min_bots;
 extern int max_bots;
 extern FILE *bot_cfg_fp;
+extern int bot_cfg_linenumber;
 extern int submod_id;
 
 extern int default_bot_skill;
@@ -483,7 +484,7 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
             if (FStrEq(pSelect[select_index].weapon_name, arg1))
                break;
          
-         if((arg2 == NULL) || (*arg2 == 0) || pSelect[select_index].iId)
+         if(pSelect[select_index].iId)
          {
             qboolean got_match = FALSE;
             
@@ -554,16 +555,24 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
                }
             }
          }
-         else if(FStrEq("weapons", arg1)) {
+         else if(FStrEq("weapons", arg1)) 
+         {
             printfunc(PRINTFUNC_INFO, arg, "List of available weapons:\n");
             
             select_index = -1;
             pSelect = &weapon_select[0];
 
-            while (pSelect[++select_index].iId) {
+            while (pSelect[++select_index].iId) 
+            {
                safevoid_snprintf(msg, sizeof(msg), "  %s\n", pSelect[select_index].weapon_name);
                printfunc(PRINTFUNC_INFO, arg, msg);
             }
+         }
+         else if((arg1 != NULL) && (*arg1 != 0) && FStrEq(arg1, "reset"))
+         {
+            //weapon select init
+            InitWeaponSelect(submod_id);
+            printfunc(PRINTFUNC_INFO, arg, "Bot weapon settings reset default.\n");
          }
          else
          { 
@@ -578,12 +587,6 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
                printfunc(PRINTFUNC_INFO, arg, "       botweapon reset - reset values back to defaults for all skills\n");
             }
          }
-      }
-      else if((arg1 != NULL) && (*arg1 != 0) && FStrEq(arg1, "reset"))
-      {
-         //weapon select init
-         InitWeaponSelect(submod_id);
-         printfunc(PRINTFUNC_INFO, arg, "Bot weapon settings reset default.\n");
       }
       else
       {
@@ -961,7 +964,7 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
 static void print_to_console_config(int printtype, void *, char * msg) 
 {
    if(printtype == PRINTFUNC_ERROR)
-      UTIL_ConsolePrintf("config error: %s", msg);
+      UTIL_ConsolePrintf("line[%d] config error: %s", bot_cfg_linenumber, msg);
 }
 
 
@@ -970,7 +973,7 @@ void ProcessBotCfgFile(void)
    int ch;
    char cmd_line[256];
    int cmd_index;
-   static char server_cmd[80];
+   char server_cmd[80], server_cmd_print[80-1];
    char *cmd, *arg1, *arg2, *arg3, *arg4, *arg5;
 
    if (bot_cfg_pause_time > gpGlobals->time)
@@ -1023,8 +1026,9 @@ void ProcessBotCfgFile(void)
    cmd_line[cmd_index] = 0;  // terminate the command line
 
    // copy the command line to a server command buffer...
-   strcpy(server_cmd, cmd_line);
-   strcat(server_cmd, "\n");
+   safevoid_snprintf(server_cmd, sizeof(server_cmd), "%s\n", cmd_line);
+   safevoid_snprintf(server_cmd_print, sizeof(server_cmd_print), "%s", cmd_line);
+   bot_cfg_linenumber++;
 
    cmd_index = 0;
    cmd = cmd_line;
@@ -1080,7 +1084,7 @@ void ProcessBotCfgFile(void)
       }
    }
 
-   if ((cmd_line[0] == '#') || (cmd_line[0] == 0))
+   if ((cmd_line[0] == '#') || (cmd_line[0] == '/' && cmd_line[1] == '/') || (cmd_line[0] == 0))
       return;  // return if comment or blank line
 
    if(arg1 && !strcmp(arg1, "\"\""))
@@ -1097,9 +1101,10 @@ void ProcessBotCfgFile(void)
    if(ProcessCommand(CFGCMD_TYPE, print_to_console_config, NULL, cmd, arg1, arg2, arg3, arg4, arg5))
       return;
    
-   UTIL_ConsolePrintf("executing server command: %s\n", server_cmd);
+   UTIL_ConsolePrintf("line[%d] unknown command: '%s' (trying to execute as server command)\n", bot_cfg_linenumber, server_cmd_print);
 
    SERVER_COMMAND(server_cmd);
+   SERVER_EXECUTE();
 }
 
 
@@ -1112,6 +1117,6 @@ static void print_to_server_output(int, void *, char * msg)
 void jk_botti_ServerCommand (void)
 {
    if(!ProcessCommand(SRVCMD_TYPE, print_to_server_output, NULL, CMD_ARGV (1), CMD_ARGV (2), CMD_ARGV (3), CMD_ARGV (4), CMD_ARGV (5), CMD_ARGV (6))) {
-      UTIL_ConsolePrintf("%s: Unknown command \'%s\'\n", CMD_ARGV(1), CMD_ARGV(2));
+      UTIL_ConsolePrintf("%s: Unknown command \'%s\'\n", CMD_ARGV(0), CMD_ARGS());
    }
 }

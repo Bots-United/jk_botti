@@ -82,6 +82,7 @@ qboolean is_team_play = FALSE;
 qboolean checked_teamplay = FALSE;
 
 FILE *bot_cfg_fp = NULL;
+int bot_cfg_linenumber = 0;
 qboolean need_to_open_cfg = TRUE;
 float bot_cfg_pause_time = 0.0;
 qboolean spawn_time_reset = FALSE;
@@ -678,16 +679,18 @@ void StartFrame( void )
       if ((bot_cfg_fp = fopen(filename, "r")) != NULL)
       {
          UTIL_ConsolePrintf("Executing %s\n", filename);
+         bot_cfg_linenumber = 0;
       }
       else
       {
          UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/jk_botti.cfg", NULL);
 
-         UTIL_ConsolePrintf("Executing %s\n", filename);
-
-         bot_cfg_fp = fopen(filename, "r");
-
-         if (bot_cfg_fp == NULL)
+         if ((bot_cfg_fp = fopen(filename, "r")) != NULL)
+         {
+            UTIL_ConsolePrintf("Executing %s\n", filename);
+            bot_cfg_linenumber = 0;
+         }
+         else
          {
             UTIL_ConsolePrintf("jk_botti.cfg file not found\n" );
          }

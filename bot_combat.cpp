@@ -174,7 +174,7 @@ void BotAimPost( bot_t &pBot )
 //
 void BotResetReactionTime(bot_t &pBot) 
 {
-   if (pBot.reaction_time)
+   if (pBot.reaction_time >= 1 && pBot.reaction_time <= 3)
    {
       float react_delay;
 
@@ -652,7 +652,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
             vecEnd += pBot.pBotEnemy->v.view_ofs;
          
          if( FInViewCone( vecEnd, pEdict ) && FVisibleEnemy( vecEnd, pEdict, pBot.pBotEnemy ))
-         {
+         {            
             // face the enemy
             Vector v_enemy = vecPredEnemy - pEdict->v.origin;
             Vector bot_angles = UTIL_VecToAngles( v_enemy );
@@ -666,8 +666,9 @@ edict_t *BotFindEnemy( bot_t &pBot )
 
             return (pBot.pBotEnemy);
          }
-         else if( (pBot.f_bot_see_enemy_time > 0) && 
-                  (pBot.f_bot_see_enemy_time + 2.0 >= gpGlobals->time) ) // enemy has gone out of bot's line of sight, remember enemy for 2 sec
+         
+         if( (pBot.f_bot_see_enemy_time > 0) && 
+             (pBot.f_bot_see_enemy_time + 2.0 >= gpGlobals->time) ) // enemy has gone out of bot's line of sight, remember enemy for 2 sec
          {
             // we remember this enemy.. keep tracking
             
@@ -1483,17 +1484,18 @@ void BotShootAtEnemy( bot_t &pBot )
    // Enemy not visible?
    if(!pBot.b_combat_longjump && !FVisibleEnemy(v_enemy_aimpos, pEdict, pBot.pBotEnemy))
    {
-      // get waypoint close to him and track him down!
-      int old_wp = pBot.curr_waypoint_index;
+      int new_wp_index;
       
-      // get waypoint close to target
-      pBot.curr_waypoint_index = WaypointFindNearest(pBot.pBotEnemy, 512);
-      
-      //
-      if(pBot.curr_waypoint_index != -1 && BotHeadTowardWaypoint(pBot))
+      // get waypoint close to target and track down!
+      if(-1 != (new_wp_index = WaypointFindNearest(pBot.pBotEnemy, 512)) && BotHeadTowardWaypoint(pBot))
+      {
+         pBot.curr_waypoint_index = new_wp_index;
+         
+      	 // not visible.. reset reaction times
+         BotResetReactionTime(pBot);
+         
          return;
-      
-      pBot.curr_waypoint_index = old_wp;
+      }
    }
    
    v_enemy = v_enemy_aimpos - GetGunPosition(pEdict);

@@ -367,11 +367,11 @@ inline qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict )
    return(FVisible(vecOrigin, pEdict, (edict_t **)NULL));
 }
 
-inline qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnemy )
+inline qboolean FVisibleEnemyOffset( const Vector &vecOrigin, const Vector &vecOffset, edict_t *pEdict, edict_t *pEnemy )
 {
    edict_t * pHit = NULL;
    
-   if(FVisible(vecOrigin, pEdict, &pHit) || (pEnemy != NULL && pHit == pEnemy))
+   if(FVisible(vecOrigin + vecOffset, pEdict, &pHit) || (pEnemy != NULL && pHit == pEnemy))
       return(TRUE);
    
    if(FNullEnt(pHit))
@@ -384,6 +384,34 @@ inline qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t
       return(FALSE);
    
    return(TRUE);
+}
+
+inline qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnemy )
+{
+   if(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ))
+      return(TRUE);
+   else if(!pEnemy)
+      return(FALSE);
+   
+   Vector feet_offset = Vector(0, 0, pEnemy->v.mins.z);
+   Vector head_offset = Vector(0, 0, pEnemy->v.maxs.z);
+   
+   if(FVisibleEnemyOffset( vecOrigin, head_offset, pEdict, pEnemy ))
+      return(TRUE);
+   if(FVisibleEnemyOffset( vecOrigin, feet_offset, pEdict, pEnemy ))
+      return(TRUE);
+   if(!pEdict)
+      return(FALSE);
+   
+   Vector v_right = UTIL_AnglesToRight(UTIL_VecToAngles(vecOrigin - (pEdict->v.origin + pEdict->v.view_offs)));
+   Vector right_offset = v_right * pEnemy->v.maxs.x;
+   Vector left_offset = v_right * pEnemy->v.mins.x;
+   
+   if(FVisibleEnemyOffset( vecOrigin, right_offset, pEdict, pEnemy ))
+      return(TRUE);
+   if(FVisibleEnemyOffset( vecOrigin, left_offset, pEdict, pEnemy ))
+      return(TRUE);
+   return(FALSE);
 }
 
 #endif /*BOT_INLINE_FUNCS*/
