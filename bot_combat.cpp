@@ -637,6 +637,9 @@ edict_t *BotFindEnemy( bot_t &pBot )
          // don't have an enemy anymore so null out the pointer...
          pBot.pBotEnemy = NULL;
          
+         // reset reactions
+         BotResetReactionTime(pBot);
+         
          // level look
          pEdict->v.idealpitch = 0;
       }

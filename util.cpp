@@ -398,7 +398,7 @@ qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit )
       *pHit = NULL;
    
    // look through caller's eyes
-   vecLookerOrigin = pEdict->v.origin + pEdict->v.view_ofs;
+   vecLookerOrigin = GetGunPosition(pEdict);
 
    int bInWater = (POINT_CONTENTS (vecOrigin) == CONTENTS_WATER);
    int bLookerInWater = (POINT_CONTENTS (vecLookerOrigin) == CONTENTS_WATER);
@@ -413,6 +413,61 @@ qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit )
       *pHit = tr.pHit;
 
    return(tr.flFraction > 0.9999);
+}
+
+qboolean FVisibleEnemyOffset( const Vector &vecOrigin, const Vector &vecOffset, edict_t *pEdict, edict_t *pEnemy )
+{
+   edict_t * pHit = NULL;
+   
+   if(FVisible(vecOrigin + vecOffset, pEdict, &pHit) || (pEnemy != NULL && pHit == pEnemy))
+      return(TRUE);
+   
+   if(FNullEnt(pHit))
+      return(FALSE);
+   
+   if(!(pHit->v.flags & FL_MONSTER) && !FIsClassname(pHit, "player"))
+      return(FALSE);
+   
+   if(!IsAlive (pHit))
+      return(FALSE);
+   
+   return(TRUE);
+}
+
+qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnemy )
+{
+   // only check center if cannot use extra information
+   if(!pEnemy)
+      return(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ));
+   
+   // first check for if head is visible
+   Vector head_offset = Vector(0, 0, pEnemy->v.maxs.z);
+   if(FVisibleEnemyOffset( vecOrigin, head_offset, pEdict, pEnemy ))
+      return(TRUE);
+   
+   // then check if feet are visible
+   Vector feet_offset = Vector(0, 0, pEnemy->v.mins.z);
+   if(FVisibleEnemyOffset( vecOrigin, feet_offset, pEdict, pEnemy ))
+      return(TRUE);
+   
+   // check center if no extra info is available
+   if(!pEdict)
+      return(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ));
+   
+   // construct sideways vector
+   Vector v_right = UTIL_AnglesToRight(UTIL_VecToAngles(vecOrigin - GetGunPosition(pEdict)));
+
+   // check if right side of player is visible
+   Vector right_offset = v_right * pEnemy->v.maxs.x;
+   if(FVisibleEnemyOffset( vecOrigin, right_offset, pEdict, pEnemy ))
+      return(TRUE);
+   
+   // check if left side of player is visible
+   Vector left_offset = v_right * pEnemy->v.mins.x;
+   if(FVisibleEnemyOffset( vecOrigin, left_offset, pEdict, pEnemy ))
+      return(TRUE);
+   
+   return(FALSE);
 }
 
 qboolean FInShootCone(const Vector & Origin, edict_t *pEdict, float distance, float diameter, float min_angle)

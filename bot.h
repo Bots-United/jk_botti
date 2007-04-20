@@ -362,7 +362,9 @@ qboolean FHearable(bot_t &pBot, edict_t *pPlayer);
 qboolean FInViewCone( const Vector & Origin, edict_t *pEdict);
 qboolean FInShootCone( const Vector & Origin, edict_t *pEdict, float distance, float target_radius, float min_angle);
 qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit);
-Vector Center(edict_t *pEdict);
+qboolean FVisibleEnemyOffset( const Vector &vecOrigin, const Vector &vecOffset, edict_t *pEdict, edict_t *pEnemy );
+qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnemy );
+
 Vector GetGunPosition(edict_t *pEdict);
 void UTIL_SelectItem(edict_t *pEdict, char *item_name);
 void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index);

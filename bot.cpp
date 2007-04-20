@@ -2249,7 +2249,7 @@ void BotThink( bot_t &pBot )
    
    // don't go too close to enemy
    // strafe instead
-   if(pBot.pBotEnemy != NULL && FInViewCone(pBot.pBotEnemy->v.origin, pEdict))
+   if(pBot.pBotEnemy != NULL && FInViewCone(pBot.pBotEnemy->v.origin, pEdict) && FVisibleEnemy( pBot.pBotEnemy->v.origin, pEdict, pBot.pBotEnemy ))
    {
       if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].battle_strafe) 
       {

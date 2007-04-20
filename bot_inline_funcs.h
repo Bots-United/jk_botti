@@ -10,6 +10,15 @@
 #include <inttypes.h>
 #include <sys/time.h>
 
+// Manual branch optimization for GCC 3.0.0 and newer
+#if !defined(__GNUC__) || __GNUC__ < 3
+	#define likely(x) (x)
+	#define unlikely(x) (x)
+#else
+	#define likely(x) __builtin_expect((long int)(x), true)
+	#define unlikely(x) __builtin_expect((long int)(x), false)
+#endif
+
 inline double UTIL_GetSecs(void) 
 {
 #ifdef _WIN32
@@ -99,7 +108,7 @@ inline Vector UTIL_VecToAngles(const Vector &forward)
    // from pm_shared/pm_math.h
    float tmp, yaw, pitch;
    
-   if (forward.y == 0 && forward.x == 0)
+   if (unlikely(forward.y == 0) && unlikely(forward.x == 0))
    {
       yaw = 0;
       pitch = (forward.z > 0) ? 90 : -90;
@@ -365,53 +374,6 @@ inline qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t * pO
 inline qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict )
 {
    return(FVisible(vecOrigin, pEdict, (edict_t **)NULL));
-}
-
-inline qboolean FVisibleEnemyOffset( const Vector &vecOrigin, const Vector &vecOffset, edict_t *pEdict, edict_t *pEnemy )
-{
-   edict_t * pHit = NULL;
-   
-   if(FVisible(vecOrigin + vecOffset, pEdict, &pHit) || (pEnemy != NULL && pHit == pEnemy))
-      return(TRUE);
-   
-   if(FNullEnt(pHit))
-      return(FALSE);
-   
-   if(!(pHit->v.flags & FL_MONSTER) && !FIsClassname(pHit, "player"))
-      return(FALSE);
-   
-   if(!IsAlive (pHit))
-      return(FALSE);
-   
-   return(TRUE);
-}
-
-inline qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnemy )
-{
-   if(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ))
-      return(TRUE);
-   else if(!pEnemy)
-      return(FALSE);
-   
-   Vector feet_offset = Vector(0, 0, pEnemy->v.mins.z);
-   Vector head_offset = Vector(0, 0, pEnemy->v.maxs.z);
-   
-   if(FVisibleEnemyOffset( vecOrigin, head_offset, pEdict, pEnemy ))
-      return(TRUE);
-   if(FVisibleEnemyOffset( vecOrigin, feet_offset, pEdict, pEnemy ))
-      return(TRUE);
-   if(!pEdict)
-      return(FALSE);
-   
-   Vector v_right = UTIL_AnglesToRight(UTIL_VecToAngles(vecOrigin - (pEdict->v.origin + pEdict->v.view_offs)));
-   Vector right_offset = v_right * pEnemy->v.maxs.x;
-   Vector left_offset = v_right * pEnemy->v.mins.x;
-   
-   if(FVisibleEnemyOffset( vecOrigin, right_offset, pEdict, pEnemy ))
-      return(TRUE);
-   if(FVisibleEnemyOffset( vecOrigin, left_offset, pEdict, pEnemy ))
-      return(TRUE);
-   return(FALSE);
 }
 
 #endif /*BOT_INLINE_FUNCS*/

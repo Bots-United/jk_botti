@@ -1,5 +1,5 @@
 jk_botti - Be More Human
---------------------------------0.52
+--------------------------------0.53
 
 1. Intro
 2. What's new
@@ -10,7 +10,7 @@ jk_botti - Be More Human
 1. Intro
 --------------------
 
-This is 0.52 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+This is 0.53 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
 You are free to use code for any of your needs.
 
 Credits:
@@ -61,6 +61,9 @@ CPU intensive operation this can only really be done on map change.
 --------------------
 2. What's new
 --------------------
+0.53:
+ * Tweaked bot behavior now with fixed reaction times. Fixed bots see better.
+
 0.52:
  * Config-file errors are now print to server console with config line number.
  * Fixed bug with bot reaction times not reseting when waypoints active.
