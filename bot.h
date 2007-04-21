@@ -59,7 +59,8 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
 #define WPT_GOAL_AMMO		4
 #define WPT_GOAL_ITEM		5
 #define WPT_GOAL_LOCATION	8
-#define WPT_GOAL_ENEMY		9
+#define WPT_GOAL_SOUND		9
+#define WPT_GOAL_ENEMY		10
 
 // instant damage (from cbase.h)
 #define DMG_CRUSH			(1 << 0)	// crushed by falling or moving object
@@ -121,25 +122,19 @@ typedef struct
    int chat_swap_percent;
    int chat_lower_percent;
 
-// TheFatal - START
-   int msecnum;
-   float msecdel;
-   float msecval;
-// TheFatal - END
-
-   float f_aim_think_frame_time;
-   float f_prev_aim_think_time;
-
    // things from pev in CBasePlayer...
    int bot_team;
    int bot_class;
    float idle_angle;
-   float idle_angle_time;  // for Front Line Force
-   int round_end;        // round has ended (in round based games)
+   float idle_angle_time;
    float blinded_time;
 
    float bot_think_time;
+   float f_last_think_time;
    
+   float msecdel;
+   float msecval;
+
    float f_max_speed;
    float f_prev_speed;
    float f_speed_check_time;
@@ -183,14 +178,11 @@ typedef struct
    edict_t *pBotEnemy;
    float f_bot_see_enemy_time;
    float f_bot_find_enemy_time;
+   
+   edict_t *pFindSoundEnt;
 
    int wpt_goal_type;
    float f_evaluate_goal_time;
-
-   Vector v_enemy_previous_origin;
-   float f_aim_tracking_time;
-   float f_aim_x_angle_delta;
-   float f_aim_y_angle_delta;
 
    edict_t *pBotUser;
    float f_bot_use_time;
@@ -219,13 +211,7 @@ typedef struct
    qboolean b_longjump_do_jump;
    
    float f_sniper_aim_time;
-
-   float f_prediction_ammount;
-   float f_shootcone_maxwidth;
-   float f_shootcone_minangle;
    
-   int   zooming;
-
    float f_shoot_time;
    float f_primary_charging;
    float f_secondary_charging;
@@ -252,10 +238,6 @@ typedef struct
    float f_use_button_time;
    qboolean  b_lift_moving;
 
-   qboolean  b_use_capture;
-   float f_use_capture_time;
-   edict_t *pCaptureEdict;
-
    int   logo_percent;
    qboolean  b_spray_logo;
    float f_spray_logo_time;
@@ -263,21 +245,21 @@ typedef struct
    int   top_color;
    int   bottom_color;
 
-   float f_start_vote_time;
-   qboolean  vote_in_progress;
-   float f_vote_time;
-
    int   reaction_time;
    float f_reaction_target_time;  // time when enemy targeting starts
    
    float f_weaponchange_time;
    
-   qboolean set_special_shoot_angle;
-   float special_shoot_angle;
+   qboolean b_set_special_shoot_angle;
+   float f_special_shoot_angle;
 
    bot_current_weapon_t current_weapon;  // one current weapon for each bot
    int m_rgAmmo[MAX_AMMO_SLOTS];  // total ammo amounts (1 array for each bot)
 
+// for counting msec effency
+   float total_frame_time;
+   float total_msecval;
+   int total_counter;
 } bot_t;
 
 #define MAX_TEAMS 32
@@ -339,12 +321,8 @@ extern int m_spriteTexture;
 
 Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean without_velocity = FALSE);
 qboolean FPredictedVisible(bot_t &pBot);
-qboolean GetPredictedIsAlive(edict_t * pPlayer, float time);
 void GatherPlayerData(edict_t * pEdict);
 qboolean AreTeamMates(edict_t * pOther, edict_t * pEdict);
-
-void RegisterCvars (void);
-void ThinkCvars (void);
 
 // new UTIL.CPP functions...
 edict_t *UTIL_FindEntityInSphere( edict_t *pentStart, const Vector & vecCenter, float flRadius );
@@ -378,6 +356,9 @@ void UTIL_DrawBeam(edict_t *pEnemy, const Vector &start, const Vector &end, int 
 breakable_list_t * UTIL_FindBreakable(breakable_list_t * pbreakable);
 void UTIL_FreeFuncBreakables(void);
 void UTIL_UpdateFuncBreakable(edict_t *pEdict, const char * setting, const char * value);
+
+void SaveAliveStatus(edict_t * pPlayer);
+float UTIL_GetTimeSinceRespawn(edict_t * pPlayer);
 
 void CheckPlayerChatProtection(edict_t * pPlayer);
 qboolean IsPlayerChatProtected(edict_t * pPlayer);

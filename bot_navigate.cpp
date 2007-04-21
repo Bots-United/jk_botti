@@ -341,7 +341,16 @@ int BotFindWaypointGoal( bot_t &pBot )
       return index;
    }
 
-   if (pBot.pBotEnemy == NULL)
+   if (pBot.pBotEnemy == NULL && pBot.pFindSoundEnt != NULL)
+   {  // find a waypoint near interesting sound
+      index = WaypointFindNearest(pBot.pFindSoundEnt, 512);
+
+      if (index != -1)
+      {
+         pBot.wpt_goal_type = WPT_GOAL_SOUND;
+      }
+   }
+   else if (pBot.pBotEnemy == NULL)
    {  
       // only if not engaging
       
@@ -498,8 +507,7 @@ int BotFindWaypointGoal( bot_t &pBot )
 
    if (index != -1)
    {
-      /*
-      switch (pBot.wpt_goal_type)
+/*      switch (pBot.wpt_goal_type)
       {
          case WPT_GOAL_HEALTH:
             UTIL_ConsolePrintf("[%s] %s", pBot.name, "I am going for some health!\n");
@@ -516,14 +524,16 @@ int BotFindWaypointGoal( bot_t &pBot )
          case WPT_GOAL_ITEM:
             UTIL_ConsolePrintf("[%s] %s", pBot.name, "I am going for an item!\n");
             break;
+         case WPT_GOAL_SOUND:
+            UTIL_ConsolePrintf("[%s] %s", pBot.name, "I am tracking a sound!\n");
+            break;
          case WPT_GOAL_ENEMY:
             UTIL_ConsolePrintf("[%s] %s", pBot.name, "I am tracking/engaging an enemy!\n");
             break;
          default:
             UTIL_ConsolePrintf("[%s] %s", pBot.name, "I have an unknown goal!\n");
             break;
-      }
-      */
+      }*/
    }
 
    return index;

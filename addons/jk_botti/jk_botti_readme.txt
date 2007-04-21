@@ -1,5 +1,5 @@
 jk_botti - Be More Human
---------------------------------0.53
+--------------------------------0.54
 
 1. Intro
 2. What's new
@@ -10,7 +10,7 @@ jk_botti - Be More Human
 1. Intro
 --------------------
 
-This is 0.53 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+This is 0.54 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
 You are free to use code for any of your needs.
 
 Credits:
@@ -61,6 +61,14 @@ CPU intensive operation this can only really be done on map change.
 --------------------
 2. What's new
 --------------------
+0.54:
+ * Fixed the way bots react to sounds. Instead of making sound enemy, bot finds
+   it's way to the interesting sound.
+ * New way of computing msec for RunPlayerMove.
+ * Bots don't attack respawn players too fast (delay is skill depend).
+ * New skill settings: pause_time_min, pause_time_max, react_delay_min[0-2],
+   react_delay_max[0-2], weaponchange_rate_min, weaponchange_rate_max.
+
 0.53:
  * Tweaked bot behavior now with fixed reaction times. Fixed bots see better.
 
@@ -158,6 +166,12 @@ List of available settings:
  - pause_frequency
       How often out of 1000 times the bot will pause.
       Value: 0-1000
+
+ - pause_time_min
+   pause_time_max
+      Set range of time bot stays paused. Exact time is randomized value
+      between these two. If min is larger than max, then min is used always.
+      Value: 0.0-10.0
  
  - normal_strafe
       How much bot strafes when walking around. This value is percent.
@@ -167,6 +181,24 @@ List of available settings:
       How much bot strafes when attacking enemy. This value is percent.
       Value: 0-100
  
+ - react_delay_min[0]
+   react_delay_min[1]
+   react_delay_min[2]
+   react_delay_max[0]
+   react_delay_max[1]
+   react_delay_max[2]
+      Set range of bot reaction time. [0] is for bot_reaction 1 settings, [1]
+      for bot_reaction 2, [2] for bot_reaction 3. Exact time is randomized value
+      between these two. If min is larger than max, then min is used always.
+      Value: 0.0-1.0
+ 
+ - weaponchange_rate_min
+   weaponchange_rate_max
+      Set range of time bot tries to keep currect weapon. Exact time is 
+      randomized value between these two. If min is larger than max, then min 
+      is used always.
+      Value: 0.0-10.0
+      
  - keep_optimal_distance
       How often bot out of 1000 times the bot tries to keep at optimum distance
       of weapon when attacking.

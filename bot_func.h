@@ -10,8 +10,7 @@
 //prototypes of bot functions...
 
 void BotSpawnInit( bot_t &pBot );
-void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
-                const char *arg3, const char *arg4, const char *arg5 );
+void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2, const char *arg3, const char *arg4, const char *arg5 );
 void BotStartGame( bot_t &pBot );
 int BotInFieldOfView( bot_t &pBot, const Vector & dest );
 qboolean BotEntityIsVisible( bot_t &pBot, const Vector & dest );
@@ -25,6 +24,10 @@ void BotPointGun(bot_t &pBot);
 void BotAimPre( bot_t &pBot );
 void BotAimPost( bot_t &pBot );
 void LoadBotModels(void);
+
+void BotChatTaunt(bot_t &pBot, edict_t *victim_edict);
+void BotChatWhine(bot_t &pBot);
+void BotChatTalk(bot_t &pBot);
 
 float BotChangePitch( bot_t &pBot, float speed );
 float BotChangeYaw( bot_t &pBot, float speed );
@@ -48,6 +51,7 @@ void BotLookForDrop( bot_t &pBot );
 
 void BotCheckTeamplay(void);
 edict_t *BotFindEnemy( bot_t &pBot );
+qboolean BotFindSoundEnemy( bot_t &pBot );
 Vector BotBodyTarget( edict_t *pBotEnemy, bot_t &pBot );
 qboolean BotFireWeapon( const Vector & v_enemy, bot_t &pBot, int weapon_choice );
 void BotShootAtEnemy( bot_t &pBot );

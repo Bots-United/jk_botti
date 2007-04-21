@@ -7,17 +7,20 @@
 typedef struct
 {
    int pause_frequency; // how often (out of 1000 times) the bot will pause, based on bot skill
-   float pause_time[2]; // how long bot pauses (min, max)
+   float pause_time_min; // how long bot pauses (min, max)
+   float pause_time_max; 
    
-   float normal_strafe; // how much bot straifes when walking around
-   float battle_strafe; // how much bot straifes when attacking enemy
+   float normal_strafe; // how much bot strafes when walking around
+   float battle_strafe; // how much bot strafes when attacking enemy
    
    int keep_optimal_dist; // how often bot (out of 100 times) the bot try to keep at optimum distance of weapon when attacking
    
+   float respawn_react_delay; // delay on players after respawn
    float react_delay_min[3]; // reaction delay settings (first is for bot_reaction 1, second for 2, etc)
    float react_delay_max[3]; 
    
-   float weaponchange_rate[2]; // how fast changing weapons (min, max)
+   float weaponchange_rate_min; // how fast changing weapons (min, max)
+   float weaponchange_rate_max; 
    
    float shootcone_diameter; // bot tries to fire when aim line is less than [diameter / 2] apart from target 
    float shootcone_minangle; // OR angle between bot aim line and line to target is less than angle set here

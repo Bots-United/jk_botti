@@ -203,7 +203,7 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
          if ((temp < 1) || (temp > 100))
             printfunc(PRINTFUNC_ERROR, arg, "invalid botthinkfps value!\n");
          else
-            bot_think_spf = 1.0 / temp;
+            bot_think_spf = 1.0 / (float)temp;
       }
 
       safevoid_snprintf(msg, sizeof(msg), "botthinkfps is %.2f\n", 1.0 / bot_think_spf);
@@ -353,7 +353,7 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
       {
          int temp = atoi(arg1);
 
-         if ((temp < 0) || (temp > 3))
+         if ((temp < 1) || (temp > 3))
             printfunc(PRINTFUNC_ERROR, arg, "invalid bot_reaction_time value!\n");
          else
             bot_reaction_time = temp;
@@ -662,13 +662,30 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
       printfunc(PRINTFUNC_INFO, arg, msg); \
    }
          CHECK_AND_SET_BOTSKILL_INT(pause_frequency) // how often (out of 1000 times) the bot will pause, based on bot skill
-         CHECK_AND_SET_BOTSKILL_FLOAT100(normal_strafe) // how much bot straifes when walking around
-         CHECK_AND_SET_BOTSKILL_FLOAT100(battle_strafe) // how much bot straifes when attacking enemy
+         
+         CHECK_AND_SET_BOTSKILL_FLOAT(pause_time_min) // how long bot pauses (min, max)
+         CHECK_AND_SET_BOTSKILL_FLOAT(pause_time_max) //
+         
+         CHECK_AND_SET_BOTSKILL_FLOAT100(normal_strafe) // how much bot strafes when walking around
+         CHECK_AND_SET_BOTSKILL_FLOAT100(battle_strafe) // how much bot strafes when attacking enemy
+         
          CHECK_AND_SET_BOTSKILL_INT(keep_optimal_dist) // how often bot (out of 100 times) the bot try to keep at optimum distance of weapon when attacking
          CHECK_AND_SET_BOTSKILL_FLOAT(shootcone_diameter) // bot tries to fire when aim line is less than [diameter / 2] apart from target 
          CHECK_AND_SET_BOTSKILL_FLOAT(shootcone_minangle) // OR angle between bot aim line and line to target is less than angle set here
+         
          CHECK_AND_SET_BOTSKILL_FLOAT(turn_skill) // BotAim turn_skill, how good bot is at aiming on enemy origin.
          CHECK_AND_SET_BOTSKILL_FLOAT(hearing_sensitivity) // how well bot hears sounds
+         
+         CHECK_AND_SET_BOTSKILL_FLOAT(respawn_react_delay) // delay on players after respawn
+         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_min[0]) // reaction delay settings ([0] is for bot_reaction 1, [1] for 2, etc)
+         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_max[0]) // 
+         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_min[1]) // 
+         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_max[1]) // 
+         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_min[2]) // 
+         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_max[2]) // 
+         
+         CHECK_AND_SET_BOTSKILL_FLOAT(weaponchange_rate_min) // how fast changing weapons (min, max)
+         CHECK_AND_SET_BOTSKILL_FLOAT(weaponchange_rate_max) //
 
          CHECK_AND_SET_BOTSKILL_QBOOLEAN(can_longjump) // and can longjump.
          CHECK_AND_SET_BOTSKILL_INT(random_jump_frequency) // how often (out of 100 times) the bot will do random jump

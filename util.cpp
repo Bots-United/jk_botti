@@ -39,6 +39,7 @@ extern bot_t bots[32];
 extern qboolean is_team_play;
 
 float last_time_not_facing_wall[32];
+float last_time_dead[32];
 
 breakable_list_t *g_breakable_list = NULL;
 
@@ -158,7 +159,44 @@ void UTIL_FreeFuncBreakables(void)
 //
 breakable_list_t * UTIL_FindBreakable(breakable_list_t * pbreakable)
 {
-   return(pbreakable?pbreakable->next:g_breakable_list);
+   if(!pbreakable)
+      return(g_breakable_list);
+   else
+      return(pbreakable->next);
+}
+
+
+//
+void SaveAliveStatus(edict_t * pPlayer)
+{
+   int idx;
+   
+   idx = ENTINDEX(pPlayer) - 1;
+   if(idx < 0 || idx >= gpGlobals->maxClients)
+      return;
+   
+   if(!IsAlive(pPlayer))
+      last_time_dead[idx] = gpGlobals->time;
+}
+
+//
+float UTIL_GetTimeSinceRespawn(edict_t * pPlayer)
+{
+   int idx;
+   
+   idx = ENTINDEX(pPlayer) - 1;
+   if(idx < 0 || idx >= gpGlobals->maxClients)
+      return(-1.0);
+   
+   if(!IsAlive(pPlayer))
+   {
+      //we are dead, so time since respawn is... 
+      return(-1.0);
+   }
+   else
+   {
+      return(gpGlobals->time - last_time_dead[idx]);
+   }
 }
 
 
@@ -450,9 +488,8 @@ qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnem
    if(FVisibleEnemyOffset( vecOrigin, feet_offset, pEdict, pEnemy ))
       return(TRUE);
    
-   // check center if no extra info is available
-   if(!pEdict)
-      return(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ));
+   // check center
+   return(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ));
    
    // construct sideways vector
    Vector v_right = UTIL_AnglesToRight(UTIL_VecToAngles(vecOrigin - GetGunPosition(pEdict)));

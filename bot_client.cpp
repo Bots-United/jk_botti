@@ -321,7 +321,6 @@ void BotClient_Valve_Damage(void *p, int bot_index)
             // stop using health or HEV stations...
             bots[bot_index].b_use_health_station = FALSE;
             bots[bot_index].b_use_HEV_station = FALSE;
-            bots[bot_index].b_use_capture = FALSE;
          }
       }
    }
@@ -337,11 +336,6 @@ void BotClient_Valve_DeathMsg(void *p, int bot_index)
    static edict_t *killer_edict;
    static edict_t *victim_edict;
    static int index;
-
-   char chat_text[81];
-   char chat_name[64];
-   char temp_name[64];
-   const char *bot_name;
 
    if (state == 0)
    {
@@ -377,62 +371,7 @@ void BotClient_Valve_DeathMsg(void *p, int bot_index)
 
          if (victim_edict != NULL)
          {
-            // are there any taunt messages and should the bot taunt?
-            if ((bot_taunt_count > 0) &&
-                (RANDOM_LONG2(1,100) <= bots[index].taunt_percent))
-            {
-               int taunt_index;
-               qboolean used;
-               int i, recent_count;
-
-               // set chat flag and time to chat...
-               bots[index].b_bot_say = TRUE;
-               bots[index].f_bot_say = gpGlobals->time + 5.0 + RANDOM_FLOAT2(0.0, 5.0);
-
-               recent_count = 0;
-
-               while (recent_count < 5)
-               {
-                  taunt_index = RANDOM_LONG2(0, bot_taunt_count-1);
-
-                  used = FALSE;
-
-                  for (i=0; i < 5; i++)
-                  {
-                     if (recent_bot_taunt[i] == taunt_index)
-                        used = TRUE;
-                  }
-
-                  if (used)
-                     recent_count++;
-                  else
-                     break;
-               }
-
-               for (i=4; i > 0; i--)
-                  recent_bot_taunt[i] = recent_bot_taunt[i-1];
-
-               recent_bot_taunt[0] = taunt_index;
-
-               if (bot_taunt[taunt_index].can_modify)
-                  BotChatText(bot_taunt[taunt_index].text, chat_text);
-               else
-                  strcpy(chat_text, bot_taunt[taunt_index].text);
-
-               if (victim_edict->v.netname)
-               {
-                  strncpy(temp_name, STRING(victim_edict->v.netname), 31);
-                  temp_name[31] = 0;
-
-                  BotChatName(temp_name, chat_name);
-               }
-               else
-                  strcpy(chat_name, "NULL");
-
-               bot_name = STRING(bots[index].pEdict->v.netname);
-
-               BotChatFillInName(bots[index].bot_say_msg, chat_text, chat_name, bot_name);
-            }
+            BotChatTaunt(bots[index], victim_edict);
          }
       }
 

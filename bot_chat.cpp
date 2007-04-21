@@ -44,6 +44,209 @@ extern int bot_chat_swap_percent;
 extern int bot_chat_lower_percent;
 
 
+// taunt on killed player
+void BotChatTaunt(bot_t &pBot, edict_t *victim_edict)
+{
+   char chat_text[81];
+   char chat_name[64];
+   char temp_name[64];
+   const char *bot_name;
+
+   // are there any taunt messages and should the bot taunt?
+   if ((bot_taunt_count > 0) &&
+       (RANDOM_LONG2(1,100) <= pBot.taunt_percent))
+   {
+      int taunt_index;
+      qboolean used;
+      int i, recent_count;
+
+      // set chat flag and time to chat...
+      pBot.b_bot_say = TRUE;
+      pBot.f_bot_say = gpGlobals->time + 5.0 + RANDOM_FLOAT2(0.0, 5.0);
+
+      recent_count = 0;
+
+      while (recent_count < 5)
+      {
+         taunt_index = RANDOM_LONG2(0, bot_taunt_count-1);
+
+         used = FALSE;
+
+         for (i=0; i < 5; i++)
+         {
+            if (recent_bot_taunt[i] == taunt_index)
+               used = TRUE;
+         }
+
+         if (used)
+            recent_count++;
+         else
+            break;
+      }
+
+      for (i=4; i > 0; i--)
+         recent_bot_taunt[i] = recent_bot_taunt[i-1];
+
+      recent_bot_taunt[0] = taunt_index;
+
+      if (bot_taunt[taunt_index].can_modify)
+         BotChatText(bot_taunt[taunt_index].text, chat_text);
+      else
+         strcpy(chat_text, bot_taunt[taunt_index].text);
+
+      if (victim_edict->v.netname)
+      {
+         strncpy(temp_name, STRING(victim_edict->v.netname), 31);
+         temp_name[31] = 0;
+
+         BotChatName(temp_name, chat_name);
+      }
+      else
+         strcpy(chat_name, "NULL");
+
+      bot_name = STRING(pBot.pEdict->v.netname);
+
+      BotChatFillInName(pBot.bot_say_msg, chat_text, chat_name, bot_name);
+   }
+}
+
+
+// did another player kill this bot AND bot whine messages loaded AND
+void BotChatWhine(bot_t &pBot)
+{
+   char chat_text[81];
+   char chat_name[64];
+   char temp_name[64];
+   const char *bot_name;
+   
+   edict_t *pEdict = pBot.pEdict;
+   
+   // has the bot been alive for at least 15 seconds AND
+   if ((pBot.killer_edict != NULL) && (bot_whine_count > 0) &&
+       ((pBot.f_bot_spawn_time + 15.0) <= gpGlobals->time))
+   {
+      int whine_index;
+      qboolean used;
+      int i, recent_count;
+
+      if ((RANDOM_LONG2(1,100) <= pBot.whine_percent))
+      {
+         // set chat flag and time to chat...
+         pBot.b_bot_say = TRUE;
+         pBot.f_bot_say = gpGlobals->time + 5.0 + RANDOM_FLOAT2(0.0, 5.0);
+
+         recent_count = 0;
+
+         while (recent_count < 5)
+         {
+            whine_index = RANDOM_LONG2(0, bot_whine_count-1);
+
+            used = FALSE;
+
+            for (i=0; i < 5; i++)
+            {
+               if (recent_bot_whine[i] == whine_index)
+                  used = TRUE;
+            }
+
+            if (used)
+               recent_count++;
+            else
+               break;
+         }
+
+         for (i=4; i > 0; i--)
+            recent_bot_whine[i] = recent_bot_whine[i-1];
+
+         recent_bot_whine[0] = whine_index;
+
+         if (bot_whine[whine_index].can_modify)
+            BotChatText(bot_whine[whine_index].text, chat_text);
+         else
+            strcpy(chat_text, bot_whine[whine_index].text);
+
+         if (pBot.killer_edict->v.netname)
+         {
+            strncpy(temp_name, STRING(pBot.killer_edict->v.netname), 31);
+            temp_name[31] = 0;
+
+            BotChatName(temp_name, chat_name);
+         }
+         else
+            strcpy(chat_name, "NULL");
+
+         bot_name = STRING(pEdict->v.netname);
+
+         BotChatFillInName(pBot.bot_say_msg, chat_text, chat_name, bot_name);
+      }
+   }
+}
+
+
+// just say something
+void BotChatTalk(bot_t &pBot)
+{
+   char chat_text[81];
+   char chat_name[64];
+   const char *bot_name;
+   
+   edict_t *pEdict = pBot.pEdict;
+   
+   if ((bot_chat_count > 0) && (pBot.f_bot_chat_time < gpGlobals->time))
+   {
+      pBot.f_bot_chat_time = gpGlobals->time + 30.0;
+
+      if (RANDOM_LONG2(1,100) <= pBot.chat_percent)
+      {
+         int chat_index;
+         qboolean used;
+         int i, recent_count;
+
+         // set chat flag and time to chat...
+         pBot.b_bot_say = TRUE;
+         pBot.f_bot_say = gpGlobals->time + 5.0 + RANDOM_FLOAT2(0.0, 5.0);
+
+         recent_count = 0;
+
+         while (recent_count < 5)
+         {
+            chat_index = RANDOM_LONG2(0, bot_chat_count-1);
+
+            used = FALSE;
+
+            for (i=0; i < 5; i++)
+            {
+               if (recent_bot_chat[i] == chat_index)
+                  used = TRUE;
+            }
+
+            if (used)
+               recent_count++;
+            else
+               break;
+         }
+
+         for (i=4; i > 0; i--)
+            recent_bot_chat[i] = recent_bot_chat[i-1];
+
+         recent_bot_chat[0] = chat_index;
+
+         if (bot_chat[chat_index].can_modify)
+            BotChatText(bot_chat[chat_index].text, chat_text);
+         else
+            strcpy(chat_text, bot_chat[chat_index].text);
+
+         strcpy(chat_name, STRING(pBot.pEdict->v.netname));
+
+         bot_name = STRING(pEdict->v.netname);
+
+         BotChatFillInName(pBot.bot_say_msg, chat_text, chat_name, bot_name);
+      }
+   }
+}
+
+
+//
 void LoadBotChat(void)
 {
    FILE *bfp;

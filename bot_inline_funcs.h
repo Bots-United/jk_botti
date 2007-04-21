@@ -261,8 +261,9 @@ inline void BotFixIdealYaw(edict_t *pEdict)
 
 inline Vector UTIL_GetOrigin(edict_t *pEdict)
 {
-   if (strncmp(STRING(pEdict->v.classname), "func_", 5) == 0)
-           return VecBModelOrigin(pEdict);
+//   if(strncmp(STRING(pEdict->v.classname), "func_", 5) == 0)
+   if(pEdict->v.solid == SOLID_BSP)
+      return VecBModelOrigin(pEdict);
 
    return pEdict->v.origin; 
 }
@@ -346,7 +347,7 @@ inline int RANDOM_LONG2(int lLow, int lHigh)
       return(lLow);
    
    rnd = fast_generate_random();
-   rnd = (rnd + rnd * ((double)lHigh - lLow)) / 4294967296.0; // div by (1<<32)
+   rnd = (rnd * (1.0 + (double)lHigh - (double)lLow)) / 4294967296.0; // div by (1<<32)
    
    return (int)(rnd + lLow);
 }

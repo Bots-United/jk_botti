@@ -68,10 +68,6 @@ qboolean BotAimsAtSomething (bot_t &pBot)
 void BotPointGun(bot_t &pBot)
 {
    edict_t *pEdict = pBot.pEdict;
-
-   // frametime botaim
-   pBot.f_aim_think_frame_time = gpGlobals->time - pBot.f_prev_aim_think_time;
-   pBot.f_prev_aim_think_time = gpGlobals->time;
    
    // this function purpose is to make the bot move its crosshair to the direction 
    // where it wants to look. There is some kind of filtering for the view, to make 
@@ -103,12 +99,12 @@ void BotPointGun(bot_t &pBot)
       speed = 0.2 + (turn_skill - 1) / 20; // slow aim
 
    // thanks Tobias "Killaruna" Heimann and Johannes "@$3.1415rin" Lampel for this one
-   pEdict->v.yaw_speed = (pEdict->v.yaw_speed * exp (log (speed / 2) * pBot.f_aim_think_frame_time * 20)
-                             + speed * v_deviation.y * (1 - exp (log (speed / 2) * pBot.f_aim_think_frame_time * 20)))
-                            * pBot.f_aim_think_frame_time * 20;
-   pEdict->v.pitch_speed = (pEdict->v.pitch_speed * exp (log (speed / 2) * pBot.f_aim_think_frame_time * 20)
-                               + speed * v_deviation.x * (1 - exp (log (speed / 2) * pBot.f_aim_think_frame_time * 20)))
-                              * pBot.f_aim_think_frame_time * 20;
+   pEdict->v.yaw_speed = (pEdict->v.yaw_speed * exp (log (speed / 2) * pBot.f_frame_time * 20)
+                             + speed * v_deviation.y * (1 - exp (log (speed / 2) * pBot.f_frame_time * 20)))
+                            * pBot.f_frame_time * 20;
+   pEdict->v.pitch_speed = (pEdict->v.pitch_speed * exp (log (speed / 2) * pBot.f_frame_time * 20)
+                               + speed * v_deviation.x * (1 - exp (log (speed / 2) * pBot.f_frame_time * 20)))
+                              * pBot.f_frame_time * 20;
 
    // influence of y movement on x axis, based on skill (less influence than x on y since it's
    // easier and more natural for the bot to "move its mouse" horizontally than vertically)
@@ -144,14 +140,14 @@ void BotAimPre( bot_t &pBot )
    pBot.pEdict->v.ideal_yaw = UTIL_WrapAngle(pBot.pEdict->v.ideal_yaw);
    
    // special aiming angle for mp5 grenade
-   if(pBot.set_special_shoot_angle)
+   if(pBot.b_set_special_shoot_angle)
    {
       float old_angle = pBot.pEdict->v.v_angle.z;
       
-      pBot.pEdict->v.v_angle.z = pBot.special_shoot_angle;
+      pBot.pEdict->v.v_angle.z = pBot.f_special_shoot_angle;
       pBot.pEdict->v.angles.x = UTIL_WrapAngle (-pBot.pEdict->v.v_angle.x / 3);
       
-      pBot.special_shoot_angle = old_angle;
+      pBot.f_special_shoot_angle = old_angle;
    }
 }
 
@@ -160,13 +156,13 @@ void BotAimPre( bot_t &pBot )
 void BotAimPost( bot_t &pBot )
 {
    // special aiming angle for mp5 grenade
-   if(pBot.set_special_shoot_angle)
+   if(pBot.b_set_special_shoot_angle)
    {
-      pBot.pEdict->v.v_angle.z = pBot.special_shoot_angle;
+      pBot.pEdict->v.v_angle.z = pBot.f_special_shoot_angle;
       pBot.pEdict->v.angles.x = UTIL_WrapAngle (-pBot.pEdict->v.v_angle.x / 3);
       
-      pBot.set_special_shoot_angle = FALSE;
-      pBot.special_shoot_angle = 0.0;
+      pBot.b_set_special_shoot_angle = FALSE;
+      pBot.f_special_shoot_angle = 0.0;
    }
 }
 
@@ -512,6 +508,16 @@ qboolean FCanShootInHead(edict_t * pEdict, edict_t * pTarget, const Vector & v_d
       return FALSE;
    
    float enemyHalfHeight = ((pTarget->v.flags & FL_DUCKING) == FL_DUCKING ? 36 : 72) / 2.0;
+   
+   // first check for if head is visible
+   if(!FVisible( pTarget->v.origin + Vector(0, 0, enemyHalfHeight), pEdict, pTarget ))
+      return FALSE;
+   
+   // check center/feet
+   if(!FVisible( pTarget->v.origin, pEdict, pTarget ))
+      if(!FVisible( pTarget->v.origin + Vector(0, 0, -enemyHalfHeight), pEdict, pTarget ))
+         return TRUE; //only head visible
+   
    float distance = (v_dest - pEdict->v.origin).Length();
    
    Vector2D triangle;
@@ -611,6 +617,85 @@ edict_t *FindEnemyNearestToPoint(Vector v_point, float radius, edict_t * pBotEdi
 
 
 //
+qboolean BotFindSoundEnemy( bot_t &pBot )
+{
+   edict_t *pEdict = pBot.pEdict;
+   
+   //remove sound target if fighting
+   if(pBot.pBotEnemy != NULL)
+   {
+      pBot.pFindSoundEnt = NULL;
+      return(FALSE);
+   }
+   
+   // check if time to check for sounds (if don't already have enemy)
+   int iSound;
+   float hearingSensitivity;
+   CSound *pCurrentSound;
+   int sound_count;
+   edict_t *pNewFindSoundEnt = NULL;
+
+   float nearestdistance = 9999;
+
+   iSound = CSoundEnt::ActiveList();
+   sound_count = 1;
+   
+   hearingSensitivity = skill_settings[pBot.bot_skill].hearing_sensitivity;
+   
+   while ( iSound != SOUNDLIST_EMPTY && sound_count < MAX_WORLD_SOUNDS ) 
+   {
+      pCurrentSound = CSoundEnt::SoundPointerForIndex( iSound );
+      if ( pCurrentSound &&
+         ( pCurrentSound->m_vecOrigin - pEdict->v.origin ).Length() <= pCurrentSound->m_iVolume * hearingSensitivity )
+      {
+         // can hear this sound, find enemy nearest sound
+         edict_t * pMonsterOrPlayer = FindEnemyNearestToPoint(pCurrentSound->m_vecOrigin, 100*skill_settings[pBot.bot_skill].hearing_sensitivity, pEdict);
+         
+         if (!FNullEnt(pMonsterOrPlayer) && IsAlive(pMonsterOrPlayer))
+         {
+            Vector v_monsterplayer = UTIL_GetOrigin(pMonsterOrPlayer);
+            float distance = (v_monsterplayer - pEdict->v.origin).Length();
+            
+            if(distance < nearestdistance)
+            {
+               distance = nearestdistance;
+               pNewFindSoundEnt = pMonsterOrPlayer;
+               
+               //draw red beam
+               //UTIL_DrawBeam(pNewEnemy, v_newenemy, pEdict->v.origin, 10, 2, 250, 50, 50, 200, 10);
+            }
+         }
+      }
+      
+      iSound = pCurrentSound->m_iNext;
+      sound_count++;
+   }
+   
+   if(iSound != SOUNDLIST_EMPTY && sound_count == MAX_WORLD_SOUNDS)
+   {
+      //sound system error, reset
+      UTIL_ConsolePrintf("run in to critical sound system error, sound system reseted.");
+      
+      *pSoundEnt = CSoundEnt();
+      pSoundEnt->Spawn();
+   }
+
+   // draw green beam
+   /*if(pNewEnemy)
+      UTIL_DrawBeam(pNewEnemy, v_newenemy, pEdict->v.origin, 10, 2, 50, 250, 50, 200, 10);*/
+      
+   if(pNewFindSoundEnt != NULL)
+   {
+      pBot.pFindSoundEnt = pNewFindSoundEnt;
+      return TRUE;
+   }
+   
+   pBot.pFindSoundEnt = NULL;
+   return FALSE;
+}
+
+
+//
 edict_t *BotFindEnemy( bot_t &pBot )
 {
    edict_t *pent = NULL;
@@ -627,8 +712,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
       // if the enemy is dead?
       // if the enemy is chat protected?
       // is the enemy dead?, assume bot killed it
-      if (!GetPredictedIsAlive(pBot.pBotEnemy, gpGlobals->time - skill_settings[pBot.bot_skill].prediction_latency) ||
-          TRUE == (chatprot = IsPlayerChatProtected(pBot.pBotEnemy))) 
+      if (!IsAlive(pBot.pBotEnemy) || TRUE == (chatprot = IsPlayerChatProtected(pBot.pBotEnemy))) 
       {
          // the enemy is dead, jump for joy about 10% of the time
          if (!chatprot && RANDOM_LONG2(1, 100) <= 10)
@@ -719,6 +803,10 @@ edict_t *BotFindEnemy( bot_t &pBot )
          if (distance >= nearestdistance)
             continue;
          
+         // 0,0,0 is considered invalid
+         if(v_origin == Vector(0,0,0))
+            continue;
+         
          // see if bot can't see ...
          if (!(FInViewCone( v_origin, pEdict ) && FVisible( v_origin, pEdict, pBreakable->pEdict )))
             continue;
@@ -746,6 +834,10 @@ edict_t *BotFindEnemy( bot_t &pBot )
 
          float distance = (pMonster->v.origin - pEdict->v.origin).Length();
          if (distance >= nearestdistance)
+            continue;
+
+         // 0,0,0 is considered invalid
+         if(pMonster->v.origin == Vector(0,0,0))
             continue;
 
          if (FIsClassname(pMonster, "hornet"))
@@ -786,9 +878,18 @@ edict_t *BotFindEnemy( bot_t &pBot )
             float distance = (pPlayer->v.origin - pEdict->v.origin).Length();
             if (distance >= nearestdistance)
                continue;
+
+            // 0,0,0 is considered invalid
+            if(pPlayer->v.origin == Vector(0,0,0))
+               continue;
             
             // skip this player if not alive (i.e. dead or dying)
-            if (!GetPredictedIsAlive(pPlayer, gpGlobals->time - skill_settings[pBot.bot_skill].prediction_latency))
+            if (!IsAlive(pPlayer))
+               continue;
+              
+            // skip this player if respawned lately
+            float time_since_respawn = UTIL_GetTimeSinceRespawn(pPlayer);
+            if(time_since_respawn != -1.0 && time_since_respawn < skill_settings[pBot.bot_skill].respawn_react_delay)
                continue;
 
             // skip this player if facing wall
@@ -799,9 +900,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
             if(AreTeamMates(pPlayer, pEdict))
                continue;
 
-            //vecEnd = pPlayer->v.origin + pPlayer->v.view_ofs;
-            v_player = GetPredictedPlayerPosition(pBot, pPlayer);
-            vecEnd = v_player + pPlayer->v.view_ofs;
+            vecEnd = GetGunPosition(pPlayer);
 
             // see if bot can't see the player...
             if (!(FInViewCone( vecEnd, pEdict ) && FVisibleEnemy( vecEnd, pEdict, pPlayer )))
@@ -818,56 +917,6 @@ edict_t *BotFindEnemy( bot_t &pBot )
             }
          }
       }
-   }
-
-   // check if time to check for sounds (if don't already have enemy)
-   if (pNewEnemy == NULL)
-   {
-      int iSound;
-      float hearingSensitivity;
-      CSound *pCurrentSound;
-
-      nearestdistance = 9999;
-
-      iSound = CSoundEnt::ActiveList();
-      
-      hearingSensitivity = skill_settings[pBot.bot_skill].hearing_sensitivity;
-      
-      while ( iSound != SOUNDLIST_EMPTY )
-      {
-         pCurrentSound = CSoundEnt::SoundPointerForIndex( iSound );
-         if ( pCurrentSound &&
-            ( pCurrentSound->m_vecOrigin - pEdict->v.origin ).Length() <= pCurrentSound->m_iVolume * hearingSensitivity )
-         {
-            // can hear this sound, find enemy nearest sound
-            edict_t * pMonsterOrPlayer = FindEnemyNearestToPoint(pCurrentSound->m_vecOrigin, 100*skill_settings[pBot.bot_skill].hearing_sensitivity, pEdict);
-            
-            if (!FNullEnt(pMonsterOrPlayer) &&
-            	GetPredictedIsAlive(pMonsterOrPlayer, gpGlobals->time - skill_settings[pBot.bot_skill].prediction_latency))
-            {
-               Vector v_monsterplayer = GetPredictedPlayerPosition(pBot, pMonsterOrPlayer);
-               float distance = (v_monsterplayer - pEdict->v.origin).Length();
-               
-               if(distance < nearestdistance)
-               {
-                  distance = nearestdistance;
-                  pNewEnemy = pMonsterOrPlayer;
-                  v_newenemy = v_monsterplayer;
-                     
-                  pBot.pBotUser = NULL;  // don't follow user when enemy found
-                  
-                  //draw red beam
-                  //UTIL_DrawBeam(pNewEnemy, v_newenemy, pEdict->v.origin, 10, 2, 250, 50, 50, 200, 10);
-               }
-            }
-         }
-         
-         iSound = pCurrentSound->m_iNext;
-      }
-
-      // draw green beam
-      /*if(pNewEnemy)
-         UTIL_DrawBeam(pNewEnemy, v_newenemy, pEdict->v.origin, 10, 2, 50, 250, 50, 200, 10);*/
    }
 
    if (pNewEnemy)
@@ -893,10 +942,6 @@ edict_t *BotFindEnemy( bot_t &pBot )
       pBot.f_bot_see_enemy_time = -1;  // so we won't keep reloading
 
       pEdict->v.button |= IN_RELOAD;  // press reload button
-
-      // initialize aim tracking angles...
-      pBot.f_aim_x_angle_delta = 5.0;
-      pBot.f_aim_y_angle_delta = 5.0;
    }
 
    return (pNewEnemy);
@@ -947,7 +992,7 @@ qboolean HaveRoomForThrow(bot_t & pBot)
 
 
 //
-qboolean CheckWeaponFireContitions(bot_t & pBot, const bot_weapon_select_t &select, qboolean &use_primary, qboolean &use_secondary) 
+qboolean CheckWeaponFireConditions(bot_t & pBot, const bot_weapon_select_t &select, qboolean &use_primary, qboolean &use_secondary) 
 {
    edict_t *pEdict = pBot.pEdict;
    
@@ -955,7 +1000,8 @@ qboolean CheckWeaponFireContitions(bot_t & pBot, const bot_weapon_select_t &sele
    if (select.iId == VALVE_WEAPON_CROWBAR)
    {
       // check if bot needs to duck down to hit enemy...
-      if (pBot.pBotEnemy->v.origin.z < (pEdict->v.origin.z - 30))
+      if (fabs(pBot.pBotEnemy->v.origin.z - pEdict->v.origin.z) > 16 &&
+      	  (pBot.pBotEnemy->v.origin - pEdict->v.origin).Length() < 64)
          pBot.f_duck_time = gpGlobals->time + 1.0;
    }
    else if(select.type == WEAPON_THROW && !HaveRoomForThrow(pBot))
@@ -974,8 +1020,8 @@ qboolean CheckWeaponFireContitions(bot_t & pBot, const bot_weapon_select_t &sele
          float angle = ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(v_enemy.Length(), v_enemy.z);
          if(angle >= -89.0 && angle <= 89.0)
          {
-            pBot.set_special_shoot_angle = TRUE;
-            pBot.special_shoot_angle = angle;
+            pBot.b_set_special_shoot_angle = TRUE;
+            pBot.f_special_shoot_angle = angle;
             ok = TRUE;
          }
       }
@@ -1005,7 +1051,7 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, 
    }
 
    // Check if weapon can be fired and setup bot for firing this weapon
-   if(!CheckWeaponFireContitions(pBot, select, use_primary, use_secondary))
+   if(!CheckWeaponFireConditions(pBot, select, use_primary, use_secondary))
       return FALSE;
    
    if (use_primary)
@@ -1100,8 +1146,8 @@ qboolean TrySelectWeapon(bot_t &pBot, const int select_index, const bot_weapon_s
    
    pBot.current_weapon_index = select_index;
    pBot.f_weaponchange_time = gpGlobals->time + 
-      RANDOM_FLOAT2(skill_settings[pBot.bot_skill].weaponchange_rate[0], 
-                    skill_settings[pBot.bot_skill].weaponchange_rate[1]);
+      RANDOM_FLOAT2(skill_settings[pBot.bot_skill].weaponchange_rate_min, 
+                    skill_settings[pBot.bot_skill].weaponchange_rate_max);
    
    return TRUE;
 }
@@ -1487,18 +1533,9 @@ void BotShootAtEnemy( bot_t &pBot )
    // Enemy not visible?
    if(!pBot.b_combat_longjump && !FVisibleEnemy(v_enemy_aimpos, pEdict, pBot.pBotEnemy))
    {
-      int new_wp_index;
-      
-      // get waypoint close to target and track down!
-      if(-1 != (new_wp_index = WaypointFindNearest(pBot.pBotEnemy, 512)) && BotHeadTowardWaypoint(pBot))
-      {
-         pBot.curr_waypoint_index = new_wp_index;
-         
-      	 // not visible.. reset reaction times
-         BotResetReactionTime(pBot);
-         
-         return;
-      }
+      pBot.pFindSoundEnt = pBot.pBotEnemy;
+      pBot.pBotEnemy = NULL;
+      return;
    }
    
    v_enemy = v_enemy_aimpos - GetGunPosition(pEdict);

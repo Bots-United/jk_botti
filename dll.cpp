@@ -45,6 +45,8 @@ extern qboolean b_observer_mode;
 extern qboolean b_botdontshoot;
 extern qboolean g_in_intermission;
 extern BOOL wp_matrix_save_on_mapend;
+extern float last_time_not_facing_wall[32];
+extern float last_time_dead[32];
 
 int submod_id = SUBMOD_HLDM;
 
@@ -61,7 +63,7 @@ int bot_chat_drop_percent = 10;  // percent of the time to drop characters
 int bot_chat_swap_percent = 10;  // percent of the time to swap characters
 int bot_chat_lower_percent = 50; // percent of the time to lowercase chat
 
-float bot_think_spf = 1/30; // == 1 / (30 fps)
+float bot_think_spf = 1.0/30.0; // == 1 / (30 fps)
 
 qboolean b_random_color = TRUE;
 float bot_check_time = 60.0;
@@ -325,6 +327,7 @@ int Spawn( edict_t *pent )
          WaypointLoad(NULL);
          
          // init sound system
+         *pSoundEnt = CSoundEnt();
          pSoundEnt->Spawn();
          
          PRECACHE_SOUND("weapons/xbow_hit1.wav");      // waypoint add
@@ -358,6 +361,9 @@ int Spawn( edict_t *pent )
          need_to_open_cfg = TRUE;
 
          bot_check_time = gpGlobals->time + 5.0;
+         
+         memset(last_time_not_facing_wall, 0, sizeof(last_time_not_facing_wall));
+         memset(last_time_dead, 0, sizeof(last_time_dead));
       }
       else
          CollectMapSpawnItems(pent);
@@ -518,7 +524,7 @@ void ServerDeactivate(void)
 }
 
 
-void PlayerPostThink( edict_t *pEdict )
+void PlayerPostThink_Post( edict_t *pEdict )
 {
    if (!gpGlobals->deathmatch) 
       RETURN_META(MRES_IGNORED);
@@ -531,6 +537,9 @@ void PlayerPostThink( edict_t *pEdict )
       
    //Sound update
    UpdatePlayerSound(pEdict);
+   
+   //Store check IsAlive
+   SaveAliveStatus(pEdict);
    
    RETURN_META (MRES_HANDLED);
 }
@@ -598,70 +607,64 @@ void StartFrame( void )
    if (pSoundEnt->m_nextthink <= gpGlobals->time)
       pSoundEnt->Think();
    
-   // Don't allow BotThink and WaypointThink run on same frame,
-   // because this would KILL bot aim (for reasons still unknown)
-   if(frame_count++ & 1)
-   {
-      if (bot_stop == 0)
-      {            
-         count = 0;
+   // bot system
+   if (bot_stop == 0)
+   {            
+      count = 0;
          
-         for (bot_index = 0; bot_index < gpGlobals->maxClients; bot_index++)
-         {
-            if (bots[bot_index].is_used)   // is this slot used 
-            {
-               if (gpGlobals->time >= bots[bot_index].bot_think_time)
-               {
-                  BotThink(bots[bot_index]);
-                  
-                  // randomness prevents all bots to run on same frame -> less laggy server
-                  bots[bot_index].bot_think_time = gpGlobals->time + bot_think_spf * RANDOM_FLOAT2(0.95, 1.05);
-               }
-            
-               count++;
-            }
-         }
-         
-         if (count > num_bots)
-            num_bots = count;
-      }
-   }
-   else
-   {
-      // Autowaypointing engine and else, limit to half of botthink rate
-      if (gpGlobals->time >= waypoint_time)
+      for (bot_index = 0; bot_index < gpGlobals->maxClients; bot_index++)
       {
-         int waypoint_player_count = 0;
-         int waypoint_player_index = 1;
-      
-         WaypointAddSpawnObjects();
-      
-         // 10 times / sec, note: this is extremely slow, do checking only for max 4 players on one frame
-         waypoint_time = gpGlobals->time + (1.0/10.0);
-      
-         while(waypoint_player_index <= gpGlobals->maxClients)
+         if (bots[bot_index].is_used)   // is this slot used 
          {
-            pPlayer = INDEXENT(waypoint_player_index++);
-
-            if (pPlayer && !pPlayer->free && !FBitSet(pPlayer->v.flags, FL_PROXY))
+            if (gpGlobals->time >= bots[bot_index].bot_think_time)
             {
-               // Is player alive?
-               if(!IsAlive(pPlayer))
-                  continue;
+               BotThink(bots[bot_index]);
+                  
+               // randomness prevents all bots to run on same frame -> less laggy server
+               bots[bot_index].bot_think_time = gpGlobals->time + bot_think_spf * RANDOM_FLOAT2(0.95, 1.05);
+            }
+
+            count++;
+         }
+      }
+         
+      if (count > num_bots)
+         num_bots = count;
+   }
+   
+   // Autowaypointing engine
+   if (gpGlobals->time >= waypoint_time)
+   {
+      int waypoint_player_count = 0;
+      int waypoint_player_index = 1;
+      
+      WaypointAddSpawnObjects();
+      
+      // 10 times / sec, note: this is extremely slow, do checking only for max 4 players on one frame
+      waypoint_time = gpGlobals->time + (1.0/10.0);
+      
+      while(waypoint_player_index <= gpGlobals->maxClients)
+      {
+         pPlayer = INDEXENT(waypoint_player_index++);
+
+         if (pPlayer && !pPlayer->free && !FBitSet(pPlayer->v.flags, FL_PROXY))
+         {
+            // Is player alive?
+            if(!IsAlive(pPlayer))
+               continue;
             
-               if (FBitSet(pPlayer->v.flags, FL_CLIENT) && !FBitSet(pPlayer->v.flags, FL_PROXY) && 
-                  !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
-               {
-                  WaypointThink(pPlayer);
+            if (FBitSet(pPlayer->v.flags, FL_CLIENT) && !FBitSet(pPlayer->v.flags, FL_PROXY) && 
+               !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
+            {
+               WaypointThink(pPlayer);
                
-                  if(++waypoint_player_count >= 2)
-                     break;
-               }
+               if(++waypoint_player_count >= 2)
+                  break;
             }
          }
       }
    }
-
+   
    if (need_to_open_cfg)  // have we open jk_botti.cfg file yet?
    {
       char filename[256];
@@ -758,7 +761,6 @@ C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVers
    gFunctionTable.pfnClientCommand = ClientCommand;
    gFunctionTable.pfnStartFrame = StartFrame;
    gFunctionTable.pfnServerDeactivate = ServerDeactivate;
-   gFunctionTable.pfnPlayerPostThink = PlayerPostThink;
    gFunctionTable.pfnPM_Move = PM_Move;
 
    memcpy (pFunctionTable, &gFunctionTable, sizeof (DLL_FUNCTIONS));
@@ -768,7 +770,8 @@ C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVers
 C_DLLEXPORT int GetEntityAPI2_POST (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion)
 {
    gFunctionTable_POST.pfnSpawn = Spawn_Post;
-   
+   gFunctionTable_POST.pfnPlayerPostThink = PlayerPostThink_Post;
+      
    memcpy (pFunctionTable, &gFunctionTable_POST, sizeof (DLL_FUNCTIONS));
    return (TRUE);
 }

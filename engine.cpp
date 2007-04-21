@@ -39,20 +39,7 @@ int botMsgIndex;
 qboolean g_in_intermission = FALSE;
 
 
-void pfnSetSize(edict_t *e, const float *rgflMin, const float *rgflMax) 
-{
-   if (!gpGlobals->deathmatch)
-      RETURN_META (MRES_IGNORED);
-
-   int index = UTIL_GetBotIndex(e);
-   if(index == -1)
-      RETURN_META (MRES_IGNORED);
-                
-   bots[index].ducking = (Vector((float *)rgflMin) == VEC_DUCK_HULL_MIN && Vector((float *)rgflMax) == VEC_DUCK_HULL_MAX);
-        
-   RETURN_META (MRES_IGNORED);
-}
-
+//
 void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 ) 
 {
    //TODO:
@@ -398,7 +385,6 @@ C_DLLEXPORT int GetEngineFunctions (enginefuncs_t *pengfuncsFromEngine, int *int
    meta_engfuncs.pfnCmd_Argv = pfnCmd_Argv;
    meta_engfuncs.pfnCmd_Argc = pfnCmd_Argc;
    meta_engfuncs.pfnSetClientMaxspeed = pfnSetClientMaxspeed;
-   meta_engfuncs.pfnSetSize = pfnSetSize;
 
    memcpy (pengfuncsFromEngine, &meta_engfuncs, sizeof (enginefuncs_t));
    return TRUE;
