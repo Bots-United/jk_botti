@@ -223,6 +223,7 @@ typedef struct
    
    float f_move_speed;
    float f_pause_time;
+   float f_pause_look_time;
    float f_sound_update_time;
 
    qboolean  b_see_tripmine;

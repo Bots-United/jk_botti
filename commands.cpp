@@ -1133,7 +1133,21 @@ static void print_to_server_output(int, void *, char * msg)
 
 void jk_botti_ServerCommand (void)
 {
-   if(!ProcessCommand(SRVCMD_TYPE, print_to_server_output, NULL, CMD_ARGV (1), CMD_ARGV (2), CMD_ARGV (3), CMD_ARGV (4), CMD_ARGV (5), CMD_ARGV (6))) {
+   if(FStrEq(CMD_ARGV(1), "kickall"))
+   {
+      int count = 0;
+      
+      // kick all bots.
+      for (int index = 0; index < 32; index++)
+         if (bots[index].is_used)  // is this slot used?
+            BotKick(bots[index]);
+      
+      if(count>0)
+         UTIL_ConsolePrintf("Kicked %d bots.", count);
+      else
+         UTIL_ConsolePrintf("No bots on server to be kicked.");
+   }
+   else if(!ProcessCommand(SRVCMD_TYPE, print_to_server_output, NULL, CMD_ARGV (1), CMD_ARGV (2), CMD_ARGV (3), CMD_ARGV (4), CMD_ARGV (5), CMD_ARGV (6))) {
       UTIL_ConsolePrintf("%s: Unknown command \'%s\'\n", CMD_ARGV(0), CMD_ARGS());
    }
 }

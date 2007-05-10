@@ -72,16 +72,8 @@ void pfnChangeLevel(char* s1, char* s2)
    
    // kick any bot off of the server after time/frag limit...
    for (int index = 0; index < 32; index++)
-   {
       if (bots[index].is_used)  // is this slot used?
-      {
-         char cmd[40];
-
-         safevoid_snprintf(cmd, sizeof(cmd), "kick \"%s\"\n", bots[index].name);
-
-         SERVER_COMMAND(cmd);  // kick the bot using (kick "name")
-      }
-   }
+         BotKick(bots[index]);
 
    RETURN_META (MRES_IGNORED);
 }

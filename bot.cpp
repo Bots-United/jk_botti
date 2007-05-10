@@ -69,6 +69,26 @@ qboolean b_botdontshoot = FALSE;
 
 
 //
+void BotKick(bot_t &pBot)
+{
+   char cmd[40];
+
+   if(pBot.name[0] == 0)
+   {
+      if(pBot.pEdict->v.netname && STRING(pBot.pEdict->v.netname)[0])
+         strcpy(pBot.name, STRING(pBot.pEdict->v.netname));
+      else
+         return; // if client-edict doesn't have netname, it's invalid
+   }
+
+   safevoid_snprintf(cmd, sizeof(cmd), "kick \"%s\"\n", pBot.name);
+
+   SERVER_COMMAND(cmd);  // kick the bot using (kick "name")
+   SERVER_EXECUTE();
+}
+
+
+//
 void BotSpawnInit( bot_t &pBot )
 {
    pBot.bot_think_time = -1.0;
@@ -189,6 +209,8 @@ void BotSpawnInit( bot_t &pBot )
    pBot.f_special_shoot_angle = 0.0;
 
    pBot.f_weaponchange_time = 0.0;
+   
+   pBot.f_pause_look_time = 0.0;
 
    memset(&(pBot.current_weapon), 0, sizeof(pBot.current_weapon));
    memset(&(pBot.m_rgAmmo), 0, sizeof(pBot.m_rgAmmo));
@@ -1981,6 +2003,24 @@ void BotThink( bot_t &pBot )
       // you could make the bot look left then right, or look up
       // and down, to make it appear that the bot is hunting for
       // something (don't do anything right now)
+      
+      if(pBot.f_pause_look_time <= gpGlobals->time)
+      {
+         if(RANDOM_LONG2(1, 100) <= 50)
+            pBot.pEdict->v.ideal_yaw += RANDOM_LONG2(30, 60);
+         else
+            pBot.pEdict->v.ideal_yaw -= RANDOM_LONG2(30, 60);
+      
+         if(pBot.pEdict->v.idealpitch > -30)
+            pBot.pEdict->v.idealpitch -= RANDOM_LONG2(10, 30);
+         else if(pBot.pEdict->v.idealpitch < 30)
+            pBot.pEdict->v.idealpitch += RANDOM_LONG2(10, 30);
+      
+         BotFixIdealYaw(pBot.pEdict);
+         BotFixIdealPitch(pBot.pEdict);
+         
+         pBot.f_pause_look_time = gpGlobals->time + RANDOM_FLOAT(0.5, 1.0);
+      }
    }
    // is bot being "used" and can still follow "user"?
    else if ((pBot.pBotUser != NULL) && BotFollowUser( pBot ))

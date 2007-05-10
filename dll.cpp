@@ -234,16 +234,8 @@ C_DLLEXPORT int Meta_Detach (PLUG_LOADTIME now, PL_UNLOAD_REASON reason)
 
    // kick any bot off of the server after time/frag limit...
    for (int index = 0; index < 32; index++)
-   {
       if (bots[index].is_used)  // is this slot used?
-      {
-         char cmd[40];
-
-         safevoid_snprintf(cmd, sizeof(cmd), "kick \"%s\"\n", bots[index].name);
-
-         SERVER_COMMAND(cmd);  // kick the bot using (kick "name")
-      }
-   }
+         BotKick(bots[index]);
    
    // free memory
    WaypointInit();
@@ -435,11 +427,7 @@ BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddres
             {
                if (bots[i].is_used)  // is this slot used?
                {
-                  char cmd[80];
-
-                  safevoid_snprintf(cmd, sizeof(cmd), "kick \"%s\"\n", bots[i].name);
-
-                  SERVER_COMMAND(cmd);  // kick the bot using (kick "name")
+                  BotKick(bots[i]);
 
                   break;
                }
@@ -672,11 +660,9 @@ void StartFrame( void )
 
       need_to_open_cfg = FALSE;  // only do this once!!!
 
-      // check if mapname_jk_botti.cfg file exists...
-
-      strcpy(mapname, STRING(gpGlobals->mapname));
-      strcat(mapname, "_jk_botti.cfg");
-
+      // check if jk_botti_mapname.cfg file exists...
+      safevoid_snprintf(mapname, sizeof(mapname), "jk_botti_%s.cfg", STRING(gpGlobals->mapname));
+      
       UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti", mapname);
 
       if ((bot_cfg_fp = fopen(filename, "r")) != NULL)

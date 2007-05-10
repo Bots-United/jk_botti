@@ -347,7 +347,7 @@ inline int RANDOM_LONG2(int lLow, int lHigh)
       return(lLow);
    
    rnd = fast_generate_random();
-   rnd = (rnd * (1.0 + (double)lHigh - (double)lLow)) / 4294967296.0; // div by (1<<32)
+   rnd = (rnd * ((double)lHigh - (double)lLow + 1.0)) / 4294967296.0; // div by (1<<32)
    
    return (int)(rnd + lLow);
 }

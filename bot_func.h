@@ -49,6 +49,7 @@ qboolean BotCheckWallOnBack( bot_t &pBot );
 qboolean BotCheckWallOnForward( bot_t &pBot );
 void BotLookForDrop( bot_t &pBot );
 
+void BotKick(bot_t &pBot);
 void BotCheckTeamplay(void);
 edict_t *BotFindEnemy( bot_t &pBot );
 qboolean BotFindSoundEnemy( bot_t &pBot );
