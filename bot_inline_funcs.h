@@ -30,7 +30,7 @@ inline double UTIL_GetSecs(void)
    QueryPerformanceFrequency(&freq);
    QueryPerformanceCounter(&count);
 
-   return (double)(count.QuadPart / freq.QuadPart);
+   return (double)count.QuadPart / (double)freq.QuadPart;
 #else
    struct timeval tv;
    

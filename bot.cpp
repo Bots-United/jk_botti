@@ -24,6 +24,10 @@
 #include <sys/stat.h>
 
 
+extern void jkbotti_ClientPutInServer( edict_t *pEntity );
+extern BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ] );
+
+
 extern edict_t *clients[32];
 extern WAYPOINT waypoints[MAX_WAYPOINTS];
 extern int num_waypoints;  // number of waypoints currently in use
@@ -582,24 +586,12 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
       if (bottom_color != -1)
          SET_CLIENT_KEYVALUE( clientIndex, infobuffer, "bottomcolor", c_bottomcolor );
 
-
+      // JK_Botti fix, call our own ClientConnect first.
+      jkbotti_ClientConnect( BotEnt, c_name, "127.0.0.1", ptr );
       MDLL_ClientConnect( BotEnt, c_name, "127.0.0.1", ptr );
 
-      // HPB_bot metamod fix - START
-
-      // we have to do the ClientPutInServer() hook's job ourselves since calling the MDLL_
-      // function calls directly the gamedll one, and not ours. You are allowed to call this
-      // an "awful hack".
-
-      while ((i < 32) && (clients[i] != NULL))
-         i++;
-
-      if (i < 32)
-         clients[i] = BotEnt;  // store this clients edict in the clients array
-
-      // HPB_bot metamod fix - END
-
-      // Pieter van Dijk - use instead of DispatchSpawn() - Hip Hip Hurray!
+      // JK_Botti fix, call our own ClientPutInServer first.
+      jkbotti_ClientPutInServer( BotEnt );
       MDLL_ClientPutInServer( BotEnt );
 
       BotEnt->v.flags |= FL_THIRDPARTYBOT | FL_FAKECLIENT;

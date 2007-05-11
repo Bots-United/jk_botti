@@ -2264,7 +2264,7 @@ int WaypointSlowFloyds(unsigned short *shortest_path, unsigned short *from_to)
    if(slow_floyds.state == 1)
    {
       // middle, the slowest part
-      int max_count = 500;
+      int max_count = 50;
       
       x = slow_floyds.x;
       y = slow_floyds.y;
@@ -2285,7 +2285,7 @@ int WaypointSlowFloyds(unsigned short *shortest_path, unsigned short *from_to)
          {
             for (y=0; y < route_num_waypoints; y++)
             {
-               if(max_count-- < 0)
+               if(max_count-- <= 0)
                {
                   slow_floyds.x = x;
                   slow_floyds.y = y;

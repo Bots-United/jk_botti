@@ -89,6 +89,7 @@ qboolean need_to_open_cfg = TRUE;
 float bot_cfg_pause_time = 0.0;
 qboolean spawn_time_reset = FALSE;
 float waypoint_time = 0.0;
+char * client_address[32];
 
 unsigned int rnd_idnum[2] = {1, 1};
 cvar_t jk_botti_version = { "jk_botti_version", "", FCVAR_EXTDLL|FCVAR_SERVER, 0, NULL};
@@ -393,52 +394,73 @@ void DispatchKeyValue( edict_t *pentKeyvalue, KeyValueData *pkvd )
 }
 
 
-BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ]  )
+BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ] )
 { 
-   if (gpGlobals->deathmatch)
-   {
-      int i;
-      int count = 0;
+   if (!gpGlobals->deathmatch)
+      RETURN_META_VALUE (MRES_IGNORED, 0);
+   
+   int i;
+   int count = 0;
 
-      // check if this client is the listen server client
-      if (strcmp(pszAddress, "loopback") == 0)
+   // check if this client is the listen server client
+   if (strcmp(pszAddress, "loopback") == 0)
+   {
+      // save the edict of the listen server client...
+      listenserver_edict = pEntity;
+   }
+
+   // check if this is NOT a bot joining the server...
+   if (strcmp(pszAddress, "127.0.0.1") != 0)
+   {
+      // don't try to add bots for 60 seconds, give client time to get added
+      bot_check_time = gpGlobals->time + 5.0;
+
+      for (i=0; i < 32; i++)
       {
-         // save the edict of the listen server client...
-         listenserver_edict = pEntity;
+         if (bots[i].is_used)  // count the number of bots in use
+            count++;
       }
 
-      // check if this is NOT a bot joining the server...
-      if (strcmp(pszAddress, "127.0.0.1") != 0)
+      // if there are currently more than the minimum number of bots running
+      // then kick one of the bots off the server...
+      if ((count > min_bots) && (min_bots != -1))
       {
-         // don't try to add bots for 60 seconds, give client time to get added
-         bot_check_time = gpGlobals->time + 5.0;
-
          for (i=0; i < 32; i++)
          {
-            if (bots[i].is_used)  // count the number of bots in use
-               count++;
-         }
-
-         // if there are currently more than the minimum number of bots running
-         // then kick one of the bots off the server...
-         if ((count > min_bots) && (min_bots != -1))
-         {
-            for (i=0; i < 32; i++)
+            if (bots[i].is_used)  // is this slot used?
             {
-               if (bots[i].is_used)  // is this slot used?
-               {
-                  BotKick(bots[i]);
+               BotKick(bots[i]);
 
-                  break;
-               }
+               break;
             }
          }
       }
-      
-      ResetSound(pEntity);
    }
 
    RETURN_META_VALUE (MRES_IGNORED, 0);
+}
+
+
+void jkbotti_ClientPutInServer( edict_t *pEntity )
+{
+   if (!gpGlobals->deathmatch)
+      RETURN_META (MRES_IGNORED);
+   
+   int idx = ENTINDEX(pEntity) - 1;
+
+   if (idx < 32 && idx >= 0)
+      clients[idx] = pEntity;  // store this clients edict in the clients array
+   else
+      RETURN_META (MRES_IGNORED);
+   
+   ResetSound(pEntity);
+   
+   if(client_address[idx])
+      free(client_address[idx]);
+   
+   client_address[idx] = NULL;
+   
+   RETURN_META (MRES_IGNORED);
 }
 
 
@@ -447,14 +469,10 @@ void ClientDisconnect( edict_t *pEntity )
    if (gpGlobals->deathmatch)
    {
       int i;
+      int idx = ENTINDEX(pEntity) - 1;
 
-      i = 0;
-      while ((i < 32) && (clients[i] != pEntity))
-         i++;
-
-      if (i < 32)
-         clients[i] = NULL;
-
+      if (idx < 32 && idx >= 0)
+         clients[idx] = NULL;
 
       for (i=0; i < 32; i++)
       {
@@ -472,22 +490,6 @@ void ClientDisconnect( edict_t *pEntity )
       ResetSound(pEntity);
    }
 
-   RETURN_META (MRES_IGNORED);
-}
-
-
-void ClientPutInServer( edict_t *pEntity )
-{
-   int i = 0;
-
-   while ((i < 32) && (clients[i] != NULL))
-      i++;
-
-   if (i < 32)
-      clients[i] = pEntity;  // store this clients edict in the clients array
-   
-   ResetSound(pEntity);
-   
    RETURN_META (MRES_IGNORED);
 }
 
@@ -577,7 +579,6 @@ void PM_Move(struct playermove_s *ppmove, qboolean server)
    
    RETURN_META (MRES_HANDLED);
 }
-
 
 void StartFrame( void )
 {
@@ -703,10 +704,8 @@ void StartFrame( void )
       bot_check_time = gpGlobals->time + 5.0;
 
       for (i = 0; i < 32; i++)
-      {
          if (clients[i] != NULL)
             count++;
-      }
 
       // if there are currently less than the maximum number of "players"
       // then add another bot using the default skill level...
@@ -741,9 +740,9 @@ C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVers
    gFunctionTable.pfnGameInit = GameDLLInit;
    gFunctionTable.pfnSpawn = Spawn;
    gFunctionTable.pfnKeyValue = DispatchKeyValue;
-   gFunctionTable.pfnClientConnect = ClientConnect;
+   gFunctionTable.pfnClientConnect = jkbotti_ClientConnect;
+   gFunctionTable.pfnClientPutInServer = jkbotti_ClientPutInServer;
    gFunctionTable.pfnClientDisconnect = ClientDisconnect;
-   gFunctionTable.pfnClientPutInServer = ClientPutInServer;
    gFunctionTable.pfnClientCommand = ClientCommand;
    gFunctionTable.pfnStartFrame = StartFrame;
    gFunctionTable.pfnServerDeactivate = ServerDeactivate;
