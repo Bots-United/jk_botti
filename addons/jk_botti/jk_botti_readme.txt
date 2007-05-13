@@ -1,5 +1,5 @@
 jk_botti - Be More Human
---------------------------------0.56
+--------------------------------0.57
 
 1. Intro
 2. What's new
@@ -10,7 +10,7 @@ jk_botti - Be More Human
 1. Intro
 --------------------
 
-This is 0.56 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+This is 0.57 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
 You are free to use code for any of your needs.
 
 Credits:
@@ -61,6 +61,9 @@ CPU intensive operation this can only really be done on map change.
 --------------------
 2. What's new
 --------------------
+0.57:
+ * Waypoint files are saved compressed with zlib.
+
 0.56:
  * Fixed waypoint matrix creation being done right on map start on win32.
  * Added command 'jk_botti kickall' for clearing server from all bots.

@@ -52,15 +52,20 @@ SRC = 	bot.cpp \
 
 OBJ = $(SRC:%.cpp=%.o)
 
-${TARGET}${DLLEND}: ${OBJ}
-	${CPP} -o $@ ${OBJ} ${LINKFLAGS}
+${TARGET}${DLLEND}: zlib/libz.a ${OBJ} 
+	${CPP} -o $@ ${OBJ} zlib/libz.a ${LINKFLAGS}
 	cp $@ addons/jk_botti/dlls/
+
+zlib/libz.a:
+	(cd zlib; CC="${CPP} ${ARCHFLAG}" ./configure; make; cd ..)
 
 clean:
 	rm -f *.o ${TARGET}${DLLEND}
+	(cd zlib; make clean; cd ..)
 
 distclean:
 	rm -f Rules.depend ${TARGET}.dll ${TARGET}_i386.so addons/jk_botti/dlls/*
+	(cd zlib; make distclean; cd ..)
 
 %.o: %.cpp
 	${CPP} ${CPPFLAGS} -c $< -o $@

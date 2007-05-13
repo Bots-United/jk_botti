@@ -27,6 +27,8 @@
 #include "waypoint.h"
 #include "bot_weapon_select.h"
 
+#include "zlib/zlib.h"
+
 
 extern int m_spriteTexture;
 
@@ -1549,7 +1551,7 @@ void WaypointRemovePath(edict_t *pEntity, int cmd)
 
 qboolean WaypointLoad(edict_t *pEntity)
 {
-   FILE *bfp;
+   gzFile bfp;
    char mapname[64];
    char filename[256];
    WAYPOINT_HDR header;
@@ -1567,12 +1569,12 @@ qboolean WaypointLoad(edict_t *pEntity)
 
    UTIL_ConsolePrintf("loading waypoint file: %s\n", filename);
 
-   bfp = fopen(filename, "rb");
+   bfp = gzopen(filename, "rb");
 
    // if file exists, read the waypoint structure from it
    if (bfp != NULL)
    {
-      fread(&header, sizeof(header), 1, bfp);
+      gzread(bfp, &header, sizeof(header));
 
       header.filetype[7] = 0;
       if (strcmp(header.filetype, WAYPOINT_MAGIC) == 0)
@@ -1582,7 +1584,7 @@ qboolean WaypointLoad(edict_t *pEntity)
             UTIL_ConsolePrintf("Incompatible jk_botti waypoint file version!\n");
             UTIL_ConsolePrintf("Waypoints not loaded!\n");
 
-            fclose(bfp);
+            gzclose(bfp);
             return FALSE;
          }
          
@@ -1597,7 +1599,7 @@ qboolean WaypointLoad(edict_t *pEntity)
 
             for (i=0; i < header.number_of_waypoints; i++)
             {
-               fread(&waypoints[i], sizeof(waypoints[0]), 1, bfp);
+               gzread(bfp, &waypoints[i], sizeof(waypoints[0]));
                num_waypoints++;
             }
 
@@ -1605,11 +1607,11 @@ qboolean WaypointLoad(edict_t *pEntity)
             for (index=0; index < num_waypoints; index++)
             {
                // read the number of paths from this node...
-               fread(&num, sizeof(num), 1, bfp);
+               gzread(bfp, &num, sizeof(num));
 
                for (i=0; i < num; i++)
                {
-                  fread(&path_index, sizeof(path_index), 1, bfp);
+                  gzread(bfp, &path_index, sizeof(path_index));
 
                   WaypointAddPath(index, path_index);
                }
@@ -1625,7 +1627,7 @@ qboolean WaypointLoad(edict_t *pEntity)
                ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
             }
 
-            fclose(bfp);
+            gzclose(bfp);
             return FALSE;
          }
       }
@@ -1637,11 +1639,11 @@ qboolean WaypointLoad(edict_t *pEntity)
             ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
          }
 
-         fclose(bfp);
+         gzclose(bfp);
          return FALSE;
       }
 
-      fclose(bfp);
+      gzclose(bfp);
 
       WaypointRouteInit();
    }
@@ -1716,15 +1718,15 @@ void WaypointSave(void)
 
    UTIL_ConsolePrintf("saving waypoint file: %s\n", filename);
 
-   FILE *bfp = fopen(filename, "wb");
+   gzFile bfp = gzopen(filename, "wb6");
 
    // write the waypoint header to the file...
-   fwrite(&header, sizeof(header), 1, bfp);
+   gzwrite(bfp, &header, sizeof(header));
 
    // write the waypoint data to the file...
    for (index=0; index < num_waypoints; index++)
    {
-      fwrite(&waypoints[index], sizeof(waypoints[0]), 1, bfp);
+      gzwrite(bfp, &waypoints[index], sizeof(waypoints[0]));
    }
 
    // save the waypoint paths...
@@ -1733,7 +1735,7 @@ void WaypointSave(void)
       // count the number of paths from this node...
       num = WaypointNumberOfPaths(index);
 
-      fwrite(&num, sizeof(num), 1, bfp);  // write the count
+      gzwrite(bfp, &num, sizeof(num));  // write the count
 
       // now write out each path index...
 
@@ -1746,7 +1748,7 @@ void WaypointSave(void)
          while (i < MAX_PATH_INDEX)
          {
             if (p->index[i] != -1)  // save path node if it's used
-               fwrite(&p->index[i], sizeof(p->index[0]), 1, bfp);
+               gzwrite(bfp, &p->index[i], sizeof(p->index[0]));
 
             i++;
          }
@@ -1755,7 +1757,7 @@ void WaypointSave(void)
       }
    }
 
-   fclose(bfp);
+   gzclose(bfp);
 }
 
 
@@ -2137,7 +2139,7 @@ void WaypointSaveFloydsMatrix(unsigned short *shortest_path, unsigned short *fro
    char filename[256];
    char mapname[64];
    int num_items;
-   FILE *bfp;
+   gzFile bfp;
    int array_size;
    
    array_size = route_num_waypoints * route_num_waypoints;
@@ -2147,47 +2149,47 @@ void WaypointSaveFloydsMatrix(unsigned short *shortest_path, unsigned short *fro
    strcat(mapname, ".matrix");
    UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/waypoints", mapname);
    
-   bfp = fopen(filename, "wb");
+   bfp = gzopen(filename, "wb6");
 
    if (bfp != NULL)
    {
-      num_items = fwrite("jkbotti_matrixA\0", 1, 16, bfp);
+      num_items = gzwrite(bfp, "jkbotti_matrixA\0", 16);
       if (num_items != 16)
       {
          // if couldn't write enough data, close file and delete it
-         fclose(bfp);
+         gzclose(bfp);
          unlink(filename);
          
          UTIL_ConsolePrintf("[matrix save] - Error writing waypoint matrix (code: %d)!\n", 1);
       }
       else
       {
-         num_items = fwrite(shortest_path, sizeof(unsigned short), array_size, bfp);
+         num_items = gzwrite(bfp, shortest_path, sizeof(unsigned short) * array_size) / sizeof(unsigned short);
 
          if (num_items != array_size)
          {
             // if couldn't write enough data, close file and delete it
-            fclose(bfp);
+            gzclose(bfp);
             unlink(filename);
             
             UTIL_ConsolePrintf("[matrix save] - Error writing waypoint matrix (code: %d)!\n", 2);
          }
          else
          {
-            num_items = fwrite("jkbotti_matrixB\0", 1, 16, bfp);
+            num_items = gzwrite(bfp, "jkbotti_matrixB\0", 16);
             if (num_items != 16)
             {
                // if couldn't write enough data, close file and delete it
-               fclose(bfp);
+               gzclose(bfp);
                unlink(filename);
                
                UTIL_ConsolePrintf("[matrix save] - Error writing waypoint matrix (code: %d)!\n", 3);
             }
             else
             {            	
-               num_items = fwrite(from_to, sizeof(unsigned short), array_size, bfp);
+               num_items = gzwrite(bfp, from_to, sizeof(unsigned short) * array_size) / sizeof(unsigned short);
 
-               fclose(bfp);
+               gzclose(bfp);
 
                if (num_items != array_size)
                {
@@ -2362,7 +2364,7 @@ void WaypointRouteInit(void)
    float distance;
    unsigned short *pShortestPath, *pFromTo;
    unsigned int num_items;
-   FILE *bfp;
+   gzFile bfp;
    char filename2[256];
    char mapname[64];
    int file1, file2;
@@ -2416,12 +2418,12 @@ void WaypointRouteInit(void)
          if (from_to == NULL)
             UTIL_ConsolePrintf("[matrix load] - Error allocating memory for from to matrix!\n");
 
-         bfp = fopen(filename2, "rb");
+         bfp = gzopen(filename2, "rb");
 
          if (bfp != NULL)
          {
             // first try read header 'jkbotti_matrixA\0', 16 bytes
-            num_items = fread(header, 1, 16, bfp);
+            num_items = gzread(bfp, header, 16);
             if(num_items != 16 || strcmp(header, "jkbotti_matrixA\0") != 0)
             {
                // if couldn't read enough data, free memory to recalculate it
@@ -2435,7 +2437,7 @@ void WaypointRouteInit(void)
             }
             else
             {
-               num_items = fread(shortest_path, sizeof(unsigned short), array_size, bfp);
+               num_items = gzread(bfp, shortest_path, sizeof(unsigned short) * array_size) / sizeof(unsigned short);
 
                if (num_items != array_size)
                {
@@ -2451,7 +2453,7 @@ void WaypointRouteInit(void)
                else
                {
                   // first try read header 'jkbotti_matrixB\0', 16 bytes
-                  num_items = fread(header, 1, 16, bfp);
+                  num_items = gzread(bfp, header, 16);
                   if(num_items != 16 || strcmp(header, "jkbotti_matrixB\0") != 0)
                   {
                      // if couldn't read enough data, free memory to recalculate it
@@ -2465,7 +2467,7 @@ void WaypointRouteInit(void)
                   }
                   else
                   {
-                     num_items = fread(from_to, sizeof(unsigned short), array_size, bfp);
+                     num_items = gzread(bfp, from_to, sizeof(unsigned short) * array_size) / sizeof(unsigned short);
    
                      if (num_items != array_size)
                      {
@@ -2484,6 +2486,8 @@ void WaypointRouteInit(void)
                   }
                }
             }
+            
+            gzclose(bfp);
          }
          else
          {
@@ -2495,8 +2499,6 @@ void WaypointRouteInit(void)
             free(from_to);
             from_to = NULL;
          }
-
-         fclose(bfp);
       }
       else
       {
