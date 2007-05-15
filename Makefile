@@ -60,11 +60,11 @@ zlib/libz.a:
 	(cd zlib; CC="${CPP} ${ARCHFLAG}" ./configure; make; cd ..)
 
 clean:
-	rm -f *.o ${TARGET}${DLLEND}
+	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe
 	(cd zlib; make clean; cd ..)
 
 distclean:
-	rm -f Rules.depend ${TARGET}.dll ${TARGET}_i386.so addons/jk_botti/dlls/*
+	rm -f Rules.depend ${TARGET}.dll ${TARGET}_i386.so addons/jk_botti/dlls/* zlib/*.exe
 	(cd zlib; make distclean; cd ..)
 
 %.o: %.cpp

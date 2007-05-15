@@ -1802,7 +1802,7 @@ void BotThink( bot_t &pBot )
    if (pBot.name[0] == 0)  // name filled in yet?
       strcpy(pBot.name, STRING(pBot.pEdict->v.netname));
 
-   // Jussi Kivilinna - New code, BotThink is not run on every StartFrame anymore.
+   // New code, BotThink is not run on every StartFrame anymore.
    pBot.f_frame_time = gpGlobals->time - pBot.f_last_think_time;
    pBot.f_last_think_time = gpGlobals->time;
   
@@ -1811,23 +1811,43 @@ void BotThink( bot_t &pBot )
    // count up difference that integer conversion caused
    pBot.msecdel += pBot.f_frame_time * 1000.0 - pBot.msecval;
    
-   // remove effect of integer conversion
-   if(pBot.msecdel > 1.5)
+   // remove effect of integer conversion and lost msecs on previous frames
+   if(pBot.msecdel > 1.625f)
    {
-      pBot.msecval += 1;
-      pBot.msecdel -= 1;
+      float diff = 1.625f;
+      
+      if(pBot.msecdel > 60.0f)
+         diff = 60.0f;
+      else if(pBot.msecdel > 30.0f)
+         diff = 30.0f;
+      else if(pBot.msecdel > 15.0f)
+         diff = 15.0f;
+      else if(pBot.msecdel > 7.5f)
+         diff = 7.5f;
+      else if(pBot.msecdel > 3.25f)
+         diff = 3.25f;
+      
+      pBot.msecval += diff - 0.5f;
+      pBot.msecdel -= diff - 0.5f;
    }
    
    if (pBot.msecval < 1)    // don't allow msec to be less than 1...
+   {      
+      // adjust msecdel so we can correct lost msecs on following frames
+      pBot.msecdel += pBot.msecval - 1;
       pBot.msecval = 1;
-   
-   if (pBot.msecval > 250)  // ...or greater than 250
-      pBot.msecval = 250;
+   }
+   else if (pBot.msecval > 100)  // ...or greater than 100
+   {
+      // adjust msecdel so we can correct lost msecs on following frames
+      pBot.msecdel += pBot.msecval - 100;
+      pBot.msecval = 100;
+   }
    
    pBot.total_msecval += pBot.msecval / 1000.0;
    pBot.total_frame_time += pBot.f_frame_time;
 
-#if _DEBUG   
+#if _DEBUG
    if(&pBot==&bots[0] && pBot.total_counter++ > 10)
    {
       UTIL_ConsolePrintf("total msecval count   : %9.4f", pBot.total_msecval);

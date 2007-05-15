@@ -507,15 +507,15 @@ qboolean FCanShootInHead(edict_t * pEdict, edict_t * pTarget, const Vector & v_d
    if(!FIsClassname("player", pTarget))
       return FALSE;
    
-   float enemyHalfHeight = ((pTarget->v.flags & FL_DUCKING) == FL_DUCKING ? 36 : 72) / 2.0;
+   float neg = pTarget->v.view_ofs.z >= 2.0f ? 2.0f : 0.0f;
    
    // first check for if head is visible
-   if(!FVisible( pTarget->v.origin + Vector(0, 0, enemyHalfHeight), pEdict, pTarget ))
+   if(!FVisible( pTarget->v.origin + (pTarget->v.view_ofs - Vector(0,0,neg)), pEdict, pTarget ))
       return FALSE;
    
    // check center/feet
    if(!FVisible( pTarget->v.origin, pEdict, pTarget ))
-      if(!FVisible( pTarget->v.origin + Vector(0, 0, -enemyHalfHeight), pEdict, pTarget ))
+      if(!FVisible( pTarget->v.origin - (pTarget->v.view_ofs - Vector(0,0,neg)), pEdict, pTarget ))
          return TRUE; //only head visible
    
    float distance = (v_dest - pEdict->v.origin).Length();
@@ -523,7 +523,7 @@ qboolean FCanShootInHead(edict_t * pEdict, edict_t * pTarget, const Vector & v_d
    Vector2D triangle;
    
    triangle.x = distance;
-   triangle.y = enemyHalfHeight;
+   triangle.y = pTarget->v.view_ofs.z - neg;
    
    if(cos(deg2rad(12.5)) < (distance / triangle.Length()))
       return FALSE; //greater angle, smaller cosine

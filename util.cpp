@@ -479,12 +479,12 @@ qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnem
       return(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ));
    
    // first check for if head is visible
-   Vector head_offset = Vector(0, 0, pEnemy->v.maxs.z);
+   Vector head_offset = Vector(0, 0, pEnemy->v.maxs.z - 6);
    if(FVisibleEnemyOffset( vecOrigin, head_offset, pEdict, pEnemy ))
       return(TRUE);
    
    // then check if feet are visible
-   Vector feet_offset = Vector(0, 0, pEnemy->v.mins.z);
+   Vector feet_offset = Vector(0, 0, pEnemy->v.mins.z - 6);
    if(FVisibleEnemyOffset( vecOrigin, feet_offset, pEdict, pEnemy ))
       return(TRUE);
    
@@ -495,12 +495,12 @@ qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnem
    Vector v_right = UTIL_AnglesToRight(UTIL_VecToAngles(vecOrigin - GetGunPosition(pEdict)));
 
    // check if right side of player is visible
-   Vector right_offset = v_right * pEnemy->v.maxs.x;
+   Vector right_offset = v_right * (pEnemy->v.maxs.x - 4);
    if(FVisibleEnemyOffset( vecOrigin, right_offset, pEdict, pEnemy ))
       return(TRUE);
    
    // check if left side of player is visible
-   Vector left_offset = v_right * pEnemy->v.mins.x;
+   Vector left_offset = v_right * (pEnemy->v.mins.x - 4);
    if(FVisibleEnemyOffset( vecOrigin, left_offset, pEdict, pEnemy ))
       return(TRUE);
    
