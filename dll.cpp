@@ -149,7 +149,7 @@ C_DLLEXPORT int Meta_Query (char *ifvers, plugin_info_t **pPlugInfo, mutil_funcs
    gpMetaUtilFuncs = pMetaUtilFuncs;
    *pPlugInfo = &Plugin_info;
 
-   safevoid_snprintf(plugver, sizeof(plugver), "%d.%d%s", VER_MAJOR, VER_MINOR, VER_NOTE);
+   safevoid_snprintf(plugver, sizeof(plugver), "%d.%02d%s", VER_MAJOR, VER_MINOR, VER_NOTE);
    Plugin_info.version = plugver;
 
    // check for interface version compatibility
