@@ -34,29 +34,8 @@ extern "C" BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvRe
 
 void WINAPI GiveFnptrsToDll( enginefuncs_t* pengfuncsFromEngine, globalvars_t *pGlobals )
 {
-   char game_dir[256];
-   char mod_name[32];
-   char game_dll_filename[256];
-
    // get the engine functions from the engine...
-
    memcpy(&g_engfuncs, pengfuncsFromEngine, sizeof(enginefuncs_t));
    gpGlobals = pGlobals;
-
-   // find the directory name of the currently running MOD...
-   GetGameDir (game_dir);
-
-   strcpy(mod_name, game_dir);
-
-   game_dll_filename[0] = 0;
-
-   if (strcmpi(mod_name, "valve") == 0)
-   {
-#ifndef __linux__
-      strcpy(game_dll_filename, "valve\\dlls\\hl.dll");
-#else
-      strcpy(game_dll_filename, "valve/dlls/hl_i386.so");
-#endif
-   }
 }
 

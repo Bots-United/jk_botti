@@ -10,7 +10,7 @@
 ifeq ($(OS),Windows_NT)
 	CPP = gcc -mno-cygwin
 	ARCHFLAG = -march=i686 -mtune=pentium4
-	LINKFLAGS = -mdll -Xlinker --add-stdcall-alias -s
+	LINKFLAGS = -mdll -lwsock32 -Xlinker --add-stdcall-alias -s
 	DLLEND = .dll
 else
 	CPP = gcc-linux
@@ -38,6 +38,9 @@ SRC = 	bot.cpp \
 	bot_combat.cpp \
 	bot_models.cpp \
 	bot_navigate.cpp \
+	bot_query_hook.cpp \
+	bot_query_hook_linux.cpp \
+	bot_query_hook_win32.cpp \
 	bot_skill.cpp \
 	bot_sound.cpp \
 	bot_start.cpp \

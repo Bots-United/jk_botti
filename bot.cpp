@@ -75,12 +75,12 @@ qboolean b_botdontshoot = FALSE;
 //
 void BotKick(bot_t &pBot)
 {
-   char cmd[40];
+   char cmd[64];
 
    if(pBot.name[0] == 0)
    {
       if(pBot.pEdict->v.netname && STRING(pBot.pEdict->v.netname)[0])
-         strcpy(pBot.name, STRING(pBot.pEdict->v.netname));
+         safevoid_snprintf(pBot.name, sizeof(pBot.name), "%s", STRING(pBot.pEdict->v.netname));
       else
          return; // if client-edict doesn't have netname, it's invalid
    }
@@ -159,10 +159,10 @@ void BotSpawnInit( bot_t &pBot )
 
    pBot.pBotUser = NULL;
    pBot.f_bot_use_time = 0.0;
-   pBot.b_bot_say = FALSE;
-   pBot.f_bot_say = 0.0;
-   pBot.bot_say_msg[0] = 0;
-   pBot.f_bot_chat_time = gpGlobals->time;
+//   pBot.b_bot_say = FALSE;
+//   pBot.f_bot_say = 0.0;
+//   pBot.bot_say_msg[0] = 0;
+//   pBot.f_bot_chat_time = gpGlobals->time;
    pBot.enemy_attack_count = 0;
    pBot.f_duck_time = 0.0;
    
@@ -261,7 +261,7 @@ void BotNameInit( void )
 
          if (name_buffer[0] != 0)
          {
-            strncpy(bot_names[number_names], name_buffer, BOT_NAME_LEN);
+            safevoid_snprintf(bot_names[number_names], sizeof(bot_names[number_names]), "%s", name_buffer);
 
             number_names++;
          }
@@ -272,7 +272,7 @@ void BotNameInit( void )
 }
 
 
-void BotPickName( char *name_buffer )
+void BotPickName( char *name_buffer, int sizeof_name_buffer )
 {
    int name_index, index;
    qboolean used;
@@ -322,177 +322,132 @@ void BotPickName( char *name_buffer )
       }
    }
 
-   strcpy(name_buffer, bot_names[name_index]);
+   safevoid_snprintf(name_buffer, sizeof_name_buffer, "%s", bot_names[name_index]);
 }
 
-
-void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
-                const char *arg3, const char *arg4, const char *arg5 )
+// 
+void BotCreate( const char *skin, const char *name, int skill, int top_color, int bottom_color, int cfg_bot_index )
 {
    edict_t *BotEnt;
    char c_skin[BOT_SKIN_LEN+1];
    char c_name[BOT_NAME_LEN+1];
-   int skill;
    int index;
    int i, j, length;
    qboolean found = FALSE;
    qboolean got_skill_arg = FALSE;
-   int top_color, bottom_color;
    char c_topcolor[4], c_bottomcolor[4];
 
-   top_color = -1;
-   bottom_color = -1;
+   
+   int  max_skin_index;
 
+   max_skin_index = number_skins;
+   
+   if ((skin == NULL) || (*skin == 0))
    {
-      int  max_skin_index;
+      index = RANDOM_LONG2(0, number_skins-1);
 
-      max_skin_index = number_skins;
-      
-      if ((arg1 == NULL) || (*arg1 == 0))
+      // check if this skin has already been used...
+      while (bot_skins[index].skin_used == TRUE)
       {
-         index = RANDOM_LONG2(0, number_skins-1);
+         index++;
 
-         // check if this skin has already been used...
-         while (bot_skins[index].skin_used == TRUE)
-         {
-            index++;
+         if (index == max_skin_index)
+            index = 0;
+      }
 
-            if (index == max_skin_index)
-               index = 0;
-         }
+      bot_skins[index].skin_used = TRUE;
 
-         bot_skins[index].skin_used = TRUE;
+      // check if all skins are now used...
+      for (i = 0; i < max_skin_index; i++)
+      {
+         if (bot_skins[i].skin_used == FALSE)
+            break;
+      }
 
-         // check if all skins are now used...
+      // if all skins are used, reset used to FALSE for next selection
+      if (i == max_skin_index)
+      {
          for (i = 0; i < max_skin_index; i++)
-         {
-            if (bot_skins[i].skin_used == FALSE)
-               break;
-         }
-
-         // if all skins are used, reset used to FALSE for next selection
-         if (i == max_skin_index)
-         {
-            for (i = 0; i < max_skin_index; i++)
-               bot_skins[i].skin_used = FALSE;
-         }
-
-         strcpy(c_skin, bot_skins[index].model_name);
+            bot_skins[i].skin_used = FALSE;
       }
+
+      safevoid_snprintf(c_skin, sizeof(c_skin), "%s", bot_skins[index].model_name);
+   }
+   else
+   {
+      safevoid_snprintf(c_skin, sizeof(c_skin), "%s", skin);
+   }
+
+   for (i = 0; c_skin[i] != 0; i++)
+      c_skin[i] = tolower( c_skin[i] );  // convert to all lowercase
+
+   index = 0;
+
+   while ((!found) && (index < max_skin_index))
+   {
+      if (strcmp(c_skin, bot_skins[index].model_name) == 0)
+         found = TRUE;
       else
+         index++;
+   }
+
+   if (found == FALSE)
+   {
+      char dir_name[32];
+      char filename[128];
+
+      struct stat stat_str;
+
+      GetGameDir(dir_name);
+
+      safevoid_snprintf(filename, sizeof(filename), "%s/models/player/%s", dir_name, c_skin);
+
+      if (stat(filename, &stat_str) != 0)
       {
-         strncpy( c_skin, arg1, BOT_SKIN_LEN-1 );
-         c_skin[BOT_SKIN_LEN] = 0;  // make sure c_skin is null terminated
-      }
-
-      for (i = 0; c_skin[i] != 0; i++)
-         c_skin[i] = tolower( c_skin[i] );  // convert to all lowercase
-
-      index = 0;
-
-      while ((!found) && (index < max_skin_index))
-      {
-         if (strcmp(c_skin, bot_skins[index].model_name) == 0)
-            found = TRUE;
-         else
-            index++;
-      }
-
-      if (found == TRUE)
-      {
-         if ((arg2 != NULL) && (*arg2 != 0))
-         {
-            strncpy( c_name, arg2, BOT_SKIN_LEN-1 );
-            c_name[BOT_SKIN_LEN] = 0;  // make sure c_name is null terminated
-         }
-         else
-         {
-            if (number_names > 0)
-               BotPickName( c_name );
-            else
-               strcpy(c_name, bot_skins[index].bot_name);
-         }
-      }
-      else
-      {
-         char dir_name[32];
-         char filename[128];
-
-         struct stat stat_str;
-
-         GetGameDir(dir_name);
-
-         safevoid_snprintf(filename, sizeof(filename), "%s/models/player/%s", dir_name, c_skin);
+         safevoid_snprintf(filename, sizeof(filename), "valve/models/player/%s", c_skin);
 
          if (stat(filename, &stat_str) != 0)
          {
-            safevoid_snprintf(filename, sizeof(filename), "valve/models/player/%s", c_skin);
-
-            if (stat(filename, &stat_str) != 0)
-            {
-               UTIL_ConsolePrintf("model \"%s\" is unknown.\n", c_skin );
-               UTIL_ConsolePrintf("use barney, gina, gman, gordon, helmet, hgrunt,\n");
-               UTIL_ConsolePrintf("    recon, robo, scientist, or zombie\n");
-               return;
-            }
+            UTIL_ConsolePrintf("model \"%s\" is unknown.\n", c_skin );
+            UTIL_ConsolePrintf("use barney, gina, gman, gordon, helmet, hgrunt,\n");
+            UTIL_ConsolePrintf("    recon, robo, scientist, or zombie\n");
+            return;
          }
-
-         if ((arg2 != NULL) && (*arg2 != 0))
-         {
-            strncpy( c_name, arg2, BOT_NAME_LEN-1 );
-            c_name[BOT_NAME_LEN] = 0;  // make sure c_name is null terminated
-         }
-         else
-         {
-            if (number_names > 0)
-               BotPickName( c_name );
-            else
-            {
-               // copy the name of the model to the bot's name...
-               strncpy( c_name, arg1, BOT_NAME_LEN-1 );
-               c_name[BOT_NAME_LEN] = 0;  // make sure c_skin is null terminated
-            }
-         }
-      }
-
-      skill = 0;
-      
-      if ((arg3 != NULL) && (*arg3 != 0))
-      {
-         skill = atoi(arg3);
-         got_skill_arg = TRUE;
-      }
-      if ((skill < 1) || (skill > 5))
-      {
-         skill = default_bot_skill;
-         got_skill_arg = FALSE;
-      }
-
-      if ((arg4 != NULL) && (*arg4 != 0))
-         top_color = atoi(arg4);
-
-      if ((top_color < 0) || (top_color > 255))
-         top_color = -1;
-      else
-         safevoid_snprintf(c_topcolor, sizeof(c_topcolor), "%d", top_color);
-
-      if ((arg5 != NULL) && (*arg5 != 0))
-         bottom_color = atoi(arg5);
-
-      if ((bottom_color < 0) || (bottom_color > 255))
-         bottom_color = -1;
-      else
-         safevoid_snprintf(c_bottomcolor, sizeof(c_bottomcolor), "%d", bottom_color);
-
-      if ((top_color == -1) && (bottom_color == -1) && (b_random_color))
-      {
-         top_color = RANDOM_LONG2(0, 255);
-         safevoid_snprintf(c_topcolor, sizeof(c_topcolor), "%d", top_color);
-
-         bottom_color = RANDOM_LONG2(0, 255);
-         safevoid_snprintf(c_bottomcolor, sizeof(c_bottomcolor), "%d", bottom_color);
       }
    }
+   
+   if ((name != NULL) && (*name != 0))
+   {
+      safevoid_snprintf(c_name, sizeof(c_name), "%s", name);
+   }
+   else
+   {
+      if (number_names > 0)
+         BotPickName( c_name, sizeof(c_name) );
+      else
+      {
+         // copy the name of the model to the bot's name...
+         safevoid_snprintf(c_name, sizeof(c_name), "%s", c_skin);
+      }
+   }
+   
+   if (skill >= 1 && skill <= 5)
+   {
+      got_skill_arg = TRUE;
+   }
+   if (skill < 1 || skill > 5)
+   {
+      skill = default_bot_skill;
+      got_skill_arg = FALSE;
+   }
+
+   if ((top_color < 0) || (top_color > 255))
+      top_color = RANDOM_LONG2(0, 255);
+   if ((bottom_color < 0) || (bottom_color > 255))
+      bottom_color = RANDOM_LONG2(0, 255);
+   
+   safevoid_snprintf(c_topcolor, sizeof(c_topcolor), "%d", top_color);
+   safevoid_snprintf(c_bottomcolor, sizeof(c_bottomcolor), "%d", bottom_color);
 
    length = strlen(c_name);
 
@@ -547,8 +502,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 
    if (FNullEnt( BotEnt ))
    {
-      if (pPlayer)
-         ClientPrint( pPlayer, HUD_PRINTNOTIFY, "Max. Players reached.  Can't create bot (jk_botti)!\n");
+      UTIL_ConsolePrintf("%s\n", "Max. Players reached. Can't create bot!");
    }
    else
    {
@@ -602,10 +556,11 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
       memset(&pBot, 0, sizeof(pBot));
 
       pBot.is_used = TRUE;
+      pBot.cfg_bot_index = cfg_bot_index;
       pBot.f_create_time = gpGlobals->time;
       pBot.name[0] = 0;  // name not set by server yet
 
-      strcpy(pBot.skin, c_skin);
+      safevoid_snprintf(pBot.skin, sizeof(pBot.skin), "%s", c_skin);
 
       pBot.top_color = top_color;
       pBot.bottom_color = bottom_color;
@@ -650,10 +605,50 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 
       pBot.bot_team = -1;
       pBot.bot_class = -1;
+
+      pBot.b_bot_say = FALSE;
+      pBot.f_bot_say = 0.0;
+      pBot.bot_say_msg[0] = 0;
+      pBot.f_bot_chat_time = gpGlobals->time;
+      
+      // use system wide timer for connection times
+      // bot will stay 30-160 minutes
+      pBot.stay_time = 60 * (double)RANDOM_FLOAT2(30, 160);
+      // bot has been already here for 10%-50% of the total stay time
+      pBot.connect_time = UTIL_GetSecs() - pBot.stay_time * (double)RANDOM_FLOAT2(0.2, 0.8);
    }
 }
 
+//
+void BotReplaceConnectionTime(const char * name, float * timeslot)
+{
+   for(int i = 0; i < 32; i++)
+   {
+      bot_t &pBot = bots[i];
+      
+      // find bot by name
+      if(strcmp(pBot.name, name) != 0)
+         continue;
+      
+      double current_time = UTIL_GetSecs();
+      
+      // check if stay time has been exceeded
+      if(current_time - pBot.connect_time > pBot.stay_time || current_time - pBot.connect_time <= 0)
+      {
+         // use system wide timer for connection times
+         // bot will stay 30-160 minutes
+         pBot.stay_time = 60 * (double)RANDOM_FLOAT2(30, 160);
+         // bot has been already here for 20%-80% of the total stay time
+         pBot.connect_time = current_time - pBot.stay_time * (double)RANDOM_FLOAT2(0.2, 0.8);
+      }
+      
+      *timeslot = (float)(current_time - pBot.connect_time);
+      
+      break;
+   }
+}
 
+//
 int BotInFieldOfView(bot_t &pBot, const Vector & dest)
 {
    // find angles from source to destination...
@@ -729,7 +724,7 @@ void BotLogoInit(void)
 
          if (logo_buffer[0] != 0)
          {
-            strncpy(bot_logos[num_logos], logo_buffer, 16);
+            safevoid_snprintf(bot_logos[num_logos], sizeof(bot_logos[num_logos]), "%s", logo_buffer);
 
             num_logos++;
          }
@@ -782,7 +777,7 @@ void BotPickLogo(bot_t &pBot)
       check_count++;
    }
 
-   strcpy(pBot.logo_name, bot_logos[logo_index]);
+   safevoid_snprintf(pBot.logo_name, sizeof(pBot.logo_name), "%s", bot_logos[logo_index]);
 }
 
 
@@ -880,7 +875,7 @@ void BotFindItem( bot_t &pBot )
    {
       can_pickup = FALSE;  // assume can't use it until known otherwise
 
-      strcpy(item_name, STRING(pent->v.classname));
+      safevoid_snprintf(item_name, sizeof(item_name), "%s", STRING(pent->v.classname));
 
       // see if this is a "func_" type of entity (func_button, etc.)...
       if (strncmp("func_", item_name, 5) == 0)
@@ -1800,7 +1795,7 @@ void BotThink( bot_t &pBot )
    pEdict->v.flags |= FL_THIRDPARTYBOT | FL_FAKECLIENT;
 
    if (pBot.name[0] == 0)  // name filled in yet?
-      strcpy(pBot.name, STRING(pBot.pEdict->v.netname));
+      safevoid_snprintf(pBot.name, sizeof(pBot.name), "%s", STRING(pBot.pEdict->v.netname));
 
    // New code, BotThink is not run on every StartFrame anymore.
    pBot.f_frame_time = gpGlobals->time - pBot.f_last_think_time;

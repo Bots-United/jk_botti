@@ -416,14 +416,8 @@ edict_t *DBG_EntOfVars( const entvars_t *pev )
 // return team string 0 through 3 based what MOD uses for team numbers
 char * UTIL_GetTeam(edict_t *pEntity, char teamstr[32])
 {
-   char *infobuffer;
-   char model_name[32];
-
-   infobuffer = GET_INFOKEYBUFFER( pEntity );
-   *model_name = 0; 
-   strncat(model_name, INFOKEY_VALUE (infobuffer, "model"), sizeof(model_name));
-
-   strcpy(teamstr, model_name);
+   safevoid_snprintf(teamstr, sizeof(teamstr), "%s", INFOKEY_VALUE(GET_INFOKEYBUFFER(pEntity), "model"));
+   
    return(teamstr);
 }
 

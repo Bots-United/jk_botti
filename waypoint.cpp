@@ -1050,7 +1050,7 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
       // make sure entity is visible...
       if (tr.flFraction >= 1.0)
       {
-         strcpy(item_name, STRING(pent->v.classname));
+         safevoid_snprintf(item_name, sizeof(item_name), "%s", STRING(pent->v.classname));
 
          if ((strncmp("item_health", item_name, 11) == 0) ||
              (strncmp("item_armor", item_name, 10) == 0) ||
@@ -1063,7 +1063,7 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
 
             if (distance < min_distance)
             {
-               strcpy(nearest_name, item_name);
+               safevoid_snprintf(nearest_name, sizeof(nearest_name), "%s", item_name);
 
                nearest_pent = pent;
 
@@ -1150,7 +1150,7 @@ edict_t *WaypointFindItem( int wpt_index )
       // make sure entity is visible...
       if ((tr.flFraction >= 1.0) || (tr.pHit == pent) || !(pent->v.effects & EF_NODRAW) || !(pent->v.frame > 0))
       {
-         strcpy(item_name, STRING(pent->v.classname));
+         safevoid_snprintf(item_name, sizeof(item_name), "%s", STRING(pent->v.classname));
          
          if(((waypoints[wpt_index].flags & W_FL_HEALTH) && strncmp("item_health", item_name, 11) == 0) ||
             ((waypoints[wpt_index].flags & W_FL_ARMOR) && strncmp("item_armor", item_name, 10) == 0) ||
@@ -1562,8 +1562,7 @@ qboolean WaypointLoad(edict_t *pEntity)
    
    g_waypoint_updated = FALSE;
    
-   strcpy(mapname, STRING(gpGlobals->mapname));
-   strcat(mapname, ".wpt");
+   safevoid_snprintf(mapname, sizeof(mapname), "%s.wpt", STRING(gpGlobals->mapname));
 
    UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/waypoints", mapname);
 
@@ -1698,7 +1697,7 @@ void WaypointSave(void)
    short int num;
    PATH *p;
 
-   strcpy(header.filetype, WAYPOINT_MAGIC);
+   safevoid_snprintf(header.filetype, sizeof(header.filetype), "%s", WAYPOINT_MAGIC);
 
    header.waypoint_file_version = WAYPOINT_VERSION;
    header.waypoint_file_subversion = 1;
@@ -1708,11 +1707,9 @@ void WaypointSave(void)
    header.number_of_waypoints = num_waypoints;
 
    memset(header.mapname, 0, sizeof(header.mapname));
-   strncpy(header.mapname, STRING(gpGlobals->mapname), 31);
-   header.mapname[31] = 0;
+   safevoid_snprintf(header.mapname, sizeof(header.mapname), "%s", STRING(gpGlobals->mapname));
 
-   strcpy(mapname, STRING(gpGlobals->mapname));
-   strcat(mapname, ".wpt");
+   safevoid_snprintf(mapname, sizeof(mapname), "%s.wpt", STRING(gpGlobals->mapname));
 
    UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/waypoints", mapname);
 
@@ -2145,8 +2142,8 @@ void WaypointSaveFloydsMatrix(unsigned short *shortest_path, unsigned short *fro
    array_size = route_num_waypoints * route_num_waypoints;
    
    //
-   strcpy(mapname, STRING(gpGlobals->mapname));
-   strcat(mapname, ".matrix");
+   safevoid_snprintf(mapname, sizeof(mapname), "%s.matrix", STRING(gpGlobals->mapname));
+   
    UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/waypoints", mapname);
    
    bfp = gzopen(filename, "wb6");
@@ -2382,8 +2379,8 @@ void WaypointRouteInit(void)
    array_size = route_num_waypoints * route_num_waypoints;
 
    //
-   strcpy(mapname, STRING(gpGlobals->mapname));
-   strcat(mapname, ".matrix");
+   safevoid_snprintf(mapname, sizeof(mapname), "%s.matrix", STRING(gpGlobals->mapname));
+   
    UTIL_BuildFileName_N(filename2, sizeof(filename2), "addons/jk_botti/waypoints", mapname);
 
    if (access(filename2, 0) == 0)  // does the ".matrix" file exist?
@@ -2391,8 +2388,8 @@ void WaypointRouteInit(void)
       char filename[256];
       
       //
-      strcpy(mapname, STRING(gpGlobals->mapname));
-      strcat(mapname, ".wpt");
+      safevoid_snprintf(mapname, sizeof(mapname), "%s.wpt", STRING(gpGlobals->mapname));
+      
       UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/waypoints", mapname);
 
       file1 = open(filename, O_RDONLY);

@@ -243,6 +243,7 @@ C_DLLEXPORT int Meta_Detach (PLUG_LOADTIME now, PL_UNLOAD_REASON reason)
    for(int i = 0; i < 32; i++)
       free_posdata_list(i);
    UTIL_FreeFuncBreakables();
+   FreeCfgBotRecord();
    
    return (TRUE); // returning TRUE enables metamod to unload this plugin
 }
@@ -352,6 +353,7 @@ int Spawn( edict_t *pent )
          
          num_bots = 0;
          need_to_open_cfg = TRUE;
+         FreeCfgBotRecord();//reset on mapchange
 
          bot_check_time = gpGlobals->time + 5.0;
          
@@ -425,14 +427,24 @@ BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *p
       // then kick one of the bots off the server...
       if ((count > min_bots) && (min_bots != -1))
       {
+         int bot_index_list[32];
+         int num_bots = 0;
+         
          for (i=0; i < 32; i++)
          {
             if (bots[i].is_used)  // is this slot used?
             {
-               BotKick(bots[i]);
+               bot_index_list[num_bots++] = i;
 
                break;
             }
+         }
+         
+         if(num_bots>0)
+         {
+            int pick = RANDOM_LONG2(0, num_bots-1);
+            
+            BotKick(bots[pick]);
          }
       }
    }
@@ -711,7 +723,12 @@ void StartFrame( void )
       // then add another bot using the default skill level...
       if ((count < max_bots) && (max_bots != -1))
       {
-         BotCreate( NULL, NULL, NULL, NULL, NULL, NULL );
+         const cfg_bot_record_t * record = GetUnusedCfgBotRecord();
+         
+         if(record)
+            BotCreate( record->skin, record->name, record->skill, record->top_color, record->bottom_color, record->index );
+         else
+            BotCreate( NULL, NULL, -1, -1, -1, -1 );
       }
    }
    

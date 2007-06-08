@@ -46,11 +46,9 @@ char *valve_bot_names[VALVE_MAX_SKINS] = {
 
 // MS-DOS directory wildcard routines...
 
-HANDLE FindDirectory(HANDLE hFile, char *dirname, char *dirspec)
+HANDLE FindDirectory(HANDLE hFile, char *dirname, int sizeof_dirname, char *dirspec)
 {
    WIN32_FIND_DATA pFindFileData;
-
-   dirname[0] = 0;
 
    if (hFile == NULL)
    {
@@ -72,7 +70,7 @@ HANDLE FindDirectory(HANDLE hFile, char *dirname, char *dirspec)
          }
       }
 
-      strcpy(dirname, pFindFileData.cFileName);
+      safevoid_snprintf(dirname, sizeof_dirname, "%s", pFindFileData.cFileName);
 
       return hFile;
    }
@@ -95,7 +93,7 @@ HANDLE FindDirectory(HANDLE hFile, char *dirname, char *dirspec)
          }
       }
 
-      strcpy(dirname, pFindFileData.cFileName);
+      safevoid_snprintf(dirname, sizeof_dirname, "%s", pFindFileData.cFileName);
 
       return hFile;
    }
@@ -105,7 +103,7 @@ HANDLE FindDirectory(HANDLE hFile, char *dirname, char *dirspec)
 
 // Linux directory wildcard routines...
 
-DIR *FindDirectory(DIR *directory, char *dirname, char *dirspec)
+DIR *FindDirectory(DIR *directory, char *dirname, int sizeof_dirname, char *dirspec)
 {
    char pathname[256];
    struct dirent *dirent;
@@ -117,29 +115,23 @@ DIR *FindDirectory(DIR *directory, char *dirname, char *dirspec)
          return NULL;
    }
 
-   while (1)
+   while ((dirent = readdir(directory)) != NULL)
    {
-      dirent = readdir(directory);
-
-      if (dirent == NULL)  /* at end of directory? */
-      {
-         closedir(directory);
-         return NULL;
-      }
-
-      strcpy(pathname, dirspec);
-      strcat(pathname, "/");
-      strcat(pathname, dirent->d_name);
+      safevoid_snprintf(pathname, sizeof(pathname), "%s/%s", dirspec, dirent->d_name);
 
       if (stat(pathname, &stat_str) == 0)
       {
          if (stat_str.st_mode & S_IFDIR)
          {
-            strcpy(dirname, dirent->d_name);
+            safevoid_snprintf(dirname, sizeof_dirname, "%s", dirent->d_name);
             return directory;
          }
       }
    }
+   
+   /* at end of directory? */
+   closedir(directory);
+   return NULL;
 }
 
 #endif
@@ -167,15 +159,14 @@ void LoadBotModels(void)
 
    for (index=0; index < VALVE_MAX_SKINS; index++)
    {
-      strcpy(bot_skins[index].model_name, valve_bot_models[index]);
-      strcpy(bot_skins[index].bot_name, valve_bot_names[index]);
+      safevoid_snprintf(bot_skins[index].model_name, sizeof(bot_skins[index].model_name), "%s", valve_bot_models[index]);
+      safevoid_snprintf(bot_skins[index].bot_name, sizeof(bot_skins[index].bot_name), "%s", valve_bot_names[index]);
    }
 
    // find the directory name of the currently running MOD...
    GetGameDir (game_dir);
 
-   strcpy(path, game_dir);
-   strcat(path, "/models/player");
+   safevoid_snprintf(path, sizeof(path), "%s/models/player", game_dir);
 
    if (stat(path, &stat_str) != 0)
    {
@@ -183,23 +174,18 @@ void LoadBotModels(void)
       strcpy(path, "valve/models/player");
    }
 
-   strcpy(search_path, path);
-
 #ifndef __linux__
-   strcat(search_path, "/*");
+   safevoid_snprintf(search_path, sizeof(search_path), "%s/*", path);
+#else
+   strcpy(search_path, path);
 #endif
 
-   while ((directory = FindDirectory(directory, dirname, search_path)) != NULL)
+   while ((directory = FindDirectory(directory, dirname, sizeof(dirname), search_path)) != NULL)
    {
       if ((strcmp(dirname, ".") == 0) || (strcmp(dirname, "..") == 0))
          continue;
 
-      strcpy(filename, path);
-      strcat(filename, "/");
-      strcat(filename, dirname);
-      strcat(filename, "/");
-      strcat(filename, dirname);
-      strcat(filename, ".mdl");
+      safevoid_snprintf(filename, sizeof(filename), "%s/%s/%s.mdl", path, dirname, dirname);
 
       if (stat(filename, &stat_str) == 0)
       {
@@ -217,10 +203,10 @@ void LoadBotModels(void)
          if (index == number_skins)
          {
             // add this model to the bot_skins array...
-            strcpy(bot_skins[number_skins].model_name, dirname);
+            safevoid_snprintf(bot_skins[number_skins].model_name, sizeof(bot_skins[number_skins].model_name), "%s", dirname);
 
             dirname[0] = toupper(dirname[0]);
-            strcpy(bot_skins[number_skins].bot_name, dirname);
+            safevoid_snprintf(bot_skins[number_skins].bot_name, sizeof(bot_skins[number_skins].bot_name), "%s", dirname);
 
             number_skins++;
          }

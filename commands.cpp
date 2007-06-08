@@ -22,6 +22,8 @@
 #include "bot_skill.h"
 #include "bot_weapon_select.h"
 
+#include "bot_query_hook.h"
+
 extern char g_argv[1024*3];
 extern char g_arg1[1024];
 extern char g_arg2[1024];
@@ -66,6 +68,10 @@ extern int bot_reaction_time;
 qboolean isFakeClientCommand = FALSE;
 int fake_arg_count;
 
+int bot_conntimes = 0;
+int cfg_bot_record_size = 0;
+cfg_bot_record_t * cfg_bot_record;
+
 #define CFGCMD_TYPE 1
 #define SRVCMD_TYPE 2
 #define CLICMD_TYPE 3
@@ -76,6 +82,89 @@ int fake_arg_count;
 typedef void (*printfunc_t)(int printtype, void *arg, char *msg);
 
 
+// 
+const cfg_bot_record_t * GetUnusedCfgBotRecord(void)
+{
+   if(cfg_bot_record_size <= 0)
+      return (const cfg_bot_record_t *)NULL;
+   
+   //
+   int record_indexes[cfg_bot_record_size];
+   int num_records = 0;
+   
+   record_indexes[0] = 0;
+   
+   // collect unused records
+   for(int cfgindex = 0; cfgindex < cfg_bot_record_size; cfgindex++)
+   {
+      int used = 0;
+      
+      for(int index = 0; index < 32; index++)
+      {
+         if(bots[index].is_used)
+         {
+            if(bots[index].cfg_bot_index == cfgindex)
+            {
+               used = 1;
+               break;
+            }
+         }
+      }
+      
+      if(used)
+         continue;
+      
+      record_indexes[num_records++] = cfgindex;
+   }
+   
+   if(num_records <= 0)
+      return (const cfg_bot_record_t *)NULL;
+   
+   // random pick one of unused records
+   int pick = RANDOM_LONG2(0, num_records-1);
+   
+   //
+   return(&cfg_bot_record[record_indexes[pick]]);
+}
+
+//
+void FreeCfgBotRecord(void)
+{
+   if(cfg_bot_record_size > 0 && cfg_bot_record_size)
+   {
+      for(int i = 0; i < cfg_bot_record_size; i++)
+      {
+         if(cfg_bot_record[i].name)
+            free(cfg_bot_record[i].name);
+         if(cfg_bot_record[i].skin)
+            free(cfg_bot_record[i].skin);
+      }
+      
+      free(cfg_bot_record);
+   }
+   
+   cfg_bot_record = NULL;
+   cfg_bot_record_size = 0;
+}
+
+//
+int AddToCfgBotRecord(const char *skin, const char *name, int skill, int top_color, int bottom_color)
+{
+   int index = cfg_bot_record_size++;
+
+   cfg_bot_record = (cfg_bot_record_t*)realloc(cfg_bot_record, sizeof(cfg_bot_record_t) * cfg_bot_record_size);
+
+   cfg_bot_record[index].index = index;
+   cfg_bot_record[index].skin = (skin) ? strdup(skin) : NULL;
+   cfg_bot_record[index].name = (name) ? strdup(name) : NULL;
+   cfg_bot_record[index].skill = skill;
+   cfg_bot_record[index].top_color = top_color;
+   cfg_bot_record[index].bottom_color = bottom_color;
+
+   return(index);
+}
+
+//
 void UTIL_PrintBotInfo(const printfunc_t printfunc, void * arg) 
 {
    //print out bot info
@@ -105,7 +194,7 @@ void UTIL_PrintBotInfo(const printfunc_t printfunc, void * arg)
    printfunc(PRINTFUNC_INFO, arg, msg);
 }
 
-
+//
 qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * arg, const char * pcmd, const char * arg1, const char * arg2, const char * arg3, const char * arg4, const char * arg5) 
 {
    char msg[128];
@@ -127,7 +216,18 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
    }
    else if (FStrEq(pcmd, "addbot"))
    {
-      BotCreate( (edict_t *)arg, arg1, arg2, arg3, arg4, arg5 );
+      int cfg_bot_index = -1;
+      const char * skin = (arg1 && *arg1) ? arg1 : NULL;
+      const char * name = (arg2 && *arg2) ? arg2 : NULL;
+      int skill = (arg3 && *arg3) ? atoi(arg3) : default_bot_skill;
+      int top_color = (arg4 && *arg4) ? atoi(arg4) : -1;
+      int bottom_color = (arg5 && *arg5) ? atoi(arg5) : -1;
+
+      // save bots from config to special buffer
+      if(cmdtype == CFGCMD_TYPE)
+         cfg_bot_index = AddToCfgBotRecord(skin, name, skill, top_color, bottom_color);
+
+      BotCreate(skin, name, skill, top_color, bottom_color, cfg_bot_index);
 
       bot_check_time = gpGlobals->time + 5.0;
       if(cmdtype == CFGCMD_TYPE)
@@ -167,6 +267,28 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
 
       safevoid_snprintf(msg, sizeof(msg), "botskill is %d\n", default_bot_skill);
       printfunc(PRINTFUNC_INFO, arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_conntimes"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < 0) || (temp > 2))
+            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_conntimes value!\n");
+         else
+            bot_conntimes = temp;
+      }
+
+      safevoid_snprintf(msg, sizeof(msg), "bot_conntimes is %d (%s)\n", bot_conntimes, (bot_conntimes==0?"disabled":"enabled"));
+      printfunc(PRINTFUNC_INFO, arg, msg);
+      
+      if(bot_conntimes == 0)
+         unhook_sendto_function();
+      else
+         hook_sendto_function();
 
       return TRUE;
    }

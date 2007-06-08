@@ -83,6 +83,16 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
 #define MAX_BOT_CHAT 100
 
 
+typedef struct
+{
+   int    index;
+   char * skin;
+   char * name;
+   int    skill;
+   int    top_color;
+   int    bottom_color;
+} cfg_bot_record_t;
+
 typedef struct breakable_list_s 
 {
    struct breakable_list_s * next;
@@ -101,6 +111,7 @@ typedef struct
 typedef struct
 {
    qboolean is_used;
+   int cfg_bot_index;
    
    edict_t *pEdict;
    qboolean need_to_initialize;
@@ -121,6 +132,9 @@ typedef struct
    int chat_drop_percent;
    int chat_swap_percent;
    int chat_lower_percent;
+
+   double connect_time;
+   double stay_time;
 
    // things from pev in CBasePlayer...
    int bot_team;
@@ -365,14 +379,17 @@ void CheckPlayerChatProtection(edict_t * pPlayer);
 qboolean IsPlayerChatProtected(edict_t * pPlayer);
 
 void LoadBotChat(void);
-void BotTrimBlanks(char *in_string, char *out_string);
-int BotChatTrimTag(char *original_name, char *out_name);
-void BotDropCharacter(char *in_string, char *out_string);
-void BotSwapCharacter(char *in_string, char *out_string);
-void BotChatName(char *original_name, char *out_name);
-void BotChatText(char *in_text, char *out_text);
-void BotChatFillInName(char *bot_say_msg, char *chat_text, char *chat_name, const char *bot_name);
-void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distance);
+void BotTrimBlanks(const char *in_string, char *out_string, int sizeof_out_string);
+int BotChatTrimTag(const char *original_name, char *out_name, int sizeof_out_name);
+void BotDropCharacter(const char *in_string, char *out_string, int sizeof_out_string);
+void BotSwapCharacter(const char *in_string, char *out_string, int sizeof_out_string);
+void BotChatName(const char *original_name, char *out_name, int sizeof_out_name);
+void BotChatText(const char *in_text, char *out_text, int sizeof_out_text);
+void BotChatFillInName(char *bot_say_msg, int sizeof_msg, const char *chat_text, const char *chat_name, const char *bot_name);
+
+const cfg_bot_record_t * GetUnusedCfgBotRecord(void);
+void FreeCfgBotRecord(void);
+int AddToCfgBotRecord(const char *skin, const char *name, int skill, int top_color, int bottom_color);
 
 #include "bot_inline_funcs.h"
 

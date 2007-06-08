@@ -1,5 +1,5 @@
-jk_botti - Be More Human
---------------------------------0.57
+jk_botti 1.00 
+-------------
 
 1. Intro
 2. What's new
@@ -10,7 +10,7 @@ jk_botti - Be More Human
 1. Intro
 --------------------
 
-This is 0.57 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+This is 1.00 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
 You are free to use code for any of your needs.
 
 Credits:
@@ -32,7 +32,7 @@ This bot aims to:
 
 jk_botti is mostly tested with Severian's, but works with original HLDM and
 Bubblemod. On Severian's and Bubblemod, gluon is disabled. Bot might work
-with XDM but this isn't tested.
+with XDM but this hasn't been tested.
 
 One of my major goals with jk_botti was to lower CPU usage compared to
 HPB_bot. I used to run Severian's server on 400Mhz Celeron (later updated 
@@ -46,7 +46,7 @@ Tricks used to lower CPU usage:
 Aiming system on jk_botti does not use currently available and latest player
 locations for tracking and shooting enemy but instead use old data (level 1
 bot 125ms, level 5 bot 225ms old) to guess position of player. This makes 
-aiming worser when player changes movement vector rapidly (jump, duck,
+bot-aiming worser when player changes movement vector rapidly (jump, duck,
 change strafe direction rapidly). 
 
 jk_botti creates waypoints automatically when 'autowaypoint' setting is
@@ -61,8 +61,16 @@ CPU intensive operation this can only really be done on map change.
 --------------------
 2. What's new
 --------------------
+1.00:
+ * Remembers bots from config when recreating bots by min_bots/max_bots.
+ * Change bot connection times on server queries.
+   - Set 'bot_conntimes 1' in config file to have different connection times
+     for each bot on server query.
+ * Tweaked code computing RunPlayerMove-msec.
+ * Bots don't see targets too early behind corners.
+
 0.57:
- * Waypoint files are saved compressed with zlib.
+ * Waypoint files are now compressed with zlib.
 
 0.56:
  * Fixed waypoint matrix creation being done right on map start on win32.

@@ -51,7 +51,10 @@ void BotChatTaunt(bot_t &pBot, edict_t *victim_edict)
    char chat_name[64];
    char temp_name[64];
    const char *bot_name;
-
+   
+   if(pBot.b_bot_say && pBot.f_bot_say >= gpGlobals->time)
+      return;
+   
    // are there any taunt messages and should the bot taunt?
    if ((bot_taunt_count > 0) &&
        (RANDOM_LONG2(1,100) <= pBot.taunt_percent))
@@ -90,23 +93,22 @@ void BotChatTaunt(bot_t &pBot, edict_t *victim_edict)
       recent_bot_taunt[0] = taunt_index;
 
       if (bot_taunt[taunt_index].can_modify)
-         BotChatText(bot_taunt[taunt_index].text, chat_text);
+         BotChatText(bot_taunt[taunt_index].text, chat_text, sizeof(chat_text));
       else
-         strcpy(chat_text, bot_taunt[taunt_index].text);
+         safevoid_snprintf(chat_text, sizeof(chat_text), "%s", bot_taunt[taunt_index].text);
 
       if (victim_edict->v.netname)
       {
-         strncpy(temp_name, STRING(victim_edict->v.netname), 31);
-         temp_name[31] = 0;
+         safevoid_snprintf(temp_name, sizeof(temp_name), "%s", STRING(victim_edict->v.netname));
 
-         BotChatName(temp_name, chat_name);
+         BotChatName(temp_name, chat_name, sizeof(chat_name));
       }
       else
          strcpy(chat_name, "NULL");
 
       bot_name = STRING(pBot.pEdict->v.netname);
 
-      BotChatFillInName(pBot.bot_say_msg, chat_text, chat_name, bot_name);
+      BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, bot_name);
    }
 }
 
@@ -118,6 +120,9 @@ void BotChatWhine(bot_t &pBot)
    char chat_name[64];
    char temp_name[64];
    const char *bot_name;
+   
+   if(pBot.b_bot_say && pBot.f_bot_say >= gpGlobals->time)
+      return;
    
    edict_t *pEdict = pBot.pEdict;
    
@@ -161,23 +166,22 @@ void BotChatWhine(bot_t &pBot)
          recent_bot_whine[0] = whine_index;
 
          if (bot_whine[whine_index].can_modify)
-            BotChatText(bot_whine[whine_index].text, chat_text);
+            BotChatText(bot_whine[whine_index].text, chat_text, sizeof(chat_text));
          else
-            strcpy(chat_text, bot_whine[whine_index].text);
+            safevoid_snprintf(chat_text, sizeof(chat_text), "%s", bot_whine[whine_index].text);
 
          if (pBot.killer_edict->v.netname)
          {
-            strncpy(temp_name, STRING(pBot.killer_edict->v.netname), 31);
-            temp_name[31] = 0;
+            safevoid_snprintf(temp_name, sizeof(temp_name), "%s", STRING(pBot.killer_edict->v.netname));
 
-            BotChatName(temp_name, chat_name);
+            BotChatName(temp_name, chat_name, sizeof(chat_name));
          }
          else
             strcpy(chat_name, "NULL");
 
          bot_name = STRING(pEdict->v.netname);
 
-         BotChatFillInName(pBot.bot_say_msg, chat_text, chat_name, bot_name);
+         BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, bot_name);
       }
    }
 }
@@ -189,6 +193,9 @@ void BotChatTalk(bot_t &pBot)
    char chat_text[81];
    char chat_name[64];
    const char *bot_name;
+   
+   if(pBot.b_bot_say && pBot.f_bot_say >= gpGlobals->time)
+      return;
    
    edict_t *pEdict = pBot.pEdict;
    
@@ -232,15 +239,15 @@ void BotChatTalk(bot_t &pBot)
          recent_bot_chat[0] = chat_index;
 
          if (bot_chat[chat_index].can_modify)
-            BotChatText(bot_chat[chat_index].text, chat_text);
+            BotChatText(bot_chat[chat_index].text, chat_text, sizeof(chat_text));
          else
-            strcpy(chat_text, bot_chat[chat_index].text);
+            safevoid_snprintf(chat_text, sizeof(chat_text), "%s", bot_chat[chat_index].text);
 
-         strcpy(chat_name, STRING(pBot.pEdict->v.netname));
+         safevoid_snprintf(chat_name, sizeof(chat_name), "%s", STRING(pBot.pEdict->v.netname));
 
          bot_name = STRING(pEdict->v.netname);
 
-         BotChatFillInName(pBot.bot_say_msg, chat_text, chat_name, bot_name);
+         BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, bot_name);
       }
    }
 }
@@ -318,12 +325,12 @@ void LoadBotChat(void)
       {
          if (buffer[0] == '!')
          {
-            strcpy(bot_chat[bot_chat_count].text, &buffer[1]);
+            safevoid_snprintf(bot_chat[bot_chat_count].text, sizeof(bot_chat[bot_chat_count].text), "%s", &buffer[1]);
             bot_chat[bot_chat_count].can_modify = FALSE;
          }
          else
          {
-            strcpy(bot_chat[bot_chat_count].text, buffer);
+            safevoid_snprintf(bot_chat[bot_chat_count].text, sizeof(bot_chat[bot_chat_count].text), "%s", buffer);
             bot_chat[bot_chat_count].can_modify = TRUE;
          }
 
@@ -335,12 +342,12 @@ void LoadBotChat(void)
       {
          if (buffer[0] == '!')
          {
-            strcpy(bot_taunt[bot_taunt_count].text, &buffer[1]);
+            safevoid_snprintf(bot_taunt[bot_taunt_count].text, sizeof(bot_taunt[bot_taunt_count].text), "%s", &buffer[1]);
             bot_taunt[bot_taunt_count].can_modify = FALSE;
          }
          else
          {
-            strcpy(bot_taunt[bot_taunt_count].text, buffer);
+            safevoid_snprintf(bot_taunt[bot_taunt_count].text, sizeof(bot_taunt[bot_taunt_count].text), "%s", buffer);
             bot_taunt[bot_taunt_count].can_modify = TRUE;
          }
 
@@ -352,12 +359,12 @@ void LoadBotChat(void)
       {
          if (buffer[0] == '!')
          {
-            strcpy(bot_whine[bot_whine_count].text, &buffer[1]);
+            safevoid_snprintf(bot_whine[bot_whine_count].text, sizeof(bot_whine[bot_whine_count].text), "%s", &buffer[1]);
             bot_whine[bot_whine_count].can_modify = FALSE;
          }
          else
          {
-            strcpy(bot_whine[bot_whine_count].text, buffer);
+            safevoid_snprintf(bot_whine[bot_whine_count].text, sizeof(bot_whine[bot_whine_count].text), "%s", buffer);
             bot_whine[bot_whine_count].can_modify = TRUE;
          }
 
@@ -366,18 +373,19 @@ void LoadBotChat(void)
    }
 }
 
-void BotTrimBlanks(char *in_string, char *out_string)
+
+void BotTrimBlanks(const char *in_string, char *out_string, int sizeof_out_string)
 {
    int i, pos;
    char *dest;
 
    pos=0;
-   while ((pos < 80) && (in_string[pos] == ' '))  // skip leading blanks
+   while ((pos < sizeof_out_string) && (in_string[pos] == ' '))  // skip leading blanks
       pos++;
 
    dest=&out_string[0];
 
-   while ((pos < 80) && (in_string[pos]))
+   while ((pos < sizeof_out_string) && (in_string[pos]))
    {
       *dest++ = in_string[pos];
       pos++;
@@ -393,15 +401,14 @@ void BotTrimBlanks(char *in_string, char *out_string)
 }
 
 
-int BotChatTrimTag(char *original_name, char *out_name)
+int BotChatTrimTag(const char *original_name, char *out_name, int sizeof_out_name)
 {
    int i;
    char *pos1, *pos2, *src, *dest;
    char in_name[80];
    int result = 0;
 
-   strncpy(in_name, original_name, 32);
-   in_name[31] = 0;
+   safevoid_snprintf(in_name, sizeof(in_name), "%s", original_name);
 
    for (i=0; i < NUM_TAGS; i++)
    {
@@ -423,15 +430,15 @@ int BotChatTrimTag(char *original_name, char *out_name)
       }
    }
 
-   strcpy(out_name, in_name);
+   safevoid_snprintf(out_name, sizeof_out_name, "%s", in_name);
 
-   BotTrimBlanks(out_name, in_name);
+   BotTrimBlanks(out_name, in_name, sizeof(in_name));
 
    if (strlen(in_name) == 0)  // is name just a tag?
    {
-      strncpy(in_name, original_name, 32);
-      in_name[31] = 0;
-
+      safevoid_snprintf(in_name, sizeof(in_name), "%s", original_name);
+      
+      /*
       // strip just the tag part...
       for (i=0; i < NUM_TAGS; i++)
       {
@@ -453,38 +460,41 @@ int BotChatTrimTag(char *original_name, char *out_name)
             *src = 0; // null out the rest of the string
          }
       }
+      */
+      result = 0;
    }
 
-   BotTrimBlanks(in_name, out_name);
+   BotTrimBlanks(in_name, out_name, sizeof_out_name);
 
-   out_name[31] = 0;
+   out_name[sizeof_out_name-1] = 0;
 
    return (result);
 }
 
 
-void BotDropCharacter(char *in_string, char *out_string)
+void BotDropCharacter(const char *in_string, char *out_string, int sizeof_out_string)
 {
    int len, pos;
-   int count = 0;
+   int count;
    char *src, *dest;
    qboolean is_bad;
 
-   strcpy(out_string, in_string);
+   safevoid_snprintf(out_string, sizeof_out_string, "%s", in_string);
 
    len = strlen(out_string);
+   if(len < 2)
+      return;
+   
    pos = RANDOM_LONG2(1, len-1);  // don't drop position zero
 
    is_bad = !isalpha(out_string[pos]) || (out_string[pos-1] == '%');
-
-   while ((is_bad) && (count < 20))
+   for(count = 0; is_bad && count < len && count < 20; count++)
    {
       pos = RANDOM_LONG2(1, len-1);
       is_bad = !isalpha(out_string[pos]) || (out_string[pos-1] == '%');
-      count++;
    }
 
-   if (count < 20)
+   if (count < len && count < 20)
    {
       src = &out_string[pos+1];
       dest = &out_string[pos];
@@ -495,27 +505,26 @@ void BotDropCharacter(char *in_string, char *out_string)
 }
 
 
-void BotSwapCharacter(char *in_string, char *out_string)
+void BotSwapCharacter(const char *in_string, char *out_string, int sizeof_out_string)
 {
    int len, pos;
    int count = 0;
    char temp;
    qboolean is_bad;
 
-   strcpy(out_string, in_string);
+   safevoid_snprintf(out_string, sizeof_out_string, "%s", in_string);
 
    len = strlen(out_string);
+   if(len < 3) // must be 3, 1+1 for swap + zero must now swap = 3
+      return;
+   
    pos = RANDOM_LONG2(1, len-2);  // don't swap position zero
 
-   is_bad = !isalpha(out_string[pos]) || !isalpha(out_string[pos+1]) ||
-            (out_string[pos-1] == '%');
-
-   while ((is_bad) && (count < 20))
+   is_bad = !isalpha(out_string[pos]) || !isalpha(out_string[pos+1]) || (out_string[pos-1] == '%');
+   for(count = 0; is_bad && count < len && count < 20; count++)
    {
       pos = RANDOM_LONG2(1, len-2);
-      is_bad = !isalpha(out_string[pos]) || !isalpha(out_string[pos+1]) ||
-               (out_string[pos-1] == '%');
-      count++;
+      is_bad = !isalpha(out_string[pos]) || !isalpha(out_string[pos+1]) || (out_string[pos-1] == '%');
    }
 
    if (count < 20)
@@ -527,17 +536,15 @@ void BotSwapCharacter(char *in_string, char *out_string)
 }
 
 
-void BotChatName(char *original_name, char *out_name)
+void BotChatName(const char *original_name, char *out_name, int sizeof_out_name)
 {
    int pos;
    char temp_lvlXless_name[80];
    
-   //remove [lvlX] tag always
+   //always remove [lvlX] tag
    if(strncmp(original_name, "[lvl", 4) == 0 && original_name[4] >= '0' && original_name[4] <= '5' && original_name[5] == ']')
    {
-      strncpy(temp_lvlXless_name, &original_name[6], 31);
-      temp_lvlXless_name[31] = 0;
-      
+      safevoid_snprintf(temp_lvlXless_name, sizeof(temp_lvlXless_name), "%s", &original_name[6]);
       original_name = temp_lvlXless_name;
    }
 
@@ -545,24 +552,22 @@ void BotChatName(char *original_name, char *out_name)
    {
       char temp_name[80];
 
-      strncpy(temp_name, original_name, 31);
-      temp_name[31] = 0;
+      safevoid_snprintf(temp_name, sizeof(temp_name), "%s", original_name);
 
-      while (BotChatTrimTag(temp_name, out_name))
+      while (BotChatTrimTag(temp_name, out_name, sizeof_out_name))
       {
-         strcpy(temp_name, out_name);
+         safevoid_snprintf(temp_name, sizeof(temp_name), "%s", out_name);
       }
    }
    else
    {
-      strncpy(out_name, original_name, 31);
-      out_name[31] = 0;
+      safevoid_snprintf(out_name, sizeof_out_name, "%s", original_name);
    }
 
    if (RANDOM_LONG2(1, 100) <= bot_chat_lower_percent)
    {
       pos=0;
-      while ((pos < 80) && (out_name[pos]))
+      while ((pos < sizeof_out_name) && (out_name[pos]))
       {
          out_name[pos] = tolower(out_name[pos]);
          pos++;
@@ -571,14 +576,13 @@ void BotChatName(char *original_name, char *out_name)
 }
 
 
-void BotChatText(char *in_text, char *out_text)
+void BotChatText(const char *in_text, char *out_text, int sizeof_out_text)
 {
    int pos;
    char temp_text[81];
    int count;
 
-   strncpy(temp_text, in_text, 79);
-   temp_text[80] = 0;
+   safevoid_snprintf(temp_text, sizeof(temp_text), "%s", in_text);
 
    if (RANDOM_LONG2(1, 100) <= bot_chat_drop_percent)
    {
@@ -586,8 +590,8 @@ void BotChatText(char *in_text, char *out_text)
 
       while (count)
       {
-         BotDropCharacter(temp_text, out_text);
-         strcpy(temp_text, out_text);
+         BotDropCharacter(temp_text, out_text, sizeof_out_text);
+         safevoid_snprintf(temp_text, sizeof(temp_text), "%s", out_text);
          count--;
       }
    }
@@ -598,8 +602,8 @@ void BotChatText(char *in_text, char *out_text)
 
       while (count)
       {
-         BotSwapCharacter(temp_text, out_text);
-         strcpy(temp_text, out_text);
+         BotSwapCharacter(temp_text, out_text, sizeof_out_text);
+         safevoid_snprintf(temp_text, sizeof(temp_text), "%s", out_text);
          count--;
       }
    }
@@ -614,7 +618,7 @@ void BotChatText(char *in_text, char *out_text)
       }
    }
 
-   strcpy(out_text, temp_text);
+   safevoid_snprintf(out_text, sizeof_out_text, "%s", temp_text);
 }
 
 
@@ -638,7 +642,7 @@ void BotChatGetPlayers(void)
 
             if (*pName != 0)
             {
-               strncpy(player_names[player_count], pName, 32);
+               safevoid_snprintf(player_names[player_count], sizeof(player_names[player_count]), "%s", pName);
 
                player_count++;
             }
@@ -648,91 +652,69 @@ void BotChatGetPlayers(void)
 }
 
 
-void BotChatFillInName(char *bot_say_msg, char *chat_text,
-                       char *chat_name, const char *bot_name)
+void BotChatFillInName(char *bot_say_msg, int sizeof_msg, const char *chat_text, const char *chat_name, const char *bot_name)
 {
-   int chat_index, say_index;
-   char *name_pos, *rand_pos;
    char random_name[64];
-   int index, name_offset=0, rand_offset;
-   qboolean is_bad;
+   int clen = strlen(chat_text);
+   int i = 0;
+   int o = 0;
 
-   chat_index = 0;
-   say_index = 0;
-   bot_say_msg[0] = 0;
-
-   name_pos = strstr(&chat_text[chat_index], "%n");
-   rand_pos = strstr(&chat_text[chat_index], "%r");
-
-   while ((name_pos != NULL) || (rand_pos != NULL))
+   while(i < clen && o < sizeof_msg)
    {
-      if (name_pos != NULL)
-         name_offset = name_pos - chat_text;
-      if (rand_pos != NULL)
-         rand_offset = rand_pos - chat_text;
-
-      if ((rand_pos == NULL) ||
-          ((name_offset < rand_offset) && (name_pos != NULL)))
+      if(chat_text[i] == '%')
       {
-         while (&chat_text[chat_index] < name_pos)
-            bot_say_msg[say_index++] = chat_text[chat_index++];
-
-         bot_say_msg[say_index] = 0;  // add null terminator
-
-         chat_index += 2;  // skip the "%n"
-
-         strcat(bot_say_msg, chat_name);
-         say_index += strlen(chat_name);
-
-         bot_say_msg[say_index] = 0;
-      }
-      else  // use random player name...
-      {
-         int count = 0;
-
-         BotChatGetPlayers();
-
-         // pick a name at random from the list of players...
-
-         index = RANDOM_LONG2(0, player_count-1);
-
-         is_bad = (strcmp(player_names[index], chat_name) == 0) ||
-                  (strcmp(player_names[index], bot_name) == 0);
-
-         while ((is_bad) && (count < 20))
+         if(i + 1 < clen)
          {
-            index = RANDOM_LONG2(0, player_count-1);
+            if(chat_text[i + 1] == 'n' || chat_text[i + 1] == 'r')
+            {
+               const char * to_output = chat_name;
+               
+               if(chat_text[i + 1] == 'r')
+               {
+                  BotChatGetPlayers();
+         
+                  // pick a name at random from the list of players...
+                  int index = RANDOM_LONG2(0, player_count-1);
+                  int count = 0;
+                  
+                  bool is_bad = (strcmp(player_names[index], chat_name) == 0) ||
+                                (strcmp(player_names[index], bot_name) == 0);
 
-            is_bad = (strcmp(player_names[index], chat_name) == 0) ||
-                     (strcmp(player_names[index], bot_name) == 0);
+                  while ((is_bad) && (count < 20))
+                  {
+                     index = RANDOM_LONG2(0, player_count-1);
 
-            count++;
+                     is_bad = (strcmp(player_names[index], chat_name) == 0) ||
+                              (strcmp(player_names[index], bot_name) == 0);
+                     
+                     count++;
+                  }
+
+                  BotChatName(player_names[index], random_name, sizeof(random_name));
+                  
+                  to_output = random_name;
+               }
+               
+               // copy chat name to output
+               int nlen = strlen(to_output);
+               int n = 0;
+               
+               while(n < nlen && o < sizeof_msg)
+                  bot_say_msg[o++] = to_output[n++];
+               
+               // skip %X
+               i+=2;
+               continue;
+            }
          }
-
-         BotChatName(player_names[index], random_name);
-
-         while (&chat_text[chat_index] < rand_pos)
-            bot_say_msg[say_index++] = chat_text[chat_index++];
-
-         bot_say_msg[say_index] = 0;  // add null terminator
-
-         chat_index += 2;  // skip the "%r"
-
-         strcat(bot_say_msg, random_name);
-         say_index += strlen(random_name);
-
-         bot_say_msg[say_index] = 0;
       }
-
-      name_pos = strstr(&chat_text[chat_index], "%n");
-      rand_pos = strstr(&chat_text[chat_index], "%r");
+      
+      bot_say_msg[o++] = chat_text[i++];
    }
-
-   // copy the rest of the chat_text into the bot_say_msg...
-
-   while (chat_text[chat_index])
-      bot_say_msg[say_index++] = chat_text[chat_index++];
-
-   bot_say_msg[say_index] = 0;  // add null terminator
+   
+   if(o < sizeof_msg)
+      bot_say_msg[o] = 0;
+   else
+      bot_say_msg[sizeof_msg - 1] = 0;
 }
 
