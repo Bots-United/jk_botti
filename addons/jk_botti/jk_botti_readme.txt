@@ -61,6 +61,9 @@ CPU intensive operation this can only really be done on map change.
 --------------------
 2. What's new
 --------------------
+1.01: 
+ * Fixed 'bot_conntimes 1' crashing on Windows servers.
+
 1.00:
  * Remembers bots from config when recreating bots by min_bots/max_bots.
  * Change bot connection times on server queries.

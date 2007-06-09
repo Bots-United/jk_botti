@@ -5,7 +5,7 @@
 #include "bot_query_hook.h"
 
 //
-bool msg_get_string(const unsigned char * &msg, size_t &len, char * name, int nlen)
+static bool msg_get_string(const unsigned char * &msg, size_t &len, char * name, int nlen)
 {
 	int i = 0;
 	
@@ -30,7 +30,7 @@ bool msg_get_string(const unsigned char * &msg, size_t &len, char * name, int nl
 }
 
 // find bot connection times and replace
-ssize_t handle_player_reply(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
+ssize_t PASCAL handle_player_reply(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
 {
 /*
 (int32) Header
@@ -103,7 +103,7 @@ error_exit:
 }
 
 //
-ssize_t sendto_hook(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
+ssize_t PASCAL sendto_hook(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
 {
 	const unsigned char * orig_buf = (unsigned char*)message;
 	

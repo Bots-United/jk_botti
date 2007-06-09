@@ -56,7 +56,7 @@ inline void reset_sendto_hook(void)
 }
 
 // Replacement sendto function
-static ssize_t __replacement_sendto(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
+static ssize_t PASCAL __replacement_sendto(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
 {
 	static int is_original_restored = 0;
 	int was_original_restored = is_original_restored;
@@ -90,7 +90,7 @@ static ssize_t __replacement_sendto(int socket, const void *message, size_t leng
 }
 
 //
-ssize_t call_original_sendto(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
+ssize_t PASCAL call_original_sendto(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
 {
 	return (*sendto_original)(socket, message, length, flags, dest_addr, dest_len);
 }
