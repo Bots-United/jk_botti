@@ -11,7 +11,7 @@
 
 #define MAX_WAYPOINTS 1024
 
-#define REACHABLE_RANGE 400.0
+#define REACHABLE_RANGE 400.0f
 
 // defines for waypoint flags field (32 bits are available)
 #define W_FL_CROUCH      (1<<1)  /* must crouch to reach this waypoint */
@@ -29,6 +29,8 @@
 #define W_FL_SNIPER      (1<<11) /* sniper waypoint (a good sniper spot) */
 #define W_FL_AIMING      (1<<12) /* aiming waypoint */
 
+#define W_FL_SPAWNADD    (1<<13) /* waypoint was added by spawn-object, marked to not have these trimmed on wp-save */
+
 #define W_FL_DELETED     (1<<31) /* used by waypoint allocation code */
 
 
@@ -36,12 +38,20 @@
 #define WAYPOINT_MAGIC "jkbotti\0"
 
 
+//
+// Subversions
+//
+#define WPF_SUBVERSION_1_00 1 // jk_botti 0.30-1.00
+#define WPF_SUBVERSION_1_02 2 // jk_botti 1.02-1.10
+#define WPF_SUBVERSION_1_10 3 // jk_botti 1.10-
+
+
 // define the waypoint file header structure...
 typedef struct {
    char filetype[8];  // should be "jkbotti\0"
    int  waypoint_file_version;
    int  waypoint_file_subversion;
-   int  waypoint_file_flags;  // not currently used
+   int  waypoint_file_flags;
    int  number_of_waypoints;
    char mapname[32];  // name of map for these waypoints
 } WAYPOINT_HDR;
@@ -78,6 +88,7 @@ int  WaypointFindNearest(edict_t *pEntity, float distance);
 int  WaypointFindNearest(Vector v_src, edict_t *pEntity, float range);
 int  WaypointFindNearestGoal(edict_t *pEntity, int src, int flags);
 int  WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags);
+int  WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags, int exclude[]);
 int  WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int exclude[]);
 int  WaypointFindNearestGoal(Vector v_src, edict_t *pEntity, float range, int flags);
 int  WaypointFindRandomGoal(edict_t *pEntity, int flags);
@@ -93,12 +104,12 @@ void WaypointCreatePath(edict_t *pEntity, int cmd);
 void WaypointRemovePath(edict_t *pEntity, int cmd);
 qboolean WaypointLoad(edict_t *pEntity);
 void WaypointSave(void);
-qboolean WaypointReachable(Vector v_srv, Vector v_dest, edict_t *pEntity);
+qboolean WaypointReachable(Vector v_srv, Vector v_dest, int flags);
 int  WaypointFindReachable(edict_t *pEntity, float range);
 void WaypointPrintInfo(edict_t *pEntity);
 void WaypointThink(edict_t *pEntity);
 void WaypointFloyds(short *shortest_path, short *from_to);
-void WaypointRouteInit(void);
+void WaypointRouteInit(qboolean ForceRebuild);
 void CollectMapSpawnItems(edict_t *pSpawn);
 void WaypointAddSpawnObjects(void);
 edict_t *WaypointFindItem( int wpt_index );
@@ -109,5 +120,6 @@ void WaypointSaveFloydsMatrix(void);
 int WaypointSlowFloydsState(void);
 int WaypointSlowFloyds(void);
 int WaypointSlowFloyds(unsigned short *shortest_path, unsigned short *from_to);
+qboolean WaypointIsRouteValid(int src, int dest);
 
 #endif // WAYPOINT_H

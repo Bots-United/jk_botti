@@ -29,7 +29,7 @@ typedef int BOOL;
 
 
 // global defines
-#define PLAYER_SEARCH_RADIUS     40.0
+#define PLAYER_SEARCH_RADIUS (64 - 4.0)
 
 
 // define a new bit flag for bot identification
@@ -250,8 +250,11 @@ typedef struct
    float f_use_HEV_time;
 
    qboolean  b_use_button;
+   qboolean  b_use_button_prev_state;
    float f_use_button_time;
    qboolean  b_lift_moving;
+   
+   Vector v_use_target;
 
    int   logo_percent;
    qboolean  b_spray_logo;

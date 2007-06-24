@@ -360,8 +360,6 @@ int Spawn( edict_t *pent )
          memset(last_time_not_facing_wall, 0, sizeof(last_time_not_facing_wall));
          memset(last_time_dead, 0, sizeof(last_time_dead));
       }
-      else
-         CollectMapSpawnItems(pent);
    }
 
    RETURN_META_VALUE (MRES_IGNORED, 0);
@@ -377,13 +375,15 @@ int Spawn_Post( edict_t *pent )
          // check for team play... gamedll check it in 'worldspawn' spawn and doesn't recheck
          BotCheckTeamplay();
       }
+      else
+         CollectMapSpawnItems(pent);
    }
    
    RETURN_META_VALUE (MRES_IGNORED, 0);
 }
 
 
-void DispatchKeyValue( edict_t *pentKeyvalue, KeyValueData *pkvd )
+void DispatchKeyValue_Post( edict_t *pentKeyvalue, KeyValueData *pkvd )
 {
    if(!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
@@ -756,7 +756,6 @@ C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVers
 {
    gFunctionTable.pfnGameInit = GameDLLInit;
    gFunctionTable.pfnSpawn = Spawn;
-   gFunctionTable.pfnKeyValue = DispatchKeyValue;
    gFunctionTable.pfnClientConnect = jkbotti_ClientConnect;
    gFunctionTable.pfnClientPutInServer = jkbotti_ClientPutInServer;
    gFunctionTable.pfnClientDisconnect = ClientDisconnect;
@@ -773,6 +772,7 @@ C_DLLEXPORT int GetEntityAPI2_POST (DLL_FUNCTIONS *pFunctionTable, int *interfac
 {
    gFunctionTable_POST.pfnSpawn = Spawn_Post;
    gFunctionTable_POST.pfnPlayerPostThink = PlayerPostThink_Post;
+   gFunctionTable_POST.pfnKeyValue = DispatchKeyValue_Post;
       
    memcpy (pFunctionTable, &gFunctionTable_POST, sizeof (DLL_FUNCTIONS));
    return (TRUE);

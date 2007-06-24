@@ -160,6 +160,11 @@ inline void UTIL_TraceMove( const Vector &vecStart, const Vector &vecEnd, IGNORE
    TRACE_HULL( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE), point_hull, pentIgnore, ptr );
 }
 
+inline void UTIL_TraceDuck( const Vector &vecStart, const Vector &vecEnd, IGNORE_MONSTERS igmon, edict_t *pentIgnore, TraceResult *ptr ) 
+{
+   TRACE_HULL( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE), head_hull, pentIgnore, ptr );
+}
+
 inline edict_t *UTIL_FindEntityInSphere( edict_t *pentStart, const Vector &vecCenter, float flRadius )
 {
    edict_t  *pentEntity;

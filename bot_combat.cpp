@@ -93,7 +93,7 @@ void BotPointGun(bot_t &pBot)
       
       speed = (0.5 * custom + 0.2) + (turn_skill - 1) / (10 * (1.0 - custom) + 10);
    }
-   else if(pBot.curr_waypoint_index != -1)
+   else if(pBot.curr_waypoint_index != -1 || !FNullEnt(pBot.pBotPickupItem))
       speed = 0.5 + (turn_skill - 1) / 15; // medium aim
    else
       speed = 0.2 + (turn_skill - 1) / 20; // slow aim
@@ -334,7 +334,7 @@ Vector TracePredictedMovement(bot_t &pBot, edict_t *pPlayer, Vector v_src, Vecto
    TraceResult tr;
    UTIL_TraceHull( v_src, v_dest, ignore_monsters, (ducking) ? head_hull : human_hull, pPlayer ? pPlayer->v.pContainingEntity : NULL, &tr);
    
-   if(!tr.fStartSolid && tr.flFraction < 0.9999)
+   if(!tr.fStartSolid && tr.flFraction < 1.0f)
       v_dest.z = tr.vecEndPos.z;
    
    return(v_dest);
@@ -655,8 +655,22 @@ qboolean BotFindSoundEnemy( bot_t &pBot )
          {
             Vector v_monsterplayer = UTIL_GetOrigin(pMonsterOrPlayer);
             float distance = (v_monsterplayer - pEdict->v.origin).Length();
+            BOOL observer_skip = FALSE;
             
-            if(distance < nearestdistance)
+            // check observer mode
+            if(b_observer_mode)
+            {
+               int idx = ENTINDEX(pMonsterOrPlayer);
+               
+               if(idx > 1 && idx <= gpGlobals->maxClients)
+               {
+                  // not bot?
+                  if(!(FBitSet(pMonsterOrPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pMonsterOrPlayer->v.flags, FL_THIRDPARTYBOT)))
+                     observer_skip = TRUE;
+               }
+            }
+            
+            if(!observer_skip && distance < nearestdistance)
             {
                distance = nearestdistance;
                pNewFindSoundEnt = pMonsterOrPlayer;
@@ -671,7 +685,7 @@ qboolean BotFindSoundEnemy( bot_t &pBot )
       sound_count++;
    }
    
-   if(iSound != SOUNDLIST_EMPTY && sound_count == MAX_WORLD_SOUNDS)
+   if(iSound != SOUNDLIST_EMPTY && sound_count > MAX_WORLD_SOUNDS)
    {
       //sound system error, reset
       UTIL_ConsolePrintf("run in to critical sound system error, sound system reseted.");
@@ -964,7 +978,7 @@ qboolean HaveRoomForThrow(bot_t & pBot)
       
    UTIL_TraceMove(v_start, v_end, ignore_monsters, pEdict, &tr);
      
-   feet_ok = (tr.flFraction >= 1.0 || tr.pHit == pBot.pBotEnemy);
+   feet_ok = (tr.flFraction >= 1.0f || tr.pHit == pBot.pBotEnemy);
       
    //center
    v_start = pEdict->v.origin;
@@ -972,7 +986,7 @@ qboolean HaveRoomForThrow(bot_t & pBot)
       
    UTIL_TraceMove(v_start, v_end, ignore_monsters, pEdict, &tr);
       
-   center_ok = (tr.flFraction >= 1.0 || tr.pHit == pBot.pBotEnemy);
+   center_ok = (tr.flFraction >= 1.0f || tr.pHit == pBot.pBotEnemy);
       
    if(center_ok && !feet_ok)
    {
@@ -982,7 +996,7 @@ qboolean HaveRoomForThrow(bot_t & pBot)
       
       UTIL_TraceMove(v_start, v_end, ignore_monsters, pEdict, &tr);
          
-      head_ok = (tr.flFraction >= 1.0 || tr.pHit == pBot.pBotEnemy);
+      head_ok = (tr.flFraction >= 1.0f || tr.pHit == pBot.pBotEnemy);
    }
    else
       head_ok = FALSE;
@@ -1483,7 +1497,7 @@ qboolean AreTeamMates(edict_t * pOther, edict_t * pEdict)
 
 void BotShootAtEnemy( bot_t &pBot )
 {
-   float f_distance;
+   float f_xy_distance;
    Vector v_enemy;
    Vector v_enemy_aimpos;
    Vector v_predicted_pos;
@@ -1509,8 +1523,8 @@ void BotShootAtEnemy( bot_t &pBot )
 
       // can the bot see the enemies feet?
 
-      if ((tr.flFraction >= 1.0) ||
-          ((tr.flFraction >= 0.95) &&
+      if ((tr.flFraction >= 1.0f) ||
+          ((tr.flFraction >= 0.95f) &&
            FIsClassname("player", tr.pHit)))
       {
          // aim at the feet for RPG type weapons
@@ -1560,14 +1574,15 @@ void BotShootAtEnemy( bot_t &pBot )
       BotFixIdealYaw(pEdict);
    }
    
-   v_enemy.z = 0;  // ignore z component (up & down)
+   Vector v_enemy_xy = v_enemy;
+   v_enemy_xy.z = 0;  // ignore z component (up & down)
 
-   f_distance = v_enemy.Length();  // how far away is the enemy scum?
+   f_xy_distance = v_enemy_xy.Length();  // how far away is the enemy scum?
 
-   if (f_distance > 20)      // run if distance to enemy is far
+   if (f_xy_distance > 20)      // run if distance to enemy is far
       pBot.f_move_speed = pBot.f_max_speed;
    else                     // don't move if close enough
-      pBot.f_move_speed =10.0;
+      pBot.f_move_speed = 10.0;
    
    // is it time to shoot yet?
    if (pBot.f_shoot_time <= gpGlobals->time)
@@ -1579,7 +1594,7 @@ void BotShootAtEnemy( bot_t &pBot )
          float shootcone_minangle = skill_settings[pBot.bot_skill].shootcone_minangle;
                   
          // check if it is possible to hit target
-         if(FInShootCone(v_enemy_aimpos, pEdict, f_distance, shootcone_diameter, shootcone_minangle)) 
+         if(FInShootCone(v_enemy_aimpos, pEdict, v_enemy.Length(), shootcone_diameter, shootcone_minangle)) 
          {
             // select the best weapon to use at this distance and fire...
             if(!BotFireWeapon(v_enemy, pBot, 0))

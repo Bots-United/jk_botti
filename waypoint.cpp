@@ -49,10 +49,12 @@ float wp_display_time[MAX_WAYPOINTS];
 WAYPOINT spawnpoints[MAX_WAYPOINTS / 2];
 int num_spawnpoints = 0;
 
-qboolean g_waypoint_paths = FALSE;  // have any paths been allocated?
+// debuging settings
 qboolean g_waypoint_on = FALSE;
-qboolean g_auto_waypoint = FALSE;
 qboolean g_path_waypoint = FALSE;
+
+qboolean g_waypoint_paths = FALSE;  // have any paths been allocated?
+qboolean g_auto_waypoint = TRUE;
 qboolean g_path_waypoint_enable = TRUE;
 qboolean g_waypoint_updated = FALSE;
 int last_waypoint[32];
@@ -64,6 +66,42 @@ unsigned short *from_to = NULL;
 BOOL wp_matrix_initialized = FALSE;
 BOOL wp_matrix_save_on_mapend = FALSE;
 
+
+static Vector * block_list = NULL;
+static int block_list_endlist = 0;
+static int block_list_size = 0;
+
+
+void WaypointAddBlock(const Vector &origin)
+{
+   if(block_list_endlist == block_list_size)
+   {
+      //resize block_list
+      int newsize = block_list_size + 64;
+      
+      Vector * temp = (Vector *)realloc(block_list, newsize * sizeof(Vector));
+      if(!temp) 
+      {
+         UTIL_ConsolePrintf("Couldn't grow block list");
+         return;
+      }
+      
+      block_list = temp;
+      block_list_size = newsize;
+   }
+   
+   block_list[block_list_endlist++] = origin;
+}
+
+
+qboolean WaypointInBlockRadius(const Vector &origin)
+{
+   for(int i = 0; i < block_list_endlist; i++)
+      if((block_list[i] - origin).Length() < 1200.0f)
+         return(TRUE);
+   
+   return(FALSE);
+}
 
 
 void WaypointDebug(void)
@@ -78,6 +116,35 @@ void WaypointDebug(void)
    y = y / x;  // cause an divide by zero exception
 
    return;
+}
+
+
+int GetReachableFlags(int i1, int i2)
+{
+   return((waypoints[i1].flags | waypoints[i2].flags) & (W_FL_LADDER | W_FL_CROUCH));
+}
+
+
+int GetReachableFlags(edict_t * pEntity, int i1)
+{
+   int flags = waypoints[i1].flags & (W_FL_LADDER | W_FL_CROUCH);
+   
+   if(FNullEnt(pEntity))
+      return(flags);
+   
+   if(pEntity->v.flags & FL_DUCKING)
+      flags |= W_FL_CROUCH;
+   
+   if(pEntity->v.movetype == MOVETYPE_FLY)
+      flags |= W_FL_LADDER;
+   
+   return(flags);
+}
+
+
+int GetReachableFlags(int i1, edict_t * pEntity)
+{
+   return(GetReachableFlags(pEntity, i1));
 }
 
 
@@ -124,14 +191,11 @@ void WaypointInit(void)
    if (from_to != NULL)
       free(from_to);
 
+   memset(waypoints, 0, sizeof(waypoints));
+   
    for (i=0; i < MAX_WAYPOINTS; i++)
    {
-      waypoints[i].flags = 0;
-      waypoints[i].origin = Vector(0,0,0);
-      waypoints[i].itemflags = 0;
-
       wp_display_time[i] = 0.0;
-
       paths[i] = NULL;  // no paths allocated yet
    }
 
@@ -148,6 +212,13 @@ void WaypointInit(void)
    
    memset(&spawnpoints, 0, sizeof(spawnpoints));
    num_spawnpoints = 0;
+   
+   if(block_list)
+      free(block_list);
+   
+   block_list = NULL;
+   block_list_endlist = 0;
+   block_list_size = 0;
 }
 
 
@@ -156,6 +227,18 @@ void WaypointAddPath(short int add_index, short int path_index)
    PATH *p, *prev;
    int i;
 
+   if((waypoints[add_index].flags | waypoints[path_index].flags) & W_FL_DELETED)
+   {
+      UTIL_ConsolePrintf("%s", "Tried to add path to deleted waypoint!");
+      return;
+   }
+   
+   if((waypoints[add_index].origin - waypoints[path_index].origin).Length() >= REACHABLE_RANGE)
+   {
+      UTIL_ConsolePrintf("%s", "Tried to add too long waypoint path!");
+      return;
+   }
+   
    p = paths[add_index];
    prev = NULL;
 
@@ -328,18 +411,24 @@ int WaypointFindPath(PATH **pPath, int *path_index, int waypoint_index)
 // Called when map-objects spawn
 void CollectMapSpawnItems(edict_t *pSpawn)
 {
-   char *classname = (char *)STRING(pSpawn->v.classname);
+   const char *classname = (const char *)STRING(pSpawn->v.classname);
    int flags = 0;
    int i;
    Vector SpawnOrigin;
    int itemflag = 0;
+   static Vector CheckOffset;
+   static int wall_count, wall_updated;
+   static BOOL offset_set = FALSE;
+   static const Vector offsets[8] = { Vector(60, 0, 0), Vector(0, 60, 0), Vector(-60, 0, 0), Vector(0, -60, 0), Vector(42, 42, 0), Vector(42, -42, 0), Vector(-42, 42, 0), Vector(-42, -42, 0) };
    
    if(num_spawnpoints >= MAX_WAYPOINTS / 2)
       return;
+      
+   Vector EntOrigin = pSpawn->v.origin;
    
    if (strncmp("item_health", classname, 11) == 0)
       flags |= W_FL_HEALTH;
-   else if (strncmp("item_armor", classname, 10) == 0)
+   else if (strncmp("item_battery", classname, 12) == 0)
       flags |= W_FL_ARMOR;
    else if ((itemflag = GetAmmoItemFlag(classname)) != 0)
       flags |= W_FL_AMMO;
@@ -348,17 +437,49 @@ void CollectMapSpawnItems(edict_t *pSpawn)
    else if (strcmp("item_longjump", classname) == 0)
       flags |= W_FL_LONGJUMP;
    else
-      return;
+   {
+      // check for func_recharge and func_healthcharger
+      if(strncmp("func_recharge", classname, 13) == 0 || strncmp("func_healthcharger", classname, 18) == 0)
+      {
+         flags |= (classname[5] == 'r') ? W_FL_ARMOR : W_FL_HEALTH;
+         
+         if(offset_set)
+         {
+            // check if there is room around charger
+            EntOrigin = VecBModelOrigin(pSpawn) + CheckOffset;
+         }
+         else
+         {
+            wall_count = 0;
+            wall_updated = 0;
+            
+            // check if there is room around charger
+            for(int i = 0; i < 8; i++)
+            {
+               CheckOffset = offsets[i];
+               offset_set = TRUE;
+               CollectMapSpawnItems(pSpawn);
+               offset_set = FALSE;
+            }
+            
+            //UTIL_ConsolePrintf("Total %d waypoints add around %s and %d waypoints updated with new flags\n", wall_count, classname, wall_updated);
+            
+            return;
+         }
+      }
+      else
+         return;
+   }
    
    // Trace item on ground
    TraceResult tr;
-   UTIL_TraceHull( pSpawn->v.origin + Vector(0, 0, 36 / 2), pSpawn->v.origin - Vector( 0, 0, 10240 ), 
+   UTIL_TraceHull( EntOrigin + Vector(0, 0, 36 / 2), EntOrigin - Vector( 0, 0, 10240 ), 
       ignore_monsters, head_hull, pSpawn->v.pContainingEntity, &tr );
    
    //stuck in world?
-   if(tr.fStartSolid) 
+   if(tr.fStartSolid || tr.fAllSolid) 
    {
-      //SERVER_PRINT("stuck in world\n");
+      //UTIL_ConsolePrintf("stuck in world\n");
       return;
    }
    
@@ -369,13 +490,13 @@ void CollectMapSpawnItems(edict_t *pSpawn)
    UTIL_TraceHull( SpawnOrigin, SpawnOrigin + Vector(0, 0, 1),
       ignore_monsters, human_hull, pSpawn->v.pContainingEntity, &tr2 );
       
-   if(tr2.fStartSolid || tr2.flFraction < 0.9999 )
+   if(tr2.fStartSolid || tr2.flFraction < 1.0f )
    {
       // Not enough space, make this duck waypoint
       SpawnOrigin = tr.vecEndPos;
       flags |= W_FL_CROUCH;
       
-      //SERVER_PRINT("add crouch waypoint\n");
+      //UTIL_ConsolePrintf("adding crouch waypoint\n");
    }
    
    // Check if any spawnpoints near already (distance 50.0)
@@ -388,15 +509,19 @@ void CollectMapSpawnItems(edict_t *pSpawn)
       {
          spawnpoints[i].flags |= flags;
          spawnpoints[i].itemflags |= itemflag;
+         
+         wall_updated++;
          return;
       }
    }
    
    // Add new
    spawnpoints[num_spawnpoints].origin = SpawnOrigin;
-   spawnpoints[num_spawnpoints].flags = flags;
+   spawnpoints[num_spawnpoints].flags = flags | W_FL_SPAWNADD;
    spawnpoints[num_spawnpoints].itemflags = itemflag;
    num_spawnpoints++;
+   
+   wall_count++;
 }
 
 
@@ -481,13 +606,13 @@ void WaypointAddSpawnObjects(void)
             continue;  // skip any aiming waypoints
 
          // check if the waypoint is reachable from the new one (one-way)
-         if ( WaypointReachable(waypoints[index].origin, waypoints[k].origin, NULL) )
+         if ( WaypointReachable(waypoints[index].origin, waypoints[k].origin, GetReachableFlags(index, k)))
          {
             WaypointAddPath(index, k);
          }
  
          // check if the new one is reachable from the waypoint (other way)
-         if ( WaypointReachable(waypoints[k].origin, waypoints[index].origin, NULL) )
+         if ( WaypointReachable(waypoints[k].origin, waypoints[index].origin, GetReachableFlags(k, index)))
          {
             WaypointAddPath(k, index);
          }
@@ -505,7 +630,7 @@ void WaypointAddSpawnObjects(void)
    memset(&spawnpoints, 0, sizeof(spawnpoints));
    
    if(count && shortest_path == NULL && from_to == NULL)
-      WaypointRouteInit();
+      WaypointRouteInit(FALSE);
 }
 
 
@@ -541,7 +666,7 @@ int WaypointFindNearest(edict_t *pEntity, float range)
          UTIL_TraceMove( pEntity->v.origin + pEntity->v.view_ofs, waypoints[i].origin,
                          ignore_monsters, pEntity->v.pContainingEntity, &tr );
 
-         if (tr.flFraction >= 1.0)
+         if (tr.flFraction >= 1.0f)
          {
             min_index = i;
             min_distance = distance;
@@ -585,7 +710,7 @@ int WaypointFindNearest(Vector v_src, edict_t *pEntity, float range)
          UTIL_TraceMove( v_src, waypoints[index].origin, ignore_monsters,
                               pEntity->v.pContainingEntity, &tr );
 
-         if (tr.flFraction >= 1.0)
+         if (tr.flFraction >= 1.0f)
          {
             min_index = index;
             min_distance = distance;
@@ -673,6 +798,69 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags)
 
       if (itemflags && !(waypoints[index].itemflags & itemflags))
       	 continue;  // skip this weapoint if no match for itemflags
+
+      if (waypoints[index].flags & (W_FL_LONGJUMP | W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
+      {
+         edict_t *wpt_item = WaypointFindItem(index);
+         if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0))
+            continue;
+      }
+
+      distance = WaypointDistanceFromTo(src, index);
+
+      if (distance < min_distance)
+      {
+         min_index = index;
+         min_distance = distance;
+      }
+   }
+
+   return min_index;
+}
+
+
+int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags, int exclude[])
+{
+   int index, min_index;
+   float distance, min_distance;
+   int exclude_index;
+
+   if (num_waypoints < 1)
+      return -1;
+
+   // find the nearest waypoint with the matching flags...
+
+   min_index = -1;
+   min_distance = 99999;
+
+   for (index=0; index < num_waypoints; index++)
+   {
+      if (index == src)
+         continue;  // skip the source waypoint
+
+      if (waypoints[index].flags & W_FL_DELETED)
+         continue;  // skip any deleted waypoints
+
+      if (waypoints[index].flags & W_FL_AIMING)
+         continue;  // skip any aiming waypoints
+
+      if ((waypoints[index].flags & flags) != flags)
+         continue;  // skip this waypoint if the flags don't match
+
+      if (itemflags && !(waypoints[index].itemflags & itemflags))
+      	 continue;  // skip this weapoint if no match for itemflags
+
+      exclude_index = 0;
+      while (exclude[exclude_index])
+      {
+         if (index == exclude[exclude_index])
+            break;  // found a match, break out of while loop
+
+         exclude_index++;
+      }
+
+      if (index == exclude[exclude_index])
+         continue;  // skip any index that matches exclude list
 
       if (waypoints[index].flags & (W_FL_LONGJUMP | W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
       {
@@ -1048,12 +1236,12 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
                       pEntity ? pEntity->v.pContainingEntity : NULL, &tr );
 
       // make sure entity is visible...
-      if (tr.flFraction >= 1.0)
+      if (tr.flFraction >= 1.0f)
       {
          safevoid_snprintf(item_name, sizeof(item_name), "%s", STRING(pent->v.classname));
 
          if ((strncmp("item_health", item_name, 11) == 0) ||
-             (strncmp("item_armor", item_name, 10) == 0) ||
+             (strncmp("item_battery", item_name, 12) == 0) ||
              (GetAmmoItemFlag(item_name) != 0) ||
              (strcmp("item_longjump", item_name) == 0) ||
              ((GetWeaponItemFlag(item_name) != 0) &&
@@ -1084,7 +1272,7 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
          waypoints[wpt_index].flags |= W_FL_HEALTH;
       }
 
-      if (strncmp("item_armor", nearest_name, 10) == 0)
+      if (strncmp("item_battery", nearest_name, 12) == 0)
       {
          if (pEntity)
             ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs2(buf, sizeof(buf), "found some armor! (%s)\n", nearest_name));
@@ -1148,12 +1336,12 @@ edict_t *WaypointFindItem( int wpt_index )
       UTIL_TraceMove( origin, pent->v.origin, ignore_monsters, NULL, &tr );
       
       // make sure entity is visible...
-      if ((tr.flFraction >= 1.0) || (tr.pHit == pent) || !(pent->v.effects & EF_NODRAW) || !(pent->v.frame > 0))
+      if ((tr.flFraction >= 1.0f) || (tr.pHit == pent) || !(pent->v.effects & EF_NODRAW) || !(pent->v.frame > 0))
       {
          safevoid_snprintf(item_name, sizeof(item_name), "%s", STRING(pent->v.classname));
          
          if(((waypoints[wpt_index].flags & W_FL_HEALTH) && strncmp("item_health", item_name, 11) == 0) ||
-            ((waypoints[wpt_index].flags & W_FL_ARMOR) && strncmp("item_armor", item_name, 10) == 0) ||
+            ((waypoints[wpt_index].flags & W_FL_ARMOR) && strncmp("item_battery", item_name, 12) == 0) ||
             ((waypoints[wpt_index].flags & W_FL_AMMO) && GetAmmoItemFlag(item_name) != 0) ||
             ((waypoints[wpt_index].flags & W_FL_LONGJUMP) && strcmp("item_longjump", item_name) == 0) ||
             ((waypoints[wpt_index].flags & W_FL_WEAPON) && GetWeaponItemFlag(item_name) != 0 && pent->v.owner == NULL))
@@ -1218,10 +1406,30 @@ void WaypointAdd(edict_t *pEntity)
 
    if ((pEntity->v.flags & FL_DUCKING) == FL_DUCKING && (pEntity->v.flags & FL_ONGROUND) == FL_ONGROUND)
    {
-      waypoints[index].flags |= W_FL_CROUCH;  // crouching waypoint
+      TraceResult tr;
+      
+      Vector v_src = waypoints[index].origin;
+      Vector v_dest = waypoints[index].origin;
+      
+      v_dest.z += 36/2 + 72/2 + 1;
+      
+      UTIL_TraceMove(v_src, v_dest, ignore_monsters, NULL, &tr);
+      
+      // no room to stand up
+      if (tr.flFraction < 1.0f)
+      {
+         waypoints[index].flags |= W_FL_CROUCH;  // crouching waypoint
 
-      start = pEntity->v.origin - Vector(0, 0, 17);
-      end = start + Vector(0, 0, 34);
+         start = pEntity->v.origin - Vector(0, 0, 17);
+         end = start + Vector(0, 0, 34);
+      }
+      else
+      {
+         waypoints[index].origin.z += 36/2;
+         
+         start = waypoints[index].origin - Vector(0, 0, 34);
+         end = start + Vector(0, 0, 68);
+      }
    }
 
    if (pEntity->v.movetype == MOVETYPE_FLY)
@@ -1256,13 +1464,13 @@ void WaypointAdd(edict_t *pEntity)
          continue;  // skip any aiming waypoints
 
       // check if the waypoint is reachable from the new one (one-way)
-      if ( WaypointReachable(pEntity->v.origin, waypoints[i].origin, pEntity) )
+      if ( WaypointReachable(waypoints[index].origin, waypoints[i].origin, GetReachableFlags(index, i)))
       {
          WaypointAddPath(index, i);
       }
 
       // check if the new one is reachable from the waypoint (other way)
-      if ( WaypointReachable(waypoints[i].origin, pEntity->v.origin, pEntity) )
+      if ( WaypointReachable(waypoints[i].origin, waypoints[index].origin, GetReachableFlags(i, index)))
       {
          WaypointAddPath(i, index);
       }
@@ -1549,16 +1757,175 @@ void WaypointRemovePath(edict_t *pEntity, int cmd)
 }
 
 
+qboolean WaypointFixOldWaypoints(void)
+{
+   int k;
+   qboolean Changed = FALSE;
+   TraceResult tr;
+   
+   int crouch_to_normal_count = 0;
+   int midair_count = 0;
+   int unreachable_path_count = 0;
+   
+   //make crouch waypoints normal waypoints where possible
+   for(k = 0; k < num_waypoints; k++)
+   {
+      if(waypoints[k].flags & W_FL_AIMING || waypoints[k].flags & W_FL_DELETED)
+         continue;
+      
+      if(!(waypoints[k].flags & W_FL_CROUCH))
+         continue;
+      
+      Vector v_src = waypoints[k].origin;
+      Vector v_dest = waypoints[k].origin;
+      
+      v_dest.z += 36 + 1;
+      
+      UTIL_TraceDuck(v_src, v_dest, ignore_monsters, NULL, &tr);
+      
+      // check if we didn't hit anything, if not then there is room to stand up
+      if (!tr.fAllSolid && !tr.fStartSolid && tr.flFraction >= 1.0f)
+      {
+         crouch_to_normal_count++;
+         
+         waypoints[k].flags &= ~W_FL_CROUCH;
+         waypoints[k].origin.z += 36/2;
+
+         g_waypoint_updated = TRUE;
+         Changed = TRUE;
+      }
+   }
+   
+   //remove all midair waypoints
+   for(k = 0; k < num_waypoints; k++)
+   {
+      if(waypoints[k].flags & W_FL_AIMING || waypoints[k].flags & W_FL_DELETED || waypoints[k].flags & W_FL_LADDER)
+         continue;
+      
+      if(POINT_CONTENTS(waypoints[k].origin) == CONTENTS_WATER)
+         continue;
+      
+      Vector v_src = waypoints[k].origin;
+      Vector v_dest = waypoints[k].origin;
+      
+      if(waypoints[k].flags & W_FL_CROUCH)
+      {
+         v_dest.z -= 72/2 + 1;
+
+         UTIL_TraceMove(v_src, v_dest, ignore_monsters, NULL, &tr);
+      }
+      else
+      {
+         v_dest.z -= 72/2 - 36/2 + 1;
+         
+         UTIL_TraceDuck(v_src, v_dest, ignore_monsters, NULL, &tr);
+      }
+
+      // check if we didn't hit anything, if not then it's in mid-air
+      if (!tr.fAllSolid && !tr.fStartSolid && tr.flFraction >= 1.0f)
+      {
+         int index = k;
+         
+         // delete any paths that lead to this index...
+         WaypointDeletePath(index);
+
+         // free the path for this index...
+         if (paths[index] != NULL)
+         {
+            PATH *p = paths[index];
+            PATH *p_next;
+
+            while (p)  // free the linked list
+            {
+               p_next = p->next;  // save the link to next
+               free(p);
+               p = p_next;
+
+#ifdef _DEBUG
+               count++;
+               if (count > 100) WaypointDebug();
+#endif
+            }
+
+            paths[index] = NULL;
+         }
+
+         // save on mapchange
+         g_waypoint_updated = TRUE;
+         Changed = TRUE;
+
+         waypoints[index].flags = W_FL_DELETED;  // not being used
+         waypoints[index].origin = Vector(0,0,0);
+         waypoints[index].itemflags = 0;
+         
+         midair_count++;
+      }
+   }
+ 
+   //Remove invalid paths
+   for(k = 0; k < num_waypoints; k++)
+   {
+      if(waypoints[k].flags & W_FL_AIMING || waypoints[k].flags & W_FL_DELETED)
+         continue;
+      
+      PATH *p = paths[k];
+      qboolean Modified = FALSE;
+      while(p)
+      {
+         for(int i = 0; i < MAX_PATH_INDEX; i++)
+         {
+            if(p->index[i] == -1)
+               continue;
+            
+            if(waypoints[p->index[i]].flags & W_FL_DELETED || p->index[i] == k || 
+                !WaypointReachable(waypoints[k].origin, waypoints[p->index[i]].origin, GetReachableFlags(k, p->index[i])))
+            {
+               unreachable_path_count++;
+               
+               // remove
+               p->index[i] = -1;
+               Modified = TRUE;
+            }
+         }
+         
+         p = p->next;
+      }
+      
+      if(Modified)
+      {
+      	 g_waypoint_updated = TRUE;
+      	 Changed = TRUE;
+      }
+   }
+   
+   if(Changed)
+   {
+      UTIL_ConsolePrintf("Detected pre-1.10 waypoint file, fixed buggy autowaypoints:");
+      
+      if(crouch_to_normal_count)
+         UTIL_ConsolePrintf("- Convert %d crouch waypoints to normal waypoints.", crouch_to_normal_count);
+         
+      if(midair_count)
+         UTIL_ConsolePrintf("- Removed %d mid-air waypoints.", midair_count);
+         
+      if(unreachable_path_count)
+         UTIL_ConsolePrintf("- Removed %d broken waypoint paths.", unreachable_path_count);
+   }
+   
+   return(Changed);
+}
+
+
 qboolean WaypointLoad(edict_t *pEntity)
 {
    gzFile bfp;
    char mapname[64];
    char filename[256];
    WAYPOINT_HDR header;
-   char msg[80];
    int index, i;
    short int num;
    short int path_index;
+   qboolean Changed;
    
    g_waypoint_updated = FALSE;
    
@@ -1566,7 +1933,7 @@ qboolean WaypointLoad(edict_t *pEntity)
 
    UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/waypoints", mapname);
 
-   UTIL_ConsolePrintf("loading waypoint file: %s\n", filename);
+   UTIL_ConsolePrintf("Loading waypoint file: %s\n", filename);
 
    bfp = gzopen(filename, "rb");
 
@@ -1595,11 +1962,16 @@ qboolean WaypointLoad(edict_t *pEntity)
          if (strcmp(header.mapname, STRING(gpGlobals->mapname)) == 0)
          {
             WaypointInit();  // remove any existing waypoints
+            
+            int count_wp = 0, count_paths = 0;
 
             for (i=0; i < header.number_of_waypoints; i++)
             {
                gzread(bfp, &waypoints[i], sizeof(waypoints[0]));
                num_waypoints++;
+               
+               if(!(waypoints[i].flags & W_FL_DELETED))
+                  count_wp++;
             }
 
             // read and add waypoint paths...
@@ -1607,6 +1979,7 @@ qboolean WaypointLoad(edict_t *pEntity)
             {
                // read the number of paths from this node...
                gzread(bfp, &num, sizeof(num));
+               count_paths += num;
 
                for (i=0; i < num; i++)
                {
@@ -1617,14 +1990,12 @@ qboolean WaypointLoad(edict_t *pEntity)
             }
 
             g_waypoint_paths = TRUE;  // keep track so path can be freed
+            
+            UTIL_ConsolePrintf("- loaded: %d waypoints, %d paths\n", count_wp, count_paths);
          }
          else
          {
-            if (pEntity)
-            {
-               safevoid_snprintf(msg, sizeof(msg), "%s jk_botti waypoints are not for this map!\n", filename);
-               ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-            }
+            UTIL_ConsolePrintf("%s jk_botti waypoints are not for this map!\n", filename);
 
             gzclose(bfp);
             return FALSE;
@@ -1632,29 +2003,39 @@ qboolean WaypointLoad(edict_t *pEntity)
       }
       else
       {
-         if (pEntity)
-         {
-            safevoid_snprintf(msg, sizeof(msg), "%s is not a jk_botti waypoint file!\n", filename);
-            ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-         }
+         UTIL_ConsolePrintf("%s is not a jk_botti waypoint file!\n", filename);
 
          gzclose(bfp);
          return FALSE;
       }
 
       gzclose(bfp);
+      
+      Changed = FALSE;
+      
+      // Check if this waypoint file is already fixed
+      if(header.waypoint_file_subversion < WPF_SUBVERSION_1_10)
+      {
+         Changed = WaypointFixOldWaypoints();
+      }
+      
+      // Reserved slots in waypoints are not used in WPF_SUBVERSION_1_00 and WPF_SUBVERSION_1_10
+      // clean up
+      if(header.waypoint_file_subversion <= WPF_SUBVERSION_1_10)
+      {
+         for(int i = 0; i < num_waypoints; i++)
+         {
+            waypoints[i].__reserved[0] = 0;
+            waypoints[i].__reserved[1] = 0;
+            waypoints[i].__reserved[2] = 0;
+         }
+      }
 
-      WaypointRouteInit();
+      WaypointRouteInit(Changed);
    }
    else
    {
-      if (pEntity)
-      {
-         safevoid_snprintf(msg, sizeof(msg), "Waypoint file %s does not exist!\n", filename);
-         ClientPrint(pEntity, HUD_PRINTNOTIFY, msg);
-      }
-
-      UTIL_ConsolePrintf("waypoint file %s not found!\n", filename);
+      UTIL_ConsolePrintf("Waypoint file %s not found!\n", filename);
 
       return FALSE;
    }
@@ -1688,6 +2069,76 @@ int WaypointNumberOfPaths(int index)
 }
 
 
+int WaypointIncomingPathsCount(int index, int exit_count)
+{
+   int num = 0;
+   
+   for(int k = 0; k < num_waypoints; k++)
+   {
+      PATH *p = paths[k];
+      while (p != NULL)
+      {
+         int i = 0;
+
+         while (i < MAX_PATH_INDEX)
+         {
+            if (p->index[i] == index)
+            {
+               num++; // count path 
+               goto found_already;
+            }
+
+            i++;
+         }
+
+         p = p->next; // go to next node in linked list
+      }
+      
+found_already:
+      
+      // exit early if we just want to know if specific number of path point to this waypoint
+      if(exit_count > 0 && num >= exit_count)
+         return(num);
+      
+      continue;
+   }
+   
+   return(num);
+}
+
+
+// remove dummy waypoints, waypoints that have no paths in or out
+void WaypointTrim(void)
+{
+   int orphan_count = 0;
+	
+   for(int i = 0; i < num_waypoints; i++)
+   {
+      if(waypoints[i].flags & (W_FL_DELETED | W_FL_AIMING | W_FL_SPAWNADD) )
+         continue;
+      
+      // get number of paths out from wp
+      if(WaypointNumberOfPaths(i) > 0)
+         continue;
+      
+      // get number of paths to wp
+      if(WaypointIncomingPathsCount(i, 1) > 0)
+         continue;
+      
+      g_waypoint_updated = TRUE;
+   
+      waypoints[i].flags = W_FL_DELETED;  // not being used
+      waypoints[i].origin = Vector(0,0,0);
+      waypoints[i].itemflags = 0;
+      
+      orphan_count++;
+   }
+   
+   if(orphan_count)
+      UTIL_ConsolePrintf("Removed %d orphan waypoints.\n", orphan_count);
+}
+
+
 void WaypointSave(void)
 {
    char filename[256];
@@ -1697,12 +2148,14 @@ void WaypointSave(void)
    short int num;
    PATH *p;
 
+   //
+   WaypointTrim();
+
    safevoid_snprintf(header.filetype, sizeof(header.filetype), "%s", WAYPOINT_MAGIC);
 
    header.waypoint_file_version = WAYPOINT_VERSION;
-   header.waypoint_file_subversion = 1;
-
-   header.waypoint_file_flags = 0;  // not currently used
+   header.waypoint_file_subversion = WPF_SUBVERSION_1_10;
+   header.waypoint_file_flags = 0;
 
    header.number_of_waypoints = num_waypoints;
 
@@ -1713,17 +2166,22 @@ void WaypointSave(void)
 
    UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/waypoints", mapname);
 
-   UTIL_ConsolePrintf("saving waypoint file: %s\n", filename);
+   UTIL_ConsolePrintf("Saving waypoint file: %s\n", filename);
 
    gzFile bfp = gzopen(filename, "wb6");
 
    // write the waypoint header to the file...
    gzwrite(bfp, &header, sizeof(header));
 
+   int count_wp=0, count_paths=0;
+
    // write the waypoint data to the file...
    for (index=0; index < num_waypoints; index++)
    {
       gzwrite(bfp, &waypoints[index], sizeof(waypoints[0]));
+      
+      if(!(waypoints[index].flags & W_FL_DELETED))
+         count_wp++;
    }
 
    // save the waypoint paths...
@@ -1731,6 +2189,7 @@ void WaypointSave(void)
    {
       // count the number of paths from this node...
       num = WaypointNumberOfPaths(index);
+      count_paths += num;
 
       gzwrite(bfp, &num, sizeof(num));  // write the count
 
@@ -1753,38 +2212,41 @@ void WaypointSave(void)
          p = p->next;  // go to next node in linked list
       }
    }
+   
+   UTIL_ConsolePrintf("- saved: %d waypoints, %d paths\n", count_wp, count_paths);
 
    gzclose(bfp);
 }
 
 
-qboolean WaypointReachable(Vector v_src, Vector v_dest, edict_t *pEntity)
+qboolean WaypointReachable(Vector v_src, Vector v_dest, int reachable_flags)
 {
    TraceResult tr;
    float curr_height, last_height;
-   qboolean on_ladder = pEntity ? ((pEntity->v.movetype == MOVETYPE_FLY) ? TRUE : FALSE) : FALSE;
-
+   
    float distance = (v_dest - v_src).Length();
 
    // is the destination close enough?
-   if (distance < REACHABLE_RANGE)
+   if (distance < (float)REACHABLE_RANGE)
    {
       // check if this waypoint is "visible"...
-      if(on_ladder)
-         UTIL_TraceMove( v_src, v_dest, ignore_monsters,  
-                      !pEntity ? NULL : pEntity->v.pContainingEntity, &tr );
+      if(reachable_flags & (W_FL_LADDER | W_FL_CROUCH))
+         UTIL_TraceMove( v_src, v_dest, ignore_monsters, NULL, &tr );
       else
-         UTIL_TraceHull( v_src, v_dest, ignore_monsters, head_hull, 
-                      !pEntity ? NULL : pEntity->v.pContainingEntity, &tr );
+         UTIL_TraceHull( v_src, v_dest, ignore_monsters, head_hull, NULL, &tr );
 
       // if waypoint is visible from current position (even behind head)...
-      if (tr.flFraction >= 1.0)
+      if (!tr.fAllSolid && !tr.fStartSolid && tr.flFraction >= 1.0f)
       {
       	 // special ladder case, if both on same ladder -> ok
-      	 if(on_ladder && (v_src.Make2D() - v_dest.Make2D()).Length() <= 32.0)
+      	 if((reachable_flags & W_FL_LADDER) && (v_src.Make2D() - v_dest.Make2D()).Length() <= 32.0f)
       	 {
       	    return TRUE;
       	 }
+      	 
+      	 // very close.. 
+         if((v_dest - v_src).Length() <= 32.0f)
+            return(TRUE);
       	
          // check for special case of both waypoints being underwater...
          if ((POINT_CONTENTS( v_src ) == CONTENTS_WATER) &&
@@ -1803,11 +2265,16 @@ qboolean WaypointReachable(Vector v_src, Vector v_dest, edict_t *pEntity)
 
             v_new_dest.z = v_new_dest.z - 50;  // straight down 50 units
 
-            UTIL_TraceHull(v_new_src, v_new_dest, dont_ignore_monsters, head_hull, 
-                           !pEntity ? NULL : pEntity->v.pContainingEntity, &tr);
-
+            UTIL_TraceMove(v_new_src, v_new_dest, ignore_monsters, NULL, &tr);
+         
+            if(tr.fAllSolid || tr.fStartSolid)
+            {
+               //BUG BUG! what should we do?
+               return FALSE;
+            }
+            
             // check if we didn't hit anything, if not then it's in mid-air
-            if (tr.flFraction >= 1.0)
+            if (tr.flFraction >= 1.0f)
             {
                return FALSE;  // can't reach this one
             }
@@ -1817,34 +2284,47 @@ qboolean WaypointReachable(Vector v_src, Vector v_dest, edict_t *pEntity)
          // at points between source and destination...
 
          Vector v_direction = (v_dest - v_src).Normalize();  // 1 unit long
-         Vector v_check = v_src;
-         Vector v_down = v_src;
+         Vector v_check = v_src + v_direction * 16.0f;
+         Vector v_down = v_check;
+         Vector v_check_dest = v_dest - v_direction * 16.0f;
 
          v_down.z = v_down.z - 1000.0;  // straight down 1000 units
 
-         UTIL_TraceMove(v_check, v_down, ignore_monsters,  
-                        !pEntity ? NULL : pEntity->v.pContainingEntity, &tr);
+         UTIL_TraceMove(v_check, v_down, ignore_monsters, NULL, &tr);
+         
+         if(tr.fAllSolid || tr.fStartSolid)
+         {
+            //BUG BUG! what should we do?
+            return FALSE;
+         }
 
          last_height = tr.flFraction * 1000.0;  // height from ground
+         
+         last_height += v_direction.z * 16.0f;  // we skipped 16 units, add height to calculations
 
-         distance = (v_dest - v_check).Length();  // distance from goal
+         distance = (v_check_dest - v_check).Length();  // distance from goal
 
-         while (distance > 10.0)
+         while (distance > 10.0f)
          {
             // move 10 units closer to the goal...
-            v_check = v_check + (v_direction * 10.0);
+            v_check = v_check + (v_direction * 10.0f);
 
             v_down = v_check;
             v_down.z = v_down.z - 1000.0;  // straight down 1000 units
 
-            UTIL_TraceMove(v_check, v_down, ignore_monsters, 
-                           !pEntity ? NULL : pEntity->v.pContainingEntity, &tr);
+            UTIL_TraceMove(v_check, v_down, ignore_monsters, NULL, &tr);
+
+            if(tr.fAllSolid || tr.fStartSolid)
+            {
+               //BUG BUG! what should we do?
+               return FALSE;
+            }
 
             curr_height = tr.flFraction * 1000.0;  // height from ground
 
             // is the difference in the last height and the current height
             // higher that the jump height?
-            if ((last_height - curr_height) > 45.0)
+            if ((last_height - curr_height) > 45.0f)
             {
                // can't get there from here...
                return FALSE;
@@ -1852,9 +2332,33 @@ qboolean WaypointReachable(Vector v_src, Vector v_dest, edict_t *pEntity)
 
             last_height = curr_height;
 
-            distance = (v_dest - v_check).Length();  // distance from goal
+            distance = (v_check_dest - v_check).Length();  // distance from goal
          }
+         
+         // we skipped last 16 units and there still is some distance left
+         v_check = v_dest;
+         
+         v_down = v_check;
+         v_down.z = v_down.z - 1000.0;  // straight down 1000 units
 
+         UTIL_TraceMove(v_check, v_down, ignore_monsters, NULL, &tr);   
+         
+         if(tr.fAllSolid || tr.fStartSolid)
+         {
+            //BUG BUG! what should we do?
+            return FALSE;
+         }
+         
+         curr_height = tr.flFraction * 1000.0;  // height from ground
+
+         // is the difference in the last height and the current height
+         // higher that the jump height?
+         if ((last_height - curr_height) > 45.0f)
+         {
+            // can't get there from here...
+            return FALSE;
+         }
+         
          return TRUE;
       }
    }
@@ -1891,9 +2395,9 @@ int WaypointFindReachable(edict_t *pEntity, float range)
          UTIL_TraceMove( pEntity->v.origin + pEntity->v.view_ofs, waypoints[i].origin,
                          ignore_monsters, pEntity->v.pContainingEntity, &tr );
 
-         if (tr.flFraction >= 1.0)
+         if (tr.flFraction >= 1.0f)
          {
-            if (WaypointReachable(pEntity->v.origin, waypoints[i].origin, pEntity))
+            if (WaypointReachable(pEntity->v.origin, waypoints[i].origin, GetReachableFlags(pEntity, i)))
             {
                min_index = i;
                min_distance = distance;
@@ -1957,6 +2461,158 @@ void WaypointPrintInfo(edict_t *pEntity)
 }
 
 
+void WaypointAutowaypointing(int idx, edict_t *pEntity)
+{
+   float distance, min_distance;
+   int i;
+   
+   //only if on ground or on ladder or under water
+   if((pEntity->v.flags & FL_ONGROUND) != FL_ONGROUND && pEntity->v.movetype != MOVETYPE_FLY && pEntity->v.waterlevel != 3)
+      return;
+   
+   // on moving platform or train?
+   if(!FNullEnt(pEntity->v.groundentity) && (pEntity->v.groundentity->v.speed > 0.0f || pEntity->v.groundentity->v.avelocity != Vector(0, 0, 0)))
+   {
+      return;
+   }
+
+   // more waypoints on ladders
+   float target_distance = (pEntity->v.movetype == MOVETYPE_FLY) ? 65.0f : 200.0f;
+
+   // find the distance from the last used waypoint
+   if(last_waypoint[idx] == -1)
+      distance = 9999.0f;
+   else
+      distance = (waypoints[last_waypoint[idx]].origin - pEntity->v.origin).Length();
+
+   if (distance >= target_distance)
+   {
+      int onepath_wpt = -1;
+      min_distance = 9999.0f;
+
+      // check that no other reachable waypoints are nearby...
+      for (i=0; i < num_waypoints; i++)
+      {
+         if (waypoints[i].flags & W_FL_DELETED)
+            continue;
+
+         if (waypoints[i].flags & W_FL_AIMING)
+            continue;
+
+         if (!WaypointReachable(pEntity->v.origin, waypoints[i].origin, GetReachableFlags(pEntity, i)))
+            continue;
+         
+         distance = (waypoints[i].origin - pEntity->v.origin).Length();
+         if (distance < min_distance) 
+         {
+            min_distance = distance;
+         }
+         
+         // special code that does linking of two waypoints that are unreachable to each other
+         // and are reachable to this location. Other end is waypoint with one or none path.
+         if(distance < target_distance && distance >= 64.0f && onepath_wpt == -1 && i != last_waypoint[idx] && WaypointNumberOfPaths(i) <= 1)
+         {
+            onepath_wpt = i;
+         }
+      }
+
+      // make sure nearest waypoint is far enough away...
+      if (min_distance >= target_distance) 
+      {
+         WaypointAdd(pEntity);
+      }
+      else if(onepath_wpt != -1 && min_distance >= 64.0f)
+      {
+         // special code that does linking of two waypoints that are unreachable to each other
+         // and are reachable to this location. Other end is waypoint with one or none path.
+         for (i=0; i < num_waypoints; i++)
+         {
+            if (waypoints[i].flags & W_FL_DELETED)
+               continue;
+
+            if (waypoints[i].flags & W_FL_AIMING)
+               continue;
+
+            // distance between isn't too much
+            if ((waypoints[i].origin - waypoints[onepath_wpt].origin).Length() >= 350.0f)
+
+            // need to be reachable to current player location
+            if (!WaypointReachable(pEntity->v.origin, waypoints[i].origin, GetReachableFlags(pEntity, i)))
+               continue;
+
+            // waypoints are unreachable to each other
+            if (!WaypointReachable(waypoints[i].origin, waypoints[onepath_wpt].origin, GetReachableFlags(onepath_wpt, i)))
+            {
+               WaypointAdd(pEntity);
+                  
+               break;
+            }
+         }
+      }
+      
+      // checking index 0 twice -> is matrix initialized?
+      // make sure we are not too close to resently added route/path-cutting waypoint
+      if(WaypointIsRouteValid(0, 0) && !WaypointInBlockRadius(pEntity->v.origin))
+      {
+         qboolean did_add = FALSE;
+                     
+         // check waypoints around this area, then add waypoint if route between waypoints is more than 1000.0 units
+         for (i=0; i < num_waypoints; i++)
+         {
+            if (waypoints[i].flags & W_FL_DELETED)
+               continue;
+
+            if (waypoints[i].flags & W_FL_AIMING)
+               continue;
+
+            if((waypoints[i].origin - pEntity->v.origin).Length() < 64.0f)
+               continue;
+
+            // need to be reachable to current player location
+            if (!WaypointReachable(pEntity->v.origin, waypoints[i].origin, GetReachableFlags(pEntity, i)) ||
+                !WaypointReachable(waypoints[i].origin, pEntity->v.origin, GetReachableFlags(i, pEntity)))
+               continue;
+
+            // distance between isn't too much
+            for (int k=0; k < num_waypoints; k++)
+            {
+               if (waypoints[k].flags & W_FL_DELETED)
+                  continue;
+
+               if (waypoints[k].flags & W_FL_AIMING)
+                  continue;
+               
+               if((waypoints[k].origin - pEntity->v.origin).Length() < 64.0f)
+                  continue;
+               
+               // valid?
+               if (!WaypointIsRouteValid(i, k))
+                  continue;
+               
+               // is it long route?
+               if (WaypointDistanceFromTo(i, k) < 1600.0f)
+                  continue;
+               
+               // need to be reachable to current player location
+               if (!WaypointReachable(pEntity->v.origin, waypoints[k].origin, GetReachableFlags(pEntity, k)) ||
+                   !WaypointReachable(waypoints[k].origin, pEntity->v.origin, GetReachableFlags(k, pEntity)))
+                  continue;
+               
+               WaypointAdd(pEntity);
+               WaypointAddBlock(pEntity->v.origin);
+               did_add = TRUE;
+               
+               break;
+            }
+            
+            if(did_add)
+               break;
+         }
+      }
+   }
+}
+
+
 void WaypointThink(edict_t *pEntity)
 {
    float distance, min_distance;
@@ -1967,82 +2623,14 @@ void WaypointThink(edict_t *pEntity)
    if(idx < 0 || idx >= gpGlobals->maxClients)
       return;
 
-   if (g_auto_waypoint)  // is auto waypoint on?
+   // is auto waypoint on?
+   // is player on ground, underwater or ladder?
+   if(g_auto_waypoint)
    {
-      // find the distance from the last used waypoint
-      if(last_waypoint[idx] == -1)
-         distance = 9999.0;
-      else
-      	 distance = (waypoints[last_waypoint[idx]].origin - pEntity->v.origin).Length();
-
-      if (distance >= 200.0)
-      {
-         int onepath_wpt = -1;
-         min_distance = 9999.0;
-
-         // check that no other reachable waypoints are nearby...
-         for (i=0; i < num_waypoints; i++)
-         {
-            if (waypoints[i].flags & W_FL_DELETED)
-               continue;
-
-            if (waypoints[i].flags & W_FL_AIMING)
-               continue;
-
-            if (!WaypointReachable(pEntity->v.origin, waypoints[i].origin, pEntity))
-               continue;
-            
-            distance = (waypoints[i].origin - pEntity->v.origin).Length();
-            if (distance < min_distance) 
-            {
-               min_distance = distance;
-            }
-            
-            // special code that does linking of two waypoints that are unreachable to each other
-            // and are reachable to this location. Other end is waypoint with one or none path.
-            if(distance < 200.0 && distance >= 64.0 && onepath_wpt == -1 && i != last_waypoint[idx] && WaypointNumberOfPaths(i) <= 1)
-            {
-               onepath_wpt = i;
-            }
-         }
-
-         // make sure nearest waypoint is far enough away...
-         if (min_distance >= 200.0) 
-         {
-            WaypointAdd(pEntity);
-         }
-         else if(onepath_wpt != -1 && min_distance >= 64.0)
-         {
-            // special code that does linking of two waypoints that are unreachable to each other
-            // and are reachable to this location. Other end is waypoint with one or none path.
-            for (i=0; i < num_waypoints; i++)
-            {
-               if (waypoints[i].flags & W_FL_DELETED)
-                  continue;
-
-               if (waypoints[i].flags & W_FL_AIMING)
-                  continue;
-
-               // distance between isn't too much
-               if ((waypoints[i].origin - waypoints[onepath_wpt].origin).Length() >= 350.0)
-
-               // need to be reachable to current player location
-               if (!WaypointReachable(pEntity->v.origin, waypoints[i].origin, pEntity))
-                  continue;
-
-               // waypoints are unreachable to each other
-               if (!WaypointReachable(waypoints[i].origin, waypoints[onepath_wpt].origin, pEntity))
-               {
-                  WaypointAdd(pEntity);
-                     
-                  break;
-               }
-            }
-         }
-      }
+      WaypointAutowaypointing(idx, pEntity);
    }
 
-   min_distance = 9999.0;
+   min_distance = 9999.0f;
 
    if (g_waypoint_on)  // display the waypoints if turned on...
    {
@@ -2053,7 +2641,7 @@ void WaypointThink(edict_t *pEntity)
 
          distance = (waypoints[i].origin - pEntity->v.origin).Length();
 
-         if (distance < 500)
+         if (distance < 500.0f)
          {
             if (distance < min_distance)
             {
@@ -2091,7 +2679,7 @@ void WaypointThink(edict_t *pEntity)
       if (g_path_waypoint)
       {
          // check if player is close enough to a waypoint and time to draw path...
-         if ((min_distance <= 50) && (f_path_time <= gpGlobals->time))
+         if ((min_distance <= 50.0f) && (f_path_time <= gpGlobals->time))
          {
             PATH *p;
 
@@ -2352,7 +2940,7 @@ escape_return:
 }
 
 
-void WaypointRouteInit(void)
+void WaypointRouteInit(qboolean ForceRebuild)
 {
    unsigned int index;
    unsigned int array_size;
@@ -2383,7 +2971,8 @@ void WaypointRouteInit(void)
    
    UTIL_BuildFileName_N(filename2, sizeof(filename2), "addons/jk_botti/waypoints", mapname);
 
-   if (access(filename2, 0) == 0)  // does the ".matrix" file exist?
+   // does the ".matrix" file exist?
+   if (!ForceRebuild && access(filename2, 0) == 0)
    {
       char filename[256];
       
@@ -2543,14 +3132,18 @@ void WaypointRouteInit(void)
                      index = p->index[i];
 
                      distance = (waypoints[row].origin - waypoints[index].origin).Length();
+                     
+                     if(waypoints[row].flags & W_FL_DELETED || waypoints[index].flags & W_FL_DELETED)
+                     {
+                        UTIL_ConsolePrintf("[matrix calc] - ERROR: Path to deleted waypoint detected.\n");
+                     }
 
                      if (distance > (float)WAYPOINT_MAX_DISTANCE)
                         distance = (float)WAYPOINT_MAX_DISTANCE;
 
-                     if (distance > REACHABLE_RANGE)
+                     if (distance > (float)REACHABLE_RANGE)
                      {
-                        UTIL_ConsolePrintf("[matrix calc] - Waypoint path distance > %4.1f at from %d to %d\n",
-                                     REACHABLE_RANGE, row, index);
+                        UTIL_ConsolePrintf("[matrix calc] - Waypoint path distance %4.1f > %4.1f at from %d to %d:\n", distance, REACHABLE_RANGE, row, index);
                      }
                      else
                      {
@@ -2577,10 +3170,19 @@ void WaypointRouteInit(void)
 }
 
 
+qboolean WaypointIsRouteValid(int src, int dest)
+{
+   if(!wp_matrix_initialized || from_to == NULL || src >= (int)route_num_waypoints || dest >= (int)route_num_waypoints)
+      return(FALSE);
+   
+   return(TRUE);
+}
+
+
 int WaypointRouteFromTo(int src, int dest)
 {
    // new waypoints come effective on mapchange
-   if(!wp_matrix_initialized || from_to == NULL || src >= (int)route_num_waypoints || dest >= (int)route_num_waypoints)
+   if(!WaypointIsRouteValid(src, dest))
       return WAYPOINT_UNREACHABLE;
    
    return (int)from_to[src * route_num_waypoints + dest];
@@ -2590,7 +3192,7 @@ int WaypointRouteFromTo(int src, int dest)
 float WaypointDistanceFromTo(int src, int dest)
 {
    // new waypoints come effective on mapchange
-   if(!wp_matrix_initialized || shortest_path == NULL || src >= (int)route_num_waypoints || dest >= (int)route_num_waypoints)
+   if(!WaypointIsRouteValid(src, dest))
       return (float)WAYPOINT_MAX_DISTANCE;
    
    return (float)(shortest_path[src * route_num_waypoints + dest]);

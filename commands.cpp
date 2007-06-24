@@ -235,6 +235,26 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
 
       return TRUE;
    }
+   else if (FStrEq(pcmd, "show_waypoints"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+         if (temp)
+            g_waypoint_on = g_path_waypoint = TRUE;
+         else
+            g_waypoint_on = g_path_waypoint = FALSE;
+      }
+      
+      g_path_waypoint = g_waypoint_on;
+
+      if (g_waypoint_on && g_path_waypoint)
+         printfunc(PRINTFUNC_INFO, arg, "waypoints are VISIBLE\n");
+      else
+         printfunc(PRINTFUNC_INFO, arg, "waypoints are HIDDEN\n");
+
+      return TRUE;
+   }
    else if (FStrEq(pcmd, "observer"))
    {
       if ((arg1 != NULL) && (*arg1 != 0))

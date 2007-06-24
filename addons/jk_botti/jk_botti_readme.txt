@@ -1,4 +1,4 @@
-jk_botti 1.00 
+jk_botti 1.10
 -------------
 
 1. Intro
@@ -10,7 +10,7 @@ jk_botti 1.00
 1. Intro
 --------------------
 
-This is 1.00 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+This is 1.10 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
 You are free to use code for any of your needs.
 
 Credits:
@@ -22,8 +22,7 @@ Credits:
 This bot aims to:
  * Lower CPU usage compared to HPB_bot.
  * Be more interesting opponent than other bots found there (try it)
-    * More humanlike aiming, hard to keep track on target making movement
-      changes
+    * More humanlike aiming, hard to keep track on target making movement changes
     * More random combat movement, random jumping, better straifing
     * Hear player footsteps/firing weapons
  * Be dedicated server targeted bot
@@ -56,11 +55,26 @@ real player(s) to join server and start moving around. New waypoints are
 added to new places where there isn't old waypoints already present. Newly
 added waypoints will not be effective until map change. This is because
 jk_botti needs to recreate route matrixes with new waypoints and since this is
-CPU intensive operation this can only really be done on map change.
+CPU intensive operation this can only be done on map change.
 
 --------------------
 2. What's new
 --------------------
+1.10:
+ * Fixed bots to use wall mounted health/battery rechargers and buttons.
+ * Fixed bots to pick up items.
+ * Fixed observer mode so that bots don't hear observers anymore. This caused
+   bots to get interested about observer sounds and track theim.
+ * Lowered default bot lookaround/pause frequency and times.
+ * Fixed autowaypointing not to place waypoints midair.
+ * Fixed autowaypointing not to create impossible upwards paths.
+ * Fixed autowaypointing not to create crouch waypoints if there is room to stand up.
+ * Old waypoint files are automatically processed to fix above autowaypointing errors.
+ * Lots of tweaks to autowaypointing: better handling of ladders and stairs, better 
+   linking of isolated areas.
+ * 'autowaypoint' is now default on.
+ * New command 'show_waypoints' for viewing/aiding waypoint creation.
+
 1.01: 
  * Fixed 'bot_conntimes 1' crashing on Windows servers.
 

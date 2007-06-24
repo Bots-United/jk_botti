@@ -211,7 +211,7 @@ qboolean IsPlayerFacingWall(edict_t * pPlayer)
    
    UTIL_TraceLine(EyePosition, EyePosition + gpGlobals->v_forward * 48, ignore_monsters, ignore_glass, pPlayer, &tr);
    
-   if (tr.flFraction >= 1.0) 
+   if (tr.flFraction >= 1.0f) 
       return(FALSE);
 
    if (DotProduct(gpGlobals->v_forward, tr.vecPlaneNormal) > -0.5f) //60deg
@@ -444,7 +444,7 @@ qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit )
    if(pHit)
       *pHit = tr.pHit;
 
-   return(tr.flFraction > 0.9999);
+   return(tr.flFraction >= 1.0f);
 }
 
 qboolean FVisibleEnemyOffset( const Vector &vecOrigin, const Vector &vecOffset, edict_t *pEdict, edict_t *pEnemy )

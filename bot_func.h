@@ -50,6 +50,9 @@ qboolean BotCheckWallOnRight( bot_t &pBot );
 qboolean BotCheckWallOnBack( bot_t &pBot );
 qboolean BotCheckWallOnForward( bot_t &pBot );
 void BotLookForDrop( bot_t &pBot );
+qboolean BotEdgeForward( bot_t &pBot, const Vector &v_move_dir );
+qboolean BotEdgeRight( bot_t &pBot, const Vector &v_move_dir );
+qboolean BotEdgeLeft( bot_t &pBot, const Vector &v_move_dir );
 
 void BotKick(bot_t &pBot);
 void BotCheckTeamplay(void);
