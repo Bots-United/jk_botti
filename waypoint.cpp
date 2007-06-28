@@ -53,12 +53,15 @@ int num_spawnpoints = 0;
 qboolean g_waypoint_on = FALSE;
 qboolean g_path_waypoint = FALSE;
 
+// 
 qboolean g_waypoint_paths = FALSE;  // have any paths been allocated?
 qboolean g_auto_waypoint = TRUE;
 qboolean g_path_waypoint_enable = TRUE;
 qboolean g_waypoint_updated = FALSE;
+qboolean g_waypoint_testing = FALSE;
 int last_waypoint[32];
 float f_path_time = 0.0;
+int g_lifts_added = 0;
 
 unsigned int route_num_waypoints;
 unsigned short *shortest_path = NULL;
@@ -96,9 +99,21 @@ void WaypointAddBlock(const Vector &origin)
 
 qboolean WaypointInBlockRadius(const Vector &origin)
 {
+   TraceResult tr;
+   
    for(int i = 0; i < block_list_endlist; i++)
-      if((block_list[i] - origin).Length() < 1200.0f)
+   {
+      // if distance is enough, don't block
+      if((block_list[i] - origin).Length() > 800.0f)
+         continue;
+      	
+      // within block distance check if visible
+      UTIL_TraceMove( block_list[i], origin, ignore_monsters, NULL, &tr );
+      
+      // block visible
+      if(tr.fStartSolid || tr.fAllSolid || tr.flFraction >= 1.0f)
          return(TRUE);
+   }
    
    return(FALSE);
 }
@@ -190,6 +205,10 @@ void WaypointInit(void)
 
    if (from_to != NULL)
       free(from_to);
+   
+   shortest_path = NULL;
+   from_to = NULL;
+   wp_matrix_initialized = FALSE;
 
    memset(waypoints, 0, sizeof(waypoints));
    
@@ -205,10 +224,6 @@ void WaypointInit(void)
 
    for(i = 0; i < 32; i++)
       last_waypoint[i] = -1;
-
-   shortest_path = NULL;
-   from_to = NULL;
-   wp_matrix_initialized = FALSE;
    
    memset(&spawnpoints, 0, sizeof(spawnpoints));
    num_spawnpoints = 0;
@@ -219,6 +234,8 @@ void WaypointInit(void)
    block_list = NULL;
    block_list_endlist = 0;
    block_list_size = 0;
+   
+   g_lifts_added = 0;
 }
 
 
@@ -230,12 +247,6 @@ void WaypointAddPath(short int add_index, short int path_index)
    if((waypoints[add_index].flags | waypoints[path_index].flags) & W_FL_DELETED)
    {
       UTIL_ConsolePrintf("%s", "Tried to add path to deleted waypoint!");
-      return;
-   }
-   
-   if((waypoints[add_index].origin - waypoints[path_index].origin).Length() >= REACHABLE_RANGE)
-   {
-      UTIL_ConsolePrintf("%s", "Tried to add too long waypoint path!");
       return;
    }
    
@@ -408,6 +419,44 @@ int WaypointFindPath(PATH **pPath, int *path_index, int waypoint_index)
 }
 
 
+// calculate all the paths to this waypoint
+void WaypointMakePathsWith(int index)
+{
+   // calculate all the paths to this new waypoint
+   if(!g_path_waypoint_enable)
+      return;
+      	 
+   for (int i=0; i < num_waypoints; i++)
+   {
+      if (i == index)
+         continue;  // skip the waypoint that was just added
+
+      if (waypoints[i].flags & W_FL_DELETED || waypoints[i].flags & W_FL_AIMING)
+         continue;  // skip any aiming waypoints
+ 
+      // don't allow paths TO lift-end
+      if(!(waypoints[i].flags & W_FL_LIFT_END))
+      {
+         // check if the waypoint is reachable from the new one (one-way)
+         if ( WaypointReachable(waypoints[index].origin, waypoints[i].origin, GetReachableFlags(index, i)))
+         {
+            WaypointAddPath(index, i);
+         }
+      }
+
+      // don't allow paths TO lift-end
+      if(!(waypoints[index].flags & W_FL_LIFT_END))
+      {
+         // check if the new one is reachable from the waypoint (other way)
+         if ( WaypointReachable(waypoints[i].origin, waypoints[index].origin, GetReachableFlags(i, index)))
+         {
+            WaypointAddPath(i, index);
+         }
+      }
+   }
+}
+
+
 // Called when map-objects spawn
 void CollectMapSpawnItems(edict_t *pSpawn)
 {
@@ -529,7 +578,7 @@ void CollectMapSpawnItems(edict_t *pSpawn)
 void WaypointAddSpawnObjects(void)
 {
    int index;
-   int i,j,k;
+   int i,j;
    qboolean done;
    int count = 0;
    int flags_updated = 0;
@@ -544,7 +593,7 @@ void WaypointAddSpawnObjects(void)
       
       // Check if there is waypoint near already
       for(j = 0; j < num_waypoints; j++) {
-         if (!(waypoints[j].flags & W_FL_DELETED)) 
+         if (!(waypoints[j].flags & W_FL_DELETED || waypoints[j].flags & W_FL_AIMING)) 
          {
             if((waypoints[j].origin - spawnpoints[i].origin).Length() < 50.0) 
             {
@@ -594,43 +643,149 @@ void WaypointAddSpawnObjects(void)
       count++;
 
       // calculate all the paths to this new waypoint
-      if(!g_path_waypoint_enable)
-      	 continue;
-      
-      for (k=0; k < num_waypoints; k++)
-      {
-         if (k == index)
-            continue;  // skip the waypoint that was just added
-
-         if (waypoints[k].flags & W_FL_AIMING)
-            continue;  // skip any aiming waypoints
-
-         // check if the waypoint is reachable from the new one (one-way)
-         if ( WaypointReachable(waypoints[index].origin, waypoints[k].origin, GetReachableFlags(index, k)))
-         {
-            WaypointAddPath(index, k);
-         }
- 
-         // check if the new one is reachable from the waypoint (other way)
-         if ( WaypointReachable(waypoints[k].origin, waypoints[index].origin, GetReachableFlags(k, index)))
-         {
-            WaypointAddPath(k, index);
-         }
-      }
+      WaypointMakePathsWith(index);
    }
    
    if(count || flags_updated || itemflags_updated) 
    {
       UTIL_ConsolePrintf("Added total %d map-object based waypoints and updated flags for %d!\n", count, flags_updated + itemflags_updated);
       
-      g_waypoint_updated = !!(count || flags_updated);
+      g_waypoint_updated = !!count;
    }
    
    num_spawnpoints = 0;
    memset(&spawnpoints, 0, sizeof(spawnpoints));
    
-   if(count && shortest_path == NULL && from_to == NULL)
-      WaypointRouteInit(FALSE);
+   if(g_lifts_added || count)
+   {
+      WaypointSlowFloydsStop();
+      
+      if (shortest_path != NULL)
+         free(shortest_path);
+
+      if (from_to != NULL)
+         free(from_to);
+   
+      shortest_path = NULL;
+      from_to = NULL;
+      wp_matrix_initialized = FALSE;
+      
+      WaypointRouteInit(TRUE);
+   }
+}
+
+
+//
+void WaypointAddLift(edict_t * pent, const Vector &start, const Vector &end)
+{
+   int index_start, index_end;
+   
+   if(end.z - start.z < 16.0f)
+      return;
+   
+   TraceResult tr;
+   Vector origin = VecBModelOrigin(pent);
+   
+   Vector move = end - start;
+   
+   // test if this is trap
+   Vector stand_start = Vector(origin.x, origin.y, pent->v.absmax.z + 72/2);
+   Vector stand_end = stand_start + move;
+   
+   UTIL_TraceDuck(stand_start, stand_end, ignore_monsters, NULL, &tr);
+   
+   if(tr.fAllSolid || tr.fStartSolid || tr.flFraction < 1.0f)
+      return;
+   
+   // Detect if waypoints already exists for this lift
+   for(int i = 0; i < num_waypoints; i++)
+   {
+      if(waypoints[i].flags & W_FL_DELETED)
+         continue;
+      
+      //check start point
+      if(waypoints[i].flags & W_FL_LIFT_START)
+      {
+         if((stand_start - waypoints[i].origin).Length() < 100.0f)
+            return;
+      }
+      
+      //check end point
+      if(waypoints[i].flags & W_FL_LIFT_END)
+      {
+         if((stand_end - waypoints[i].origin).Length() < 100.0f)
+            return;
+      }
+   }
+
+   // Get two free waypoint indexes
+   index_start = 0;
+   index_end = 0;
+   
+   // find the next available slot for the new waypoint...
+   while (index_start < num_waypoints)
+   {
+      if (waypoints[index_start].flags & W_FL_DELETED)
+         break;
+
+      index_start++;
+   }
+   
+   if (index_start >= MAX_WAYPOINTS) // out of space
+      return;
+
+   // increment total number of waypoints if adding at end of array...
+   if (index_start == num_waypoints)
+      num_waypoints++;
+   
+   // find the next available slot for the new waypoint...
+   while (index_end < num_waypoints)
+   {
+      if ((waypoints[index_end].flags & W_FL_DELETED) && index_end != index_start)
+         break;
+
+      index_end++;
+   }
+
+   if (index_end >= MAX_WAYPOINTS) // out of space
+      return;
+
+   // increment total number of waypoints if adding at end of array...
+   if (index_end == num_waypoints)
+      num_waypoints++;
+   
+   // Add waypoints (W_FL_LIFT_START -> W_FL_LIFT_END)
+   waypoints[index_start].origin = stand_start;
+   waypoints[index_start].flags = W_FL_LIFT_START;
+   waypoints[index_start].itemflags = 0;
+   
+   waypoints[index_end].origin = stand_end;
+   waypoints[index_end].flags = W_FL_LIFT_END;
+   waypoints[index_end].itemflags = 0;
+   
+   // Add one way path
+   WaypointAddPath(index_start, index_end);
+   
+   // Make path links with start point
+   WaypointMakePathsWith(index_start);
+   
+   // Move lift to upper position and make path links with end point
+   SET_ORIGIN(pent, end);
+   WaypointMakePathsWith(index_end);
+   SET_ORIGIN(pent, start);
+   
+   // done
+   g_lifts_added++;
+   g_waypoint_updated = TRUE;
+
+   if(0)
+   {
+      UTIL_ConsolePrintf("%s\n", STRING(pent->v.classname));
+      UTIL_ConsolePrintf(" - start : %4.1f, %4.1f, %4.1f", start.x, start.y, start.z);
+      UTIL_ConsolePrintf(" - end   : %4.1f, %4.1f, %4.1f", end.x, end.y, end.z);
+      UTIL_ConsolePrintf(" - move  : %4.1f, %4.1f, %4.1f", move.x, move.y, move.z);
+      UTIL_ConsolePrintf(" - origin: %4.1f, %4.1f, %4.1f\n", origin.x, origin.y, origin.z);
+   }
 }
 
 
@@ -648,7 +803,7 @@ int WaypointFindNearest(edict_t *pEntity, float range)
    // find the nearest waypoint...
 
    min_index = -1;
-   min_distance = 9999.0;
+   min_distance = 99999.0;
 
    for (i=0; i < num_waypoints; i++)
    {
@@ -692,7 +847,7 @@ int WaypointFindNearest(Vector v_src, edict_t *pEntity, float range)
    // find the nearest waypoint...
 
    min_index = -1;
-   min_distance = 9999.0;
+   min_distance = 99999.0;
 
    for (index=0; index < num_waypoints; index++)
    {
@@ -1144,7 +1299,7 @@ int WaypointFindNearestAiming(Vector v_origin)
 {
    int index;
    int min_index = -1;
-   float min_distance = 9999.0;
+   float min_distance = 99999.0;
    float distance;
 
    if (num_waypoints < 1)
@@ -1179,7 +1334,7 @@ void WaypointDrawBeam(edict_t *pEntity, const Vector &start, const Vector &end, 
    if(!g_waypoint_on)
       return;
    
-   MESSAGE_BEGIN(MSG_ONE, SVC_TEMPENTITY, NULL, pEntity);
+   MESSAGE_BEGIN(FNullEnt(pEntity)?MSG_ALL:MSG_ONE, SVC_TEMPENTITY, NULL, pEntity);
    WRITE_BYTE( TE_BEAMPOINTS);
    WRITE_COORD(start.x);
    WRITE_COORD(start.y);
@@ -1224,7 +1379,7 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
    nearest_name[0] = 0;      // null out nearest_name string
    nearest_pent = NULL;
 
-   min_distance = 9999.0;
+   min_distance = 99999.0;
 
    //********************************************************
    // look for the nearest health, armor, ammo, weapon, etc.
@@ -1240,12 +1395,11 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
       {
          safevoid_snprintf(item_name, sizeof(item_name), "%s", STRING(pent->v.classname));
 
-         if ((strncmp("item_health", item_name, 11) == 0) ||
-             (strncmp("item_battery", item_name, 12) == 0) ||
+         if ((strncmp("item_health", item_name, 11) == 0) || strncmp("func_healthcharger", item_name, 18) == 0 ||
+             (strncmp("item_battery", item_name, 12) == 0) || strncmp("func_recharge", item_name, 13) == 0||
              (GetAmmoItemFlag(item_name) != 0) ||
              (strcmp("item_longjump", item_name) == 0) ||
-             ((GetWeaponItemFlag(item_name) != 0) &&
-              (pent->v.owner == NULL)))
+             ((GetWeaponItemFlag(item_name) != 0) && (pent->v.owner == NULL)))
          {
             distance = (pent->v.origin - origin).Length();
 
@@ -1265,14 +1419,14 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
    {
       char buf[128];
       
-      if (strncmp("item_health", nearest_name, 11) == 0)
+      if (strncmp("item_health", nearest_name, 11) == 0 || strncmp("func_healthcharger", nearest_name, 18) == 0)
       {
          if (pEntity)
             ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs2(buf, sizeof(buf), "found a healthkit! (%s)\n", nearest_name));
          waypoints[wpt_index].flags |= W_FL_HEALTH;
       }
 
-      if (strncmp("item_battery", nearest_name, 12) == 0)
+      if (strncmp("item_battery", nearest_name, 12) == 0 || strncmp("func_recharge", nearest_name, 13) == 0)
       {
          if (pEntity)
             ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs2(buf, sizeof(buf), "found some armor! (%s)\n", nearest_name));
@@ -1325,7 +1479,7 @@ edict_t *WaypointFindItem( int wpt_index )
    nearest_name[0] = 0;      // null out nearest_name string
    nearest_pent = NULL;
    
-   min_distance = 9999.0;
+   min_distance = 99999.0;
    
    Vector origin = waypoints[wpt_index].origin;
    //********************************************************
@@ -1340,8 +1494,8 @@ edict_t *WaypointFindItem( int wpt_index )
       {
          safevoid_snprintf(item_name, sizeof(item_name), "%s", STRING(pent->v.classname));
          
-         if(((waypoints[wpt_index].flags & W_FL_HEALTH) && strncmp("item_health", item_name, 11) == 0) ||
-            ((waypoints[wpt_index].flags & W_FL_ARMOR) && strncmp("item_battery", item_name, 12) == 0) ||
+         if(((waypoints[wpt_index].flags & W_FL_HEALTH) && (strncmp("item_health", item_name, 11) == 0) || strncmp("func_healthcharger", item_name, 18) == 0) ||
+            ((waypoints[wpt_index].flags & W_FL_ARMOR) && (strncmp("item_battery", item_name, 12) == 0) || strncmp("func_recharge", item_name, 13) == 0) ||
             ((waypoints[wpt_index].flags & W_FL_AMMO) && GetAmmoItemFlag(item_name) != 0) ||
             ((waypoints[wpt_index].flags & W_FL_LONGJUMP) && strcmp("item_longjump", item_name) == 0) ||
             ((waypoints[wpt_index].flags & W_FL_WEAPON) && GetWeaponItemFlag(item_name) != 0 && pent->v.owner == NULL))
@@ -1452,29 +1606,49 @@ void WaypointAdd(edict_t *pEntity)
       num_waypoints++;
 
    // calculate all the paths to this new waypoint
-   if(!g_path_waypoint_enable)
-      return;
-   
-   for (int i=0; i < num_waypoints; i++)
+   WaypointMakePathsWith(index);
+}
+
+
+int WaypointAddTesting(const Vector &vecOrigin, int flags, int itemflags, qboolean MakePaths)
+{
+   int index = 0;
+
+   // find the next available slot for the new waypoint...
+   while (index < num_waypoints)
    {
-      if (i == index)
-         continue;  // skip the waypoint that was just added
+      if (waypoints[index].flags & W_FL_DELETED)
+         break;
 
-      if (waypoints[i].flags & W_FL_AIMING)
-         continue;  // skip any aiming waypoints
-
-      // check if the waypoint is reachable from the new one (one-way)
-      if ( WaypointReachable(waypoints[index].origin, waypoints[i].origin, GetReachableFlags(index, i)))
-      {
-         WaypointAddPath(index, i);
-      }
-
-      // check if the new one is reachable from the waypoint (other way)
-      if ( WaypointReachable(waypoints[i].origin, waypoints[index].origin, GetReachableFlags(i, index)))
-      {
-         WaypointAddPath(i, index);
-      }
+      index++;
    }
+
+   if (index >= MAX_WAYPOINTS)
+      return(-1);
+   
+   // block saving test waypoints
+   g_waypoint_testing = TRUE;
+
+   // ladder check
+   waypoints[index].flags = flags;
+
+   waypoints[index].itemflags = itemflags;
+
+   // store the origin (location) of this waypoint 
+   waypoints[index].origin = vecOrigin;
+
+   // set the time that this waypoint was originally displayed...
+   wp_display_time[index] = gpGlobals->time - 10.0f;
+
+   // increment total number of waypoints if adding at end of array...
+   if (index == num_waypoints)
+      num_waypoints++;
+
+   // calculate all the paths to this new waypoint
+   if(MakePaths)
+      WaypointMakePathsWith(index);
+   
+   return(index);
 }
 
 
@@ -1554,7 +1728,7 @@ void WaypointDelete(edict_t *pEntity)
    {
       int i;
       int min_index = -1;
-      float min_distance = 9999.0;
+      float min_distance = 99999.0;
       float distance;
 
       // search for nearby aiming waypoint and delete it also...
@@ -1928,6 +2102,7 @@ qboolean WaypointLoad(edict_t *pEntity)
    qboolean Changed;
    
    g_waypoint_updated = FALSE;
+   g_waypoint_testing = FALSE;
    
    safevoid_snprintf(mapname, sizeof(mapname), "%s.wpt", STRING(gpGlobals->mapname));
 
@@ -2148,6 +2323,9 @@ void WaypointSave(void)
    short int num;
    PATH *p;
 
+   if(g_waypoint_testing || !g_waypoint_updated)
+      return;
+
    //
    WaypointTrim();
 
@@ -2219,15 +2397,16 @@ void WaypointSave(void)
 }
 
 
-qboolean WaypointReachable(Vector v_src, Vector v_dest, int reachable_flags)
+qboolean WaypointReachable(const Vector &v_src, const Vector &v_dest, const int reachable_flags)
 {
    TraceResult tr;
-   float curr_height, last_height;
+   float curr_height, last_height, waterlevel;
+   Vector v_check_dest, v_check, v_direction, v_down;
    
    float distance = (v_dest - v_src).Length();
 
    // is the destination close enough?
-   if (distance < (float)REACHABLE_RANGE)
+   if (distance < REACHABLE_RANGE)
    {
       // check if this waypoint is "visible"...
       if(reachable_flags & (W_FL_LADDER | W_FL_CROUCH))
@@ -2280,13 +2459,43 @@ qboolean WaypointReachable(Vector v_src, Vector v_dest, int reachable_flags)
             }
          }
 
+         // get source water level
+         if(POINT_CONTENTS( v_src ) == CONTENTS_WATER)
+         {
+            waterlevel = -99999;
+            
+            v_direction = (v_dest - v_src).Normalize();  // 1 unit long
+            v_check = v_src;
+            
+            if(v_direction.z > 0.0f)
+            {
+               // go upwards until get to air
+               while((v_dest - v_check).Length() < (v_dest - v_src).Length())
+               {
+                  // advance one unit upwards
+                  v_check = v_check + v_direction * (1.0f / v_direction.z);
+               
+                  if(POINT_CONTENTS( v_check ) == CONTENTS_EMPTY)
+                  {
+                     waterlevel = round(v_check.z);
+                     break;
+                  }
+               }
+            }
+         }
+         else
+         {
+            // outside map area (lowest level on map is -4096)
+            waterlevel = -99999;
+         }
+
          // check if distance to ground increases more than jump height
          // at points between source and destination...
 
-         Vector v_direction = (v_dest - v_src).Normalize();  // 1 unit long
-         Vector v_check = v_src + v_direction * 16.0f;
-         Vector v_down = v_check;
-         Vector v_check_dest = v_dest - v_direction * 16.0f;
+         v_direction = (v_dest - v_src).Normalize();  // 1 unit long
+         v_check = v_src + v_direction * 16.0f;
+         v_down = v_check;
+         v_check_dest = v_dest - v_direction * 16.0f;
 
          v_down.z = v_down.z - 1000.0;  // straight down 1000 units
 
@@ -2299,6 +2508,12 @@ qboolean WaypointReachable(Vector v_src, Vector v_dest, int reachable_flags)
          }
 
          last_height = tr.flFraction * 1000.0;  // height from ground
+         
+         //check against waterlevel
+         if(v_check.z - last_height < waterlevel)
+         {
+            last_height = v_check.z - waterlevel;
+         }
          
          last_height += v_direction.z * 16.0f;  // we skipped 16 units, add height to calculations
 
@@ -2321,6 +2536,12 @@ qboolean WaypointReachable(Vector v_src, Vector v_dest, int reachable_flags)
             }
 
             curr_height = tr.flFraction * 1000.0;  // height from ground
+
+            //check against waterlevel
+            if(v_check.z - curr_height < waterlevel)
+            {
+               curr_height = v_check.z - waterlevel;
+            }
 
             // is the difference in the last height and the current height
             // higher that the jump height?
@@ -2377,7 +2598,7 @@ int WaypointFindReachable(edict_t *pEntity, float range)
 
    // find the nearest waypoint...
 
-   min_distance = 9999.0;
+   min_distance = 99999.0;
 
    for (i=0; i < num_waypoints; i++)
    {
@@ -2415,6 +2636,7 @@ int WaypointFindReachable(edict_t *pEntity, float range)
 }
 
 
+#if _DEBUG
 void WaypointPrintInfo(edict_t *pEntity)
 {
    char msg[80];
@@ -2432,9 +2654,12 @@ void WaypointPrintInfo(edict_t *pEntity)
 
    flags = waypoints[index].flags;
 
-   if (flags & W_FL_LIFT)
-      ClientPrint(pEntity, HUD_PRINTNOTIFY, "Bot will wait for lift before approaching\n");
-
+   if (flags & W_FL_LIFT_START)
+      ClientPrint(pEntity, HUD_PRINTNOTIFY, "This waypoint is start of lift\n");
+      
+   if (flags & W_FL_LIFT_END)
+      ClientPrint(pEntity, HUD_PRINTNOTIFY, "This waypoint is end of lift\n");
+      
    if (flags & W_FL_LADDER)
       ClientPrint(pEntity, HUD_PRINTNOTIFY, "This waypoint is on a ladder\n");
 
@@ -2459,15 +2684,17 @@ void WaypointPrintInfo(edict_t *pEntity)
    if (flags & W_FL_SNIPER)
       ClientPrint(pEntity, HUD_PRINTNOTIFY, "This is a sniper waypoint\n");
 }
+#endif
 
 
 void WaypointAutowaypointing(int idx, edict_t *pEntity)
 {
    float distance, min_distance;
    int i;
+   qboolean DidAddAlready = FALSE;
    
    //only if on ground or on ladder or under water
-   if((pEntity->v.flags & FL_ONGROUND) != FL_ONGROUND && pEntity->v.movetype != MOVETYPE_FLY && pEntity->v.waterlevel != 3)
+   if((pEntity->v.flags & FL_ONGROUND) != FL_ONGROUND && pEntity->v.movetype != MOVETYPE_FLY && pEntity->v.waterlevel == 0)
       return;
    
    // on moving platform or train?
@@ -2481,14 +2708,14 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
 
    // find the distance from the last used waypoint
    if(last_waypoint[idx] == -1)
-      distance = 9999.0f;
+      distance = 99999.0f;
    else
       distance = (waypoints[last_waypoint[idx]].origin - pEntity->v.origin).Length();
 
    if (distance >= target_distance)
    {
       int onepath_wpt = -1;
-      min_distance = 9999.0f;
+      min_distance = 99999.0f;
 
       // check that no other reachable waypoints are nearby...
       for (i=0; i < num_waypoints; i++)
@@ -2497,6 +2724,9 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
             continue;
 
          if (waypoints[i].flags & W_FL_AIMING)
+            continue;
+         
+         if (waypoints[i].flags & W_FL_LIFT_END)
             continue;
 
          if (!WaypointReachable(pEntity->v.origin, waypoints[i].origin, GetReachableFlags(pEntity, i)))
@@ -2520,6 +2750,8 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
       if (min_distance >= target_distance) 
       {
          WaypointAdd(pEntity);
+         WaypointAddBlock(pEntity->v.origin);
+         DidAddAlready = TRUE;
       }
       else if(onepath_wpt != -1 && min_distance >= 64.0f)
       {
@@ -2533,6 +2765,9 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
             if (waypoints[i].flags & W_FL_AIMING)
                continue;
 
+            if (waypoints[i].flags & W_FL_LIFT_END)
+               continue;
+
             // distance between isn't too much
             if ((waypoints[i].origin - waypoints[onepath_wpt].origin).Length() >= 350.0f)
 
@@ -2544,6 +2779,8 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
             if (!WaypointReachable(waypoints[i].origin, waypoints[onepath_wpt].origin, GetReachableFlags(onepath_wpt, i)))
             {
                WaypointAdd(pEntity);
+               WaypointAddBlock(pEntity->v.origin);
+               DidAddAlready = TRUE;
                   
                break;
             }
@@ -2552,10 +2789,8 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
       
       // checking index 0 twice -> is matrix initialized?
       // make sure we are not too close to resently added route/path-cutting waypoint
-      if(WaypointIsRouteValid(0, 0) && !WaypointInBlockRadius(pEntity->v.origin))
+      if(!DidAddAlready && WaypointIsRouteValid(0, 0) && !WaypointInBlockRadius(pEntity->v.origin))
       {
-         qboolean did_add = FALSE;
-                     
          // check waypoints around this area, then add waypoint if route between waypoints is more than 1000.0 units
          for (i=0; i < num_waypoints; i++)
          {
@@ -2563,6 +2798,9 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
                continue;
 
             if (waypoints[i].flags & W_FL_AIMING)
+               continue;
+
+            if (waypoints[i].flags & W_FL_LIFT_END)
                continue;
 
             if((waypoints[i].origin - pEntity->v.origin).Length() < 64.0f)
@@ -2580,6 +2818,9 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
                   continue;
 
                if (waypoints[k].flags & W_FL_AIMING)
+                  continue;
+            
+               if (waypoints[k].flags & W_FL_LIFT_END)
                   continue;
                
                if((waypoints[k].origin - pEntity->v.origin).Length() < 64.0f)
@@ -2600,12 +2841,12 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
                
                WaypointAdd(pEntity);
                WaypointAddBlock(pEntity->v.origin);
-               did_add = TRUE;
+               DidAddAlready = TRUE;
                
                break;
             }
             
-            if(did_add)
+            if(DidAddAlready)
                break;
          }
       }
@@ -2630,13 +2871,13 @@ void WaypointThink(edict_t *pEntity)
       WaypointAutowaypointing(idx, pEntity);
    }
 
-   min_distance = 9999.0f;
+   min_distance = 99999.0f;
 
    if (g_waypoint_on)  // display the waypoints if turned on...
    {
       for (i=0; i < num_waypoints; i++)
       {
-         if ((waypoints[i].flags & W_FL_DELETED) == W_FL_DELETED)
+         if ((waypoints[i].flags & W_FL_DELETED) == W_FL_DELETED || waypoints[i].flags & W_FL_AIMING )
             continue;
 
          distance = (waypoints[i].origin - pEntity->v.origin).Length();
@@ -2667,8 +2908,31 @@ void WaypointThink(edict_t *pEntity)
                   end = start + Vector(0, 0, 68);
                }
 
-               // draw a blue waypoint
-               WaypointDrawBeam(pEntity, start, end, 30, 0, 0, 0, 255, 250, 5);
+               if(waypoints[i].flags & W_FL_CROUCH)
+               {
+                  // draw a yellow waypoint
+                  WaypointDrawBeam(pEntity, start, end, 30, 0, 250, 250, 0, 250, 5);
+               }
+               else if(waypoints[i].flags & W_FL_LADDER)
+               {
+                  // draw a purple waypoint
+                  WaypointDrawBeam(pEntity, start, end, 30, 0, 250, 0, 250, 250, 5);
+               }
+               else if(waypoints[i].flags & W_FL_LIFT_START)
+               {
+                  // draw a red waypoint
+                  WaypointDrawBeam(pEntity, start, end, 30, 0, 255, 0, 0, 250, 5);
+               }
+               else if(waypoints[i].flags & W_FL_LIFT_END)
+               {
+                  // draw a green waypoint
+                  WaypointDrawBeam(pEntity, start, end, 30, 0, 0, 255, 0, 250, 5);
+               }
+               else
+               {
+                  // draw a blue waypoint
+                  WaypointDrawBeam(pEntity, start, end, 30, 0, 0, 0, 255, 250, 5);
+               }
 
                wp_display_time[i] = gpGlobals->time;
             }
@@ -2810,6 +3074,11 @@ static struct {
    int changed;
    int escaped;
 } slow_floyds = {-1,0,0,0,0,0};
+
+void WaypointSlowFloydsStop(void)
+{
+   slow_floyds.state = -1;
+}
 
 int WaypointSlowFloydsState(void)
 {
@@ -3138,12 +3407,13 @@ void WaypointRouteInit(qboolean ForceRebuild)
                         UTIL_ConsolePrintf("[matrix calc] - ERROR: Path to deleted waypoint detected.\n");
                      }
 
-                     if (distance > (float)WAYPOINT_MAX_DISTANCE)
-                        distance = (float)WAYPOINT_MAX_DISTANCE;
+                     if (distance > WAYPOINT_MAX_DISTANCE)
+                        distance = WAYPOINT_MAX_DISTANCE;
 
-                     if (distance > (float)REACHABLE_RANGE)
+                     if (!(waypoints[row].flags & W_FL_LIFT_START && waypoints[index].flags & W_FL_LIFT_END) &&
+                     	distance > REACHABLE_RANGE)
                      {
-                        UTIL_ConsolePrintf("[matrix calc] - Waypoint path distance %4.1f > %4.1f at from %d to %d:\n", distance, REACHABLE_RANGE, row, index);
+                        UTIL_ConsolePrintf("[matrix calc] - Waypoint path distance %4.1f > %4.1f at from %d to %d:\n", distance, (float)REACHABLE_RANGE, row, index);
                      }
                      else
                      {

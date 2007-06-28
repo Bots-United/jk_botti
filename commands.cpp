@@ -51,6 +51,7 @@ extern int max_bots;
 extern FILE *bot_cfg_fp;
 extern int bot_cfg_linenumber;
 extern int submod_id;
+extern edict_t *clients[32];
 
 extern int default_bot_skill;
 extern int bot_add_level_tag;
@@ -216,6 +217,7 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
    }
    else if (FStrEq(pcmd, "addbot"))
    {
+      int i, count = 0;
       int cfg_bot_index = -1;
       const char * skin = (arg1 && *arg1) ? arg1 : NULL;
       const char * name = (arg2 && *arg2) ? arg2 : NULL;
@@ -226,13 +228,22 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
       // save bots from config to special buffer
       if(cmdtype == CFGCMD_TYPE)
          cfg_bot_index = AddToCfgBotRecord(skin, name, skill, top_color, bottom_color);
-
-      BotCreate(skin, name, skill, top_color, bottom_color, cfg_bot_index);
-
+      
+      // only add bots if max_bots not reached
+      for (i = 0; i < 32; i++)
+         if (clients[i] != NULL)
+            count++;
+      
+      if(max_bots == -1 || count < max_bots)
+      {
+         BotCreate(skin, name, skill, top_color, bottom_color, cfg_bot_index);
+         
+         if(cmdtype == CFGCMD_TYPE)
+            bot_cfg_pause_time = gpGlobals->time + 2.0;
+      }
+      
       bot_check_time = gpGlobals->time + 5.0;
-      if(cmdtype == CFGCMD_TYPE)
-         bot_cfg_pause_time = gpGlobals->time + 2.0;
-
+      
       return TRUE;
    }
    else if (FStrEq(pcmd, "show_waypoints"))
@@ -1281,15 +1292,21 @@ void jk_botti_ServerCommand (void)
       
       // kick all bots.
       for (int index = 0; index < 32; index++)
+      {
          if (bots[index].is_used)  // is this slot used?
+         {
             BotKick(bots[index]);
+            count++;
+         }
+      }
       
       if(count>0)
          UTIL_ConsolePrintf("Kicked %d bots.", count);
       else
          UTIL_ConsolePrintf("No bots on server to be kicked.");
    }
-   else if(!ProcessCommand(SRVCMD_TYPE, print_to_server_output, NULL, CMD_ARGV (1), CMD_ARGV (2), CMD_ARGV (3), CMD_ARGV (4), CMD_ARGV (5), CMD_ARGV (6))) {
+   else if(!ProcessCommand(SRVCMD_TYPE, print_to_server_output, NULL, CMD_ARGV (1), CMD_ARGV (2), CMD_ARGV (3), CMD_ARGV (4), CMD_ARGV (5), CMD_ARGV (6))) 
+   {
       UTIL_ConsolePrintf("%s: Unknown command \'%s\'\n", CMD_ARGV(0), CMD_ARGS());
    }
 }

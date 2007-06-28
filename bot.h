@@ -119,11 +119,12 @@ typedef struct
    char name[BOT_NAME_LEN+1];
    char skin[BOT_SKIN_LEN+1];
    int bot_skill;
-   int not_started;
-   int start_action;
+   int weapon_skill;
+   
    float f_kick_time;
    float f_create_time;
    float f_frame_time;
+   float f_bot_spawn_time;
    
    int chat_percent;
    int taunt_percent;
@@ -135,10 +136,13 @@ typedef struct
 
    double connect_time;
    double stay_time;
+   
+   qboolean b_on_ground;
+   qboolean b_on_ladder;
+   qboolean b_in_water;
+   qboolean b_ducking;
 
    // things from pev in CBasePlayer...
-   int bot_team;
-   int bot_class;
    float idle_angle;
    float idle_angle_time;
    float blinded_time;
@@ -171,8 +175,8 @@ typedef struct
    float f_drop_check_time;
 
    int wander_dir;
+   qboolean b_not_maxspeed;
    float f_move_direction;
-   //int strafe_percent;
    float f_strafe_direction;  // 0 = none, negative = left, positive = right
    float f_strafe_time;
    float f_exit_water_time;
@@ -185,22 +189,17 @@ typedef struct
    int waypoint_goal;
    float f_waypoint_goal_time;
    float prev_waypoint_distance;
-   int exclude_points[6];  // five item locations + 1 null
+   int wpt_goal_type;
+
+#define EXCLUDE_POINTS_COUNT 10
+   int exclude_points[EXCLUDE_POINTS_COUNT+1];  // ten item locations + 1 null
 
    float f_last_item_found;
 
    edict_t *pBotEnemy;
    float f_bot_see_enemy_time;
    float f_bot_find_enemy_time;
-   
    edict_t *pFindSoundEnt;
-
-   int wpt_goal_type;
-   float f_evaluate_goal_time;
-
-   edict_t *pBotUser;
-   float f_bot_use_time;
-   float f_bot_spawn_time;
 
    edict_t *killer_edict;
    qboolean  b_bot_say;
@@ -208,9 +207,7 @@ typedef struct
    char  bot_say_msg[256];
    float f_bot_chat_time;
 
-   int   enemy_attack_count;
    float f_duck_time;
-   int   ducking;
    
    float f_random_jump_time;
    float f_random_jump_duck_time;
@@ -250,7 +247,6 @@ typedef struct
    float f_use_HEV_time;
 
    qboolean  b_use_button;
-   qboolean  b_use_button_prev_state;
    float f_use_button_time;
    qboolean  b_lift_moving;
    

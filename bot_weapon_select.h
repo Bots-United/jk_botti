@@ -111,6 +111,8 @@ extern void InitWeaponSelect(int submod_id);
 
 extern int GetAmmoItemFlag(const char * classname);
 extern int GetWeaponItemFlag(const char * classname);
+extern qboolean BotSkilledEnoughForPrimaryAttack(bot_t &pBot, const bot_weapon_select_t &select);
+extern qboolean BotSkilledEnoughForSecondaryAttack(bot_t &pBot, const bot_weapon_select_t &select);
 extern qboolean BotCanUseWeapon(bot_t &pBot, const bot_weapon_select_t &select);
 extern ammo_low_t BotPrimaryAmmoLow(bot_t &pBot, const bot_weapon_select_t &select);
 extern ammo_low_t BotSecondaryAmmoLow(bot_t &pBot, const bot_weapon_select_t &select);

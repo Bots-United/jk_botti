@@ -63,29 +63,24 @@ hahahaha
 !n1
 
 [bot_taunt]
-!gf, yeah right, lol!
-Aww, I'm sorry %n, were you facing wall?
-Oh stop whining %n, you act like you never got killed by a BOT b4!
-So, you think you're l33t with that xbow %n? Bring it on buddy!
-!LOL, man you suck %n!
-My 8 yr old sister has more skillz then you %n!
-Get a grip you loser!
-neener neener, you got killed by a BOT! lmao
-Don't you have a life %n? You're always playing HL.
-!Oh yeah, you're l33t %n.......NOT!
-Nice ping %n, where's your connection? Mars?
-You should use another weapon %n, you suck with that tau! LOL
-!ns.. by me
+!gf, %n
+!5hp left :D
+!1hp left :S
+I'm almost dead
+where's health?
+where's battery?
 
 [bot_whine]
 i'm drunk lol
 I WAS CHATTING %n!!
 damn mousepad slipped again
-!<---rolls eye...nice shot!
+!rolls eye...nice shot!
 mouse broke.. I need a new one
 mouse sensitivity messed up, I need to restart, brb!
 Dead AGAIN? Sheesh, I'm gonna go play pool!
 argh! dropped pepsi on kboard
-!n1, %r
-hahahaha, %n??? hahaha!!! good name there.. lol
-%n .. hacker as usual :P
+!n1, %n
+!ns, %n
+!doh
+!DOH!!
+%n .. leet as usual :P

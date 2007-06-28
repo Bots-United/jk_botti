@@ -635,7 +635,7 @@ qboolean BotFindSoundEnemy( bot_t &pBot )
    int sound_count;
    edict_t *pNewFindSoundEnt = NULL;
 
-   float nearestdistance = 9999;
+   float nearestdistance = 99999;
 
    iSound = CSoundEnt::ActiveList();
    sound_count = 1;
@@ -789,9 +789,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
    pent = NULL;
    pNewEnemy = NULL;
    v_newenemy = Vector(0,0,0);
-   nearestdistance = 9999;
-
-   pBot.enemy_attack_count = 0;  // don't limit number of attacks
+   nearestdistance = 99999;
 
    if (pNewEnemy == NULL)
    {
@@ -825,15 +823,9 @@ edict_t *BotFindEnemy( bot_t &pBot )
          if (!(FInViewCone( v_origin, pEdict ) && FVisible( v_origin, pEdict, pBreakable->pEdict )))
             continue;
          
-         //float distance = (v_origin - pEdict->v.origin).Length();
-         //if (distance < nearestdistance)
-         {
-            nearestdistance = distance;
-            pNewEnemy = pBreakable->pEdict;
-            v_newenemy = v_origin;
-
-            pBot.pBotUser = NULL;  // don't follow user when enemy found
-         }
+         nearestdistance = distance;
+         pNewEnemy = pBreakable->pEdict;
+         v_newenemy = v_origin;
       }
 
       // search the world for monsters...
@@ -866,15 +858,9 @@ edict_t *BotFindEnemy( bot_t &pBot )
          if (!(FInViewCone( vecEnd, pEdict ) && FVisibleEnemy( vecEnd, pEdict, pMonster )))
             continue;
 
-         //float distance = (pMonster->v.origin - pEdict->v.origin).Length();
-         //if (distance < nearestdistance)
-         {
-            nearestdistance = distance;
-            pNewEnemy = pMonster;
-            v_newenemy = pMonster->v.origin;
-
-            pBot.pBotUser = NULL;  // don't follow user when enemy found
-         }
+         nearestdistance = distance;
+         pNewEnemy = pMonster;
+         v_newenemy = pMonster->v.origin;
       }
 
       // search the world for players...
@@ -920,15 +906,9 @@ edict_t *BotFindEnemy( bot_t &pBot )
             if (!(FInViewCone( vecEnd, pEdict ) && FVisibleEnemy( vecEnd, pEdict, pPlayer )))
                continue;
 
-            //float distance = (pPlayer->v.origin - pEdict->v.origin).Length();
-            //if (distance < nearestdistance)
-            {
-               nearestdistance = distance;
-               pNewEnemy = pPlayer;
-               v_newenemy = v_player;
-
-               pBot.pBotUser = NULL;  // don't follow user when enemy found
-            }
+            nearestdistance = distance;
+            pNewEnemy = pPlayer;
+            v_newenemy = v_player;
          }
       }
    }
@@ -1051,6 +1031,8 @@ qboolean CheckWeaponFireConditions(bot_t & pBot, const bot_weapon_select_t &sele
    return TRUE;
 }
 
+
+char s_firetype[32];
 
 //
 qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, const bot_fire_delay_t &delay, qboolean use_primary, qboolean use_secondary)
@@ -1184,6 +1166,10 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
    int min_index;
    qboolean min_use_primary;
    qboolean min_use_secondary;
+   int avoid_skill;
+   int avoid_index;
+   qboolean avoid_use_primary;
+   qboolean avoid_use_secondary;
    select_list_t * tmp_select_list;
    
    distance = v_enemy.Length();  // how far away is the enemy?
@@ -1193,7 +1179,7 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
    pDelay = &fire_delay[0];
 
    // keep weapon only if can be used underwater
-   if(pBot.pEdict->v.waterlevel == 3)
+   if(pBot.b_in_water)
    {
       select_index = pBot.current_weapon_index;
       
@@ -1294,6 +1280,9 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
    {
       select_index = pBot.current_weapon_index;
       
+      use_primary = FALSE;
+      use_secondary = FALSE;
+      
       // Check if we can use this weapon
       if ((weapon_choice == pSelect[select_index].iId || weapon_choice == 0) || 
       	  (IsValidWeaponChoose(pBot, pSelect[select_index]) && 
@@ -1309,13 +1298,19 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
             if(better_index > -1) 
                select_index = better_index;
          }
-         
+
          if(better_index == -1)
          {
             // Check if this weapon is ok for current contitions
             use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
             use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
          }
+
+         // check if bot has enough skill for attack
+         if(use_primary && !BotSkilledEnoughForPrimaryAttack(pBot, pSelect[select_index]))
+            use_primary = FALSE;
+         if(use_secondary && !BotSkilledEnoughForSecondaryAttack(pBot, pSelect[select_index]))
+            use_secondary = FALSE;
          
          if(use_primary || use_secondary)
          {
@@ -1326,7 +1321,7 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
          }
       }
    }
-   
+
    // don't change weapon too fast
    if(pBot.f_weaponchange_time >= gpGlobals->time && pBot.current_weapon_index >= 0 && weapon_choice == 0)
       return FALSE;
@@ -1360,6 +1355,13 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       // Check if this weapon is ok for current contitions
       use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
       use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
+      
+      // check if bot has enough skill for attack
+      if(use_primary && !BotSkilledEnoughForPrimaryAttack(pBot, pSelect[select_index]))
+         use_primary = FALSE;
+      if(use_secondary && !BotSkilledEnoughForSecondaryAttack(pBot, pSelect[select_index]))
+         use_secondary = FALSE;
+
       if(!use_primary && !use_secondary)
          continue;
       
@@ -1424,10 +1426,16 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
 
    // AT THIS POINT:
    // We didn't find good weapon, now try find least skilled weapon that bot has, but avoid avoidable weapons
+   // Also get best avoidable weapon bot can use
    min_index = -1;
    min_skill = -1;
    min_use_primary = FALSE;
    min_use_secondary = FALSE;
+   
+   avoid_index = -1;
+   avoid_skill = 6;
+   avoid_use_primary = FALSE;
+   avoid_use_secondary = FALSE;
    
    select_index = -1;
    while (pSelect[++select_index].iId)
@@ -1440,24 +1448,31 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
          continue;
       
       // Underwater: only use avoidable weapon if can be used underwater
-      if(pBot.pEdict->v.waterlevel == 3)
+      if(pBot.b_in_water)
       {
          if(!pSelect[select_index].can_use_underwater)
             continue;
       }
-      else if(pSelect[select_index].avoid_this_gun)
-      	 continue;
-
-      // is use percent greater than weapon use percent?
-      if (RANDOM_LONG2(1, 100) > pSelect[select_index].use_percent)
-         continue;
 
       // Check if this weapon is ok for current contitions
       use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
       use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
       if(use_primary || use_secondary)
       {
-         if(pSelect[select_index].primary_skill_level > min_skill || pSelect[select_index].secondary_skill_level > min_skill)
+         if(pSelect[select_index].avoid_this_gun)
+         {
+            if(((use_primary && pSelect[select_index].primary_skill_level < avoid_skill) ||
+               (use_secondary && pSelect[select_index].secondary_skill_level < avoid_skill)) &&
+               BotCanUseWeapon(pBot, pSelect[select_index]))
+            {
+               avoid_skill = max(pSelect[select_index].primary_skill_level, pSelect[select_index].secondary_skill_level);
+               avoid_index = select_index;
+               avoid_use_primary = use_primary;
+               avoid_use_secondary = use_secondary;
+            }
+         }
+         else if((use_primary && pSelect[select_index].primary_skill_level > min_skill) || 
+            (use_secondary && pSelect[select_index].secondary_skill_level > min_skill))
          {
             min_skill = max(pSelect[select_index].primary_skill_level, pSelect[select_index].secondary_skill_level);
             min_index = select_index;
@@ -1466,13 +1481,44 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
          }
       }
    }
-
+   
    if(min_index > -1 && min_skill > -1)
    {
-      if(!TrySelectWeapon(pBot, min_index, pSelect[min_index], pDelay[min_index]))
-         return FALSE; //error
+      select_index = min_index;
+      use_primary = min_use_primary;
+      use_secondary = min_use_secondary;
       
-      return(BotFireSelectedWeapon(pBot, pSelect[min_index], pDelay[min_index], min_use_primary, min_use_secondary));
+      if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
+         return FALSE; //error
+
+      if(use_primary && use_secondary)
+      {
+         //use least skilled
+         if(pSelect[select_index].primary_skill_level < pSelect[select_index].secondary_skill_level)
+            use_primary = FALSE;
+         else if(pSelect[select_index].primary_skill_level > pSelect[select_index].secondary_skill_level)
+            use_secondary = FALSE;
+      }
+
+      return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], use_primary, use_secondary));
+   }
+   
+   if(avoid_index > -1 && avoid_skill < 6)
+   {
+      select_index = avoid_index;
+      use_primary = avoid_use_primary;
+      use_secondary = avoid_use_secondary;
+      
+      if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
+         return FALSE; //error
+
+      // check if bot has enough skill for attack
+      if(use_primary && !BotSkilledEnoughForPrimaryAttack(pBot, pSelect[select_index]))
+         use_primary = FALSE;
+      if(use_secondary && !BotSkilledEnoughForSecondaryAttack(pBot, pSelect[select_index]))
+         use_secondary = FALSE;
+
+      return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], use_primary, use_secondary));
    }
 
    // didn't have any available weapons or ammo, return FALSE
@@ -1581,8 +1627,11 @@ void BotShootAtEnemy( bot_t &pBot )
 
    if (f_xy_distance > 20)      // run if distance to enemy is far
       pBot.f_move_speed = pBot.f_max_speed;
-   else                     // don't move if close enough
-      pBot.f_move_speed = 10.0;
+   else                     // don't move too fast if close enough
+   {
+      pBot.b_not_maxspeed = TRUE;
+      pBot.f_move_speed = pBot.f_max_speed/2;
+   }
    
    // is it time to shoot yet?
    if (pBot.f_shoot_time <= gpGlobals->time)

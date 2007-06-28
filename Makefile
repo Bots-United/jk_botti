@@ -12,16 +12,18 @@ ifeq ($(OS),Windows_NT)
 	ARCHFLAG = -march=i686 -mtune=pentium4
 	LINKFLAGS = -mdll -lwsock32 -Xlinker --add-stdcall-alias -s
 	DLLEND = .dll
+	ZLIB_OSFLAGS = 
 else
 	CPP = gcc-linux
 	ARCHFLAG = -march=i686 -mcpu=pentium4 -fPIC
 	LINKFLAGS = -fPIC -shared -ldl -s
 	DLLEND = _i386.so
+	ZLIB_OSFLAGS = -DNO_UNDERLINE 
 endif
 
 TARGET = jk_botti_mm
 BASEFLAGS = 
-OPTFLAGS = -O3 -fomit-frame-pointer -ffast-math
+OPTFLAGS = -O3 -fomit-frame-pointer -ffast-math -funroll-loops
 #OPTFLAGS = -O0 -g
 INCLUDES = -I"./metamod" \
 	-I"./common" \
@@ -43,7 +45,6 @@ SRC = 	bot.cpp \
 	bot_query_hook_win32.cpp \
 	bot_skill.cpp \
 	bot_sound.cpp \
-	bot_start.cpp \
 	bot_weapons.cpp \
 	commands.cpp \
 	dll.cpp \
@@ -60,7 +61,7 @@ ${TARGET}${DLLEND}: zlib/libz.a ${OBJ}
 	cp $@ addons/jk_botti/dlls/
 
 zlib/libz.a:
-	(cd zlib; CC="${CPP} ${ARCHFLAG}" ./configure; make; cd ..)
+	(cd zlib; CC="${CPP} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -DASMV" ./configure; make OBJA=match.o; cd ..)
 
 clean:
 	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe

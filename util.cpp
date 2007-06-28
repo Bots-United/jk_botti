@@ -136,7 +136,7 @@ void UTIL_UpdateFuncBreakable(edict_t *pEdict, const char * setting, const char 
    if(FStrEq(setting, "material"))
    {
       // update data value
-      plist->material_breakable = atoi(value) != matUnbreakableGlass;
+      plist->material_breakable = (atoi(value) != matUnbreakableGlass);
    }
 }
 

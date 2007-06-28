@@ -17,7 +17,7 @@
 #define W_FL_CROUCH      (1<<1)  /* must crouch to reach this waypoint */
 #define W_FL_JUMP        (1<<2) /* jump waypoint */
 #define W_FL_LADDER      (1<<3)  /* waypoint on a ladder */
-#define W_FL_LIFT        (1<<4)  /* wait for lift to be down before approaching this waypoint */
+//#define W_FL_OLDLIFT     (1<<4)  /* wait for lift to be down before approaching this waypoint */
 #define W_FL_DOOR        (1<<5)  /* wait for door to open */
 
 #define W_FL_LONGJUMP    (1<<6)  /* item (longjump) */
@@ -30,6 +30,10 @@
 #define W_FL_AIMING      (1<<12) /* aiming waypoint */
 
 #define W_FL_SPAWNADD    (1<<13) /* waypoint was added by spawn-object, marked to not have these trimmed on wp-save */
+
+#define W_FL_LIFT_START  (1<<14) /* handled as normal waypoint + one path to lift-end waypoint */
+#define W_FL_LIFT_END    (1<<15) /* handled otherwise as normal waypoint except only one incoming path from lift-start,
+                                    other incoming paths are ignored (at creating time of other waypoints). */
 
 #define W_FL_DELETED     (1<<31) /* used by waypoint allocation code */
 
@@ -65,7 +69,7 @@ typedef struct {
    int __reserved[3];
 } WAYPOINT;
 
-#define WAYPOINT_UNREACHABLE   USHRT_MAX
+#define WAYPOINT_UNREACHABLE  (USHRT_MAX)
 #define WAYPOINT_MAX_DISTANCE (USHRT_MAX-1)
 
 #define MAX_PATH_INDEX 4
@@ -98,13 +102,15 @@ int  WaypointFindNearestAiming(Vector v_origin);
 void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index);
 void WaypointAdd(edict_t *pEntity);
 void WaypointAddAiming(edict_t *pEntity);
+int  WaypointAddTesting(const Vector &vecOrigin, int flags, int itemflags, qboolean MakePaths);
+void WaypointAddLift(edict_t * pent, const Vector &start, const Vector &end);
 void WaypointDelete(edict_t *pEntity);
 void WaypointUpdate(edict_t *pEntity);
 void WaypointCreatePath(edict_t *pEntity, int cmd);
 void WaypointRemovePath(edict_t *pEntity, int cmd);
 qboolean WaypointLoad(edict_t *pEntity);
 void WaypointSave(void);
-qboolean WaypointReachable(Vector v_srv, Vector v_dest, int flags);
+qboolean WaypointReachable(const Vector &v_src, const Vector &v_dest, const int reachable_flags);
 int  WaypointFindReachable(edict_t *pEntity, float range);
 void WaypointPrintInfo(edict_t *pEntity);
 void WaypointThink(edict_t *pEntity);
@@ -117,6 +123,7 @@ int WaypointRouteFromTo(int src, int dest);
 float WaypointDistanceFromTo(int src, int dest);
 void WaypointSaveFloydsMatrix(unsigned short *shortest_path, unsigned short *from_to);
 void WaypointSaveFloydsMatrix(void);
+void WaypointSlowFloydsStop(void);
 int WaypointSlowFloydsState(void);
 int WaypointSlowFloyds(void);
 int WaypointSlowFloyds(unsigned short *shortest_path, unsigned short *from_to);

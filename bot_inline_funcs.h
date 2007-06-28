@@ -41,7 +41,7 @@ inline double UTIL_GetSecs(void)
 }
 
 #ifdef __GNUC__
-inline void fsincos(double x, double &s, double &c)
+inline void fsincos(double x, double &s, double &c) 
 {
    __asm__ ("fsincos;" : "=t" (c), "=u" (s) : "0" (x) : "st(7)");
 }

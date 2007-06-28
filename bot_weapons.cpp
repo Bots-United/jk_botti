@@ -27,7 +27,7 @@ bot_weapon_select_t valve_weapon_select[13] =
 {
    {VALVE_WEAPON_CROWBAR, "weapon_crowbar", WEAPON_MELEE, 1.0,
     SKILL4, NOSKILL, FALSE, FALSE,
-    0.0, 48.0, 0, 0, 1.0,
+    0.0, 64.0, 0, 0, 1.0,
     20, TRUE, 100, 0, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
     W_IFL_CROWBAR, 0, 0 },
 
@@ -108,11 +108,18 @@ bot_weapon_select_t valve_weapon_select[13] =
 // List of different ammo we are looking for
 bot_ammo_names_t ammo_names[] = {
    { W_IFL_AMMO_GAUSS     , "ammo_gaussclip" },
+   { W_IFL_AMMO_GAUSS     , "ammo_egonclip" },
    { W_IFL_AMMO_BUCKSHOT  , "ammo_buckshot" },
    { W_IFL_AMMO_357       , "ammo_357" },
+   { W_IFL_AMMO_9MM       , "ammo_glockclip" },
    { W_IFL_AMMO_9MM       , "ammo_9mmclip" },
    { W_IFL_AMMO_9MM       , "ammo_9mmAR" },
+   { W_IFL_AMMO_9MM       , "ammo_9mmbox" },
+   { W_IFL_AMMO_9MM       , "ammo_mp5clip" },
+   { W_IFL_AMMO_9MM       , "ammo_mp5AR" },
+   { W_IFL_AMMO_9MM       , "ammo_mp5box" },
    { W_IFL_AMMO_ARGRENADES, "ammo_ARgrenades" },
+   { W_IFL_AMMO_ARGRENADES, "ammo_mp5grenades" },
    { W_IFL_AMMO_CROSSBOW  , "ammo_crossbow" },
    { W_IFL_AMMO_RPG       , "ammo_rpgclip" },
    { 0, "" },
@@ -247,9 +254,21 @@ int GetAmmoItemFlag(const char * classname)
 }
 
 //
+qboolean BotSkilledEnoughForPrimaryAttack(bot_t &pBot, const bot_weapon_select_t &select)
+{
+   return(select.primary_skill_level != NOSKILL && pBot.weapon_skill <= select.primary_skill_level);
+}
+
+//
+qboolean BotSkilledEnoughForSecondaryAttack(bot_t &pBot, const bot_weapon_select_t &select)
+{
+   return(select.secondary_skill_level != NOSKILL && pBot.weapon_skill <= select.secondary_skill_level);
+}
+
+//
 qboolean BotCanUseWeapon(bot_t &pBot, const bot_weapon_select_t &select)
 {
-   return((pBot.bot_skill + 1) <= select.primary_skill_level || (pBot.bot_skill + 1) <= select.secondary_skill_level);
+   return(BotSkilledEnoughForPrimaryAttack(pBot, select) || BotSkilledEnoughForSecondaryAttack(pBot, select));
 }
 
 //
@@ -259,10 +278,10 @@ void BotSelectAttack(bot_t &pBot, const bot_weapon_select_t &select, qboolean &u
    use_primary = FALSE;
    
    // if better attack is preferred
-   // and bot_skill is equal or lesser than attack skill on both attacks
+   // and weapon_skill is equal or lesser than attack skill on both attacks
    if(select.prefer_higher_skill_attack && 
-      (pBot.bot_skill + 1) <= select.secondary_skill_level && 
-      (pBot.bot_skill + 1) <= select.primary_skill_level)
+      pBot.weapon_skill <= select.secondary_skill_level && 
+      pBot.weapon_skill <= select.primary_skill_level)
    {
       // check which one is prefered
       if(select.secondary_skill_level < select.primary_skill_level)
@@ -288,7 +307,7 @@ qboolean IsValidToFireAtTheMoment(bot_t &pBot, const bot_weapon_select_t &select
       return(FALSE);
 
    // underwater and cannot use underwater
-   if (pBot.pEdict->v.waterlevel == 3 && !select.can_use_underwater)
+   if (pBot.b_in_water && !select.can_use_underwater)
       return(FALSE);
    
    return(TRUE);
@@ -528,12 +547,15 @@ int BotGetBetterWeaponChoice(bot_t &pBot, const bot_weapon_select_t &current, co
       if(pSelect[select_index].avoid_this_gun)
          continue;
 
-      *use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, FALSE);
-      *use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, FALSE);
+      *use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, FALSE) && BotSkilledEnoughForPrimaryAttack(pBot, pSelect[select_index]);
+      *use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, FALSE) && BotSkilledEnoughForSecondaryAttack(pBot, pSelect[select_index]);
       
       if(*use_primary || *use_secondary)
          return select_index;
    }
+   
+   *use_primary = FALSE;
+   *use_secondary = FALSE;
    
    return -1;
 }

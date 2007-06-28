@@ -1,4 +1,4 @@
-jk_botti 1.10
+jk_botti 1.20
 -------------
 
 1. Intro
@@ -10,7 +10,7 @@ jk_botti 1.10
 1. Intro
 --------------------
 
-This is 1.10 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+This is 1.20 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
 You are free to use code for any of your needs.
 
 Credits:
@@ -23,7 +23,7 @@ This bot aims to:
  * Lower CPU usage compared to HPB_bot.
  * Be more interesting opponent than other bots found there (try it)
     * More humanlike aiming, hard to keep track on target making movement changes
-    * More random combat movement, random jumping, better straifing
+    * More random combat movement, random jumping, better strafing
     * Hear player footsteps/firing weapons
  * Be dedicated server targeted bot
     * Listenserver client interfaces removed.
@@ -60,6 +60,28 @@ CPU intensive operation this can only be done on map change.
 --------------------
 2. What's new
 --------------------
+1.20:
+ * Added support for lifts.
+ * Fixed weapon selection code to honor weapon secondary/primary attack skill
+   setting.
+ * Fixed bot get up ladders better.
+ * Fixed min_bots/max_bots to handle other metamod bots correctly.
+ * More aggressive autowaypointing for linking separate areas.
+ * Fixed autowaypointing for paths leading from water to dry.
+ * Added missing ammunition type 'ammo_9mmbox'.
+ * Fixed goal selection to use wall mounted health/battery rechargers.
+ * Compiled with more aggressive optimization flags. This speeds up 
+   path-matrix creation.
+ * Fixed output for 'kickall'-command.
+ * Fixed bot not to jump when coming near edge and bot is planing to go down 
+   using ladders.
+ * Workaround for loading map specific config for map 'logo'. 
+   Use '_jk_botti_logo.cfg' for this map. 'jk_botti_logo.cfg' is already used 
+   for bot spraypaints.
+ * Fixed bot always ducking when next waypoint is crouch waypoint. This 
+   caused bot not be able to jump through small window with crouch waypoint 
+   inside.
+
 1.10:
  * Fixed bots to use wall mounted health/battery rechargers and buttons.
  * Fixed bots to pick up items.
@@ -68,10 +90,12 @@ CPU intensive operation this can only be done on map change.
  * Lowered default bot lookaround/pause frequency and times.
  * Fixed autowaypointing not to place waypoints midair.
  * Fixed autowaypointing not to create impossible upwards paths.
- * Fixed autowaypointing not to create crouch waypoints if there is room to stand up.
- * Old waypoint files are automatically processed to fix above autowaypointing errors.
- * Lots of tweaks to autowaypointing: better handling of ladders and stairs, better 
-   linking of isolated areas.
+ * Fixed autowaypointing not to create crouch waypoints if there is room to 
+   stand up.
+ * Old waypoint files are automatically processed to fix above 
+   autowaypointing errors.
+ * Lots of tweaks to autowaypointing: better handling of ladders and stairs, 
+   better linking of isolated areas.
  * 'autowaypoint' is now default on.
  * New command 'show_waypoints' for viewing/aiding waypoint creation.
 
@@ -95,8 +119,8 @@ CPU intensive operation this can only be done on map change.
  * Added waypoint files for default valve maps.
 
 0.54:
- * Fixed the way bots react to sounds. Instead of making sound enemy, bot finds
-   it's way to the interesting sound.
+ * Fixed the way bots react to sounds. Instead of making sound enemy, bot 
+   finds it's way to the interesting sound.
  * New way of computing msec for RunPlayerMove.
  * Bots don't attack respawn players too fast (delay is skill depend).
  * New skill settings: pause_time_min, pause_time_max, react_delay_min[0-2],

@@ -25,6 +25,7 @@ void BotAimPre( bot_t &pBot );
 void BotAimPost( bot_t &pBot );
 void LoadBotModels(void);
 
+void BotDoStrafe(bot_t &pBot);
 void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distance);
 
 void BotChatTaunt(bot_t &pBot, edict_t *victim_edict);

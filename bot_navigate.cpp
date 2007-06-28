@@ -193,7 +193,7 @@ qboolean BotFindWaypoint( bot_t &pBot )
    
    for (index=0; index < 3; index++)
    {
-      min_distance[index] = 9999.0;
+      min_distance[index] = 99999.0;
       min_index[index] = -1;
    }
 
@@ -310,7 +310,7 @@ int BotFindWaypointGoal( bot_t &pBot )
    edict_t *pEdict = pBot.pEdict;
    bot_weapon_select_t *pSelect;
    float distance;
-   float mindistance = 9999;
+   float mindistance = 99999;
    int ammoflags, weaponflags, select_index;
    int *pExclude = pBot.exclude_points;
 
@@ -572,8 +572,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
       pBot.waypoint_top_of_ladder = FALSE;
 
       // did we just come off of a ladder or are we underwater?
-      if (((pBot.f_end_use_ladder_time + 2.0) > gpGlobals->time) ||
-          (pBot.pEdict->v.waterlevel == 3))
+      if (((pBot.f_end_use_ladder_time + 2.0) > gpGlobals->time) || pBot.b_in_water)
       {
          // find the nearest visible waypoint
          i = WaypointFindNearest(pEdict, REACHABLE_RANGE);
@@ -605,8 +604,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
          // longjump toward the waypoint
          // we have to be out of water, on the ground, able to longjump, far enough away to longjump, and
          // facing pretty close to the waypoint
-         if(pEdict->v.waterlevel == 0 && 
-            (pEdict->v.flags & FL_ONGROUND) == FL_ONGROUND && 
+         if(!pBot.b_in_water && pBot.b_on_ground && !pBot.b_ducking && !pBot.b_on_ladder &&
             vecToWpt.Length() >= max_lj_distance * 0.6 && 
             pEdict->v.velocity.Length() > 50 && 
             DotProduct(UTIL_AnglesToForward(pEdict->v.v_angle), vecToWpt.Normalize()) > cos(deg2rad(10)))
@@ -656,8 +654,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
          if (tr.flFraction < 1.0f)
          {
             // did we just come off of a ladder or are we under water?
-            if (((pBot.f_end_use_ladder_time + 2.0) > gpGlobals->time) ||
-                (pBot.pEdict->v.waterlevel == 3))
+            if (((pBot.f_end_use_ladder_time + 2.0) > gpGlobals->time) || pBot.b_in_water)
             {
                // find the nearest visible waypoint
                i = WaypointFindNearest(pEdict, REACHABLE_RANGE);
@@ -697,6 +694,14 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
 
    // if this is a ladder waypoint, bot must be fairly close to get on ladder
    if (waypoints[pBot.curr_waypoint_index].flags & W_FL_LADDER)
+      min_distance = 20.0;
+
+   // if this is a lift-start waypoint
+   if (waypoints[pBot.curr_waypoint_index].flags & W_FL_LIFT_START)
+      min_distance = 32.0;
+   
+   // if this is a lift-end waypoint, bot must be very close
+   if (waypoints[pBot.curr_waypoint_index].flags & W_FL_LIFT_END)
       min_distance = 20.0;
 
    // if item waypoint, go close
@@ -781,12 +786,6 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
             pBot.f_last_item_found = gpGlobals->time;
          }
 
-         /*pBot.exclude_points[4] = pBot.exclude_points[3];
-         pBot.exclude_points[3] = pBot.exclude_points[2];
-         pBot.exclude_points[2] = pBot.exclude_points[1];
-         pBot.exclude_points[1] = pBot.exclude_points[0];
-         pBot.exclude_points[0] = pBot.curr_waypoint_index;*/
-
          if (pBot.pBotEnemy != NULL)
             pBot.f_waypoint_goal_time = gpGlobals->time;
          else   // a little delay time, since we'll touch the waypoint before we actually get what it has
@@ -797,7 +796,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
       }
 
       // test special case of bot underwater and close to surface...
-      if (pBot.pEdict->v.waterlevel == 3)
+      if (pBot.b_in_water)
       {
          Vector v_src, v_dest;
          TraceResult tr;
@@ -854,10 +853,9 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
          {
             pBot.waypoint_goal = index;
 
-            pBot.exclude_points[4] = pBot.exclude_points[3];
-            pBot.exclude_points[3] = pBot.exclude_points[2];
-            pBot.exclude_points[2] = pBot.exclude_points[1];
-            pBot.exclude_points[1] = pBot.exclude_points[0];
+            for(i = EXCLUDE_POINTS_COUNT - 1; i > 0; i--)
+               pBot.exclude_points[i] = pBot.exclude_points[i-1];
+            
             pBot.exclude_points[0] = pBot.waypoint_goal;
          }
       }
@@ -907,8 +905,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
 
    // check if the next waypoint is on a ladder AND
    // the bot it not currently on a ladder...
-   if ((waypoints[pBot.curr_waypoint_index].flags & W_FL_LADDER) &&
-       (pEdict->v.movetype != MOVETYPE_FLY))
+   if ((waypoints[pBot.curr_waypoint_index].flags & W_FL_LADDER) && !pBot.b_on_ladder)
    {
       // if it's origin is lower than the bot...
       if (waypoints[pBot.curr_waypoint_index].origin.z < pEdict->v.origin.z)
@@ -928,7 +925,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
    Vector v_angles = UTIL_VecToAngles(v_direction);
 
    // if the bot is NOT on a ladder, change the yaw...
-   if (pEdict->v.movetype != MOVETYPE_FLY)
+   if (!pBot.b_on_ladder)
    {
       pEdict->v.idealpitch = -v_angles.x;
       BotFixIdealPitch(pEdict);
@@ -943,19 +940,39 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
 
 void BotOnLadder( bot_t &pBot, float moved_distance )
 {
+   static float search_angles[] = { 0.0f, 0.0f, 90.0f, -90.0f, 45.0f, -45.0f, 60.0f, -30.0f, 30.0f, -60.0f, 10.0f, -10.0f, 20.0f, -20.0f, 40.0f, -40.0f, 50.0f, -50.0f, 70.0f, -70.0f, 80.0f, -80.0f, 9999.9f };
    Vector v_src, v_dest, view_angles;
    TraceResult tr;
-   float angle = 0.0;
+   float angle, search_dir;
    qboolean done = FALSE;
+   int i;
 
    edict_t *pEdict = pBot.pEdict;
 
    // check if the bot has JUST touched this ladder...
    if (pBot.ladder_dir == LADDER_UNKNOWN)
    {
-      // try to square up the bot on the ladder...
-      while ((!done) && (angle < 180.0))
+      i = 0;
+      search_dir = RANDOM_LONG2(0, 1) ? 1.0f : -1.0f;      
+      search_angles[0] = 0.0f;
+      
+      // add special case to angles, check towards next waypoint
+      if(pBot.curr_waypoint_index != -1)
       {
+         Vector v_dir = waypoints[pBot.curr_waypoint_index].origin - pEdict->v.origin;
+         Vector v_to_wp = UTIL_VecToAngles(v_dir);
+         
+         search_angles[0] = v_to_wp.y * search_dir;
+      }
+      
+      if(search_angles[0] == 0.0f)
+         i++;
+      
+      // try to square up the bot on the ladder...
+      while ((!done) && (search_angles[i] <= 90.0f))
+      {
+         angle = search_angles[i] * search_dir;
+         
          // try looking in one direction (forward + angle)
          view_angles.x = pEdict->v.v_angle.x;
          view_angles.y = UTIL_WrapAngle(pEdict->v.v_angle.y + angle);
@@ -969,7 +986,8 @@ void BotOnLadder( bot_t &pBot, float moved_distance )
 
          if (tr.flFraction < 1.0f)  // hit something?
          {
-            if (FIsClassname("func_wall", tr.pHit))
+            //if (FIsClassname("func_wall", tr.pHit))
+            if (!FNullEnt(tr.pHit) && tr.pHit->v.solid == SOLID_BSP)
             {
                // square up to the wall...
                view_angles = UTIL_VecToAngles(tr.vecPlaneNormal);
@@ -1002,7 +1020,8 @@ void BotOnLadder( bot_t &pBot, float moved_distance )
 
             if (tr.flFraction < 1.0f)  // hit something?
             {
-               if (FIsClassname("func_wall", tr.pHit))
+               //if (FIsClassname("func_wall", tr.pHit))
+               if (!FNullEnt(tr.pHit) && tr.pHit->v.solid == SOLID_BSP)
                {
                   // square up to the wall...
                   view_angles = UTIL_VecToAngles(tr.vecPlaneNormal);
@@ -1022,7 +1041,7 @@ void BotOnLadder( bot_t &pBot, float moved_distance )
             }
          }
 
-         angle += 10;
+         i++;
       }
 
       if (!done)  // if didn't find a wall, just reset ideal_yaw...
@@ -1156,14 +1175,8 @@ void BotUseLift( bot_t &pBot, float moved_distance )
    edict_t *pEdict = pBot.pEdict;
 
    // just need to press the button once, when the flag gets set...
-   if (pBot.f_use_button_time + 0.50 >= gpGlobals->time)
-   {
-      if(pBot.b_use_button_prev_state)
-         pEdict->v.button &= ~IN_USE;
-      else
-         pEdict->v.button |= IN_USE;
-      pBot.b_use_button_prev_state = !pBot.b_use_button_prev_state;
-      
+   if (pBot.f_use_button_time + 0.0 >= gpGlobals->time)
+   {     
       // aim at the button..
       Vector v_target = pBot.v_use_target - GetGunPosition( pEdict );
       Vector target_angle = UTIL_VecToAngles(v_target);
@@ -1171,10 +1184,34 @@ void BotUseLift( bot_t &pBot, float moved_distance )
       pEdict->v.idealpitch = UTIL_WrapAngle(target_angle.x);
       pEdict->v.ideal_yaw = UTIL_WrapAngle(target_angle.y);
       
-      pBot.f_move_speed = pBot.f_max_speed;
+      pBot.b_not_maxspeed = TRUE;
+      pBot.f_move_speed = 120.0f;
+      
+      // block strafing before using hev
+      pBot.f_strafe_time = gpGlobals->time + 1.0f;
+      pBot.f_strafe_direction = 0.0f;
 
       BotFixIdealYaw(pEdict);
       BotFixIdealPitch(pEdict);
+      
+      if (pBot.f_use_button_time + 0.40 >= gpGlobals->time)
+      {
+         pEdict->v.button |= IN_USE;
+      
+         // find near by W_FL_LIFT_START and make it current waypoint
+         int index = WaypointFindNearestGoal(pEdict->v.origin, pEdict, 150.0f, W_FL_LIFT_START);
+      
+         if(index != -1)
+         {
+            pBot.prev_waypoint_index[4] = pBot.prev_waypoint_index[3];
+            pBot.prev_waypoint_index[3] = pBot.prev_waypoint_index[2];
+            pBot.prev_waypoint_index[2] = pBot.prev_waypoint_index[1];
+            pBot.prev_waypoint_index[1] = pBot.prev_waypoint_index[0];
+            pBot.prev_waypoint_index[0] = pBot.curr_waypoint_index;
+         
+            pBot.curr_waypoint_index = index;
+         }
+      }
    }
 
    // check if the bot has waited too long for the lift to move...
@@ -1186,7 +1223,10 @@ void BotUseLift( bot_t &pBot, float moved_distance )
 
       // bot doesn't have to set f_find_item since the bot
       // should already be facing away from the button
-
+      
+      pBot.b_not_maxspeed = FALSE;
+      pBot.f_move_speed = pBot.f_max_speed;
+      pBot.f_strafe_time = gpGlobals->time;
       pBot.f_move_speed = pBot.f_max_speed;
    }
 
@@ -1205,6 +1245,11 @@ void BotUseLift( bot_t &pBot, float moved_distance )
       Vector angle_v_forward, angle_v_right, angle_v_left;
       
       pBot.b_use_button = FALSE;
+      
+      pBot.b_not_maxspeed = FALSE;
+      pBot.f_move_speed = pBot.f_max_speed;
+      pBot.f_strafe_time = gpGlobals->time;
+      pBot.f_move_speed = pBot.f_max_speed;
 
       // TraceLines in 4 directions to find which way to go...
 
@@ -1726,7 +1771,7 @@ qboolean BotEdgeForward( bot_t &pBot, const Vector &v_move_dir )
    
    // pre checks
    if (FBitSet(pEdict->v.button, IN_DUCK) || FBitSet(pEdict->v.button, IN_JUMP) ||
-       !FBitSet(pEdict->v.flags, FL_ONGROUND) || pEdict->v.movetype == MOVETYPE_FLY)
+       !pBot.b_on_ground || pBot.b_on_ladder)
       return FALSE;
    
    // 1. Trace from origin 32 units forward
@@ -1786,7 +1831,7 @@ qboolean BotEdgeRight( bot_t &pBot, const Vector &v_move_dir )
    
    // pre checks
    if (FBitSet(pEdict->v.button, IN_DUCK) || FBitSet(pEdict->v.button, IN_JUMP) ||
-       !FBitSet(pEdict->v.flags, FL_ONGROUND) || pEdict->v.movetype == MOVETYPE_FLY)
+       !pBot.b_on_ground || pBot.b_on_ladder)
       return FALSE;
 
    // 1. Trace from origin 32 units right
@@ -1846,7 +1891,7 @@ qboolean BotEdgeLeft( bot_t &pBot, const Vector &v_move_dir )
    
    // pre checks
    if (FBitSet(pEdict->v.button, IN_DUCK) || FBitSet(pEdict->v.button, IN_JUMP) ||
-       !FBitSet(pEdict->v.flags, FL_ONGROUND) || pEdict->v.movetype == MOVETYPE_FLY)
+       !pBot.b_on_ground || pBot.b_on_ladder)
       return FALSE;
 
    // 1. Trace from origin 32 units left
@@ -1919,60 +1964,6 @@ void BotRandomTurn( bot_t &pBot )
    }
             
    BotFixIdealYaw(pBot.pEdict);
-}
-
-
-qboolean BotFollowUser( bot_t &pBot )
-{
-   qboolean user_visible;
-   float f_distance;
-   edict_t *pEdict = pBot.pEdict;
-
-   if (!IsAlive( pBot.pBotUser ))
-   {
-      // the bot's user is dead!
-      pBot.pBotUser = NULL;
-      return FALSE;
-   }
-
-   Vector vecEnd = pBot.pBotUser->v.origin + pBot.pBotUser->v.view_ofs;
-
-   user_visible = FInViewCone( vecEnd, pEdict ) && FVisible( vecEnd, pEdict, pBot.pBotUser );
-
-   // check if the "user" is still visible or if the user has been visible
-   // in the last 5 seconds (or the player just starting "using" the bot)
-
-   if (user_visible || (pBot.f_bot_use_time + 5 > gpGlobals->time))
-   {
-      if (user_visible)
-         pBot.f_bot_use_time = gpGlobals->time;  // reset "last visible time"
-
-      // face the user
-      Vector v_user = pBot.pBotUser->v.origin - pEdict->v.origin;
-      Vector bot_angles = UTIL_VecToAngles( v_user );
-
-      pEdict->v.ideal_yaw = bot_angles.y;
-
-      BotFixIdealYaw(pEdict);
-
-      f_distance = v_user.Length( );  // how far away is the "user"?
-
-      if (f_distance > 200)      // run if distance to enemy is far
-         pBot.f_move_speed = pBot.f_max_speed;
-      else if (f_distance > 50)  // walk if distance is closer
-         pBot.f_move_speed = pBot.f_max_speed / 2;
-      else                     // don't move if close enough
-         pBot.f_move_speed = 0.0;
-
-      return TRUE;
-   }
-   else
-   {
-      // person to follow has gone out of sight...
-      pBot.pBotUser = NULL;
-
-      return FALSE;
-   }
 }
 
 
@@ -2153,7 +2144,7 @@ void BotLookForDrop( bot_t &pBot )
 
          v_dest = pEdict->v.origin;
 
-         if (pEdict->v.flags & FL_DUCKING)
+         if (pBot.b_ducking)
          {
             v_src.z = v_src.z - 22;  // (36/2) + 4 units
             v_dest.z = v_dest.z - 22;

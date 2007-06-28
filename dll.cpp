@@ -73,6 +73,7 @@ int max_bots = -1;
 int num_bots = 0;
 int prev_num_bots = 0;
 edict_t *clients[32];
+char *client_addresses[32];
 edict_t *listenserver_edict = NULL;
 float welcome_time = 0.0;
 qboolean welcome_sent = FALSE;
@@ -307,6 +308,11 @@ void CheckSubMod(void)
 }
 
 
+static float m_height = 0;
+static float m_lip = 0;
+static Vector m_origin;
+
+
 int Spawn( edict_t *pent )
 {
    if (gpGlobals->deathmatch)
@@ -360,24 +366,77 @@ int Spawn( edict_t *pent )
          memset(last_time_not_facing_wall, 0, sizeof(last_time_not_facing_wall));
          memset(last_time_dead, 0, sizeof(last_time_dead));
       }
+      else if(FIsClassname(pent, "func_plat") || FIsClassname(pent, "func_door"))
+      {
+         m_origin = pent->v.origin;
+      }
    }
 
    RETURN_META_VALUE (MRES_IGNORED, 0);
 }
 
 
+
+
+
 int Spawn_Post( edict_t *pent )
 {
-   if (gpGlobals->deathmatch)
+   if(!gpGlobals->deathmatch)
+      RETURN_META_VALUE (MRES_IGNORED, 0);
+   
+   if (FIsClassname(pent, "worldspawn"))
    {
-      if (FIsClassname(pent, "worldspawn"))
+      // check for team play... gamedll check it in 'worldspawn' spawn and doesn't recheck
+      BotCheckTeamplay();
+   }
+   else if(FIsClassname(pent, "func_plat"))
+   {
+      if(m_height == 0)
+         m_height = pent->v.size.z + 8;
+      
+      Vector v_position1 = m_origin;
+      Vector v_position2 = m_origin;
+      v_position2.z -= m_height;
+      
+      Vector start, end;
+      if(!FStringNull(pent->v.targetname))
       {
-         // check for team play... gamedll check it in 'worldspawn' spawn and doesn't recheck
-         BotCheckTeamplay();
+         start = v_position1;
+         end = v_position2;
       }
       else
-         CollectMapSpawnItems(pent);
+      {
+         start = v_position2;
+         end = v_position1;
+      }
+      
+      WaypointAddLift(pent, start, end);
    }
+   else if(FIsClassname(pent, "func_door"))
+   {
+      const int SF_DOOR_START_OPEN = 1;
+      
+      Vector v_position1 = m_origin;
+      // Subtract 2 from size because the engine expands bboxes by 1 in all directions making the size too big
+      Vector v_position2 = m_origin + (pent->v.movedir * (fabs( pent->v.movedir.x * (pent->v.size.x-2) ) + fabs( pent->v.movedir.y * (pent->v.size.y-2) ) + fabs( pent->v.movedir.z * (pent->v.size.z-2) ) - m_lip));
+
+      if ( FBitSet (pent->v.spawnflags, SF_DOOR_START_OPEN) )
+      {
+         Vector swap = v_position1;
+         v_position1 = v_position2;
+         v_position2 = swap;
+      }
+      
+      Vector start = v_position1;
+      Vector end = v_position2;
+      
+      WaypointAddLift(pent, start, end);
+   }
+   else
+      CollectMapSpawnItems(pent);
+   
+   m_height = 0;
+   m_lip = 0;
    
    RETURN_META_VALUE (MRES_IGNORED, 0);
 }
@@ -389,8 +448,26 @@ void DispatchKeyValue_Post( edict_t *pentKeyvalue, KeyValueData *pkvd )
       RETURN_META (MRES_IGNORED);
    
    if(pkvd && pkvd->szKeyName && pkvd->szValue)
-      if(FIsClassname(pentKeyvalue, "func_breakable") || (FIsClassname(pentKeyvalue, "func_pushable") && pentKeyvalue->v.spawnflags & SF_PUSH_BREAKABLE))
+   {
+      if(FIsClassname(pentKeyvalue, "func_breakable") && !(pentKeyvalue->v.spawnflags & SF_BREAK_TRIGGER_ONLY))
+      	 UTIL_UpdateFuncBreakable(pentKeyvalue, pkvd->szKeyName, pkvd->szValue);
+      
+      else if(FIsClassname(pentKeyvalue, "func_pushable") && pentKeyvalue->v.spawnflags & SF_PUSH_BREAKABLE && !(pentKeyvalue->v.spawnflags & SF_BREAK_TRIGGER_ONLY))
          UTIL_UpdateFuncBreakable(pentKeyvalue, pkvd->szKeyName, pkvd->szValue);
+      
+      else if(FIsClassname(pentKeyvalue, "func_plat"))
+      {
+         // save height?
+         if(FStrEq(pkvd->szKeyName, "height"))
+            m_height = atof(pkvd->szValue);
+      }
+      else if(FIsClassname(pentKeyvalue, "func_door"))
+      {
+         // save lip?
+         if (FStrEq(pkvd->szKeyName, "lip"))
+            m_lip = atof(pkvd->szValue);
+      }
+   }
    
    RETURN_META (MRES_HANDLED);
 }
@@ -400,9 +477,6 @@ BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *p
 { 
    if (!gpGlobals->deathmatch)
       RETURN_META_VALUE (MRES_IGNORED, 0);
-   
-   int i;
-   int count = 0;
 
    // check if this client is the listen server client
    if (strcmp(pszAddress, "loopback") == 0)
@@ -410,10 +484,41 @@ BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *p
       // save the edict of the listen server client...
       listenserver_edict = pEntity;
    }
+   
+   int idx = ENTINDEX(pEntity) - 1;
+   
+   if (idx < gpGlobals->maxClients && idx >= 0)
+   {
+      if(client_addresses[idx])
+         free(client_addresses[idx]);
+   
+      client_addresses[idx] = strdup(pszAddress);
+   }
+   else
+      RETURN_META_VALUE (MRES_IGNORED, 0);
+      
+   RETURN_META_VALUE (MRES_IGNORED, 0);
+}
+
+
+void jkbotti_ClientPutInServer( edict_t *pEntity )
+{
+   if (!gpGlobals->deathmatch)
+      RETURN_META (MRES_IGNORED);
+   
+   int idx = ENTINDEX(pEntity) - 1;
+
+   if (idx < gpGlobals->maxClients && idx >= 0)
+      clients[idx] = pEntity;  // store this clients edict in the clients array
+   else
+      RETURN_META (MRES_IGNORED);
 
    // check if this is NOT a bot joining the server...
-   if (strcmp(pszAddress, "127.0.0.1") != 0)
+   if (client_addresses[idx] && strcmp(client_addresses[idx], "::::local:jk_botti") != 0)
    {
+      int i;
+      int count = 0;
+   
       // don't try to add bots for 60 seconds, give client time to get added
       bot_check_time = gpGlobals->time + 5.0;
 
@@ -422,7 +527,7 @@ BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *p
          if (bots[i].is_used)  // count the number of bots in use
             count++;
       }
-
+      
       // if there are currently more than the minimum number of bots running
       // then kick one of the bots off the server...
       if ((count > min_bots) && (min_bots != -1))
@@ -448,29 +553,39 @@ BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *p
          }
       }
    }
-
-   RETURN_META_VALUE (MRES_IGNORED, 0);
-}
-
-
-void jkbotti_ClientPutInServer( edict_t *pEntity )
-{
-   if (!gpGlobals->deathmatch)
-      RETURN_META (MRES_IGNORED);
    
-   int idx = ENTINDEX(pEntity) - 1;
+   if(client_addresses[idx])
+      free(client_addresses[idx]);
+   client_addresses[idx] = NULL;
 
-   if (idx < 32 && idx >= 0)
-      clients[idx] = pEntity;  // store this clients edict in the clients array
-   else
-      RETURN_META (MRES_IGNORED);
-   
    ResetSound(pEntity);
    
    if(client_address[idx])
       free(client_address[idx]);
    
    client_address[idx] = NULL;
+   
+   RETURN_META (MRES_IGNORED);
+}
+
+
+void CmdStart( const edict_t *player, const struct usercmd_s *cmd, unsigned int random_seed )
+{
+   // This is to detect other third party bots
+   
+   // check if connected
+   for(int i = 0; i < gpGlobals->maxClients; i++)
+   {
+      if(player == clients[i])
+         RETURN_META (MRES_IGNORED);
+   }
+   
+   char szRejectReason[ 128 ];
+   
+   memset(szRejectReason, 0, sizeof(szRejectReason));
+   
+   jkbotti_ClientConnect((edict_t*)player, STRING(player->v.netname), "::::local:other_bot", szRejectReason);
+   jkbotti_ClientPutInServer( (edict_t*)player );
    
    RETURN_META (MRES_IGNORED);
 }
@@ -483,7 +598,7 @@ void ClientDisconnect( edict_t *pEntity )
       int i;
       int idx = ENTINDEX(pEntity) - 1;
 
-      if (idx < 32 && idx >= 0)
+      if (idx < gpGlobals->maxClients && idx >= 0)
          clients[idx] = NULL;
 
       for (i=0; i < 32; i++)
@@ -521,7 +636,7 @@ void ServerDeactivate(void)
       WaypointSave();
    
    UTIL_FreeFuncBreakables();
-   
+      
    RETURN_META (MRES_HANDLED);
 }
 
@@ -674,7 +789,10 @@ void StartFrame( void )
       need_to_open_cfg = FALSE;  // only do this once!!!
 
       // check if jk_botti_mapname.cfg file exists...
-      safevoid_snprintf(mapname, sizeof(mapname), "jk_botti_%s.cfg", STRING(gpGlobals->mapname));
+      if(stricmp(STRING(gpGlobals->mapname), "logo") == 0)
+         safevoid_snprintf(mapname, sizeof(mapname), "%s", "_jk_botti_logo.cfg");
+      else
+         safevoid_snprintf(mapname, sizeof(mapname), "jk_botti_%s.cfg", STRING(gpGlobals->mapname));
       
       UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti", mapname);
 
@@ -763,6 +881,7 @@ C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVers
    gFunctionTable.pfnStartFrame = StartFrame;
    gFunctionTable.pfnServerDeactivate = ServerDeactivate;
    gFunctionTable.pfnPM_Move = PM_Move;
+   gFunctionTable.pfnCmdStart = CmdStart;
 
    memcpy (pFunctionTable, &gFunctionTable, sizeof (DLL_FUNCTIONS));
    return (TRUE);
