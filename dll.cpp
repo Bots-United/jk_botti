@@ -7,6 +7,7 @@
 #ifndef _WIN32
 #include <string.h>
 #endif
+#include "asm_string.h"
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -80,6 +81,7 @@ qboolean welcome_sent = FALSE;
 int bot_stop = 0;
 int frame_count = 0;
 int randomize_bots_on_mapchange = 0;
+int debug_minmax = 0;
 
 qboolean is_team_play = FALSE;
 qboolean checked_teamplay = FALSE;
@@ -154,7 +156,7 @@ C_DLLEXPORT int Meta_Query (char *ifvers, plugin_info_t **pPlugInfo, mutil_funcs
    Plugin_info.version = plugver;
 
    // check for interface version compatibility
-   if (strcmp (ifvers, Plugin_info.ifvers) != 0)
+   if (jkstrcmp (ifvers, Plugin_info.ifvers) != 0)
    {
       int mmajor = 0, mminor = 0, pmajor = 0, pminor = 0;
 
@@ -353,9 +355,7 @@ int Spawn( edict_t *pent )
          spawn_time_reset = FALSE;
 
          for(int i = 0; i < 32; i++)
-         {
-            bots[i].is_used = 0;
-         }
+            bots[i].is_used = FALSE;
          
          num_bots = 0;
          need_to_open_cfg = TRUE;
@@ -374,9 +374,6 @@ int Spawn( edict_t *pent )
 
    RETURN_META_VALUE (MRES_IGNORED, 0);
 }
-
-
-
 
 
 int Spawn_Post( edict_t *pent )
@@ -479,24 +476,22 @@ BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *p
       RETURN_META_VALUE (MRES_IGNORED, 0);
 
    // check if this client is the listen server client
-   if (strcmp(pszAddress, "loopback") == 0)
+   if (jkstrcmp(pszAddress, "loopback") == 0)
    {
       // save the edict of the listen server client...
       listenserver_edict = pEntity;
    }
-   
-   int idx = ENTINDEX(pEntity) - 1;
-   
-   if (idx < gpGlobals->maxClients && idx >= 0)
+   else if(jkstrcmp(pszAddress, "::::local:jk_botti") == 0)
    {
-      if(client_addresses[idx])
-         free(client_addresses[idx]);
-   
-      client_addresses[idx] = strdup(pszAddress);
+      // don't try to add bots for 1 second, give client time to get added
+      bot_check_time = gpGlobals->time + 1.0;
    }
-   else
-      RETURN_META_VALUE (MRES_IGNORED, 0);
-      
+   else if(jkstrcmp(pszAddress, "::::local:other_bot") == 0)
+   {
+      // don't try to add bots for 1 second, give client time to get added
+      bot_check_time = gpGlobals->time + 1.0;
+   }
+   
    RETURN_META_VALUE (MRES_IGNORED, 0);
 }
 
@@ -511,66 +506,36 @@ void jkbotti_ClientPutInServer( edict_t *pEntity )
    if (idx < gpGlobals->maxClients && idx >= 0)
       clients[idx] = pEntity;  // store this clients edict in the clients array
    else
-      RETURN_META (MRES_IGNORED);
-
-   // check if this is NOT a bot joining the server...
-   if (client_addresses[idx] && strcmp(client_addresses[idx], "::::local:jk_botti") != 0)
    {
-      int i;
-      int count = 0;
-   
-      // don't try to add bots for 60 seconds, give client time to get added
-      bot_check_time = gpGlobals->time + 5.0;
-
-      for (i=0; i < 32; i++)
-      {
-         if (bots[i].is_used)  // count the number of bots in use
-            count++;
-      }
-      
-      // if there are currently more than the minimum number of bots running
-      // then kick one of the bots off the server...
-      if ((count > min_bots) && (min_bots != -1))
-      {
-         int bot_index_list[32];
-         int num_bots = 0;
-         
-         for (i=0; i < 32; i++)
-         {
-            if (bots[i].is_used)  // is this slot used?
-            {
-               bot_index_list[num_bots++] = i;
-
-               break;
-            }
-         }
-         
-         if(num_bots>0)
-         {
-            int pick = RANDOM_LONG2(0, num_bots-1);
-            
-            BotKick(bots[pick]);
-         }
-      }
+      UTIL_ConsolePrintf("Error! ClientPutInServer pEntity invalid!");
+      RETURN_META (MRES_IGNORED);
    }
    
-   if(client_addresses[idx])
-      free(client_addresses[idx]);
-   client_addresses[idx] = NULL;
-
    ResetSound(pEntity);
-   
-   if(client_address[idx])
-      free(client_address[idx]);
-   
-   client_address[idx] = NULL;
-   
+
    RETURN_META (MRES_IGNORED);
 }
 
 
 void CmdStart( const edict_t *player, const struct usercmd_s *cmd, unsigned int random_seed )
 {
+   // check if is our bot
+   int bot_index = UTIL_GetBotIndex(player);
+   
+   if(bot_index != -1)
+   {
+      if(bots[bot_index].name[0] == 0)  // name filled in yet?
+         safevoid_snprintf(bots[bot_index].name, sizeof(bots[bot_index].name), "%s", STRING(bots[bot_index].pEdict->v.netname));
+      
+      if(bots[bot_index].userid <= 0)  // user id filled in yet?
+         bots[bot_index].userid = GETPLAYERUSERID(bots[bot_index].pEdict);
+      
+      JKASSERT(bots[bot_index].name[0] == 0);
+      JKASSERT(bots[bot_index].userid <= 0);
+      
+      RETURN_META (MRES_IGNORED);
+   }
+	
    // This is to detect other third party bots
    
    // check if connected
@@ -609,6 +574,7 @@ void ClientDisconnect( edict_t *pEntity )
 
             bots[i].is_used = FALSE;  // this slot is now free to use
             bots[i].f_kick_time = gpGlobals->time;  // save the kicked time
+            bots[i].userid = 0;
 
             break;
          }
@@ -710,7 +676,7 @@ void PM_Move(struct playermove_s *ppmove, qboolean server)
 void StartFrame( void )
 {
    edict_t *pPlayer;
-   int i, bot_index;
+   int bot_index;
    int count;
    double begin_time;
    
@@ -816,30 +782,42 @@ void StartFrame( void )
          }
       }
 
-      bot_cfg_pause_time = gpGlobals->time + 5.0;
+      bot_cfg_pause_time = gpGlobals->time + 0.1;
+      bot_check_time = gpGlobals->time + 1.0;
    }
 
    if ((bot_cfg_fp) &&
-       (bot_cfg_pause_time >= 1.0) && (bot_cfg_pause_time <= gpGlobals->time))
+       (bot_cfg_pause_time > 0.0f) && (bot_cfg_pause_time <= gpGlobals->time))
    {
       // process jk_botti.cfg file options...
       ProcessBotCfgFile();
+      
+      bot_check_time = gpGlobals->time + 1.0;
    }
 
    // check if time to see if a bot needs to be created...
-   if (bot_check_time < gpGlobals->time)
+   if (bot_check_time < gpGlobals->time && min_bots != -1 && max_bots != -1 && min_bots <= max_bots)
    {
-      count = 0;
-
-      bot_check_time = gpGlobals->time + 5.0;
-
-      for (i = 0; i < 32; i++)
-         if (clients[i] != NULL)
-            count++;
-
-      // if there are currently less than the maximum number of "players"
-      // then add another bot using the default skill level...
-      if ((count < max_bots) && (max_bots != -1))
+      int client_count = UTIL_GetClientCount();
+      
+      if(debug_minmax)
+      {
+         UTIL_ConsolePrintf("client count: %d, bot count: %d, max_bots: %d, min_bots: %d\n", 
+            client_count, UTIL_GetBotCount(), max_bots, min_bots);
+         
+         UTIL_ConsolePrintf("client_count < max_bots: %s", client_count < max_bots ? "TRUE":"FALSE");
+         UTIL_ConsolePrintf("client_count > max_bots: %s", client_count > max_bots ? "TRUE":"FALSE");
+         UTIL_ConsolePrintf("bot_count > min_bots: %s", UTIL_GetBotCount() > min_bots ? "TRUE":"FALSE");
+         
+         UTIL_ConsolePrintf("Should add bot: %s", client_count < max_bots ? "TRUE":"FALSE");
+         UTIL_ConsolePrintf("Should remove bot: %s", (client_count > max_bots && UTIL_GetBotCount() > min_bots) ? "TRUE":"FALSE");
+         
+         if(client_count > max_bots && UTIL_GetBotCount() > min_bots)
+            UTIL_ConsolePrintf("Test UTIL_PickRandomBot(), return value: %d", UTIL_PickRandomBot());
+      }
+      
+      // need more clients
+      if(client_count < max_bots)
       {
          const cfg_bot_record_t * record = GetUnusedCfgBotRecord();
          
@@ -847,7 +825,21 @@ void StartFrame( void )
             BotCreate( record->skin, record->name, record->skill, record->top_color, record->bottom_color, record->index );
          else
             BotCreate( NULL, NULL, -1, -1, -1, -1 );
+         
+         bot_check_time = gpGlobals->time + 0.5;
       }
+      // more than minimum count of bots and need to lower client count
+      else if(client_count > max_bots && UTIL_GetBotCount() > min_bots)
+      {
+         int pick = UTIL_PickRandomBot();
+         
+         if(pick != -1)
+            BotKick(bots[pick]);
+         
+         bot_check_time = gpGlobals->time + 0.5;
+      }
+      else
+         bot_check_time = gpGlobals->time + ((!!debug_minmax) ? 5.0 : 0.5);
    }
    
    // -- Run Floyds for creating waypoint path matrix

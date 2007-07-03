@@ -4,7 +4,10 @@
 // bot_weapons.cpp
 //
 
+#ifndef _WIN32
 #include <string.h>
+#endif
+#include "asm_string.h"
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -27,7 +30,7 @@ bot_weapon_select_t valve_weapon_select[13] =
 {
    {VALVE_WEAPON_CROWBAR, "weapon_crowbar", WEAPON_MELEE, 1.0,
     SKILL4, NOSKILL, FALSE, FALSE,
-    0.0, 64.0, 0, 0, 1.0,
+    0.0, 40.0, 0, 0, 1.0,
     20, TRUE, 100, 0, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
     W_IFL_CROWBAR, 0, 0 },
 

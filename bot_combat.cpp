@@ -6,7 +6,11 @@
 
 #define BOTCOMBAT
 
+#ifndef _WIN32
 #include <string.h>
+#endif
+#include "asm_string.h"
+
 #include <malloc.h>
 
 #include <extdll.h>
@@ -560,12 +564,8 @@ edict_t *FindEnemyNearestToPoint(Vector v_point, float radius, edict_t * pBotEdi
          if (!FVisible( v_point, pMonster, pMonster ))
             continue;
 
-         //float distance = (pMonster->v.origin - v_point).Length();
-         //if (distance < nearestdistance)
-         {
-            nearestdistance = distance;
-            pNearestEnemy = pMonster;
-         }
+         nearestdistance = distance;
+         pNearestEnemy = pMonster;
       }
    }
 
@@ -598,12 +598,8 @@ edict_t *FindEnemyNearestToPoint(Vector v_point, float radius, edict_t * pBotEdi
          if (!FVisible( v_point, pPlayer, pPlayer))
                continue;
 
-         //float distance = (pMonster->v.origin - v_point).Length();
-         //if (distance < nearestdistance)
-         {
-            nearestdistance = distance;
-            pNearestEnemy = pPlayer;
-         }
+         nearestdistance = distance;
+         pNearestEnemy = pPlayer;
       }
    }
    
@@ -653,7 +649,7 @@ qboolean BotFindSoundEnemy( bot_t &pBot )
          
          if (!FNullEnt(pMonsterOrPlayer) && IsAlive(pMonsterOrPlayer))
          {
-            Vector v_monsterplayer = UTIL_GetOrigin(pMonsterOrPlayer);
+            Vector v_monsterplayer = UTIL_GetOriginWithExtent(pBot, pMonsterOrPlayer);
             float distance = (v_monsterplayer - pEdict->v.origin).Length();
             BOOL observer_skip = FALSE;
             
@@ -746,7 +742,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
          Vector vecEnd;
          Vector vecPredEnemy;
 
-         vecPredEnemy = GetPredictedPlayerPosition(pBot, pBot.pBotEnemy);
+         vecPredEnemy = UTIL_AdjustOriginWithExtent(pBot, GetPredictedPlayerPosition(pBot, pBot.pBotEnemy), pBot.pBotEnemy);
 
          vecEnd = vecPredEnemy;
          if(FCanShootInHead(pEdict, pBot.pBotEnemy, vecPredEnemy))
@@ -806,10 +802,14 @@ edict_t *BotFindEnemy( bot_t &pBot )
             continue;
          
          // cannot take damage
-         if(pBreakable->pEdict->v.takedamage == DAMAGE_NO || pBreakable->pEdict->v.solid == SOLID_NOT || !pBreakable->material_breakable)
+         if(pBreakable->pEdict->v.takedamage == DAMAGE_NO || 
+            pBreakable->pEdict->v.solid == SOLID_NOT || 
+            pBreakable->pEdict->v.deadflag == DEAD_DEAD ||
+            !pBreakable->material_breakable ||
+            pBreakable->pEdict->v.health <= 0)
             continue;
          
-         Vector v_origin = UTIL_GetOrigin(pBreakable->pEdict);
+         Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBreakable->pEdict);
          
          float distance = (v_origin - pEdict->v.origin).Length();
          if (distance >= nearestdistance)
@@ -838,7 +838,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
          if (!IsAlive (pMonster))
             continue; // discard dead or dying monsters
 
-         float distance = (pMonster->v.origin - pEdict->v.origin).Length();
+         float distance = (UTIL_GetOriginWithExtent(pBot, pMonster) - pEdict->v.origin).Length();
          if (distance >= nearestdistance)
             continue;
 
@@ -875,7 +875,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
             if ((b_observer_mode) && !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
                continue;
             
-            float distance = (pPlayer->v.origin - pEdict->v.origin).Length();
+            float distance = (UTIL_GetOriginWithExtent(pBot, pPlayer) - pEdict->v.origin).Length();
             if (distance >= nearestdistance)
                continue;
 
@@ -937,6 +937,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
 
       pEdict->v.button |= IN_RELOAD;  // press reload button
    }
+   
 
    return (pNewEnemy);
 }
@@ -1553,7 +1554,7 @@ void BotShootAtEnemy( bot_t &pBot )
    if (pBot.f_reaction_target_time > gpGlobals->time)
       return;
 
-   v_predicted_pos = GetPredictedPlayerPosition(pBot, pBot.pBotEnemy);
+   v_predicted_pos = UTIL_AdjustOriginWithExtent(pBot, GetPredictedPlayerPosition(pBot, pBot.pBotEnemy), pBot.pBotEnemy);
 
    // do we need to aim at the feet?
    if (pBot.current_weapon.iId == VALVE_WEAPON_RPG)

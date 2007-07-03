@@ -7,6 +7,7 @@
 #ifndef _WIN32
 #include <string.h>
 #endif
+#include "asm_string.h"
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -77,17 +78,16 @@ void BotKick(bot_t &pBot)
 {
    char cmd[64];
 
-   if(pBot.name[0] == 0)
-   {
-      if(pBot.pEdict->v.netname && STRING(pBot.pEdict->v.netname)[0])
-         safevoid_snprintf(pBot.name, sizeof(pBot.name), "%s", STRING(pBot.pEdict->v.netname));
-      else
-         return; // if client-edict doesn't have netname, it's invalid
-   }
-
-   safevoid_snprintf(cmd, sizeof(cmd), "kick \"%s\"\n", pBot.name);
-
-   SERVER_COMMAND(cmd);  // kick the bot using (kick "name")
+   if(pBot.userid <= 0)  // user id filled in yet?
+      pBot.userid = GETPLAYERUSERID(pBot.pEdict);
+   
+   JKASSERT(pBot.is_used == FALSE);
+   JKASSERT(FNullEnt(pBot.pEdict));   
+   JKASSERT(pBot.userid <= 0);
+   
+   safevoid_snprintf(cmd, sizeof(cmd), "kick # %d\n", pBot.userid);
+   
+   SERVER_COMMAND(cmd);  // kick the bot using 'kick # <userid>'
    SERVER_EXECUTE();
 }
 
@@ -292,10 +292,10 @@ void BotPickName( char *name_buffer, int sizeof_name_buffer )
             const char * netname = STRING(pPlayer->v.netname);
             
             //check if bot name is [lvlX]name format...
-            if (strncmp(netname, "[lvl", 4) == 0 && netname[4] >= '1' && netname[4] <= '5' && netname[5] == ']')
+            if (jkstrncmp(netname, "[lvl", 4) == 0 && netname[4] >= '1' && netname[4] <= '5' && netname[5] == ']')
                netname += 6;
             
-            if (strcmp(bot_names[name_index], netname) == 0)
+            if (jkstrcmp(bot_names[name_index], netname) == 0)
             {
                used = TRUE;
                break;
@@ -378,7 +378,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
 
    while ((!found) && (index < max_skin_index))
    {
-      if (strcmp(c_skin, bot_skins[index].model_name) == 0)
+      if (jkstrcmp(c_skin, bot_skins[index].model_name) == 0)
          found = TRUE;
       else
          index++;
@@ -469,7 +469,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
    //
    // Bug fix: remove [lvlX] tags always
    //
-   if(!strncmp(c_name, "[lvl", 4) && (c_name[4] >= '1' && c_name[4] <= '5') && c_name[5] == ']')
+   if(!jkstrncmp(c_name, "[lvl", 4) && (c_name[4] >= '1' && c_name[4] <= '5') && c_name[5] == ']')
    {
       // Read skill from config file name
       if(!got_skill_arg)
@@ -491,7 +491,10 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
       c_name[sizeof(c_name)-1] = 0;  // make sure c_name is null terminated
    }
    
-   BotEnt = (*g_engfuncs.pfnCreateFakeClient)( c_name );
+   if(UTIL_GetBotCount() < 32)
+      BotEnt = (*g_engfuncs.pfnCreateFakeClient)( c_name );
+   else
+      BotEnt = NULL;
 
    if (FNullEnt( BotEnt ))
    {
@@ -549,6 +552,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
       memset(&pBot, 0, sizeof(pBot));
 
       pBot.is_used = TRUE;
+      pBot.userid = 0;
       pBot.cfg_bot_index = cfg_bot_index;
       pBot.f_create_time = gpGlobals->time;
       pBot.name[0] = 0;  // name not set by server yet
@@ -612,7 +616,7 @@ void BotReplaceConnectionTime(const char * name, float * timeslot)
       bot_t &pBot = bots[i];
       
       // find bot by name
-      if(strcmp(pBot.name, name) != 0)
+      if(jkstrcmp(pBot.name, name) != 0)
          continue;
       
       double current_time = UTIL_GetSecs();
@@ -746,7 +750,7 @@ void BotPickLogo(bot_t &pBot)
       {
          if (bots[index].is_used)
          {
-            if (strcmp(bots[index].logo_name, bot_logos[logo_index]) == 0)
+            if (jkstrcmp(bots[index].logo_name, bot_logos[logo_index]) == 0)
             {
                used = TRUE;
             }
@@ -836,7 +840,7 @@ void BotFindItem( bot_t &pBot )
 
    // forget about item if it we picked it up
    if (pBot.pBotPickupItem && ((pBot.pBotPickupItem->v.effects & EF_NODRAW) ||
-      !BotEntityIsVisible(pBot, UTIL_GetOrigin(pBot.pBotPickupItem))))
+      !BotEntityIsVisible(pBot, UTIL_GetOriginWithExtent(pBot, pBot.pBotPickupItem))))
    {
       pBot.f_last_item_found = -1;
       pBot.pBotPickupItem = NULL;
@@ -864,7 +868,7 @@ void BotFindItem( bot_t &pBot )
       safevoid_snprintf(item_name, sizeof(item_name), "%s", STRING(pent->v.classname));
 
       // see if this is a "func_" type of entity (func_button, etc.)...
-      if (strncmp("func_", item_name, 5) == 0)
+      if (jkstrncmp("func_", item_name, 5) == 0)
       {      	
          // BModels have 0,0,0 for origin so must use VecBModelOrigin...
          entity_origin = VecBModelOrigin(pent);
@@ -880,7 +884,7 @@ void BotFindItem( bot_t &pBot )
 
          // check if entity is a ladder (ladders are a special case)
          // DON'T search for ladders if there are waypoints in this level...
-         if ((strcmp("func_ladder", item_name) == 0) && (num_waypoints == 0))
+         if ((jkstrcmp("func_ladder", item_name) == 0) && (num_waypoints == 0))
          {
             // force ladder origin to same z coordinate as bot since
             // the VecBModelOrigin is the center of the ladder.  For
@@ -935,7 +939,7 @@ void BotFindItem( bot_t &pBot )
                // check if entity is wall mounted health charger...
                // check if the bot can use this item and
                // check if the recharger is ready to use (has power left)...
-               if (strcmp("func_healthcharger", item_name) == 0 && 
+               if (jkstrcmp("func_healthcharger", item_name) == 0 && 
                	   (pEdict->v.health < VALVE_MAX_NORMAL_HEALTH) && (pent->v.frame == 0))
                {
                   // check if flag not set...
@@ -947,7 +951,7 @@ void BotFindItem( bot_t &pBot )
                      {
                         pBot.b_use_health_station = TRUE;
                         pBot.f_use_health_time = gpGlobals->time;
-                        pBot.v_use_target = UTIL_GetOrigin(pent);
+                        pBot.v_use_target = UTIL_GetOriginWithExtent(pBot, pent);
                      }
 
                      // if close to health station...
@@ -972,7 +976,7 @@ void BotFindItem( bot_t &pBot )
                // check if entity is wall mounted HEV charger...
                // check if the bot can use this item and
                // check if the recharger is ready to use (has power left)...
-               if (strcmp("func_recharge", item_name) == 0 &&
+               if (jkstrcmp("func_recharge", item_name) == 0 &&
                	   (pEdict->v.armorvalue < VALVE_MAX_NORMAL_BATTERY) && (pent->v.frame == 0))
                {
                   // check if flag not set and facing it...
@@ -984,7 +988,7 @@ void BotFindItem( bot_t &pBot )
                      {
                         pBot.b_use_HEV_station = TRUE;
                         pBot.f_use_HEV_time = gpGlobals->time;
-                        pBot.v_use_target = UTIL_GetOrigin(pent);
+                        pBot.v_use_target = UTIL_GetOriginWithExtent(pBot, pent);
                      }
 
                      // if close to HEV recharger...
@@ -1007,7 +1011,7 @@ void BotFindItem( bot_t &pBot )
                }
 
                // check if entity is a button...
-               if (FIsClassname(item_name, tr.pHit) && strcmp("func_button", item_name) == 0)
+               if (FIsClassname(item_name, tr.pHit) && jkstrcmp("func_button", item_name) == 0)
                {               	  
                   // use the button about 100% of the time, if haven't
                   // used a button in at least 5 seconds...
@@ -1023,7 +1027,7 @@ void BotFindItem( bot_t &pBot )
                         {
                            pBot.b_use_button = TRUE;
                            pBot.b_lift_moving = FALSE;
-                           pBot.v_use_target = UTIL_GetOrigin(pent);
+                           pBot.v_use_target = UTIL_GetOriginWithExtent(pBot, pent);
                            pBot.f_use_button_time = gpGlobals->time;
                         }
 
@@ -1090,7 +1094,7 @@ void BotFindItem( bot_t &pBot )
                if(found)
                {
                   //does player have this weapon
-                  if(pBot.pEdict->v.weapons & (1<<pSelect[select_index].iId))
+                  if(pEdict->v.weapons & (1<<pSelect[select_index].iId))
                   {
                      // is ammo low?
                      if(BotPrimaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
@@ -1141,7 +1145,7 @@ void BotFindItem( bot_t &pBot )
             }
             
             // pick up longjump
-            else if (strcmp("item_longjump", item_name) == 0)
+            else if (jkstrcmp("item_longjump", item_name) == 0)
             {
                if (pent->v.effects & EF_NODRAW)
                {
@@ -1157,7 +1161,7 @@ void BotFindItem( bot_t &pBot )
             }
 
             // check if entity is a battery...
-            else if (strcmp("item_battery", item_name) == 0)
+            else if (jkstrcmp("item_battery", item_name) == 0)
             {
                // check if the item is not visible (i.e. has not respawned)
                if (pent->v.effects & EF_NODRAW)
@@ -1171,7 +1175,7 @@ void BotFindItem( bot_t &pBot )
             }
 
             // check if entity is a healthkit...
-            else if (strcmp("item_healthkit", item_name) == 0)
+            else if (jkstrcmp("item_healthkit", item_name) == 0)
             {
                // check if the item is not visible (i.e. has not respawned)
                if (pent->v.effects & EF_NODRAW)
@@ -1185,18 +1189,18 @@ void BotFindItem( bot_t &pBot )
             }
 
             // check if entity is a packed up weapons box...
-            else if (strcmp("weaponbox", item_name) == 0)
+            else if (jkstrcmp("weaponbox", item_name) == 0)
             {
                can_pickup = TRUE;
             }
 
             // check if entity is the spot from RPG laser
-            else if (strcmp("laser_spot", item_name) == 0)
+            else if (jkstrcmp("laser_spot", item_name) == 0)
             {
             }
 
             // check if entity is an armed tripmine
-            else if (strcmp("monster_tripmine", item_name) == 0)
+            else if (jkstrcmp("monster_tripmine", item_name) == 0)
             {
                float distance = (pent->v.origin - pEdict->v.origin).Length( );
 
@@ -1230,12 +1234,12 @@ void BotFindItem( bot_t &pBot )
             }
 
             // check if entity is an armed satchel charge
-            else if (strcmp("monster_satchel", item_name) == 0)
+            else if (jkstrcmp("monster_satchel", item_name) == 0)
             {
             }
 
             // check if entity is a snark (squeak grenade)
-            else if (strcmp("monster_snark", item_name) == 0)
+            else if (jkstrcmp("monster_snark", item_name) == 0)
             {
             }
             
@@ -1292,7 +1296,7 @@ qboolean BotLookForGrenades( bot_t &pBot )
    pent = NULL;
    while ((pent = UTIL_FindEntityInSphere( pent, pEdict->v.origin, radius )) != NULL)
    {
-      entity_origin = pent->v.origin;
+      entity_origin = UTIL_GetOriginWithExtent(pBot, pent);
 
       if (FInViewCone( entity_origin, pEdict ) && FVisible( entity_origin, pEdict, pent ))
       {
@@ -1847,8 +1851,10 @@ void BotThink( bot_t &pBot )
 
    pEdict->v.flags |= FL_THIRDPARTYBOT | FL_FAKECLIENT;
 
-   if (pBot.name[0] == 0)  // name filled in yet?
-      safevoid_snprintf(pBot.name, sizeof(pBot.name), "%s", STRING(pBot.pEdict->v.netname));
+   if(pBot.name[0] == 0)  // name filled in yet?
+      safevoid_snprintf(pBot.name, sizeof(pBot.name), "%s", STRING(pEdict->v.netname));
+   if(pBot.userid <= 0)  // user id filled in yet?
+      pBot.userid = GETPLAYERUSERID(pEdict);
 
    // New code, BotThink is not run on every StartFrame anymore.
    pBot.f_frame_time = gpGlobals->time - pBot.f_last_think_time;
@@ -2060,17 +2066,17 @@ void BotThink( bot_t &pBot )
       if(pBot.f_pause_look_time <= gpGlobals->time)
       {
          if(RANDOM_LONG2(1, 100) <= 50)
-            pBot.pEdict->v.ideal_yaw += RANDOM_LONG2(30, 60);
+            pEdict->v.ideal_yaw += RANDOM_LONG2(30, 60);
          else
-            pBot.pEdict->v.ideal_yaw -= RANDOM_LONG2(30, 60);
+            pEdict->v.ideal_yaw -= RANDOM_LONG2(30, 60);
       
-         if(pBot.pEdict->v.idealpitch > -30)
-            pBot.pEdict->v.idealpitch -= RANDOM_LONG2(10, 30);
-         else if(pBot.pEdict->v.idealpitch < 30)
-            pBot.pEdict->v.idealpitch += RANDOM_LONG2(10, 30);
+         if(pEdict->v.idealpitch > -30)
+            pEdict->v.idealpitch -= RANDOM_LONG2(10, 30);
+         else if(pEdict->v.idealpitch < 30)
+            pEdict->v.idealpitch += RANDOM_LONG2(10, 30);
       
-         BotFixIdealYaw(pBot.pEdict);
-         BotFixIdealPitch(pBot.pEdict);
+         BotFixIdealYaw(pEdict);
+         BotFixIdealPitch(pEdict);
          
          pBot.f_pause_look_time = gpGlobals->time + RANDOM_FLOAT(0.5, 1.0);
       }
@@ -2292,7 +2298,7 @@ void BotDoStrafe(bot_t &pBot)
    edict_t *pEdict = pBot.pEdict;
    
    // combat strafe
-   if(pBot.pBotEnemy != NULL && FInViewCone(pBot.pBotEnemy->v.origin, pEdict) && FVisibleEnemy( pBot.pBotEnemy->v.origin, pEdict, pBot.pBotEnemy ))
+   if(pBot.pBotEnemy != NULL && FInViewCone(UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy), pEdict) && FVisibleEnemy( UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy), pEdict, pBot.pBotEnemy ))
    {
       // don't go too close to enemy
       // strafe instead
@@ -2316,7 +2322,7 @@ void BotDoStrafe(bot_t &pBot)
             
             if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].keep_optimal_dist)
             {
-               if((pBot.pBotEnemy->v.origin - pEdict->v.origin).Length() < pBot.current_opt_distance)
+               if((UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy) - pEdict->v.origin).Length() < pBot.current_opt_distance)
                   pBot.f_move_direction = -1;
                else
                   pBot.f_move_direction = 1;
@@ -2598,7 +2604,7 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
    if(lj)
    {
       max_lj_distance = LONGJUMP_DISTANCE * (800 / CVAR_GET_FLOAT("sv_gravity"));
-      target_distance = (pBot.pBotEnemy->v.origin - pBot.pEdict->v.origin).Length();
+      target_distance = (UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy) - pEdict->v.origin).Length();
       
       lj = (target_distance > 128.0f && target_distance < max_lj_distance);
    }
@@ -2645,12 +2651,12 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
       pEdict->v.button |= IN_JUMP;
       
       pBot.prev_random_type = 1;
-      //UTIL_ConsolePrintf("%s - Random jump\n", STRING(pBot.pEdict->v.netname));
+      //UTIL_ConsolePrintf("%s - Random jump\n", STRING(pEdict->v.netname));
       
       // duck mid-air?
       if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_jump_duck_frequency)
       {
-         //UTIL_ConsolePrintf("%s - Random duck-jump\n", STRING(pBot.pEdict->v.netname));
+         //UTIL_ConsolePrintf("%s - Random duck-jump\n", STRING(pEdict->v.netname));
          pBot.f_random_jump_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.15, 0.25);
          pBot.f_random_jump_duck_end = pBot.f_random_jump_duck_time + RANDOM_FLOAT2(0.3, 0.5);
          pBot.f_random_jump_time = pBot.f_random_jump_duck_end + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
@@ -2667,7 +2673,7 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
       pEdict->v.button |= IN_DUCK;
       
       pBot.prev_random_type = 2;
-      //UTIL_ConsolePrintf("%s - Random duck\n", STRING(pBot.pEdict->v.netname));
+      //UTIL_ConsolePrintf("%s - Random duck\n", STRING(pEdict->v.netname));
       
       pBot.f_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.3, 0.45);
       pBot.f_random_duck_time = pBot.f_duck_time + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
@@ -2688,9 +2694,9 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
       // get a random angle (-30 or 30)
       for (int i = 1; i >= -1; i-=2)
       {
-         target_angle.x = -pBot.pEdict->v.v_angle.x;
-         target_angle.y = UTIL_WrapAngle(pBot.pEdict->v.v_angle.y + 30 * (mod * i));
-         target_angle.z = pBot.pEdict->v.v_angle.z;
+         target_angle.x = -pEdict->v.v_angle.x;
+         target_angle.y = UTIL_WrapAngle(pEdict->v.v_angle.y + 30 * (mod * i));
+         target_angle.z = pEdict->v.v_angle.z;
 
          // trace a hull toward the current waypoint the distance of a longjump (depending on gravity)
          UTIL_TraceMove(vecSrc, vecSrc + UTIL_AnglesToForward(target_angle) * max_lj_distance, dont_ignore_monsters, pEdict, &tr);
@@ -2698,7 +2704,7 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
          // make sure it's clear
          if (tr.flFraction >= 1.0f)
          {
-            //UTIL_ConsolePrintf("%s - Clear longjump path found\n", STRING(pBot.pEdict->v.netname));
+            //UTIL_ConsolePrintf("%s - Clear longjump path found\n", STRING(pEdict->v.netname));
             pBot.b_combat_longjump = TRUE;
                
             pEdict->v.ideal_yaw += 30 * mod;

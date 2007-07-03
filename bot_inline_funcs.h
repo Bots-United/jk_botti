@@ -15,10 +15,11 @@
 	#define likely(x) (x)
 	#define unlikely(x) (x)
 #else
-	#define likely(x) __builtin_expect((long int)(x), true)
-	#define unlikely(x) __builtin_expect((long int)(x), false)
+	#define likely(x) __builtin_expect((long int)!!(x), true)
+	#define unlikely(x) __builtin_expect((long int)!!(x), false)
 #endif
 
+//
 inline double UTIL_GetSecs(void) 
 {
 #ifdef _WIN32
@@ -129,14 +130,14 @@ inline Vector GetGunPosition(edict_t *pEdict)
    return (pEdict->v.origin + pEdict->v.view_ofs);
 }
 
-inline void UTIL_SelectItem(edict_t *pEdict, const char *item_name)
-{
-   FakeClientCommand(pEdict, item_name, NULL, NULL);
-}
-
 inline Vector VecBModelOrigin(edict_t *pEdict)
 {
    return pEdict->v.absmin + (pEdict->v.size * 0.5);
+}
+
+inline void UTIL_SelectItem(edict_t *pEdict, const char *item_name)
+{
+   FakeClientCommand(pEdict, item_name, NULL, NULL);
 }
 
 // Overloaded to add IGNORE_GLASS
@@ -171,7 +172,7 @@ inline edict_t *UTIL_FindEntityInSphere( edict_t *pentStart, const Vector &vecCe
 
    pentEntity = FIND_ENTITY_IN_SPHERE( pentStart, vecCenter, flRadius);
 
-   if (!FNullEnt(pentEntity))
+   if (likely(!FNullEnt(pentEntity)))
       return pentEntity;
 
    return NULL;
@@ -183,7 +184,7 @@ inline edict_t *UTIL_FindEntityByString( edict_t *pentStart, const char *szKeywo
 
    pentEntity = FIND_ENTITY_BY_STRING( pentStart, szKeyword, szValue );
 
-   if (!FNullEnt(pentEntity))
+   if (likely(!FNullEnt(pentEntity)))
       return pentEntity;
    
    return NULL;
@@ -266,11 +267,41 @@ inline void BotFixIdealYaw(edict_t *pEdict)
 
 inline Vector UTIL_GetOrigin(edict_t *pEdict)
 {
-//   if(strncmp(STRING(pEdict->v.classname), "func_", 5) == 0)
-   if(pEdict->v.solid == SOLID_BSP)
+//   if(jkstrncmp(STRING(pEdict->v.classname), "func_", 5) == 0)
+   if(unlikely(pEdict->v.solid == SOLID_BSP))
       return VecBModelOrigin(pEdict);
 
    return pEdict->v.origin; 
+}
+
+inline Vector UTIL_AdjustOriginWithExtent(bot_t &pBot, const Vector & v_target_origin, edict_t *pTarget)
+{
+   // get smallest extent of bots mins/maxs
+   float smallest_extent = -pTarget->v.mins[0];
+   if(-pTarget->v.mins[1] < smallest_extent)
+      smallest_extent = -pTarget->v.mins[1];
+   if(-pTarget->v.mins[2] < smallest_extent)
+      smallest_extent = -pTarget->v.mins[2];
+   
+   if(pTarget->v.maxs[0] < smallest_extent)
+      smallest_extent = pTarget->v.maxs[0];
+   if(pTarget->v.maxs[1] < smallest_extent)
+      smallest_extent = pTarget->v.maxs[1];
+   if(pTarget->v.maxs[2] < smallest_extent)
+      smallest_extent = pTarget->v.maxs[2];
+   
+   if(smallest_extent <= 0.0f)
+      return(v_target_origin);
+   
+   // extent origin towards bot
+   Vector v_extent_dir = (GetGunPosition(pBot.pEdict) - v_target_origin).Normalize();
+   
+   return(v_target_origin + v_extent_dir * smallest_extent);
+}
+
+inline Vector UTIL_GetOriginWithExtent(bot_t &pBot, edict_t *pTarget)
+{
+   return(UTIL_AdjustOriginWithExtent(pBot, UTIL_GetOrigin(pTarget), pTarget));
 }
 
 inline void UTIL_ParticleEffect( const Vector &vecOrigin, const Vector &vecDirection, ULONG ulColor, ULONG ulCount )
@@ -278,7 +309,7 @@ inline void UTIL_ParticleEffect( const Vector &vecOrigin, const Vector &vecDirec
    PARTICLE_EFFECT( vecOrigin, vecDirection, (float)ulColor, (float)ulCount );
 }
 
-inline int UTIL_GetBotIndex(edict_t *pEdict)
+inline int UTIL_GetBotIndex(const edict_t *pEdict)
 {
    int index;
 
@@ -289,7 +320,7 @@ inline int UTIL_GetBotIndex(edict_t *pEdict)
    return -1;  // return -1 if edict is not a bot
 }
 
-inline bot_t *UTIL_GetBotPointer(edict_t *pEdict)
+inline bot_t *UTIL_GetBotPointer(const edict_t *pEdict)
 {
    int index = UTIL_GetBotIndex(pEdict);
    
@@ -308,7 +339,7 @@ inline qboolean FInViewCone(const Vector & Origin, edict_t *pEdict)
 
 inline qboolean FIsClassname(edict_t * pent, const char * cname)
 {
-   return(pent?FStrEq(STRING(pent->v.classname), cname):FALSE);
+   return(likely(pent)?jkstrcmp(STRING(pent->v.classname), cname)==0:FALSE);
 }
 
 inline qboolean FIsClassname(const char * cname, edict_t * pent)
@@ -348,7 +379,7 @@ inline int RANDOM_LONG2(int lLow, int lHigh)
 {
    double rnd;
    
-   if(lLow >= lHigh)
+   if(unlikely(lLow >= lHigh))
       return(lLow);
    
    rnd = fast_generate_random();
@@ -361,7 +392,7 @@ inline float RANDOM_FLOAT2(float flLow, float flHigh)
 {
    double rnd;
    
-   if(flLow >= flHigh)
+   if(unlikely(flLow >= flHigh))
       return(flLow);
    
    rnd = fast_generate_random();

@@ -1,4 +1,4 @@
-jk_botti 1.20
+jk_botti 1.24
 -------------
 
 1. Intro
@@ -10,7 +10,7 @@ jk_botti 1.20
 1. Intro
 --------------------
 
-This is 1.20 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+This is 1.24 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
 You are free to use code for any of your needs.
 
 Credits:
@@ -60,6 +60,12 @@ CPU intensive operation this can only be done on map change.
 --------------------
 2. What's new
 --------------------
+1.24:
+ * Rewrote min/max_bots code.
+ * Increased config-file processing and bot adding speed.
+ * Changed bot kicking to use 'kick # <userid>' instead of 'kick <name>'.
+ * Fixed broken random bot selection code.
+
 1.20:
  * Added support for lifts.
  * Fixed weapon selection code to honor weapon secondary/primary attack skill

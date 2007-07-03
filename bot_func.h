@@ -64,7 +64,14 @@ qboolean BotFireWeapon( const Vector & v_enemy, bot_t &pBot, int weapon_choice )
 void BotShootAtEnemy( bot_t &pBot );
 qboolean BotShootTripmine( bot_t &pBot );
 
-void free_posdata_list(int idx);
+void LoadBotChat(void);
+void BotTrimBlanks(const char *in_string, char *out_string, int sizeof_out_string);
+int BotChatTrimTag(const char *original_name, char *out_name, int sizeof_out_name);
+void BotDropCharacter(const char *in_string, char *out_string, int sizeof_out_string);
+void BotSwapCharacter(const char *in_string, char *out_string, int sizeof_out_string);
+void BotChatName(const char *original_name, char *out_name, int sizeof_out_name);
+void BotChatText(const char *in_text, char *out_text, int sizeof_out_text);
+void BotChatFillInName(char *bot_say_msg, int sizeof_msg, const char *chat_text, const char *chat_name, const char *bot_name);
 
 #endif // BOT_FUNC_H
 

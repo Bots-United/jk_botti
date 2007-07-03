@@ -1,6 +1,16 @@
+//
+// JK_Botti - be more human!
+//
+// safe_snprintf.cpp
+//
+
+#ifndef _WIN32
+#include <string.h>
+#endif
+#include "asm_string.h"
+
 #include <stdarg.h>
 #include <stdio.h>
-#include <string.h>
 #include <memory.h>
 #include <malloc.h>
 #include <limits.h>
@@ -121,6 +131,29 @@ void safevoid_vsnprintf(char* s, size_t n, const char *format, va_list ap)
 	if(!format || !*format) 
 	{
 		s[0]=0;
+		return;
+	}
+	else if(format[0] == '%' && format[1] == 's' && format[2] == '\0')
+	{
+		//special case for handling "%s" fast!
+		const char *str = va_arg(ap, const char *);
+		size_t i;
+		
+		if(!str)
+			str = "(null)";
+		
+		i = 0;
+		while(str[i] != '\0' && i < n)
+		{
+			s[i] = str[i];
+			i++;
+		}
+		
+		if(i < n)
+			s[i] = '\0';
+		else if(i == n)
+			s[i-1] = '\0';
+		
 		return;
 	}
 	

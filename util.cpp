@@ -1,22 +1,5 @@
-/***
-*
-*  Copyright (c) 1999, Valve LLC. All rights reserved.
-*
-*  This product contains software technology licensed from Id
-*  Software, Inc. ("Id Technology").  Id Technology (c) 1996 Id Software, Inc.
-*  All Rights Reserved.
-*
-*   Use, distribution, and modification of this source code and/or resulting
-*   object code is restricted to non-commercial enhancements to products from
-*   Valve LLC.  All other use, distribution, or modification is prohibited
-*   without written permission from Valve LLC.
-*
-****/
-
 //
-// HPB_bot - botman's High Ping Bastard bot
-//
-// (http://planethalflife.com/botman/)
+// JK_Botti - be more human!
 //
 // util.cpp
 //
@@ -24,6 +7,7 @@
 #ifndef _WIN32
 #include <string.h>
 #endif
+#include "asm_string.h"
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -42,6 +26,64 @@ float last_time_not_facing_wall[32];
 float last_time_dead[32];
 
 breakable_list_t *g_breakable_list = NULL;
+
+
+// classic way of getting connected client count without using data collected from 'ClientPutInServer'/'ClientDisconnect'.
+int UTIL_GetClientCount(void)
+{
+   int count = 0;
+   
+   for(int i = 1; i <= gpGlobals->maxClients; i++)
+   {
+      edict_t * pClient = INDEXENT(i);
+      
+      if(!pClient || pClient->free || FNullEnt(pClient) || GETPLAYERUSERID(pClient) <= 0 || STRING(pClient->v.netname)[0] == 0)
+         continue;
+      
+      count++;
+   }
+   
+   return(count);
+}
+
+
+// 
+int UTIL_GetBotCount(void)
+{
+   int count = 0;
+   
+   for(int i = 0; i < 32; i++)
+      if(bots[i].is_used)
+         count++;
+   
+   return(count);
+}
+
+
+//
+int UTIL_PickRandomBot(void)
+{
+   int bot_index_list[32];
+   int num_bots = 0;
+   
+   for(int i = 0; i < 32; i++)
+      if(bots[i].is_used)  // is this slot used?
+         bot_index_list[num_bots++] = i;
+   
+   if(num_bots > 0)
+   {
+      if(num_bots == 1)
+         return(bot_index_list[0]);
+      
+      int pick = RANDOM_LONG2(0, num_bots-1);
+      
+      JKASSERT(pick < 0 || pick > num_bots-1);
+      
+      return(bot_index_list[pick]);
+   }
+   
+   return(-1);
+}
 
 
 //
@@ -157,12 +199,35 @@ void UTIL_FreeFuncBreakables(void)
 }
 
 //
-breakable_list_t * UTIL_FindBreakable(breakable_list_t * pbreakable)
+breakable_list_t * UTIL_FindBreakable_Internal(breakable_list_t * pbreakable)
 {
-   if(!pbreakable)
+   if(unlikely(!pbreakable))
       return(g_breakable_list);
    else
       return(pbreakable->next);
+}
+
+//
+breakable_list_t * UTIL_FindBreakable(breakable_list_t * pbreakable)
+{
+   do {
+      pbreakable = UTIL_FindBreakable_Internal(pbreakable);
+      
+      if(unlikely(!pbreakable))
+         return(NULL);
+      
+      // skip unbreakable glass
+      if(!pbreakable->material_breakable)
+         continue;
+      
+      // skip deleted entities
+      if(FNullEnt(pbreakable->pEdict) || pbreakable->pEdict->v.health <= 0)
+         continue;
+   
+   // skip reused/wrong name entities
+   } while(!FIsClassname(pbreakable->pEdict, "func_breakable") && !FIsClassname(pbreakable->pEdict, "func_pushable"));
+   
+   return(pbreakable);
 }
 
 

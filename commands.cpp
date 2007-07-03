@@ -7,6 +7,7 @@
 #ifndef _WIN32
 #include <string.h>
 #endif
+#include "asm_string.h"
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -51,7 +52,7 @@ extern int max_bots;
 extern FILE *bot_cfg_fp;
 extern int bot_cfg_linenumber;
 extern int submod_id;
-extern edict_t *clients[32];
+extern int debug_minmax;
 
 extern int default_bot_skill;
 extern int bot_add_level_tag;
@@ -217,7 +218,6 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
    }
    else if (FStrEq(pcmd, "addbot"))
    {
-      int i, count = 0;
       int cfg_bot_index = -1;
       const char * skin = (arg1 && *arg1) ? arg1 : NULL;
       const char * name = (arg2 && *arg2) ? arg2 : NULL;
@@ -230,19 +230,15 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
          cfg_bot_index = AddToCfgBotRecord(skin, name, skill, top_color, bottom_color);
       
       // only add bots if max_bots not reached
-      for (i = 0; i < 32; i++)
-         if (clients[i] != NULL)
-            count++;
-      
-      if(max_bots == -1 || count < max_bots)
+      if(max_bots == -1 || UTIL_GetClientCount() < max_bots)
       {
          BotCreate(skin, name, skill, top_color, bottom_color, cfg_bot_index);
          
          if(cmdtype == CFGCMD_TYPE)
-            bot_cfg_pause_time = gpGlobals->time + 2.0;
+            bot_cfg_pause_time = gpGlobals->time + 0.5;
       }
       
-      bot_check_time = gpGlobals->time + 5.0;
+      bot_check_time = gpGlobals->time + 1.0;
       
       return TRUE;
    }
@@ -263,6 +259,24 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
          printfunc(PRINTFUNC_INFO, arg, "waypoints are VISIBLE\n");
       else
          printfunc(PRINTFUNC_INFO, arg, "waypoints are HIDDEN\n");
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "debug_minmax"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+         if (temp)
+            debug_minmax = TRUE;
+         else
+            debug_minmax = FALSE;
+      }
+
+      if (debug_minmax)
+         printfunc(PRINTFUNC_INFO, arg, "debug_minmax mode ENABLED\n");
+      else
+         printfunc(PRINTFUNC_INFO, arg, "debug_minmax mode DISABLED\n");
 
       return TRUE;
    }
@@ -565,7 +579,7 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
          min_bots = atoi( arg1 );
 
          if ((min_bots < 0) || (min_bots > 31))
-            min_bots = 1;
+            min_bots = -1;
       }
       
       safevoid_snprintf(msg, sizeof(msg), "min_bots is set to %d\n", min_bots);
@@ -580,7 +594,7 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
          max_bots = atoi( arg1 );
 
          if ((max_bots < 0) || (max_bots > 31))
-            max_bots = 1;
+            max_bots = -1;
       }
       
       safevoid_snprintf(msg, sizeof(msg), "max_bots is set to %d\n", max_bots);
@@ -593,6 +607,9 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
       if ((arg1 != NULL) && (*arg1 != 0))
       {
          bot_cfg_pause_time = gpGlobals->time + atoi( arg1 );
+         
+         if(bot_cfg_pause_time <= 0.0f)
+            bot_cfg_pause_time = 0.1f;
       }
 
       return TRUE;
@@ -1257,15 +1274,15 @@ void ProcessBotCfgFile(void)
    if ((cmd_line[0] == '#') || (cmd_line[0] == '/' && cmd_line[1] == '/') || (cmd_line[0] == 0))
       return;  // return if comment or blank line
 
-   if(arg1 && !strcmp(arg1, "\"\""))
+   if(arg1 && !jkstrcmp(arg1, "\"\""))
       *arg1=0;
-   if(arg2 && !strcmp(arg2, "\"\""))
+   if(arg2 && !jkstrcmp(arg2, "\"\""))
       *arg2=0;
-   if(arg3 && !strcmp(arg3, "\"\""))
+   if(arg3 && !jkstrcmp(arg3, "\"\""))
       *arg3=0;
-   if(arg4 && !strcmp(arg4, "\"\""))
+   if(arg4 && !jkstrcmp(arg4, "\"\""))
       *arg4=0;
-   if(arg5 && !strcmp(arg5, "\"\""))
+   if(arg5 && !jkstrcmp(arg5, "\"\""))
       *arg5=0;
 
    if(ProcessCommand(CFGCMD_TYPE, print_to_console_config, NULL, cmd, arg1, arg2, arg3, arg4, arg5))
@@ -1304,6 +1321,12 @@ void jk_botti_ServerCommand (void)
          UTIL_ConsolePrintf("Kicked %d bots.", count);
       else
          UTIL_ConsolePrintf("No bots on server to be kicked.");
+      
+      if(max_bots != -1 && min_bots != -1)
+      {
+         max_bots = min_bots = -1;
+         UTIL_ConsolePrintf("Disabled min_bots/max_bots.");
+      }
    }
    else if(!ProcessCommand(SRVCMD_TYPE, print_to_server_output, NULL, CMD_ARGV (1), CMD_ARGV (2), CMD_ARGV (3), CMD_ARGV (4), CMD_ARGV (5), CMD_ARGV (6))) 
    {

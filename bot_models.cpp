@@ -1,12 +1,13 @@
 //
 // JK_Botti - be more human!
 //
-// bot.cpp
+// bot_models.cpp
 //
 
 #ifndef _WIN32
 #include <string.h>
 #endif
+#include "asm_string.h"
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -182,7 +183,7 @@ void LoadBotModels(void)
 
    while ((directory = FindDirectory(directory, dirname, sizeof(dirname), search_path)) != NULL)
    {
-      if ((strcmp(dirname, ".") == 0) || (strcmp(dirname, "..") == 0))
+      if ((jkstrcmp(dirname, ".") == 0) || (jkstrcmp(dirname, "..") == 0))
          continue;
 
       safevoid_snprintf(filename, sizeof(filename), "%s/%s/%s.mdl", path, dirname, dirname);
@@ -196,7 +197,7 @@ void LoadBotModels(void)
          // check for duplicate...
          for (index=0; index < number_skins; index++)
          {
-            if (strcmp(dirname, bot_skins[index].model_name) == 0)
+            if (jkstrcmp(dirname, bot_skins[index].model_name) == 0)
                break;
          }
 

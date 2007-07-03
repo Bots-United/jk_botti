@@ -1,8 +1,16 @@
+//
+// JK_Botti - be more human!
+//
+// bot_query_hook_linux.cpp
+//
+
 #ifndef _WIN32
 
 #ifndef __USE_GNU
 #define __USE_GNU
 #endif
+
+#include "asm_string.h"
 
 #include <sys/mman.h>
 #include <asm/page.h>

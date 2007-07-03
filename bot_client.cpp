@@ -7,6 +7,7 @@
 #ifndef _WIN32
 #include <string.h>
 #endif
+#include "asm_string.h"
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -238,7 +239,7 @@ void BotClient_Valve_ItemPickup(void *p, int bot_index)
    
    safevoid_snprintf(itemname, sizeof(itemname), "%s", (char *)p);
 
-   if (strcmp(itemname, "item_longjump") == 0)
+   if (jkstrcmp(itemname, "item_longjump") == 0)
    {
       bots[bot_index].b_longjump = TRUE;
       bots[bot_index].f_combat_longjump = gpGlobals->time + 0.2;

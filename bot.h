@@ -10,6 +10,21 @@
 #include <ctype.h>
 #include "safe_snprintf.h"
 
+// Manual branch optimization for GCC 3.0.0 and newer
+#if !defined(__GNUC__) || __GNUC__ < 3
+	#define likely(x) (x)
+	#define unlikely(x) (x)
+#else
+	#define likely(x) __builtin_expect((long int)!!(x), true)
+	#define unlikely(x) __builtin_expect((long int)!!(x), false)
+#endif
+
+
+//
+#define JKASSERT(_x_) \
+    do { if (unlikely(!!(_x_))) UTIL_ConsolePrintf("[ERROR][ASSERT] %s:%d: (%s)", #_x_, __FILE__, __LINE__); } while(0)
+
+
 // stuff for Win32 vs. Linux builds
 
 #ifdef __linux__
@@ -111,6 +126,8 @@ typedef struct
 typedef struct
 {
    qboolean is_used;
+   int userid;
+   
    int cfg_bot_index;
    
    edict_t *pEdict;
@@ -336,6 +353,7 @@ extern int m_spriteTexture;
 Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean without_velocity = FALSE);
 qboolean FPredictedVisible(bot_t &pBot);
 void GatherPlayerData(edict_t * pEdict);
+void free_posdata_list(int idx);
 qboolean AreTeamMates(edict_t * pOther, edict_t * pEdict);
 
 // new UTIL.CPP functions...
@@ -366,7 +384,10 @@ void UTIL_ServerPrintf( char *fmt, ... );
 void UTIL_ConsolePrintf( char *fmt, ... );
 char* UTIL_VarArgs2( char * string, size_t strlen, char *format, ... );
 void UTIL_DrawBeam(edict_t *pEnemy, const Vector &start, const Vector &end, int width, int noise, int red, int green, int blue, int brightness, int speed);
-    
+int UTIL_GetClientCount(void);
+int UTIL_GetBotCount(void);
+int UTIL_PickRandomBot(void);
+
 breakable_list_t * UTIL_FindBreakable(breakable_list_t * pbreakable);
 void UTIL_FreeFuncBreakables(void);
 void UTIL_UpdateFuncBreakable(edict_t *pEdict, const char * setting, const char * value);
@@ -376,15 +397,6 @@ float UTIL_GetTimeSinceRespawn(edict_t * pPlayer);
 
 void CheckPlayerChatProtection(edict_t * pPlayer);
 qboolean IsPlayerChatProtected(edict_t * pPlayer);
-
-void LoadBotChat(void);
-void BotTrimBlanks(const char *in_string, char *out_string, int sizeof_out_string);
-int BotChatTrimTag(const char *original_name, char *out_name, int sizeof_out_name);
-void BotDropCharacter(const char *in_string, char *out_string, int sizeof_out_string);
-void BotSwapCharacter(const char *in_string, char *out_string, int sizeof_out_string);
-void BotChatName(const char *original_name, char *out_name, int sizeof_out_name);
-void BotChatText(const char *in_text, char *out_text, int sizeof_out_text);
-void BotChatFillInName(char *bot_say_msg, int sizeof_msg, const char *chat_text, const char *chat_name, const char *bot_name);
 
 const cfg_bot_record_t * GetUnusedCfgBotRecord(void);
 void FreeCfgBotRecord(void);
