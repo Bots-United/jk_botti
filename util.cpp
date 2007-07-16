@@ -374,8 +374,8 @@ void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
    char  text[128];
    char *pc;
    edict_t *client;
-   char  sender_teamstr[32];
-   char  player_teamstr[32];
+   char  sender_teamstr[MAX_TEAMNAME_LENGTH];
+   char  player_teamstr[MAX_TEAMNAME_LENGTH];
 
    // make sure the text has content
    for ( pc = message; pc != NULL && *pc != 0; pc++ )
@@ -411,7 +411,7 @@ void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
    if (GET_USER_MSG_ID (PLID, "SayText", NULL) <= 0)
       REG_USER_MSG ("SayText", -1);
 
-   UTIL_GetTeam(pEntity, sender_teamstr);
+   UTIL_GetTeam(pEntity, sender_teamstr, sizeof(sender_teamstr));
 
    client = NULL;
    while((client = UTIL_FindEntityByClassname( client, "player" )) != NULL && !FNullEnt(client))
@@ -419,7 +419,7 @@ void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
       if ( client == pEntity )  // skip sender of message
          continue;
 
-      UTIL_GetTeam(client, player_teamstr);
+      UTIL_GetTeam(client, player_teamstr, sizeof(player_teamstr));
 
       if ( teamonly && is_team_play && stricmp(sender_teamstr, player_teamstr) != 0 )
          continue;
@@ -479,9 +479,9 @@ edict_t *DBG_EntOfVars( const entvars_t *pev )
 #endif //DEBUG
 
 // return team string 0 through 3 based what MOD uses for team numbers
-char * UTIL_GetTeam(edict_t *pEntity, char teamstr[32])
+char * UTIL_GetTeam(edict_t *pEntity, char *teamstr, size_t slen)
 {
-   safevoid_snprintf(teamstr, sizeof(teamstr), "%s", INFOKEY_VALUE(GET_INFOKEYBUFFER(pEntity), "model"));
+   safevoid_snprintf(teamstr, slen, "%s", INFOKEY_VALUE(GET_INFOKEYBUFFER(pEntity), "model"));
    
    return(teamstr);
 }

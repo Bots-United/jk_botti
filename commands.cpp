@@ -43,6 +43,9 @@ extern qboolean b_botdontshoot;
 extern qboolean g_in_intermission;
 extern BOOL wp_matrix_save_on_mapend;
 
+extern int team_balancetype;
+extern char *team_blockedlist;
+
 extern float bot_check_time;
 extern float bot_cfg_pause_time;
 extern int randomize_bots_on_mapchange;
@@ -200,7 +203,7 @@ void UTIL_PrintBotInfo(const printfunc_t printfunc, void * arg)
 qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * arg, const char * pcmd, const char * arg1, const char * arg2, const char * arg3, const char * arg4, const char * arg5) 
 {
    char msg[128];
-
+   
    switch(cmdtype) {
       default:
          return FALSE;
@@ -298,6 +301,44 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
 
       return TRUE;
    }
+   else if (FStrEq(pcmd, "team_balancetype"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+         if (temp < 0)
+            temp = 0;
+         if (temp > 1)
+            temp = 1;
+         
+         team_balancetype = temp;
+      }
+
+      safevoid_snprintf(msg, sizeof(msg), "team_balancetype is %d\n", team_balancetype);
+      printfunc(PRINTFUNC_INFO, arg, msg);
+
+      return TRUE;
+   }
+   
+   else if (FStrEq(pcmd, "team_blockedlist"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         if(team_blockedlist)
+            free(team_blockedlist);
+         
+         team_blockedlist = strdup(arg1);
+      }
+      
+      if(!team_blockedlist)
+         team_blockedlist = strdup("");
+
+      safevoid_snprintf(msg, sizeof(msg), "team_blockedlist: %s\n", team_blockedlist);
+      printfunc(PRINTFUNC_INFO, arg, msg);
+
+      return TRUE;
+   }
+
    else if (FStrEq(pcmd, "botskill"))
    {
       if ((arg1 != NULL) && (*arg1 != 0))
@@ -321,10 +362,17 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
       {
          int temp = atoi(arg1);
 
-         if ((temp < 0) || (temp > 2))
+         if ((temp < 0) || (temp > 1))
             printfunc(PRINTFUNC_ERROR, arg, "invalid bot_conntimes value!\n");
          else
             bot_conntimes = temp;
+      }
+
+      if(!IS_DEDICATED_SERVER() && bot_conntimes != 0)
+      {
+         bot_conntimes = 0;
+         
+         printfunc(PRINTFUNC_INFO, arg, "bot_conntimes is not supported on listenserver!");
       }
 
       safevoid_snprintf(msg, sizeof(msg), "bot_conntimes is %d (%s)\n", bot_conntimes, (bot_conntimes==0?"disabled":"enabled"));
@@ -1285,6 +1333,29 @@ void ProcessBotCfgFile(void)
    if(arg5 && !jkstrcmp(arg5, "\"\""))
       *arg5=0;
 
+   // trim "s
+   if(arg1 && *arg1=='\"')
+      arg1++;
+   if(arg2 && *arg2=='\"')
+      arg2++;
+   if(arg3 && *arg3=='\"')
+      arg3++;
+   if(arg4 && *arg4=='\"')
+      arg4++;
+   if(arg5 && *arg5=='\"')
+      arg5++;
+   
+   if(arg1 && arg1[strlen(arg1)-1]=='\"')
+      arg1[strlen(arg1)-1]='\0';
+   if(arg2 && arg2[strlen(arg2)-1]=='\"')
+      arg2[strlen(arg2)-1]='\0';
+   if(arg3 && arg3[strlen(arg3)-1]=='\"')
+      arg3[strlen(arg3)-1]='\0';
+   if(arg4 && arg4[strlen(arg4)-1]=='\"')
+      arg4[strlen(arg4)-1]='\0';
+   if(arg5 && arg5[strlen(arg5)-1]=='\"')
+      arg5[strlen(arg5)-1]='\0';
+   
    if(ProcessCommand(CFGCMD_TYPE, print_to_console_config, NULL, cmd, arg1, arg2, arg3, arg4, arg5))
       return;
    

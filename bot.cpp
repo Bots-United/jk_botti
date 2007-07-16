@@ -9,6 +9,8 @@
 #endif
 #include "asm_string.h"
 
+#include <malloc.h>
+
 #include <extdll.h>
 #include <dllapi.h>
 #include <h_export.h>
@@ -44,6 +46,7 @@ extern int bot_chat_swap_percent;
 extern int bot_chat_lower_percent;
 extern qboolean b_random_color;
 extern int bot_reaction_time;
+extern qboolean debug_minmax;
 
 extern qboolean g_in_intermission;
 
@@ -56,6 +59,14 @@ extern int recent_bot_whine[];
 extern qboolean checked_teamplay;
 extern qboolean is_team_play;
 extern float bot_think_spf;
+extern int team_balancetype;
+extern char *team_blockedlist;
+
+extern char g_team_list[TEAMPLAY_TEAMLISTLENGTH];
+extern char g_team_names[MAX_TEAMS][MAX_TEAMNAME_LENGTH];
+extern int g_team_scores[MAX_TEAMS];
+extern int g_num_teams;
+extern qboolean g_team_limit;
 
 extern int number_skins;
 extern skin_t bot_skins[MAX_SKINS];
@@ -97,6 +108,8 @@ void BotSpawnInit( bot_t &pBot )
 {
    pBot.bot_think_time = -1.0;
    pBot.f_last_think_time = gpGlobals->time - 0.1;
+   
+   pBot.f_recoil = 0;
    
    pBot.v_prev_origin = Vector(9999.0, 9999.0, 9999.0);
    pBot.f_speed_check_time = gpGlobals->time;
@@ -320,20 +333,138 @@ void BotPickName( char *name_buffer, int sizeof_name_buffer )
    safevoid_snprintf(name_buffer, sizeof_name_buffer, "%s", bot_names[name_index]);
 }
 
+
+//
+qboolean TeamInTeamBlockList(const char * teamname)
+{
+   if(!team_blockedlist)
+      team_blockedlist = strdup("");
+      
+   // make a copy because strtok is destructive
+   int slen = strlen(team_blockedlist);
+   char * blocklist = (char*)alloca(slen+1);
+   memcpy(blocklist, team_blockedlist, slen+1);
+   
+   char *pName = strtok( blocklist, ";" );
+   while ( pName != NULL && *pName)
+   {
+      if(!stricmp(teamname, pName))
+      {
+         //UTIL_ConsolePrintf("in block list: %s", pName);
+         return(TRUE);
+      }
+
+      pName = strtok( NULL, ";" );
+   }
+      
+   return(FALSE);
+}
+
+
+//
+char * GetSpecificTeam(char * teamstr, size_t slen, qboolean get_smallest, qboolean get_largest, qboolean only_count_bots)
+{
+   if(!!get_smallest + !!get_largest != 1)
+      return(NULL);
+   
+   // get team
+   int find_index = -1;
+   int find_count = get_smallest ? 9999 : -1;
+   
+   for(int i = 0; i < MAX_TEAMS; i++)
+   {         
+      if(*g_team_names[i] && !TeamInTeamBlockList(g_team_names[i]))
+      {
+         int count = 0;
+         char teamname[MAX_TEAMNAME_LENGTH];
+            
+         // collect player counts for team
+         for(int j = 1; j <= gpGlobals->maxClients; j++)
+         {
+            edict_t * pClient = INDEXENT(j);
+            
+            // skip unactive clients
+            if(!pClient || pClient->free || FNullEnt(pClient) || GETPLAYERUSERID(pClient) <= 0 || STRING(pClient->v.netname)[0] == 0)
+               continue;
+            
+            // skip bots?
+            if(only_count_bots && UTIL_GetBotIndex(pClient) != -1)
+               continue;
+            
+            // match team
+            if(!stricmp(UTIL_GetTeam(pClient, teamname, sizeof(teamname)), g_team_names[i]))
+            {
+               count++;
+            }
+         }
+                        
+         
+         if(get_smallest)
+         {
+            // smaller?
+            if(count < find_count)
+            {
+               find_count = count;
+               find_index = i;
+            }
+         }
+         else
+         {
+            // larger?
+            if(count > find_count)
+            {
+               find_count = count;
+               find_index = i;
+            }
+         }
+      }
+   }
+      
+   // got it?
+   if(find_index != -1)
+   {
+      if(get_largest && find_count == 0)
+         return(NULL);
+      
+      safevoid_snprintf(teamstr, slen, "%s", g_team_names[find_index]);
+      return(teamstr);
+   }
+   
+   return(NULL);
+}
+
+
 // 
 void BotCreate( const char *skin, const char *name, int skill, int top_color, int bottom_color, int cfg_bot_index )
 {
    edict_t *BotEnt;
-   char c_skin[BOT_SKIN_LEN+1];
-   char c_name[BOT_NAME_LEN+1];
+   char c_skin[BOT_SKIN_LEN];
+   char c_name[BOT_NAME_LEN];
+   char balanceskin[MAX_TEAMNAME_LENGTH];
    int index;
    int i, j, length;
    qboolean found = FALSE;
    qboolean got_skill_arg = FALSE;
    char c_topcolor[4], c_bottomcolor[4];
    int  max_skin_index;
-
+   qboolean forceskin = FALSE;
+   
    max_skin_index = number_skins;
+   
+   // balance teams, ignore input skin
+   if(is_team_play && team_balancetype >= 1 && g_team_limit)
+   {
+      RecountTeams();
+      
+      // get smallest team
+      if(GetSpecificTeam(balanceskin, sizeof(balanceskin), TRUE, FALSE, FALSE))
+      {
+         skin = balanceskin;
+         
+         if(debug_minmax)
+            UTIL_ConsolePrintf("Teambalance override, adding to team: %s", skin);
+      }
+   }
    
    if ((skin == NULL) || (*skin == 0))
    {
@@ -374,37 +505,40 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
    for (i = 0; c_skin[i] != 0; i++)
       c_skin[i] = tolower( c_skin[i] );  // convert to all lowercase
 
-   index = 0;
-
-   while ((!found) && (index < max_skin_index))
+   if(!forceskin)
    {
-      if (jkstrcmp(c_skin, bot_skins[index].model_name) == 0)
-         found = TRUE;
-      else
-         index++;
-   }
+      index = 0;
 
-   if (found == FALSE)
-   {
-      char dir_name[32];
-      char filename[128];
-
-      struct stat stat_str;
-
-      GetGameDir(dir_name);
-
-      safevoid_snprintf(filename, sizeof(filename), "%s/models/player/%s", dir_name, c_skin);
-
-      if (stat(filename, &stat_str) != 0)
+      while ((!found) && (index < max_skin_index))
       {
-         safevoid_snprintf(filename, sizeof(filename), "valve/models/player/%s", c_skin);
+         if (jkstrcmp(c_skin, bot_skins[index].model_name) == 0)
+            found = TRUE;
+         else
+            index++;
+      }
+
+      if (found == FALSE)
+      {
+         char dir_name[128];
+         char filename[256];
+
+         struct stat stat_str;
+
+         GetGameDir(dir_name);
+
+         safevoid_snprintf(filename, sizeof(filename), "%s/models/player/%s", dir_name, c_skin);
 
          if (stat(filename, &stat_str) != 0)
          {
-            UTIL_ConsolePrintf("model \"%s\" is unknown.\n", c_skin );
-            UTIL_ConsolePrintf("use barney, gina, gman, gordon, helmet, hgrunt,\n");
-            UTIL_ConsolePrintf("    recon, robo, scientist, or zombie\n");
-            return;
+            safevoid_snprintf(filename, sizeof(filename), "valve/models/player/%s", c_skin);
+
+            if (stat(filename, &stat_str) != 0)
+            {
+               UTIL_ConsolePrintf("model \"%s\" is unknown.\n", c_skin );
+               UTIL_ConsolePrintf("use barney, gina, gman, gordon, helmet, hgrunt,\n");
+               UTIL_ConsolePrintf("    recon, robo, scientist, or zombie\n");
+               return;
+            }
          }
       }
    }
@@ -1927,7 +2061,7 @@ void BotThink( bot_t &pBot )
 
       UTIL_HostSay(pEdict, 0, pBot.bot_say_msg);
    }
-   
+      
    // in intermission.. don't do anything, freeze bot
    if(g_in_intermission)
    {

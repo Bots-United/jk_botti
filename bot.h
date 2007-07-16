@@ -51,6 +51,12 @@ typedef int BOOL;
 #define FL_THIRDPARTYBOT (1 << 27)
 
 
+// teamplay_gamerules.h
+#define MAX_TEAMNAME_LENGTH     16
+#define MAX_TEAMS               32
+#define TEAMPLAY_TEAMLISTLENGTH (MAX_TEAMS*MAX_TEAMNAME_LENGTH)
+
+
 // define some function prototypes...
 void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const char *arg3);
 
@@ -92,7 +98,7 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
 #define DMG_SLOWFREEZE		(1 << 22)	// in a subzero freezer
 
 
-#define BOT_SKIN_LEN 32
+#define BOT_SKIN_LEN MAX_TEAMNAME_LENGTH 
 #define BOT_NAME_LEN 32
 
 #define MAX_BOT_CHAT 100
@@ -133,10 +139,12 @@ typedef struct
    edict_t *pEdict;
    qboolean need_to_initialize;
    
-   char name[BOT_NAME_LEN+1];
-   char skin[BOT_SKIN_LEN+1];
+   char name[BOT_NAME_LEN];
+   char skin[BOT_SKIN_LEN];
    int bot_skill;
    int weapon_skill;
+   
+   float f_recoil;
    
    float f_kick_time;
    float f_create_time;
@@ -366,7 +374,7 @@ edict_t *UTIL_FindEntityByTargetname( edict_t *pentStart, const char *szName );
 void ClientPrint( edict_t *pEdict, int msg_dest, const char *msg_name);
 void UTIL_SayText( const char *pText, edict_t *pEdict );
 void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message );
-char* UTIL_GetTeam(edict_t *pEntity, char teamstr[32]);
+char* UTIL_GetTeam(edict_t *pEntity, char *teamstr, size_t slen);
 
 qboolean FHearable(bot_t &pBot, edict_t *pPlayer);
 qboolean FInViewCone( const Vector & Origin, edict_t *pEdict);
@@ -401,6 +409,9 @@ qboolean IsPlayerChatProtected(edict_t * pPlayer);
 const cfg_bot_record_t * GetUnusedCfgBotRecord(void);
 void FreeCfgBotRecord(void);
 int AddToCfgBotRecord(const char *skin, const char *name, int skill, int top_color, int bottom_color);
+
+void RecountTeams(void);
+char * GetSpecificTeam(char * teamstr, size_t slen, qboolean get_smallest, qboolean get_largest, qboolean only_count_bots);
 
 #include "bot_inline_funcs.h"
 

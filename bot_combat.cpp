@@ -33,6 +33,12 @@ extern qboolean checked_teamplay;
 extern int num_logos;
 extern int submod_id;
 
+char g_team_list[TEAMPLAY_TEAMLISTLENGTH];
+char g_team_names[MAX_TEAMS][MAX_TEAMNAME_LENGTH];
+int g_team_scores[MAX_TEAMS];
+int g_num_teams = 0;
+qboolean g_team_limit = FALSE;
+
 typedef struct select_list_s
 {
    struct select_list_s *next;
@@ -138,7 +144,7 @@ void BotAimPre( bot_t &pBot )
 {   
    // make bot aim and turn
    BotPointGun(pBot); // update and save this bot's view angles
-   
+      
    // wrap angles that were not wrapped in pointgun
    pBot.pEdict->v.idealpitch = UTIL_WrapAngle(pBot.pEdict->v.idealpitch);
    pBot.pEdict->v.ideal_yaw = UTIL_WrapAngle(pBot.pEdict->v.ideal_yaw);
@@ -168,6 +174,10 @@ void BotAimPost( bot_t &pBot )
       pBot.b_set_special_shoot_angle = FALSE;
       pBot.f_special_shoot_angle = 0.0;
    }
+   
+   // add any recoil left to punch angle now
+   pBot.pEdict->v.punchangle.x += pBot.f_recoil;
+   pBot.f_recoil = 0;
 }
 
 
@@ -191,18 +201,142 @@ void BotResetReactionTime(bot_t &pBot)
 
 
 //
+int GetTeamIndex( const char *pTeamName )
+{
+   if ( pTeamName && *pTeamName != 0 )
+   {
+      // try to find existing team
+      for ( int tm = 0; tm < g_num_teams; tm++ )
+      {
+         if ( !stricmp( g_team_names[tm], pTeamName ) )
+            return tm;
+      }
+   }
+   
+   return -1;   // No match
+}
+
+
+//
+void RecountTeams(void)
+{
+   if(!is_team_play)
+      return;
+	
+   // Construct teams list
+   char teamlist[TEAMPLAY_TEAMLISTLENGTH];
+   char *pName;
+
+   // loop through all teams, recounting everything
+   g_num_teams = 0;
+
+   // Copy all of the teams from the teamlist
+   // make a copy because strtok is destructive
+   safevoid_snprintf(teamlist, sizeof(teamlist), "%s", g_team_list);
+   
+   pName = teamlist;
+   pName = strtok( pName, ";" );
+   while ( pName != NULL && *pName )
+   {
+      if ( GetTeamIndex( pName ) < 0 )
+      {
+         safevoid_snprintf(g_team_names[g_num_teams], sizeof(g_team_names[g_num_teams]), "%s", pName);
+         g_num_teams++;
+         
+         if(g_num_teams == MAX_TEAMS)
+            break;
+      }
+      
+      pName = strtok( NULL, ";" );
+   }
+
+   if ( g_num_teams < 2 )
+   {
+      g_num_teams = 0;
+      g_team_limit = FALSE;
+   }
+   
+   // Sanity check
+   memset( g_team_scores, 0, sizeof(g_team_scores) );
+
+   // loop through all clients
+   for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+   {
+      edict_t * plr = INDEXENT(i);
+
+      if(!plr || plr->free || FNullEnt(plr) || GETPLAYERUSERID(plr) <= 0 || STRING(plr->v.netname)[0] == 0)
+         continue;
+      
+      char teamname[MAX_TEAMNAME_LENGTH];
+      const char *pTeamName;
+      
+      pTeamName = UTIL_GetTeam(plr, teamname, sizeof(teamname));
+      
+      // try add to existing team
+      int tm = GetTeamIndex( pTeamName );
+      
+      if ( tm < 0 ) // no team match found
+      { 
+         if ( !g_team_limit && g_num_teams < MAX_TEAMS)
+         {
+            // add to new team
+            tm = g_num_teams;
+            g_num_teams++;
+            g_team_scores[tm] = 0;
+            safevoid_snprintf(g_team_names[tm], sizeof(g_team_names[tm]), "%s", pTeamName);
+         }
+      }
+
+      if ( tm >= 0 )
+      {
+         g_team_scores[tm] += (int)plr->v.frags;
+      }
+   }
+}
+
+
+//
 void BotCheckTeamplay(void)
 {
-   float f_team_play = 0.0;
+   float f_team_play = CVAR_GET_FLOAT("mp_teamplay");  // teamplay enabled?
 
-   f_team_play = CVAR_GET_FLOAT("mp_teamplay");  // teamplay enabled?
-
-   if (f_team_play > 0.0)
+   if (f_team_play > 0.0f)
       is_team_play = TRUE;
    else
       is_team_play = FALSE;
 
    checked_teamplay = TRUE;
+   
+   // get team list, exactly as in teamplay_gamerules.cpp
+   if(is_team_play)
+   {
+      safevoid_snprintf(g_team_list, sizeof(g_team_list), "%s", CVAR_GET_STRING("mp_teamlist"));
+      
+      edict_t *pWorld = INDEXENT(0);
+      if ( pWorld && pWorld->v.team )
+      {
+         if ( CVAR_GET_FLOAT("mp_teamoverride") != 0.0f )
+         {
+            const char *pTeamList = STRING(pWorld->v.team);
+            if ( pTeamList && *pTeamList )
+            {
+               safevoid_snprintf(g_team_list, sizeof(g_team_list), "%s", pTeamList);
+            }
+         }
+      }
+      
+      // Has the server set teams
+      g_team_limit = ( *g_team_list != 0 );
+      
+      RecountTeams();
+   }
+   else
+   {
+      g_team_list[0] = 0;
+      g_team_limit = FALSE;
+      
+      memset(g_team_names, 0, sizeof(g_team_names));
+   }
 }
 
 
@@ -996,7 +1130,7 @@ qboolean CheckWeaponFireConditions(bot_t & pBot, const bot_weapon_select_t &sele
    {
       // check if bot needs to duck down to hit enemy...
       if (fabs(pBot.pBotEnemy->v.origin.z - pEdict->v.origin.z) > 16 &&
-      	  (pBot.pBotEnemy->v.origin - pEdict->v.origin).Length() < 64)
+          (pBot.pBotEnemy->v.origin - pEdict->v.origin).Length() < 64)
          pBot.f_duck_time = gpGlobals->time + 1.0;
    }
    else if(select.type == WEAPON_THROW && !HaveRoomForThrow(pBot))
@@ -1286,14 +1420,14 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       
       // Check if we can use this weapon
       if ((weapon_choice == pSelect[select_index].iId || weapon_choice == 0) || 
-      	  (IsValidWeaponChoose(pBot, pSelect[select_index]) && 
-      	   BotCanUseWeapon(pBot, pSelect[select_index]) &&
-      	   IsValidToFireAtTheMoment(pBot, pSelect[select_index])))
+          (IsValidWeaponChoose(pBot, pSelect[select_index]) && 
+           BotCanUseWeapon(pBot, pSelect[select_index]) &&
+           IsValidToFireAtTheMoment(pBot, pSelect[select_index])))
       {
-      	 better_index = -1;
-      	 
-      	 if(weapon_choice == 0)
-      	 {
+         better_index = -1;
+         
+         if(weapon_choice == 0)
+         {
             // Check if we REALLY want to change to other weapon (aka current gun IS shit)
             better_index = BotGetBetterWeaponChoice(pBot, pSelect[select_index], pSelect, distance, height, &use_primary, &use_secondary);
             if(better_index > -1) 
@@ -1351,7 +1485,7 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       if(!IsValidWeaponChoose(pBot, pSelect[select_index]) ||
          !BotCanUseWeapon(pBot, pSelect[select_index]) ||
          !IsValidToFireAtTheMoment(pBot, pSelect[select_index]))
-      	 continue;
+         continue;
 
       // Check if this weapon is ok for current contitions
       use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
@@ -1383,7 +1517,7 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       select_list_t *prev = tmp_select_list;
       if(prev)
       {
-      	 do {
+         do {
             if(!prev->next)
             {
                prev->next = next;
@@ -1532,10 +1666,10 @@ qboolean AreTeamMates(edict_t * pOther, edict_t * pEdict)
    // is team play enabled?
    if (is_team_play)
    {
-      char other_model[32];
-      char edict_model[32];
+      char other_model[MAX_TEAMNAME_LENGTH];
+      char edict_model[MAX_TEAMNAME_LENGTH];
       
-      return(!stricmp(UTIL_GetTeam(pOther, other_model), UTIL_GetTeam(pEdict, edict_model)));
+      return(!stricmp(UTIL_GetTeam(pOther, other_model, sizeof(other_model)), UTIL_GetTeam(pEdict, edict_model, sizeof(edict_model))));
    }
    
    return FALSE;

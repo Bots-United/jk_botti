@@ -40,16 +40,100 @@ int botMsgIndex;
 qboolean g_in_intermission = FALSE;
 
 
+typedef struct event_info_s {
+   int eventindex;
+   const char * eventname;
+   float volume;
+   float recoil[2];
+} event_info_t;
+
+
+event_info_t g_event_info[] = {
+   {-1, "events/glock1.sc",		0.96,  {-2.0, -2.0}},
+   {-1, "events/glock2.sc",		0.96,  {-2.0, -2.0}},
+   {-1, "events/shotgun1.sc",		0.975, {-5.0, -5.0}},
+   {-1, "events/shotgun2.sc",		0.99,  {-10.0, -10.0}},
+   {-1, "events/mp5.sc",		1.0,   {-2.0, 2.0}},
+   {-1, "events/mp52.sc",		1.0,   {-10.0, -10.0}},
+   {-1, "events/python.sc",		0.85,  {-10.0, -10.0}},
+   {-1, "events/gauss.sc",		1.0,   {-2.0, -2.0}},
+   {-1, "events/gaussspin.sc",		1.0,   {0, 0}},
+   {-1, "events/train.sc",		0.6,   {0, 0}},
+   {-1, "events/crowbar.sc",		1.0,   {0, 0}},
+   {-1, "events/crossbow1.sc",		1.0,   {-2.0, -2.0}},
+   {-1, "events/crossbow2.sc",		1.0,   {0, 0}},
+   {-1, "events/rpg.sc",		0.9,   {-5.0, -5.0}},
+   {-1, "events/egon_fire.sc",		0.94,  {0, 0}},
+   {-1, "events/egon_stop.sc",		0.98,  {0, 0}},
+   {-1, "events/firehornet.sc",		1.0,   {0.0, 2.0}},
+   {-1, "events/tripfire.sc",		0.0,   {0, 0}},
+   {-1, "events/snarkfire.sc",		0.0,   {0, 0}},
+   {-1, "", 0, {0, 0}} //NULL
+};
+
+
+//
+unsigned short pfnPrecacheEvent_Post(int type, const char* psz)
+{
+   if (!gpGlobals->deathmatch)
+      RETURN_META_VALUE (MRES_IGNORED, 0);
+   
+   unsigned short eventindex = (META_RESULT_STATUS == MRES_OVERRIDE || META_RESULT_STATUS == MRES_SUPERCEDE) ? META_RESULT_OVERRIDE_RET(unsigned short) : META_RESULT_ORIG_RET(unsigned short);
+
+   for(event_info_t *pei = g_event_info; pei->eventname; pei++)
+   {
+      if(jkstrcmp(psz, pei->eventname) == 0)
+      {
+         // found event, update eventindex
+         pei->eventindex = eventindex;
+         break;
+      }
+   }
+   
+   RETURN_META_VALUE (MRES_IGNORED, 0);
+}
+
+
 //
 void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 ) 
 {
-   //TODO:
-   float volume = /*GetEventIndexVolume(eventindex)*/1.0;
+   if (!gpGlobals->deathmatch)
+      RETURN_META (MRES_IGNORED);
+
+   // get event info
+   event_info_t *pei;
    
-   if (gpGlobals->deathmatch)
+   for(pei = g_event_info; pei->eventname; pei++)
    {
-      int ivolume = (int)(1000*volume);
+      if(eventindex == pei->eventindex)
+         break;
+   }
+   
+   if(!pei->eventname)
+      RETURN_META (MRES_IGNORED);
+   
+   // event creates sound?
+   if(pei->volume > 0.0f)
+   {
+      int ivolume = (int)(1000*pei->volume);
+      
       SaveSound((edict_t*)pInvoker, pInvoker->v.origin, ivolume, CHAN_WEAPON);
+   }
+   
+   // event causes client recoil?
+   if(pei->recoil[0] != 0.0f && pei->recoil[1] != 0.0f)
+   {
+      // gauss uses bug fix that sends two events at same time,
+      // ignore the duplicated one...
+      if(jkstrcmp("events/gauss.sc", pei->eventname) == 0 && delay > 0.0f && (flags & FEV_RELIABLE))
+         RETURN_META (MRES_IGNORED);
+      
+      int index = UTIL_GetBotIndex(pInvoker);
+      
+      if(index != -1)
+      {
+         bots[index].f_recoil += RANDOM_FLOAT2(pei->recoil[0], pei->recoil[1]);
+      }
    }
    
    RETURN_META (MRES_IGNORED);
@@ -359,26 +443,37 @@ void pfnSetClientMaxspeed(const edict_t *pEdict, float fNewMaxspeed)
 
 C_DLLEXPORT int GetEngineFunctions (enginefuncs_t *pengfuncsFromEngine, int *interfaceVersion)
 {
-   meta_engfuncs.pfnPlaybackEvent = pfnPlaybackEvent;
-   meta_engfuncs.pfnChangeLevel = pfnChangeLevel;
-   meta_engfuncs.pfnEmitSound = pfnEmitSound;
-   meta_engfuncs.pfnClientCommand = pfnClientCommand;
-   meta_engfuncs.pfnMessageBegin = pfnMessageBegin;
-   meta_engfuncs.pfnMessageEnd = pfnMessageEnd;
-   meta_engfuncs.pfnWriteByte = pfnWriteByte;
-   meta_engfuncs.pfnWriteChar = pfnWriteChar;
-   meta_engfuncs.pfnWriteShort = pfnWriteShort;
-   meta_engfuncs.pfnWriteLong = pfnWriteLong;
-   meta_engfuncs.pfnWriteAngle = pfnWriteAngle;
-   meta_engfuncs.pfnWriteCoord = pfnWriteCoord;
-   meta_engfuncs.pfnWriteString = pfnWriteString;
-   meta_engfuncs.pfnWriteEntity = pfnWriteEntity;
-   meta_engfuncs.pfnClientPrintf = pfnClientPrintf;
-   meta_engfuncs.pfnCmd_Args = pfnCmd_Args;
-   meta_engfuncs.pfnCmd_Argv = pfnCmd_Argv;
-   meta_engfuncs.pfnCmd_Argc = pfnCmd_Argc;
-   meta_engfuncs.pfnSetClientMaxspeed = pfnSetClientMaxspeed;
+   memset(pengfuncsFromEngine, 0, sizeof(enginefuncs_t));
+   
+   pengfuncsFromEngine->pfnPlaybackEvent = pfnPlaybackEvent;
+   pengfuncsFromEngine->pfnChangeLevel = pfnChangeLevel;
+   pengfuncsFromEngine->pfnEmitSound = pfnEmitSound;
+   pengfuncsFromEngine->pfnClientCommand = pfnClientCommand;
+   pengfuncsFromEngine->pfnMessageBegin = pfnMessageBegin;
+   pengfuncsFromEngine->pfnMessageEnd = pfnMessageEnd;
+   pengfuncsFromEngine->pfnWriteByte = pfnWriteByte;
+   pengfuncsFromEngine->pfnWriteChar = pfnWriteChar;
+   pengfuncsFromEngine->pfnWriteShort = pfnWriteShort;
+   pengfuncsFromEngine->pfnWriteLong = pfnWriteLong;
+   pengfuncsFromEngine->pfnWriteAngle = pfnWriteAngle;
+   pengfuncsFromEngine->pfnWriteCoord = pfnWriteCoord;
+   pengfuncsFromEngine->pfnWriteString = pfnWriteString;
+   pengfuncsFromEngine->pfnWriteEntity = pfnWriteEntity;
+   pengfuncsFromEngine->pfnClientPrintf = pfnClientPrintf;
+   pengfuncsFromEngine->pfnCmd_Args = pfnCmd_Args;
+   pengfuncsFromEngine->pfnCmd_Argv = pfnCmd_Argv;
+   pengfuncsFromEngine->pfnCmd_Argc = pfnCmd_Argc;
+   pengfuncsFromEngine->pfnSetClientMaxspeed = pfnSetClientMaxspeed;
 
-   memcpy (pengfuncsFromEngine, &meta_engfuncs, sizeof (enginefuncs_t));
+   return TRUE;
+}
+
+
+C_DLLEXPORT int GetEngineFunctions_POST (enginefuncs_t *pengfuncsFromEngine, int *interfaceVersion)
+{
+   memset(pengfuncsFromEngine, 0, sizeof(enginefuncs_t));
+   
+   pengfuncsFromEngine->pfnPrecacheEvent = pfnPrecacheEvent_Post;
+   
    return TRUE;
 }

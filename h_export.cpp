@@ -17,8 +17,6 @@
 #include "bot.h"
 
 
-DLL_FUNCTIONS gFunctionTable;
-DLL_FUNCTIONS gFunctionTable_POST;
 enginefuncs_t g_engfuncs;
 globalvars_t  *gpGlobals;
 

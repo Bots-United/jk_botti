@@ -76,13 +76,13 @@ bot_weapon_select_t valve_weapon_select[13] =
     10, TRUE, 50, 1, 4, TRUE, TRUE, FALSE, FALSE, 0.0, 0.0, TRUE, -1, -1,
     W_IFL_HORNETGUN, 0, 0 },
 
-   {VALVE_WEAPON_MP5, "weapon_9mmAR", WEAPON_FIRE, 0.8,
+   {VALVE_WEAPON_MP5, "weapon_9mmAR", WEAPON_FIRE, 1.0,
     SKILL5, SKILL3, FALSE, FALSE,
     50.0, 2000.0, 300.0, 700.0, 600.0,
     45, FALSE, 70, 1, 1, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, 50, 2,
     W_IFL_MP5, W_IFL_AMMO_9MM, 0 },
 
-   {VALVE_WEAPON_CROSSBOW, "weapon_crossbow", WEAPON_FIRE_ZOOM, 0.8,
+   {VALVE_WEAPON_CROSSBOW, "weapon_crossbow", WEAPON_FIRE_ZOOM, 1.0,
     SKILL2, NOSKILL, FALSE, FALSE,
     800.0, 4000.0, 0, 0, 1000.0,
     55, TRUE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, 5, -1,

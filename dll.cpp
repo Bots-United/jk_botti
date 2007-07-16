@@ -9,6 +9,8 @@
 #endif
 #include "asm_string.h"
 
+#include <malloc.h>
+
 #include <extdll.h>
 #include <dllapi.h>
 #include <h_export.h>
@@ -25,8 +27,8 @@
 #include "bot_sound.h"
 #include "version.h"
 
-extern DLL_FUNCTIONS gFunctionTable;
-extern DLL_FUNCTIONS gFunctionTable_POST;
+#include "bot_query_hook.h"
+
 extern enginefuncs_t g_engfuncs;
 extern globalvars_t  *gpGlobals;
 extern char g_argv[1024*3];
@@ -49,6 +51,12 @@ extern BOOL wp_matrix_save_on_mapend;
 extern float last_time_not_facing_wall[32];
 extern float last_time_dead[32];
 
+extern char g_team_list[TEAMPLAY_TEAMLISTLENGTH];
+extern char g_team_names[MAX_TEAMS][MAX_TEAMNAME_LENGTH];
+extern int g_team_scores[MAX_TEAMS];
+extern int g_num_teams;
+extern qboolean g_team_limit;
+
 int submod_id = SUBMOD_HLDM;
 
 int m_spriteTexture = 0;
@@ -63,6 +71,9 @@ int bot_chat_tag_percent = 80;   // percent of the time to drop clan tag
 int bot_chat_drop_percent = 10;  // percent of the time to drop characters
 int bot_chat_swap_percent = 10;  // percent of the time to swap characters
 int bot_chat_lower_percent = 50; // percent of the time to lowercase chat
+
+int team_balancetype = 1;
+char *team_blockedlist;
 
 float bot_think_spf = 1.0/30.0; // == 1 / (30 fps)
 
@@ -109,8 +120,8 @@ void CheckSubMod(void);
 
 // START of Metamod stuff
 C_DLLEXPORT int GetEntityAPI2_POST (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion);
+C_DLLEXPORT int GetEngineFunctions_POST (enginefuncs_t *pengfuncsFromEngine, int *interfaceVersion);
 
-enginefuncs_t meta_engfuncs;
 gamedll_funcs_t *gpGamedllFuncs;
 mutil_funcs_t *gpMetaUtilFuncs;
 meta_globals_t *gpMetaGlobals;
@@ -124,7 +135,7 @@ META_FUNCTIONS gMetaFunctionTable =
    NULL, // pfnGetNewDLLFunctions()
    NULL, // pfnGetNewDLLFunctions_Post()
    GetEngineFunctions, // pfnGetEngineFunctions()
-   NULL, // pfnGetEngineFunctions_Post()
+   GetEngineFunctions_POST, // pfnGetEngineFunctions_Post()
 };
 
 
@@ -169,19 +180,40 @@ C_DLLEXPORT int Meta_Query (char *ifvers, plugin_info_t **pPlugInfo, mutil_funcs
 
       if ((pmajor > mmajor) || ((pmajor == mmajor) && (pminor > mminor)))
       {
-         LOG_CONSOLE (PLID, "metamod version is too old for this plugin; update metamod");
-         LOG_ERROR (PLID, "metamod version is too old for this plugin; update metamod");
+         LOG_CONSOLE (PLID, "%s", "metamod version is too old for this plugin; update metamod");
+         LOG_ERROR (PLID, "%s", "metamod version is too old for this plugin; update metamod");
          return (FALSE);
       }
 
       // if plugin has older major interface version, it's incompatible (update plugin)
       else if (pmajor < mmajor)
       {
-         LOG_CONSOLE (PLID, "metamod version is incompatible with this plugin; please find a newer version of this plugin");
-         LOG_ERROR (PLID, "metamod version is incompatible with this plugin; please find a newer version of this plugin");
+         LOG_CONSOLE (PLID, "%s", "metamod version is incompatible with this plugin; please find a newer version of this plugin");
+         LOG_ERROR (PLID, "%s", "metamod version is incompatible with this plugin; please find a newer version of this plugin");
          return (FALSE);
       }
    }
+   
+   // Check if server is listenserver (AKA: unsupported)
+   if(!IS_DEDICATED_SERVER())
+   {
+      static const char * listenserver_info[] = { 
+         /*"JK_BOTTI DOES NOT WORK ON LISTENSERVER! SORRY!",
+         "--------",
+         "jk_botti was never indeed for listenserver use but only for dedicated server.",
+         "Since I never tested it on listenserver, it broke up somewhere.",
+         "You can play jk_botti by installing hlds locally and jk_botti under it.",*/
+         NULL
+      };
+      
+      for(const char *pc = listenserver_info[0]; pc != NULL; pc++)
+      {
+         LOG_CONSOLE (PLID, "%s", pc);
+         LOG_ERROR (PLID, "%s", pc);
+      }
+      
+      //return( FALSE );
+   }   
 
    return (TRUE); // tell metamod this plugin looks safe
 }
@@ -248,6 +280,10 @@ C_DLLEXPORT int Meta_Detach (PLUG_LOADTIME now, PL_UNLOAD_REASON reason)
    UTIL_FreeFuncBreakables();
    FreeCfgBotRecord();
    
+   // try remove hook
+   if(!unhook_sendto_function())
+      return(FALSE);
+   
    return (TRUE); // returning TRUE enables metamod to unload this plugin
 }
 
@@ -288,7 +324,16 @@ void CheckSubMod(void)
    else if(!strnicmp(desc, "XDM", 3))
       submod_id = SUBMOD_XDM;
    else if(CVAR_GET_POINTER("bm_ver") != NULL)
-      submod_id = SUBMOD_BUBBLEMOD;
+      submod_id = SUBMOD_BUBBLEMOD; 
+   else if(!strnicmp(desc, "HL Teamplay", 11))
+   {
+      // this is a bit of hack, sevs uses "HL Teamplay" string for teamplay so we need alternative way of detecting
+      // Ofcourse all other submods with same problem will be detected as sevs now too, oh well.. got to live with it :S
+      if(CVAR_GET_POINTER("mp_giveweapons") != NULL && CVAR_GET_POINTER("mp_giveammo") != NULL)
+         submod_id = SUBMOD_SEVS;
+      else
+         submod_id = SUBMOD_HLDM;
+   }
    else
       submod_id = SUBMOD_HLDM;
    
@@ -303,6 +348,8 @@ void CheckSubMod(void)
    case SUBMOD_BUBBLEMOD:
       UTIL_ConsolePrintf("BubbleMod MOD detected.");
       break;
+   default:
+      submod_id = SUBMOD_HLDM;
    case SUBMOD_HLDM:
       UTIL_ConsolePrintf("Standard HL1DM assumed.");
       break;
@@ -347,6 +394,12 @@ int Spawn( edict_t *pent )
 
          is_team_play = FALSE;
          checked_teamplay = FALSE;
+
+         *g_team_list = 0;
+         memset(g_team_names, 0, sizeof(g_team_names));
+         memset(g_team_scores, 0, sizeof(g_team_scores));
+         g_num_teams = 0;
+         g_team_limit = FALSE;
 
          frame_count = 0;
 
@@ -833,6 +886,35 @@ void StartFrame( void )
       {
          int pick = UTIL_PickRandomBot();
          
+         if(is_team_play && team_balancetype >= 1 && g_team_limit)
+         {
+            char balanceskin[MAX_TEAMNAME_LENGTH];
+
+            // get largest team, count by all players
+            if( GetSpecificTeam(balanceskin, sizeof(balanceskin), FALSE, TRUE, FALSE) ||
+            // get largest team, count by bots only
+                GetSpecificTeam(balanceskin, sizeof(balanceskin), FALSE, TRUE, TRUE) )
+            {
+               for(int i = 0; i < 32; i++)
+               {
+                  char teamstr[MAX_TEAMNAME_LENGTH];
+                  
+                  if(bots[i].is_used)
+                  {
+                     if(!stricmp(UTIL_GetTeam(bots[i].pEdict, teamstr, sizeof(teamstr)), balanceskin))
+                     {
+                        pick = i;
+                        
+                        if(debug_minmax)
+                           UTIL_ConsolePrintf("Teambalance override, kicking from team: %s", balanceskin);
+                        
+                        break;
+                     }
+                  }
+               }
+            }
+         }
+            
          if(pick != -1)
             BotKick(bots[pick]);
          
@@ -864,27 +946,29 @@ extern void ClientCommand( edict_t *pEntity );
 
 C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion)
 {
-   gFunctionTable.pfnGameInit = GameDLLInit;
-   gFunctionTable.pfnSpawn = Spawn;
-   gFunctionTable.pfnClientConnect = jkbotti_ClientConnect;
-   gFunctionTable.pfnClientPutInServer = jkbotti_ClientPutInServer;
-   gFunctionTable.pfnClientDisconnect = ClientDisconnect;
-   gFunctionTable.pfnClientCommand = ClientCommand;
-   gFunctionTable.pfnStartFrame = StartFrame;
-   gFunctionTable.pfnServerDeactivate = ServerDeactivate;
-   gFunctionTable.pfnPM_Move = PM_Move;
-   gFunctionTable.pfnCmdStart = CmdStart;
+   memset(pFunctionTable, 0, sizeof (DLL_FUNCTIONS));
+   
+   pFunctionTable->pfnGameInit = GameDLLInit;
+   pFunctionTable->pfnSpawn = Spawn;
+   pFunctionTable->pfnClientConnect = jkbotti_ClientConnect;
+   pFunctionTable->pfnClientPutInServer = jkbotti_ClientPutInServer;
+   pFunctionTable->pfnClientDisconnect = ClientDisconnect;
+   pFunctionTable->pfnClientCommand = ClientCommand;
+   pFunctionTable->pfnStartFrame = StartFrame;
+   pFunctionTable->pfnServerDeactivate = ServerDeactivate;
+   pFunctionTable->pfnPM_Move = PM_Move;
+   pFunctionTable->pfnCmdStart = CmdStart;
 
-   memcpy (pFunctionTable, &gFunctionTable, sizeof (DLL_FUNCTIONS));
    return (TRUE);
 }
 
 C_DLLEXPORT int GetEntityAPI2_POST (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion)
 {
-   gFunctionTable_POST.pfnSpawn = Spawn_Post;
-   gFunctionTable_POST.pfnPlayerPostThink = PlayerPostThink_Post;
-   gFunctionTable_POST.pfnKeyValue = DispatchKeyValue_Post;
-      
-   memcpy (pFunctionTable, &gFunctionTable_POST, sizeof (DLL_FUNCTIONS));
+   memset(pFunctionTable, 0, sizeof (DLL_FUNCTIONS));
+   
+   pFunctionTable->pfnSpawn = Spawn_Post;
+   pFunctionTable->pfnPlayerPostThink = PlayerPostThink_Post;
+   pFunctionTable->pfnKeyValue = DispatchKeyValue_Post;
+
    return (TRUE);
 }

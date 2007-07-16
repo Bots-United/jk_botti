@@ -1,4 +1,4 @@
-jk_botti 1.24
+jk_botti 1.30
 -------------
 
 1. Intro
@@ -10,7 +10,7 @@ jk_botti 1.24
 1. Intro
 --------------------
 
-This is 1.24 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+This is 1.30 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
 You are free to use code for any of your needs.
 
 Credits:
@@ -60,6 +60,24 @@ CPU intensive operation this can only be done on map change.
 --------------------
 2. What's new
 --------------------
+1.30:
+ * Fixed Severians MOD detection with teamplay.
+ * Fixed bug with jk_botti only using first 3 letters of player/bot team name.
+ * Fixed bots to get affected by weapon recoil. Somewhere along hldm releases
+   recoil code was moved completely to client.dll, so now jk_botti will
+   emulate client.dll function. Difference to MP5 aiming is most notable.
+ * Removed hack to make bot aim worser than it should when using MP5, this 
+   isn't needed anymore.
+ * Added team autobalance for teamplay servers. Requirements: mp_teamplay is
+   set to 1 and mp_teamlist is set with more than one team.
+   * New commands 'team_balancetype' and 'team_blockedlist'. See jk_botti.cfg
+     for details.
+ * Disabled 'bot_conntimes 1' on listenserver.
+ * NOTE: listenserver support might be completely dropped in 1.40 unless
+   someone confirms that jk_botti actually works correctly on listenserver.
+   Dropping support means that loading jk_botti on listenserver will be
+   blocked with some error message.
+
 1.24:
  * Rewrote min/max_bots code.
  * Increased config-file processing and bot adding speed.
