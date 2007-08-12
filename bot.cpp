@@ -447,7 +447,6 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
    qboolean got_skill_arg = FALSE;
    char c_topcolor[4], c_bottomcolor[4];
    int  max_skin_index;
-   qboolean forceskin = FALSE;
    
    max_skin_index = number_skins;
    
@@ -505,7 +504,8 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
    for (i = 0; c_skin[i] != 0; i++)
       c_skin[i] = tolower( c_skin[i] );  // convert to all lowercase
 
-   if(!forceskin)
+   // check existance of player model file only on listenserver, dedicated server doesn't _need_ model.
+   if(!IS_DEDICATED_SERVER())
    {
       index = 0;
 
