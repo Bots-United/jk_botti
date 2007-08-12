@@ -71,6 +71,9 @@ distclean:
 	rm -f Rules.depend ${TARGET}.dll ${TARGET}_i386.so addons/jk_botti/dlls/* zlib/*.exe
 	(cd zlib; make distclean; cd ..)
 
+waypoint.o: waypoint.cpp
+	${CPP} ${CPPFLAGS} -funroll-loops -c $< -o $@
+
 %.o: %.cpp
 	${CPP} ${CPPFLAGS} -c $< -o $@
 
