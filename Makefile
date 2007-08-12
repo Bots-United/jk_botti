@@ -64,7 +64,7 @@ zlib/libz.a:
 	(cd zlib; CC="${CPP} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -DASMV" ./configure; make OBJA=match.o; cd ..)
 
 clean:
-	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe
+	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe zlib/Makefile
 	(cd zlib; make clean; cd ..)
 
 distclean:
