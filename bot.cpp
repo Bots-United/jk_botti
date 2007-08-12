@@ -459,14 +459,14 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
       // get smallest team
       if(GetSpecificTeam(balanceskin, sizeof(balanceskin), TRUE, FALSE, FALSE))
       {
-         skin = balanceskin;
+         if (skin != NULL && skin[0] != '\0')
+            UTIL_ConsolePrintf("Teambalance overriding input model '%s' with '%s'", skin, balanceskin);
          
-         if(debug_minmax)
-            UTIL_ConsolePrintf("Teambalance override, adding to team: %s", skin);
+         skin = balanceskin;
       }
    }
    
-   if ((skin == NULL) || (*skin == 0))
+   if (skin == NULL || skin[0] == '\0')
    {
       index = RANDOM_LONG2(0, number_skins-1);
 
