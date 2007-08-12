@@ -460,7 +460,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
       if(GetSpecificTeam(balanceskin, sizeof(balanceskin), TRUE, FALSE, FALSE))
       {
          if (skin != NULL && skin[0] != '\0')
-            UTIL_ConsolePrintf("Teambalance overriding input model '%s' with '%s'", skin, balanceskin);
+            UTIL_ConsolePrintf("[warning] Teambalance overriding input model '%s' with '%s'", skin, balanceskin);
          
          skin = balanceskin;
       }
