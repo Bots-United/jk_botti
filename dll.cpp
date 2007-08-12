@@ -192,27 +192,6 @@ C_DLLEXPORT int Meta_Query (char *ifvers, plugin_info_t **pPlugInfo, mutil_funcs
          return (FALSE);
       }
    }
-   
-   // Check if server is listenserver (AKA: unsupported)
-   if(!IS_DEDICATED_SERVER())
-   {
-      static const char * listenserver_info[] = { 
-         /*"JK_BOTTI DOES NOT WORK ON LISTENSERVER! SORRY!",
-         "--------",
-         "jk_botti was never indeed for listenserver use but only for dedicated server.",
-         "Since I never tested it on listenserver, it broke up somewhere.",
-         "You can play jk_botti by installing hlds locally and jk_botti under it.",*/
-         NULL
-      };
-      
-      for(const char *pc = listenserver_info[0]; pc != NULL; pc++)
-      {
-         LOG_CONSOLE (PLID, "%s", pc);
-         LOG_ERROR (PLID, "%s", pc);
-      }
-      
-      //return( FALSE );
-   }   
 
    return (TRUE); // tell metamod this plugin looks safe
 }
