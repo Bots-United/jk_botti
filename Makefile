@@ -64,8 +64,9 @@ zlib/libz.a:
 	(cd zlib; CC="${CPP} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -DASMV" ./configure; make OBJA=match.o; cd ..)
 
 clean:
-	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe zlib/Makefile
+	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe 
 	(cd zlib; make clean; cd ..)
+	rm -f zlib/Makefile
 
 distclean:
 	rm -f Rules.depend ${TARGET}.dll ${TARGET}_i386.so addons/jk_botti/dlls/* zlib/*.exe
