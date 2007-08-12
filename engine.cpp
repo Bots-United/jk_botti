@@ -7,7 +7,6 @@
 #ifndef _WIN32
 #include <string.h>
 #endif
-#include "asm_string.h"
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -82,7 +81,7 @@ unsigned short pfnPrecacheEvent_Post(int type, const char* psz)
 
    for(event_info_t *pei = g_event_info; pei->eventname; pei++)
    {
-      if(jkstrcmp(psz, pei->eventname) == 0)
+      if(strcmp(psz, pei->eventname) == 0)
       {
          // found event, update eventindex
          pei->eventindex = eventindex;
@@ -125,7 +124,7 @@ void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventi
    {
       // gauss uses bug fix that sends two events at same time,
       // ignore the duplicated one...
-      if(jkstrcmp("events/gauss.sc", pei->eventname) == 0 && delay > 0.0f && (flags & FEV_RELIABLE))
+      if(strcmp("events/gauss.sc", pei->eventname) == 0 && delay > 0.0f && (flags & FEV_RELIABLE))
          RETURN_META (MRES_IGNORED);
       
       int index = UTIL_GetBotIndex(pInvoker);

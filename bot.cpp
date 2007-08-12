@@ -7,7 +7,6 @@
 #ifndef _WIN32
 #include <string.h>
 #endif
-#include "asm_string.h"
 
 #include <malloc.h>
 
@@ -305,10 +304,10 @@ void BotPickName( char *name_buffer, int sizeof_name_buffer )
             const char * netname = STRING(pPlayer->v.netname);
             
             //check if bot name is [lvlX]name format...
-            if (jkstrncmp(netname, "[lvl", 4) == 0 && netname[4] >= '1' && netname[4] <= '5' && netname[5] == ']')
+            if (strncmp(netname, "[lvl", 4) == 0 && netname[4] >= '1' && netname[4] <= '5' && netname[5] == ']')
                netname += 6;
             
-            if (jkstrcmp(bot_names[name_index], netname) == 0)
+            if (strcmp(bot_names[name_index], netname) == 0)
             {
                used = TRUE;
                break;
@@ -511,7 +510,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
 
       while ((!found) && (index < max_skin_index))
       {
-         if (jkstrcmp(c_skin, bot_skins[index].model_name) == 0)
+         if (strcmp(c_skin, bot_skins[index].model_name) == 0)
             found = TRUE;
          else
             index++;
@@ -603,7 +602,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
    //
    // Bug fix: remove [lvlX] tags always
    //
-   if(!jkstrncmp(c_name, "[lvl", 4) && (c_name[4] >= '1' && c_name[4] <= '5') && c_name[5] == ']')
+   if(!strncmp(c_name, "[lvl", 4) && (c_name[4] >= '1' && c_name[4] <= '5') && c_name[5] == ']')
    {
       // Read skill from config file name
       if(!got_skill_arg)
@@ -750,7 +749,7 @@ void BotReplaceConnectionTime(const char * name, float * timeslot)
       bot_t &pBot = bots[i];
       
       // find bot by name
-      if(jkstrcmp(pBot.name, name) != 0)
+      if(strcmp(pBot.name, name) != 0)
          continue;
       
       double current_time = UTIL_GetSecs();
@@ -884,7 +883,7 @@ void BotPickLogo(bot_t &pBot)
       {
          if (bots[index].is_used)
          {
-            if (jkstrcmp(bots[index].logo_name, bot_logos[logo_index]) == 0)
+            if (strcmp(bots[index].logo_name, bot_logos[logo_index]) == 0)
             {
                used = TRUE;
             }
@@ -1002,7 +1001,7 @@ void BotFindItem( bot_t &pBot )
       safevoid_snprintf(item_name, sizeof(item_name), "%s", STRING(pent->v.classname));
 
       // see if this is a "func_" type of entity (func_button, etc.)...
-      if (jkstrncmp("func_", item_name, 5) == 0)
+      if (strncmp("func_", item_name, 5) == 0)
       {      	
          // BModels have 0,0,0 for origin so must use VecBModelOrigin...
          entity_origin = VecBModelOrigin(pent);
@@ -1018,7 +1017,7 @@ void BotFindItem( bot_t &pBot )
 
          // check if entity is a ladder (ladders are a special case)
          // DON'T search for ladders if there are waypoints in this level...
-         if ((jkstrcmp("func_ladder", item_name) == 0) && (num_waypoints == 0))
+         if ((strcmp("func_ladder", item_name) == 0) && (num_waypoints == 0))
          {
             // force ladder origin to same z coordinate as bot since
             // the VecBModelOrigin is the center of the ladder.  For
@@ -1073,7 +1072,7 @@ void BotFindItem( bot_t &pBot )
                // check if entity is wall mounted health charger...
                // check if the bot can use this item and
                // check if the recharger is ready to use (has power left)...
-               if (jkstrcmp("func_healthcharger", item_name) == 0 && 
+               if (strcmp("func_healthcharger", item_name) == 0 && 
                	   (pEdict->v.health < VALVE_MAX_NORMAL_HEALTH) && (pent->v.frame == 0))
                {
                   // check if flag not set...
@@ -1110,7 +1109,7 @@ void BotFindItem( bot_t &pBot )
                // check if entity is wall mounted HEV charger...
                // check if the bot can use this item and
                // check if the recharger is ready to use (has power left)...
-               if (jkstrcmp("func_recharge", item_name) == 0 &&
+               if (strcmp("func_recharge", item_name) == 0 &&
                	   (pEdict->v.armorvalue < VALVE_MAX_NORMAL_BATTERY) && (pent->v.frame == 0))
                {
                   // check if flag not set and facing it...
@@ -1145,7 +1144,7 @@ void BotFindItem( bot_t &pBot )
                }
 
                // check if entity is a button...
-               if (FIsClassname(item_name, tr.pHit) && jkstrcmp("func_button", item_name) == 0)
+               if (FIsClassname(item_name, tr.pHit) && strcmp("func_button", item_name) == 0)
                {               	  
                   // use the button about 100% of the time, if haven't
                   // used a button in at least 5 seconds...
@@ -1279,7 +1278,7 @@ void BotFindItem( bot_t &pBot )
             }
             
             // pick up longjump
-            else if (jkstrcmp("item_longjump", item_name) == 0)
+            else if (strcmp("item_longjump", item_name) == 0)
             {
                if (pent->v.effects & EF_NODRAW)
                {
@@ -1295,7 +1294,7 @@ void BotFindItem( bot_t &pBot )
             }
 
             // check if entity is a battery...
-            else if (jkstrcmp("item_battery", item_name) == 0)
+            else if (strcmp("item_battery", item_name) == 0)
             {
                // check if the item is not visible (i.e. has not respawned)
                if (pent->v.effects & EF_NODRAW)
@@ -1309,7 +1308,7 @@ void BotFindItem( bot_t &pBot )
             }
 
             // check if entity is a healthkit...
-            else if (jkstrcmp("item_healthkit", item_name) == 0)
+            else if (strcmp("item_healthkit", item_name) == 0)
             {
                // check if the item is not visible (i.e. has not respawned)
                if (pent->v.effects & EF_NODRAW)
@@ -1323,18 +1322,18 @@ void BotFindItem( bot_t &pBot )
             }
 
             // check if entity is a packed up weapons box...
-            else if (jkstrcmp("weaponbox", item_name) == 0)
+            else if (strcmp("weaponbox", item_name) == 0)
             {
                can_pickup = TRUE;
             }
 
             // check if entity is the spot from RPG laser
-            else if (jkstrcmp("laser_spot", item_name) == 0)
+            else if (strcmp("laser_spot", item_name) == 0)
             {
             }
 
             // check if entity is an armed tripmine
-            else if (jkstrcmp("monster_tripmine", item_name) == 0)
+            else if (strcmp("monster_tripmine", item_name) == 0)
             {
                float distance = (pent->v.origin - pEdict->v.origin).Length( );
 
@@ -1368,12 +1367,12 @@ void BotFindItem( bot_t &pBot )
             }
 
             // check if entity is an armed satchel charge
-            else if (jkstrcmp("monster_satchel", item_name) == 0)
+            else if (strcmp("monster_satchel", item_name) == 0)
             {
             }
 
             // check if entity is a snark (squeak grenade)
-            else if (jkstrcmp("monster_snark", item_name) == 0)
+            else if (strcmp("monster_snark", item_name) == 0)
             {
             }
             

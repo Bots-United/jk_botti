@@ -92,13 +92,13 @@ inline int strmatch(const char *s1, const char *s2) {
 	if(!s1 || !s2) 
 		return(0);
 	else 
-		return(!jkstrcmp(s1, s2));
+		return(!strcmp(s1, s2));
 }
 inline int strnmatch(const char *s1, const char *s2, size_t n) {
 	if(!s1 || !s2) 
 		return(0);
 	else 
-		return(!jkstrncmp(s1, s2, n));
+		return(!strncmp(s1, s2, n));
 }
 inline int strcasematch(const char *s1, const char *s2) {
 	if(!s1 || !s2) 

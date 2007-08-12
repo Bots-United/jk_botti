@@ -9,7 +9,6 @@
 #ifndef _WIN32
 #include <string.h>
 #endif
-#include "asm_string.h"
 
 #include <malloc.h>
 

@@ -7,7 +7,6 @@
 #ifdef _WIN32
 
 #include <string.h>
-#include "asm_string.h"
 
 #include <memory.h>
 #include <string.h>

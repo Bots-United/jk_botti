@@ -267,7 +267,7 @@ inline void BotFixIdealYaw(edict_t *pEdict)
 
 inline Vector UTIL_GetOrigin(edict_t *pEdict)
 {
-//   if(jkstrncmp(STRING(pEdict->v.classname), "func_", 5) == 0)
+//   if(strncmp(STRING(pEdict->v.classname), "func_", 5) == 0)
    if(unlikely(pEdict->v.solid == SOLID_BSP))
       return VecBModelOrigin(pEdict);
 
@@ -339,7 +339,7 @@ inline qboolean FInViewCone(const Vector & Origin, edict_t *pEdict)
 
 inline qboolean FIsClassname(edict_t * pent, const char * cname)
 {
-   return(likely(pent)?jkstrcmp(STRING(pent->v.classname), cname)==0:FALSE);
+   return(likely(pent)?strcmp(STRING(pent->v.classname), cname)==0:FALSE);
 }
 
 inline qboolean FIsClassname(const char * cname, edict_t * pent)

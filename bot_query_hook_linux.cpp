@@ -10,8 +10,6 @@
 #define __USE_GNU
 #endif
 
-#include "asm_string.h"
-
 #include <sys/mman.h>
 #include <asm/page.h>
 #define PAGE_ALIGN(addr) (((addr)+PAGE_SIZE-1)&PAGE_MASK)

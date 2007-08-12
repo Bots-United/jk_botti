@@ -22,7 +22,7 @@ else
 endif
 
 TARGET = jk_botti_mm
-BASEFLAGS = -Djkstrcmp=asm_strcmp -Djkstrncmp=asm_strncmp
+BASEFLAGS = 
 OPTFLAGS = -O2 -fomit-frame-pointer -ffast-math
 #OPTFLAGS = -O0 -g
 INCLUDES = -I"./metamod" \

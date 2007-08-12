@@ -7,7 +7,6 @@
 #ifndef _WIN32
 #include <string.h>
 #endif
-#include "asm_string.h"
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -304,19 +303,19 @@ void LoadBotChat(void)
          length--;
       }
 
-      if (jkstrcmp(buffer, "[bot_chat]") == 0)
+      if (strcmp(buffer, "[bot_chat]") == 0)
       {
          section = 0;
          continue;
       }
 
-      if (jkstrcmp(buffer, "[bot_taunt]") == 0)
+      if (strcmp(buffer, "[bot_taunt]") == 0)
       {
          section = 1;
          continue;
       }
 
-      if (jkstrcmp(buffer, "[bot_whine]") == 0)
+      if (strcmp(buffer, "[bot_whine]") == 0)
       {
          section = 2;
          continue;
@@ -544,7 +543,7 @@ void BotChatName(const char *original_name, char *out_name, int sizeof_out_name)
    char temp_lvlXless_name[80];
    
    //always remove [lvlX] tag
-   if(jkstrncmp(original_name, "[lvl", 4) == 0 && original_name[4] >= '0' && original_name[4] <= '5' && original_name[5] == ']')
+   if(strncmp(original_name, "[lvl", 4) == 0 && original_name[4] >= '0' && original_name[4] <= '5' && original_name[5] == ']')
    {
       safevoid_snprintf(temp_lvlXless_name, sizeof(temp_lvlXless_name), "%s", &original_name[6]);
       original_name = temp_lvlXless_name;
@@ -679,15 +678,15 @@ void BotChatFillInName(char *bot_say_msg, int sizeof_msg, const char *chat_text,
                   int index = RANDOM_LONG2(0, player_count-1);
                   int count = 0;
                   
-                  bool is_bad = (jkstrcmp(player_names[index], chat_name) == 0) ||
-                                (jkstrcmp(player_names[index], bot_name) == 0);
+                  bool is_bad = (strcmp(player_names[index], chat_name) == 0) ||
+                                (strcmp(player_names[index], bot_name) == 0);
 
                   while ((is_bad) && (count < 20))
                   {
                      index = RANDOM_LONG2(0, player_count-1);
 
-                     is_bad = (jkstrcmp(player_names[index], chat_name) == 0) ||
-                              (jkstrcmp(player_names[index], bot_name) == 0);
+                     is_bad = (strcmp(player_names[index], chat_name) == 0) ||
+                              (strcmp(player_names[index], bot_name) == 0);
                      
                      count++;
                   }

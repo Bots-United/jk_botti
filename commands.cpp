@@ -7,7 +7,6 @@
 #ifndef _WIN32
 #include <string.h>
 #endif
-#include "asm_string.h"
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -1322,15 +1321,15 @@ void ProcessBotCfgFile(void)
    if ((cmd_line[0] == '#') || (cmd_line[0] == '/' && cmd_line[1] == '/') || (cmd_line[0] == 0))
       return;  // return if comment or blank line
 
-   if(arg1 && !jkstrcmp(arg1, "\"\""))
+   if(arg1 && !strcmp(arg1, "\"\""))
       *arg1=0;
-   if(arg2 && !jkstrcmp(arg2, "\"\""))
+   if(arg2 && !strcmp(arg2, "\"\""))
       *arg2=0;
-   if(arg3 && !jkstrcmp(arg3, "\"\""))
+   if(arg3 && !strcmp(arg3, "\"\""))
       *arg3=0;
-   if(arg4 && !jkstrcmp(arg4, "\"\""))
+   if(arg4 && !strcmp(arg4, "\"\""))
       *arg4=0;
-   if(arg5 && !jkstrcmp(arg5, "\"\""))
+   if(arg5 && !strcmp(arg5, "\"\""))
       *arg5=0;
 
    // trim "s

@@ -7,7 +7,6 @@
 #ifndef _WIN32
 #include <string.h>
 #endif
-#include "asm_string.h"
 
 #include <malloc.h>
 
@@ -167,7 +166,7 @@ C_DLLEXPORT int Meta_Query (char *ifvers, plugin_info_t **pPlugInfo, mutil_funcs
    Plugin_info.version = plugver;
 
    // check for interface version compatibility
-   if (jkstrcmp (ifvers, Plugin_info.ifvers) != 0)
+   if (strcmp (ifvers, Plugin_info.ifvers) != 0)
    {
       int mmajor = 0, mminor = 0, pmajor = 0, pminor = 0;
 
@@ -529,17 +528,17 @@ BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *p
       RETURN_META_VALUE (MRES_IGNORED, 0);
 
    // check if this client is the listen server client
-   if (jkstrcmp(pszAddress, "loopback") == 0)
+   if (strcmp(pszAddress, "loopback") == 0)
    {
       // save the edict of the listen server client...
       listenserver_edict = pEntity;
    }
-   else if(jkstrcmp(pszAddress, "::::local:jk_botti") == 0)
+   else if(strcmp(pszAddress, "::::local:jk_botti") == 0)
    {
       // don't try to add bots for 1 second, give client time to get added
       bot_check_time = gpGlobals->time + 1.0;
    }
-   else if(jkstrcmp(pszAddress, "::::local:other_bot") == 0)
+   else if(strcmp(pszAddress, "::::local:other_bot") == 0)
    {
       // don't try to add bots for 1 second, give client time to get added
       bot_check_time = gpGlobals->time + 1.0;

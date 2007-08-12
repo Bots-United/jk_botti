@@ -7,7 +7,6 @@
 #ifndef _WIN32
 #include <string.h>
 #endif
-#include "asm_string.h"
 
 #ifndef __linux__
 #include <io.h>
@@ -479,20 +478,20 @@ void CollectMapSpawnItems(edict_t *pSpawn)
       
    Vector EntOrigin = pSpawn->v.origin;
    
-   if (jkstrncmp("item_health", classname, 11) == 0)
+   if (strncmp("item_health", classname, 11) == 0)
       flags |= W_FL_HEALTH;
-   else if (jkstrncmp("item_battery", classname, 12) == 0)
+   else if (strncmp("item_battery", classname, 12) == 0)
       flags |= W_FL_ARMOR;
    else if ((itemflag = GetAmmoItemFlag(classname)) != 0)
       flags |= W_FL_AMMO;
    else if ((itemflag = GetWeaponItemFlag(classname)) != 0 && (pSpawn->v.owner == NULL))
       flags |= W_FL_WEAPON;
-   else if (jkstrcmp("item_longjump", classname) == 0)
+   else if (strcmp("item_longjump", classname) == 0)
       flags |= W_FL_LONGJUMP;
    else
    {
       // check for func_recharge and func_healthcharger
-      if(jkstrncmp("func_recharge", classname, 13) == 0 || jkstrncmp("func_healthcharger", classname, 18) == 0)
+      if(strncmp("func_recharge", classname, 13) == 0 || strncmp("func_healthcharger", classname, 18) == 0)
       {
          flags |= (classname[5] == 'r') ? W_FL_ARMOR : W_FL_HEALTH;
          
@@ -1399,10 +1398,10 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
       {
          safevoid_snprintf(item_name, sizeof(item_name), "%s", STRING(pent->v.classname));
 
-         if ((jkstrncmp("item_health", item_name, 11) == 0) || jkstrncmp("func_healthcharger", item_name, 18) == 0 ||
-             (jkstrncmp("item_battery", item_name, 12) == 0) || jkstrncmp("func_recharge", item_name, 13) == 0||
+         if ((strncmp("item_health", item_name, 11) == 0) || strncmp("func_healthcharger", item_name, 18) == 0 ||
+             (strncmp("item_battery", item_name, 12) == 0) || strncmp("func_recharge", item_name, 13) == 0||
              (GetAmmoItemFlag(item_name) != 0) ||
-             (jkstrcmp("item_longjump", item_name) == 0) ||
+             (strcmp("item_longjump", item_name) == 0) ||
              ((GetWeaponItemFlag(item_name) != 0) && (pent->v.owner == NULL)))
          {
             distance = (pent->v.origin - origin).Length();
@@ -1423,14 +1422,14 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
    {
       char buf[128];
       
-      if (jkstrncmp("item_health", nearest_name, 11) == 0 || jkstrncmp("func_healthcharger", nearest_name, 18) == 0)
+      if (strncmp("item_health", nearest_name, 11) == 0 || strncmp("func_healthcharger", nearest_name, 18) == 0)
       {
          if (pEntity)
             ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs2(buf, sizeof(buf), "found a healthkit! (%s)\n", nearest_name));
          waypoints[wpt_index].flags |= W_FL_HEALTH;
       }
 
-      if (jkstrncmp("item_battery", nearest_name, 12) == 0 || jkstrncmp("func_recharge", nearest_name, 13) == 0)
+      if (strncmp("item_battery", nearest_name, 12) == 0 || strncmp("func_recharge", nearest_name, 13) == 0)
       {
          if (pEntity)
             ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs2(buf, sizeof(buf), "found some armor! (%s)\n", nearest_name));
@@ -1453,7 +1452,7 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
          waypoints[wpt_index].itemflags |= itemflag;
       }
       
-      if ((jkstrcmp("item_longjump", nearest_name) == 0))
+      if ((strcmp("item_longjump", nearest_name) == 0))
       {
          if (pEntity)
             ClientPrint(pEntity, HUD_PRINTCONSOLE, UTIL_VarArgs2(buf, sizeof(buf), "found a longjump! (%s)\n", nearest_name));
@@ -1498,10 +1497,10 @@ edict_t *WaypointFindItem( int wpt_index )
       {
          safevoid_snprintf(item_name, sizeof(item_name), "%s", STRING(pent->v.classname));
          
-         if(((waypoints[wpt_index].flags & W_FL_HEALTH) && (jkstrncmp("item_health", item_name, 11) == 0) || jkstrncmp("func_healthcharger", item_name, 18) == 0) ||
-            ((waypoints[wpt_index].flags & W_FL_ARMOR) && (jkstrncmp("item_battery", item_name, 12) == 0) || jkstrncmp("func_recharge", item_name, 13) == 0) ||
+         if(((waypoints[wpt_index].flags & W_FL_HEALTH) && (strncmp("item_health", item_name, 11) == 0) || strncmp("func_healthcharger", item_name, 18) == 0) ||
+            ((waypoints[wpt_index].flags & W_FL_ARMOR) && (strncmp("item_battery", item_name, 12) == 0) || strncmp("func_recharge", item_name, 13) == 0) ||
             ((waypoints[wpt_index].flags & W_FL_AMMO) && GetAmmoItemFlag(item_name) != 0) ||
-            ((waypoints[wpt_index].flags & W_FL_LONGJUMP) && jkstrcmp("item_longjump", item_name) == 0) ||
+            ((waypoints[wpt_index].flags & W_FL_LONGJUMP) && strcmp("item_longjump", item_name) == 0) ||
             ((waypoints[wpt_index].flags & W_FL_WEAPON) && GetWeaponItemFlag(item_name) != 0 && pent->v.owner == NULL))
          {
             distance = (pent->v.origin - origin).Length();
@@ -2122,7 +2121,7 @@ qboolean WaypointLoad(edict_t *pEntity)
       gzread(bfp, &header, sizeof(header));
 
       header.filetype[7] = 0;
-      if (jkstrcmp(header.filetype, WAYPOINT_MAGIC) == 0)
+      if (strcmp(header.filetype, WAYPOINT_MAGIC) == 0)
       {
          if (header.waypoint_file_version != WAYPOINT_VERSION)
          {
@@ -2138,7 +2137,7 @@ qboolean WaypointLoad(edict_t *pEntity)
 
          header.mapname[31] = 0;
 
-         if (jkstrcmp(header.mapname, STRING(gpGlobals->mapname)) == 0)
+         if (strcmp(header.mapname, STRING(gpGlobals->mapname)) == 0)
          {
             WaypointInit();  // remove any existing waypoints
             
@@ -3283,7 +3282,7 @@ void WaypointRouteInit(qboolean ForceRebuild)
          {
             // first try read header 'jkbotti_matrixA\0', 16 bytes
             num_items = gzread(bfp, header, 16);
-            if(num_items != 16 || jkstrcmp(header, "jkbotti_matrixA\0") != 0)
+            if(num_items != 16 || strcmp(header, "jkbotti_matrixA\0") != 0)
             {
                // if couldn't read enough data, free memory to recalculate it
                UTIL_ConsolePrintf("[matrix load] - error reading first matrix file header, recalculating...\n");
@@ -3313,7 +3312,7 @@ void WaypointRouteInit(qboolean ForceRebuild)
                {
                   // first try read header 'jkbotti_matrixB\0', 16 bytes
                   num_items = gzread(bfp, header, 16);
-                  if(num_items != 16 || jkstrcmp(header, "jkbotti_matrixB\0") != 0)
+                  if(num_items != 16 || strcmp(header, "jkbotti_matrixB\0") != 0)
                   {
                      // if couldn't read enough data, free memory to recalculate it
                      UTIL_ConsolePrintf("[matrix load] - error reading second matrix file header, recalculating...\n");
