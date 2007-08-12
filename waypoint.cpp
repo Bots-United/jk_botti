@@ -2131,9 +2131,6 @@ qboolean WaypointLoad(edict_t *pEntity)
             gzclose(bfp);
             return FALSE;
          }
-         
-         // Handle subversions here (header.waypoint_file_subversion), fixup old versions
-         //  1: Original, didn't use __reserved slots (int __reserved[4])
 
          header.mapname[31] = 0;
 
@@ -2189,7 +2186,16 @@ qboolean WaypointLoad(edict_t *pEntity)
 
       gzclose(bfp);
       
-      Changed = FALSE;
+      Changed = false;
+      
+      // very early pre-1.00 version waypoints(v0) had __reserved[4] and no itemflags
+      if(header.waypoint_file_subversion < WPF_SUBVERSION_1_00)
+      {
+         for(int i = 0; i < num_waypoints; i++)
+         {
+            waypoints[i].itemflags = 0;
+         }
+      }
       
       // Check if this waypoint file is already fixed
       if(header.waypoint_file_subversion < WPF_SUBVERSION_1_10)
