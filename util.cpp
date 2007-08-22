@@ -628,11 +628,13 @@ void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index)
 
 void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2)
 {
+   const char * mod_dir = (submod_id == SUBMOD_OP4) ? "gearbox" : "valve";
+   
    if ((arg1 != NULL) && (arg2 != NULL))
    {
       if (*arg1 && *arg2)
       {
-         safevoid_snprintf(filename, size, "valve/%s/%s", arg1, arg2);
+         safevoid_snprintf(filename, size, "%s/%s/%s", mod_dir, arg1, arg2);
          return;
       }
    }
@@ -641,12 +643,12 @@ void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2)
    {
       if (*arg1)
       {
-         safevoid_snprintf(filename, size, "valve/%s", arg1);
+         safevoid_snprintf(filename, size, "%s/%s", mod_dir, arg1);
          return;
       }
    }
    
-   safevoid_snprintf(filename, size, "valve/");
+   safevoid_snprintf(filename, size, "%s/", mod_dir);
    return;
 }
 
