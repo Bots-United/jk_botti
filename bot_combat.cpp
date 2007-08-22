@@ -1817,5 +1817,8 @@ qboolean BotShootTripmine( bot_t &pBot )
    pEdict->v.idealpitch = UTIL_WrapAngle(enemy_angle.x);
    pEdict->v.ideal_yaw = UTIL_WrapAngle(enemy_angle.y);
    
+   //TODO: check if glock is available!!!!
+   // if not try find another weapon which can do this (type: WEAPON_FIRE or FIRE_ZOOM).
+   //TODO: or maybe throw grenade????
    return (BotFireWeapon( v_enemy, pBot, VALVE_WEAPON_GLOCK ));
 }
