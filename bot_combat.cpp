@@ -1689,8 +1689,10 @@ void BotShootAtEnemy( bot_t &pBot )
 
    v_predicted_pos = UTIL_AdjustOriginWithExtent(pBot, GetPredictedPlayerPosition(pBot, pBot.pBotEnemy), pBot.pBotEnemy);
 
+   JKASSERT(pBot.current_weapon_index == -1);
+
    // do we need to aim at the feet?
-   if (pBot.current_weapon.type == WEAPON_FIRE_AT_FEET)
+   if (weapon_select[pBot.current_weapon_index].type == WEAPON_FIRE_AT_FEET)
    {
       Vector v_src, v_dest;
       TraceResult tr;
