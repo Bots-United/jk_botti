@@ -1690,7 +1690,7 @@ void BotShootAtEnemy( bot_t &pBot )
    v_predicted_pos = UTIL_AdjustOriginWithExtent(pBot, GetPredictedPlayerPosition(pBot, pBot.pBotEnemy), pBot.pBotEnemy);
 
    // do we need to aim at the feet?
-   if (pBot.current_weapon.iId == VALVE_WEAPON_RPG)
+   if (pBot.current_weapon.type == WEAPON_FIRE_AT_FEET)
    {
       Vector v_src, v_dest;
       TraceResult tr;

@@ -38,7 +38,10 @@
 #define WEAPON_FIRE  (1<<1)
 #define WEAPON_MELEE (1<<2)
 #define WEAPON_THROW (1<<3)
-#define WEAPON_FIRE_ZOOM (WEAPON_FIRE|(1<<4))
+#define WEAPON_ZOOM (1<<4)
+#define WEAPON_FIRE_ZOOM (WEAPON_FIRE|WEAPON_ZOOM)
+#define WEAPON_AT_FEET (1<<5)
+#define WEAPON_FIRE_AT_FEET (WEAPON_FIRE|WEAPON_AT_FEET)
 
 typedef struct
 {

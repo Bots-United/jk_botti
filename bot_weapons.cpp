@@ -87,7 +87,7 @@ bot_weapon_select_t valve_weapon_select[13] =
     55, TRUE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, 5, -1,
     W_IFL_CROSSBOW, W_IFL_AMMO_CROSSBOW, 0 },
    
-   {VALVE_WEAPON_RPG, "weapon_rpg", WEAPON_FIRE, 1.0,
+   {VALVE_WEAPON_RPG, "weapon_rpg", WEAPON_FIRE_AT_FEET, 1.0,
     SKILL3, NOSKILL, FALSE, FALSE,
     400.0, 5000.0, 0.0, 0.0, 700.0,
     60, TRUE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, 2, -1,
