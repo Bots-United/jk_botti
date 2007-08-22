@@ -123,8 +123,10 @@ typedef struct
    char ammoName[64];
 } bot_ammo_names_t;
 
-extern bot_weapon_select_t weapon_select[13];
-extern bot_fire_delay_t fire_delay[13];
+#define NUM_OF_WEAPON_SELECTS 22
+
+extern bot_weapon_select_t weapon_select[NUM_OF_WEAPON_SELECTS];
+extern bot_fire_delay_t fire_delay[NUM_OF_WEAPON_SELECTS];
 extern bot_ammo_names_t ammo_names[];
 
 enum ammo_low_t {

@@ -79,7 +79,8 @@ unsigned short pfnPrecacheEvent_Post(int type, const char* psz)
    
    unsigned short eventindex = (META_RESULT_STATUS == MRES_OVERRIDE || META_RESULT_STATUS == MRES_SUPERCEDE) ? META_RESULT_OVERRIDE_RET(unsigned short) : META_RESULT_ORIG_RET(unsigned short);
 
-   for(event_info_t *pei = g_event_info; pei->eventname; pei++)
+   event_info_t *pei;
+   for(pei = g_event_info; pei->eventname && pei->eventname[0]; pei++)
    {
       if(strcmp(psz, pei->eventname) == 0)
       {
@@ -87,6 +88,12 @@ unsigned short pfnPrecacheEvent_Post(int type, const char* psz)
          pei->eventindex = eventindex;
          break;
       }
+   }
+   
+   if(!pei->eventname || !pei->eventname[0])
+   {
+      // unknown event
+      UTIL_ConsolePrintf("PrecacheEvent, new event type: \"%s\" : %d", psz, eventindex);
    }
    
    RETURN_META_VALUE (MRES_IGNORED, 0);

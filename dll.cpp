@@ -113,7 +113,7 @@ void BotLogoInit(void);
 void UpdateClientData(const struct edict_s *ent, int sendweapons, struct clientdata_s *cd);
 void ProcessBotCfgFile(void);
 void jk_botti_ServerCommand (void);
-void CheckSubMod(void);
+int CheckSubMod(void);
 
 
 

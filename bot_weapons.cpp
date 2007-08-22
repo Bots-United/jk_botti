@@ -25,7 +25,7 @@ extern int submod_id;
 // weapons are stored in priority order, most desired weapon should be at
 // the start of the array and least desired should be at the end
 
-bot_weapon_select_t valve_weapon_select[13] = 
+bot_weapon_select_t valve_weapon_select[NUM_OF_WEAPON_SELECTS] = 
 {
    {VALVE_WEAPON_CROWBAR, WEAPON_SUBMOD_ALL, "weapon_crowbar", WEAPON_MELEE, 1.0,
     SKILL4, NOSKILL, FALSE, FALSE,
@@ -189,7 +189,7 @@ bot_ammo_names_t ammo_names[] = {
 // weapon firing delay based on skill (min and max delay for each weapon)
 // THESE MUST MATCH THE SAME ORDER AS THE WEAPON SELECT ARRAY!!!
 
-bot_fire_delay_t valve_fire_delay[13] = {
+bot_fire_delay_t valve_fire_delay[NUM_OF_WEAPON_SELECTS] = {
    {VALVE_WEAPON_CROWBAR,
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
@@ -260,8 +260,8 @@ bot_fire_delay_t valve_fire_delay[13] = {
        0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}}
 };
 
-bot_fire_delay_t fire_delay[13];
-bot_weapon_select_t weapon_select[13];
+bot_fire_delay_t fire_delay[NUM_OF_WEAPON_SELECTS];
+bot_weapon_select_t weapon_select[NUM_OF_WEAPON_SELECTS];
 
 
 //
@@ -270,16 +270,11 @@ int SubmodToSubmodWeaponFlag(int submod)
    switch(submod)
    {
       default:
-      case(SUBMOD_HLDM)
-         return(WEAPON_SUBMOD_HLDM);
-      case(SUBMOD_SEVS)
-         return(WEAPON_SUBMOD_SEVS);
-      case(SUBMOD_BUBBLEMOD)
-         return(WEAPON_SUBMOD_BUBBLEMOD);
-      case(SUBMOD_XDM)
-         return(WEAPON_SUBMOD_XDM);
-      case(SUBMOD_OP4)
-         return(WEAPON_SUBMOD_OP4);
+      case(SUBMOD_HLDM):      return(WEAPON_SUBMOD_HLDM);
+      case(SUBMOD_SEVS):      return(WEAPON_SUBMOD_SEVS);
+      case(SUBMOD_BUBBLEMOD): return(WEAPON_SUBMOD_BUBBLEMOD);
+      case(SUBMOD_XDM):       return(WEAPON_SUBMOD_XDM);
+      case(SUBMOD_OP4):       return(WEAPON_SUBMOD_OP4);
    }
 }
 
@@ -431,7 +426,7 @@ qboolean IsValidWeaponChoose(bot_t &pBot, const bot_weapon_select_t &select)
       return(FALSE);
    
    // exclude weapons that are not supported
-   if(!(select.supported_submods & SubmodToSubmodWeaponFlag(submod)))
+   if(!(select.supported_submods & SubmodToSubmodWeaponFlag(submod_id)))
       return(FALSE);
    
    // Severians and Bubblemod checks, skip egon (bubblemod-egon is total conversion and severians-egon is selfkilling after time)
