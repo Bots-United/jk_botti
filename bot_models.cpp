@@ -29,17 +29,26 @@ skin_t bot_skins[MAX_SKINS];
 int number_skins;
 
 #define VALVE_MAX_SKINS     10
+#define GEARBOX_MAX_SKINS   10
 
 
 // default player models for various MODs...
-char *valve_bot_models[VALVE_MAX_SKINS] = {
+char *default_bot_models[VALVE_MAX_SKINS + GEARBOX_MAX_SKINS] = {
    "barney", "gina", "gman", "gordon", "helmet",
-   "hgrunt", "recon", "robo", "scientist", "zombie"};
+   "hgrunt", "recon", "robo", "scientist", "zombie",
+   
+   "beret", "cl_suit", "drill", "fassn", "grunt", 
+   "massn", "otis", "recruit", "shephard", "tower"
+};
 
 // default names for each of the above player models...
-char *valve_bot_names[VALVE_MAX_SKINS] = {
+char *default_bot_names[VALVE_MAX_SKINS + GEARBOX_MAX_SKINS] = {
    "Barney", "Gina", "G-Man", "Gordon", "Helmet",
-   "H-Grunt", "Recon", "Robo", "Scientist", "Zombie"};
+   "H-Grunt", "Recon", "Robo", "Scientist", "Zombie",
+   
+   "Beret", "Cleansuit", "Drill", "Female Assassin", "Grunt",
+   "Male Assassin", "Otis", "Recruit", "Shephard", "Tower"
+};
 
 
 #ifndef __linux__
@@ -156,11 +165,13 @@ void LoadBotModels(void)
       bot_skins[index].skin_used = FALSE;
 
    number_skins = VALVE_MAX_SKINS;
+   if(submod_id == SUBMOD_OP4)
+      number_skins += GEARBOX_MAX_SKINS;
 
-   for (index=0; index < VALVE_MAX_SKINS; index++)
+   for (index=0; index < number_skins; index++)
    {
-      safevoid_snprintf(bot_skins[index].model_name, sizeof(bot_skins[index].model_name), "%s", valve_bot_models[index]);
-      safevoid_snprintf(bot_skins[index].bot_name, sizeof(bot_skins[index].bot_name), "%s", valve_bot_names[index]);
+      safevoid_snprintf(bot_skins[index].model_name, sizeof(bot_skins[index].model_name), "%s", default_bot_models[index]);
+      safevoid_snprintf(bot_skins[index].bot_name, sizeof(bot_skins[index].bot_name), "%s", default_bot_names[index]);
    }
 
    // find the directory name of the currently running MOD...

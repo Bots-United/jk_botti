@@ -357,6 +357,7 @@ typedef struct
 } lumpinfo_t;
 
 extern bot_t bots[32];
+extern int submod_id;
 extern int m_spriteTexture;
 
 Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean without_velocity = FALSE);
