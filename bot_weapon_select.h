@@ -34,6 +34,20 @@
 #define W_IFL_AMMO_CROSSBOW   (1<<17)
 #define W_IFL_AMMO_RPG        (1<<18)
 
+#define W_IFL_GRAPPLE         (1<<19)
+#define W_IFL_EAGLE           (1<<20)
+#define W_IFL_PIPEWRENCH      (1<<21)
+#define W_IFL_M249            (1<<22)
+#define W_IFL_DISPLACER       (1<<23)
+#define W_IFL_SHOCKRIFLE      (1<<24)
+#define W_IFL_SPORELAUNCHER   (1<<25)
+#define W_IFL_SNIPERRIFLE     (1<<26)
+#define W_IFL_KNIFE           (1<<27)
+
+#define W_IFL_AMMO_556        (1<<28)
+#define W_IFL_AMMO_762        (1<<29)
+#define W_IFL_AMMO_SPORE      (1<<30)
+
 // weapon types
 #define WEAPON_FIRE  (1<<1)
 #define WEAPON_MELEE (1<<2)
@@ -43,9 +57,19 @@
 #define WEAPON_AT_FEET (1<<5)
 #define WEAPON_FIRE_AT_FEET (WEAPON_FIRE|WEAPON_AT_FEET)
 
+// submod support flags
+#define WEAPON_SUBMOD_HLDM (1<<0)
+#define WEAPON_SUBMOD_SEVS (1<<1)
+#define WEAPON_SUBMOD_BUBBLEMOD (1<<2)
+#define WEAPON_SUBMOD_XDM (1<<3)
+#define WEAPON_SUBMOD_OP4 (1<<4)
+
+#define WEAPON_SUBMOD_ALL (WEAPON_SUBMOD_HLDM|WEAPON_SUBMOD_SEVS|WEAPON_SUBMOD_BUBBLEMOD|WEAPON_SUBMOD_XDM|WEAPON_SUBMOD_OP4)
+
 typedef struct
 {
    int iId;  // the weapon ID value
+   int supported_submods; // supported submods
    char  weapon_name[64];  // name of the weapon when selecting it
    int type;
    
@@ -108,6 +132,8 @@ enum ammo_low_t {
    AMMO_LOW = 2,
    AMMO_OK = 3,
 };
+
+extern int SubmodToSubmodWeaponFlag(int submod);
 
 extern bot_weapon_select_t * GetWeaponSelect(int id);
 extern void InitWeaponSelect(int submod_id);

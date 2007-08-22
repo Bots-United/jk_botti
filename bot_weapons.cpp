@@ -27,80 +27,135 @@ extern int submod_id;
 
 bot_weapon_select_t valve_weapon_select[13] = 
 {
-   {VALVE_WEAPON_CROWBAR, "weapon_crowbar", WEAPON_MELEE, 1.0,
+   {VALVE_WEAPON_CROWBAR, WEAPON_SUBMOD_ALL, "weapon_crowbar", WEAPON_MELEE, 1.0,
     SKILL4, NOSKILL, FALSE, FALSE,
     0.0, 40.0, 0, 0, 1.0,
     20, TRUE, 100, 0, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
     W_IFL_CROWBAR, 0, 0 },
 
-   {VALVE_WEAPON_HANDGRENADE, "weapon_handgrenade", WEAPON_THROW, 1.0,
+   {VALVE_WEAPON_HANDGRENADE, WEAPON_SUBMOD_ALL, "weapon_handgrenade", WEAPON_THROW, 1.0,
     SKILL4, NOSKILL, TRUE, FALSE,
     300.0, 800.0, 0.0, 0.0, 300.0,
     10, TRUE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, -1, -1,
     W_IFL_HANDGRENADE, 0, 0 },
 
-   {VALVE_WEAPON_SNARK, "weapon_snark", WEAPON_THROW, 1.0,
+   {VALVE_WEAPON_SNARK, WEAPON_SUBMOD_ALL, "weapon_snark", WEAPON_THROW, 1.0,
     SKILL3, NOSKILL, FALSE, FALSE,
     200.0, 800.0, 0, 0, 300.0,
     20, FALSE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
     W_IFL_SNARK, 0, 0 },
 
-   {VALVE_WEAPON_EGON, "weapon_egon", WEAPON_FIRE, 1.0,
+   {VALVE_WEAPON_EGON, WEAPON_SUBMOD_ALL, "weapon_egon", WEAPON_FIRE, 1.0,
     SKILL3, NOSKILL, FALSE, FALSE,
     200.0, 2000.0, 0, 0, 350.0,
     50, FALSE, 100, 1, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, 20, -1,
     W_IFL_EGON, W_IFL_AMMO_GAUSS, 0 },
 
-   {VALVE_WEAPON_GAUSS, "weapon_gauss", WEAPON_FIRE, 1.0,
+   {VALVE_WEAPON_GAUSS, WEAPON_SUBMOD_ALL, "weapon_gauss", WEAPON_FIRE, 1.0,
     SKILL4, SKILL2, FALSE, TRUE,
     100.0, 500.0, 50.0, 3000.0, 500.0,
     20, FALSE, 80, 1, 10, TRUE, FALSE, FALSE, TRUE, 0.0, 0.8, TRUE, 30, 30,
     W_IFL_GAUSS, W_IFL_AMMO_GAUSS, 0 },
 
-   {VALVE_WEAPON_SHOTGUN, "weapon_shotgun", WEAPON_FIRE, 1.0,
+   {VALVE_WEAPON_SHOTGUN, WEAPON_SUBMOD_ALL, "weapon_shotgun", WEAPON_FIRE, 1.0,
     SKILL5, SKILL3, FALSE, TRUE,
     400.0, 1500.0, 50.0, 800.0, 400.0,
     55, FALSE, 70, 1, 2, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, 12, 12,
     W_IFL_SHOTGUN, W_IFL_AMMO_BUCKSHOT, 0 },
 
-   {VALVE_WEAPON_PYTHON, "weapon_357", WEAPON_FIRE, 1.0,
+   {VALVE_WEAPON_PYTHON, WEAPON_SUBMOD_ALL, "weapon_357", WEAPON_FIRE, 1.0,
     SKILL3, NOSKILL, FALSE, FALSE,
     50.0, 4000, 0, 0, 750.0,
     15, FALSE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, 12, 12,
     W_IFL_PYTHON, W_IFL_AMMO_357, 0 },
 
-   {VALVE_WEAPON_HORNETGUN, "weapon_hornetgun", WEAPON_FIRE, 1.0,
+   {VALVE_WEAPON_HORNETGUN, WEAPON_SUBMOD_ALL, "weapon_hornetgun", WEAPON_FIRE, 1.0,
     SKILL4, SKILL3, FALSE, FALSE,
     200.0, 1500.0, 50.0, 250.0, 300.0,
     10, TRUE, 50, 1, 4, TRUE, TRUE, FALSE, FALSE, 0.0, 0.0, TRUE, -1, -1,
     W_IFL_HORNETGUN, 0, 0 },
 
-   {VALVE_WEAPON_MP5, "weapon_9mmAR", WEAPON_FIRE, 1.0,
+   {VALVE_WEAPON_MP5, WEAPON_SUBMOD_ALL, "weapon_9mmAR", WEAPON_FIRE, 1.0,
     SKILL5, SKILL3, FALSE, FALSE,
     50.0, 2000.0, 300.0, 700.0, 600.0,
     45, FALSE, 70, 1, 1, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, 50, 2,
     W_IFL_MP5, W_IFL_AMMO_9MM, 0 },
 
-   {VALVE_WEAPON_CROSSBOW, "weapon_crossbow", WEAPON_FIRE_ZOOM, 1.0,
+   {VALVE_WEAPON_CROSSBOW, WEAPON_SUBMOD_ALL, "weapon_crossbow", WEAPON_FIRE_ZOOM, 1.0,
     SKILL2, NOSKILL, FALSE, FALSE,
     800.0, 4000.0, 0, 0, 1000.0,
     55, TRUE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, 5, -1,
     W_IFL_CROSSBOW, W_IFL_AMMO_CROSSBOW, 0 },
    
-   {VALVE_WEAPON_RPG, "weapon_rpg", WEAPON_FIRE_AT_FEET, 1.0,
+   {VALVE_WEAPON_RPG, WEAPON_SUBMOD_ALL, "weapon_rpg", WEAPON_FIRE_AT_FEET, 1.0,
     SKILL3, NOSKILL, FALSE, FALSE,
     400.0, 5000.0, 0.0, 0.0, 700.0,
     60, TRUE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, 2, -1,
     W_IFL_RPG, W_IFL_AMMO_RPG, 0 },
     
-   {VALVE_WEAPON_GLOCK, "weapon_9mmhandgun", WEAPON_FIRE, 1.0,
+   {VALVE_WEAPON_GLOCK, WEAPON_SUBMOD_ALL, "weapon_9mmhandgun", WEAPON_FIRE, 1.0,
     SKILL5, SKILL3, TRUE, TRUE,
     250.0, 1500.0, 50.0, 300.0, 300.0,
     20, TRUE, 70, 1, 1, TRUE, TRUE, FALSE, FALSE, 0.0, 0.0, TRUE, 30, -1,
     W_IFL_GLOCK, W_IFL_AMMO_9MM, 0 },
+
+   // grapple disabled atm
+   {GEARBOX_WEAPON_GRAPPLE, /*WEAPON_SUBMOD_OP4*/0, "weapon_grapple", /*WEAPON_FIRE_AND_SUCK*/0, 1.0,
+    SKILL4, NOSKILL, FALSE, FALSE,
+    50.0, 300.0, 0, 0, 100.0,
+    15, TRUE, 100, 0, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
+    W_IFL_GRAPPLE, 0, 0 },
+   
+   {GEARBOX_WEAPON_EAGLE, WEAPON_SUBMOD_OP4, "weapon_eagle", WEAPON_FIRE, 1.0, 
+    SKILL5, NOSKILL, FALSE, FALSE,
+    50.0, 1400.0, 0, 0, 200.0,
+    30, TRUE, 100, 1, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, 12, -1,
+    W_IFL_EAGLE, W_IFL_AMMO_357, 0 },
+   
+   {GEARBOX_WEAPON_PIPEWRENCH, WEAPON_SUBMOD_OP4, "weapon_pipewrench", WEAPON_MELEE, 1.0,
+    SKILL4, NOSKILL, FALSE, FALSE,
+    0.0, 40.0, 0, 0, 1.0,
+    20, TRUE, 100, 0, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
+    W_IFL_PIPEWRENCH, 0, 0 },
+   
+   {GEARBOX_WEAPON_M249, WEAPON_SUBMOD_OP4, "weapon_m249", WEAPON_FIRE, 1.0,
+    SKILL3, NOSKILL, FALSE, FALSE,
+    50.0, 1300.0, 0, 0, 200.0,
+    60, FALSE, 100, 1, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, 75, 0,
+    W_IFL_M249, W_IFL_AMMO_556, 0 },
+   
+   {GEARBOX_WEAPON_DISPLACER, WEAPON_SUBMOD_OP4, "weapon_displacer", WEAPON_FIRE_AT_FEET, 1.0,
+    SKILL2, NOSKILL, FALSE, FALSE,
+    400.0, 1200.0, 0.0, 0.0, 400.0,
+    30, FALSE, 100, 100, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, 100, -1,
+    W_IFL_DISPLACER, W_IFL_AMMO_GAUSS, 0 },
+   
+   {GEARBOX_WEAPON_SHOCKRIFLE, WEAPON_SUBMOD_OP4, "weapon_shockrifle", WEAPON_FIRE, 1.0,
+    SKILL5, NOSKILL, FALSE, FALSE,
+    100.0, 800.0, 0.0, 0.0, 300.0,
+    20, FALSE, 100, 3, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
+    W_IFL_SHOCKRIFLE, 0, 0 },
     
+   {GEARBOX_WEAPON_SPORELAUNCHER, WEAPON_SUBMOD_OP4, "weapon_sporelauncher", WEAPON_FIRE_AT_FEET, 1.0,
+    SKILL3, NOSKILL, FALSE, FALSE,
+    400.0, 1200.0, 0.0, 0.0, 400.0,
+    60, TRUE, 100, 1, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, 7, -1,
+    W_IFL_SPORELAUNCHER, W_IFL_AMMO_SPORE, 0 },
+   
+   {GEARBOX_WEAPON_SNIPERRIFLE, WEAPON_SUBMOD_OP4, "weapon_sniperrifle", WEAPON_FIRE_ZOOM, 1.0,
+    SKILL3, NOSKILL, FALSE, FALSE,
+    600.0, 4000.0, 0, 0, 800.0,
+    55, FALSE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, 5, -1,
+    W_IFL_SNIPERRIFLE, W_IFL_AMMO_762, 0 },
+    
+   {GEARBOX_WEAPON_KNIFE, WEAPON_SUBMOD_OP4, "weapon_knife", WEAPON_MELEE, 1.0,
+    SKILL4, NOSKILL, FALSE, FALSE,
+    0.0, 40.0, 0, 0, 1.0,
+    20, TRUE, 100, 0, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
+    W_IFL_KNIFE, 0, 0 },
+
    /* terminator */   
-   {0, "", 0, 0.0,
+   {0, 0, "", 0, 0.0,
     NOSKILL, NOSKILL, FALSE, FALSE, 
     0.0, 0.0, 0.0, 0.0, 0.0,
     0, FALSE, 0, 1, 1, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, 0, 0, 
@@ -124,6 +179,10 @@ bot_ammo_names_t ammo_names[] = {
    { W_IFL_AMMO_ARGRENADES, "ammo_mp5grenades" },
    { W_IFL_AMMO_CROSSBOW  , "ammo_crossbow" },
    { W_IFL_AMMO_RPG       , "ammo_rpgclip" },
+   { W_IFL_AMMO_556       , "ammo_556" },
+   { W_IFL_AMMO_762       , "ammo_762" },
+   { W_IFL_AMMO_SPORE     , "ammo_spore" },
+   { W_IFL_AMMO_357       , "ammo_eagleclip" },
    { 0, "" },
 };
 
@@ -167,6 +226,35 @@ bot_fire_delay_t valve_fire_delay[13] = {
    {VALVE_WEAPON_GLOCK,
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
+
+   {GEARBOX_WEAPON_GRAPPLE,
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
+   {GEARBOX_WEAPON_EAGLE,
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
+   {GEARBOX_WEAPON_PIPEWRENCH,
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
+   {GEARBOX_WEAPON_M249,
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
+   {GEARBOX_WEAPON_DISPLACER,
+    1.5, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
+    0.5, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
+   {GEARBOX_WEAPON_SHOCKRIFLE,
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
+   {GEARBOX_WEAPON_SPORELAUNCHER,
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
+   {GEARBOX_WEAPON_SNIPERRIFLE,
+    0.05, {0.05, 0.1, 0.2, 0.0, 0.0}, {0.05, 0.1, 0.2, 0.0, 0.0},
+    0.1, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
+   {GEARBOX_WEAPON_KNIFE,
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
+
    /* terminator */
    {0, 0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
        0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}}
@@ -174,6 +262,26 @@ bot_fire_delay_t valve_fire_delay[13] = {
 
 bot_fire_delay_t fire_delay[13];
 bot_weapon_select_t weapon_select[13];
+
+
+//
+int SubmodToSubmodWeaponFlag(int submod)
+{
+   switch(submod)
+   {
+      default:
+      case(SUBMOD_HLDM)
+         return(WEAPON_SUBMOD_HLDM);
+      case(SUBMOD_SEVS)
+         return(WEAPON_SUBMOD_SEVS);
+      case(SUBMOD_BUBBLEMOD)
+         return(WEAPON_SUBMOD_BUBBLEMOD);
+      case(SUBMOD_XDM)
+         return(WEAPON_SUBMOD_XDM);
+      case(SUBMOD_OP4)
+         return(WEAPON_SUBMOD_OP4);
+   }
+}
 
 
 //
@@ -320,6 +428,10 @@ qboolean IsValidWeaponChoose(bot_t &pBot, const bot_weapon_select_t &select)
 {
    // iId == 0 is null terminator, don't allow
    if(select.iId == 0 || select.weapon_name[0] == 0)
+      return(FALSE);
+   
+   // exclude weapons that are not supported
+   if(!(select.supported_submods & SubmodToSubmodWeaponFlag(submod)))
       return(FALSE);
    
    // Severians and Bubblemod checks, skip egon (bubblemod-egon is total conversion and severians-egon is selfkilling after time)

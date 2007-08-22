@@ -41,6 +41,7 @@ typedef int BOOL;
 #define SUBMOD_SEVS 1
 #define SUBMOD_BUBBLEMOD 2
 #define SUBMOD_XDM 3
+#define SUBMOD_OP4 4
 
 
 // global defines

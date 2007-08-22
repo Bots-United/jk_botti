@@ -279,7 +279,7 @@ void GameDLLInit( void )
    ResetSkillsToDefault();
 
    //weapon select init
-   CheckSubMod();
+   submod_id = CheckSubMod();
    InitWeaponSelect(submod_id);
 
    BotNameInit();
@@ -292,31 +292,38 @@ void GameDLLInit( void )
 }
 
 
-void CheckSubMod(void)
+int CheckSubMod(void)
 {
+   int submod = 0;
+   
    // Check if Severians, XDM or Bubblemod
    const char * desc = MDLL_GetGameDescription();
    
-   if(!strnicmp(desc, "Sev", 3))
-      submod_id = SUBMOD_SEVS;
+   if(!strnicmp(desc, "Opposing", 8) || !strnicmp(desc, "OpFor", 5))
+      submod = SUBMOD_OP4;
+   else if(!strnicmp(desc, "Sev", 3))
+      submod = SUBMOD_SEVS;
    else if(!strnicmp(desc, "XDM", 3))
-      submod_id = SUBMOD_XDM;
+      submod = SUBMOD_XDM;
    else if(CVAR_GET_POINTER("bm_ver") != NULL)
-      submod_id = SUBMOD_BUBBLEMOD; 
+      submod = SUBMOD_BUBBLEMOD; 
    else if(!strnicmp(desc, "HL Teamplay", 11))
    {
       // this is a bit of hack, sevs uses "HL Teamplay" string for teamplay so we need alternative way of detecting
       // Ofcourse all other submods with same problem will be detected as sevs now too, oh well.. got to live with it :S
       if(CVAR_GET_POINTER("mp_giveweapons") != NULL && CVAR_GET_POINTER("mp_giveammo") != NULL)
-         submod_id = SUBMOD_SEVS;
+         submod = SUBMOD_SEVS;
       else
-         submod_id = SUBMOD_HLDM;
+         submod = SUBMOD_HLDM;
    }
    else
-      submod_id = SUBMOD_HLDM;
+      submod = SUBMOD_HLDM;
    
-   switch(submod_id)
+   switch(submod)
    {
+   case SUBMOD_OP4:
+      UTIL_ConsolePrintf("Opposing Force DM detected.");
+      break;
    case SUBMOD_SEVS:
       UTIL_ConsolePrintf("Severians MOD detected.");
       break;
@@ -327,11 +334,13 @@ void CheckSubMod(void)
       UTIL_ConsolePrintf("BubbleMod MOD detected.");
       break;
    default:
-      submod_id = SUBMOD_HLDM;
+      submod = SUBMOD_HLDM;
    case SUBMOD_HLDM:
       UTIL_ConsolePrintf("Standard HL1DM assumed.");
       break;
    }
+   
+   return(submod_id);
 }
 
 

@@ -24,6 +24,18 @@
 #define VALVE_WEAPON_SATCHEL      14
 #define VALVE_WEAPON_SNARK        15
 
+// weapon ID values for extra weapons from Gearbox's Opposing Force
+#define GEARBOX_WEAPON_GRAPPLE       16
+#define GEARBOX_WEAPON_EAGLE         17
+#define GEARBOX_WEAPON_PIPEWRENCH    18
+#define GEARBOX_WEAPON_M249          19
+#define GEARBOX_WEAPON_DISPLACER     20
+#define GEARBOX_WEAPON_UNKNOWN21     21
+#define GEARBOX_WEAPON_SHOCKRIFLE    22
+#define GEARBOX_WEAPON_SPORELAUNCHER 23
+#define GEARBOX_WEAPON_SNIPERRIFLE   24
+#define GEARBOX_WEAPON_KNIFE         25
+
 // in normal gravity, how far the longjump hurls us
 #define LONGJUMP_DISTANCE	540
 
