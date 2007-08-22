@@ -1125,7 +1125,7 @@ qboolean CheckWeaponFireConditions(bot_t & pBot, const bot_weapon_select_t &sele
    edict_t *pEdict = pBot.pEdict;
    
    //
-   if (select.iId == VALVE_WEAPON_CROWBAR)
+   if (select.type == WEAPON_MELEE)
    {
       // check if bot needs to duck down to hit enemy...
       if (fabs(pBot.pBotEnemy->v.origin.z - pEdict->v.origin.z) > 16 &&
