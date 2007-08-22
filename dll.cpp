@@ -270,6 +270,9 @@ C_DLLEXPORT int Meta_Detach (PLUG_LOADTIME now, PL_UNLOAD_REASON reason)
 
 void GameDLLInit( void )
 {
+   //before anything else detect submod
+   submod_id = CheckSubMod();
+   
    memset(clients, 0, sizeof(clients));
 
    // initialize the bots array of structures...
@@ -277,9 +280,8 @@ void GameDLLInit( void )
 
    //skill init
    ResetSkillsToDefault();
-
-   //weapon select init
-   submod_id = CheckSubMod();
+   
+   //weapon init
    InitWeaponSelect(submod_id);
 
    BotNameInit();
@@ -340,7 +342,7 @@ int CheckSubMod(void)
       break;
    }
    
-   return(submod_id);
+   return(submod);
 }
 
 
