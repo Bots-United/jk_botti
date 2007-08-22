@@ -48,6 +48,7 @@ typedef struct event_info_s {
 
 
 event_info_t g_event_info[] = {
+//from valve
    {-1, "events/glock1.sc",		0.96,  {-2.0, -2.0}},
    {-1, "events/glock2.sc",		0.96,  {-2.0, -2.0}},
    {-1, "events/shotgun1.sc",		0.975, {-5.0, -5.0}},
@@ -67,8 +68,21 @@ event_info_t g_event_info[] = {
    {-1, "events/firehornet.sc",		1.0,   {0.0, 2.0}},
    {-1, "events/tripfire.sc",		0.0,   {0, 0}},
    {-1, "events/snarkfire.sc",		0.0,   {0, 0}},
+//from gearbox
+   {-1, "events/egon_effect.sc",	0.0,   {0, 0}},
+   {-1, "events/eagle.sc",		0.90,  {-10.0, -10.0}},
+   {-1, "events/pipewrench.sc",		0.8,   {0, 0}},
+   {-1, "events/m249.sc",		0.96,  {-7.0, 7.0}},
+   {-1, "events/shock.sc",		0.96,  {0.0, 2.0}},
+   {-1, "events/sniper.sc",		1.00,  {-10.0, -10.0}},
+   {-1, "events/knife.sc",		0.6,   {0, 0}},
+   {-1, "events/penguinfire.sc",	0.85,  {0, 0}},
+   {-1, "events/spore.sc",		0.96,  {-10.0, -10.0}},
+   
    {-1, "", 0, {0, 0}} //NULL
 };
+
+
 
 
 //
@@ -93,7 +107,7 @@ unsigned short pfnPrecacheEvent_Post(int type, const char* psz)
    if(!pei->eventname || !pei->eventname[0])
    {
       // unknown event
-      UTIL_ConsolePrintf("PrecacheEvent, new event type: \"%s\" : %d", psz, eventindex);
+      //UTIL_ConsolePrintf("PrecacheEvent, new event type: \"%s\" : %d", psz, eventindex);
    }
    
    RETURN_META_VALUE (MRES_IGNORED, 0);
