@@ -14,8 +14,8 @@ ifeq ($(OS),Windows_NT)
 	DLLEND = .dll
 	ZLIB_OSFLAGS = 
 else
-	CPP = gcc-linux
-	ARCHFLAG = -march=i686 -mcpu=pentium4 -fPIC
+	CPP = gcc-linux-4.1
+	ARCHFLAG = -march=i686 -mtune=pentium4 -fPIC
 	LINKFLAGS = -fPIC -shared -ldl -s
 	DLLEND = _i386.so
 	ZLIB_OSFLAGS = -DNO_UNDERLINE 
