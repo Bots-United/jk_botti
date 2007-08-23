@@ -1,4 +1,4 @@
-jk_botti 1.30
+jk_botti 1.40
 -------------
 
 1. Intro
@@ -10,7 +10,7 @@ jk_botti 1.30
 1. Intro
 --------------------
 
-This is 1.30 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+This is 1.40 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
 You are free to use code for any of your needs.
 
 Credits:
@@ -30,7 +30,8 @@ This bot aims to:
     * Automatic waypoints creation.
 
 jk_botti is mostly tested with Severian's, but works with original HLDM and
-Bubblemod. On Severian's and Bubblemod, gluon is disabled. Bot might work
+Bubblemod. As of version 1.40 jk_botti also supports Opposing Force.
+On Severian's and Bubblemod, gluon is disabled. Bot might work
 with XDM but this hasn't been tested.
 
 One of my major goals with jk_botti was to lower CPU usage compared to
@@ -60,6 +61,14 @@ CPU intensive operation this can only be done on map change.
 --------------------
 2. What's new
 --------------------
+1.40:
+ * Add support for Opposing Force Deathmatch.
+ * Changed optimization flags from '-O3 -funroll-loops' to '-O2'.
+ * Output warning message when model given for bot creation is replaced by 
+   team-balance code.
+ * Changed to only check existance of player model file on listenserver 
+   when creating bots.
+
 1.30:
  * Fixed Severians MOD detection with teamplay.
  * Fixed bug with jk_botti only using first 3 letters of player/bot team name.
