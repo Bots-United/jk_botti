@@ -2372,8 +2372,6 @@ void BotThink( bot_t &pBot )
       pBot.f_strafe_time = gpGlobals->time + 2.0f;
    }
 
-bot_do_move:
-
    BotDoStrafe(pBot);
 
    if (pBot.f_duck_time > gpGlobals->time)
