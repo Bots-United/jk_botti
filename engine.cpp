@@ -83,8 +83,6 @@ event_info_t g_event_info[] = {
 };
 
 
-
-
 //
 unsigned short pfnPrecacheEvent_Post(int type, const char* psz)
 {
@@ -449,6 +447,9 @@ int pfnCmd_Argc( void )
 
 void pfnSetClientMaxspeed(const edict_t *pEdict, float fNewMaxspeed)
 {
+   if (!gpGlobals->deathmatch)
+      RETURN_META (MRES_IGNORED);
+   
    int index;
 
    index = UTIL_GetBotIndex((edict_t *)pEdict);
@@ -458,6 +459,22 @@ void pfnSetClientMaxspeed(const edict_t *pEdict, float fNewMaxspeed)
       bots[index].f_max_speed = fNewMaxspeed;
 
    RETURN_META (MRES_IGNORED);
+}
+
+
+int pfnGetPlayerUserId(edict_t *e )
+{
+   if (gpGlobals->deathmatch)
+   {
+      if (submod_id == SUBMOD_OP4)
+      {
+         // is this edict a bot?
+         if (UTIL_GetBotPointer( e ))
+            RETURN_META_VALUE (MRES_SUPERCEDE, 0);  // don't return a valid index (so bot won't get kicked)
+      }
+   }
+
+   RETURN_META_VALUE (MRES_IGNORED, 0);
 }
 
 
@@ -484,6 +501,7 @@ C_DLLEXPORT int GetEngineFunctions (enginefuncs_t *pengfuncsFromEngine, int *int
    pengfuncsFromEngine->pfnCmd_Argv = pfnCmd_Argv;
    pengfuncsFromEngine->pfnCmd_Argc = pfnCmd_Argc;
    pengfuncsFromEngine->pfnSetClientMaxspeed = pfnSetClientMaxspeed;
+   pengfuncsFromEngine->pfnGetPlayerUserId = pfnGetPlayerUserId;
 
    return TRUE;
 }

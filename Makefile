@@ -23,8 +23,13 @@ endif
 
 TARGET = jk_botti_mm
 BASEFLAGS = 
-OPTFLAGS = -O2 -fomit-frame-pointer -ffast-math
-#OPTFLAGS = -O0 -g
+
+ifeq ($(DBG_FLGS),1)
+	OPTFLAGS = -O0 -g
+else
+	OPTFLAGS = -O2 -fomit-frame-pointer -ffast-math
+endif
+
 INCLUDES = -I"./metamod" \
 	-I"./common" \
 	-I"./dlls" \

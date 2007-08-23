@@ -2088,7 +2088,7 @@ void BotThink( bot_t &pBot )
 
       return;
    }
-
+      
    // random chatting
    BotChatTalk(pBot);
 
@@ -2157,7 +2157,7 @@ void BotThink( bot_t &pBot )
 
    // turn towards ideal_yaw by yaw_speed degrees
    yaw_degrees = BotChangeYaw( pBot, pEdict->v.yaw_speed );
-
+   
    // get enemy
    pBot.pBotEnemy = (b_botdontshoot == 0) ? BotFindEnemy( pBot ) : NULL; // clear enemy pointer (no ememy for you!)
 
@@ -2175,7 +2175,7 @@ void BotThink( bot_t &pBot )
          pEdict->v.button |= IN_ATTACK2;
       }
    }
-   
+
    // does an enemy exist?
    if (pBot.pBotEnemy != NULL)
    {
@@ -2371,6 +2371,8 @@ void BotThink( bot_t &pBot )
       // disable normal strafe code until we have cleared grenade
       pBot.f_strafe_time = gpGlobals->time + 2.0f;
    }
+
+bot_do_move:
 
    BotDoStrafe(pBot);
 

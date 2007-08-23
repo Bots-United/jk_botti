@@ -22,7 +22,7 @@
 
 //
 #define JKASSERT(_x_) \
-    do { if (unlikely(!!(_x_))) UTIL_ConsolePrintf("[ERROR][ASSERT] %s:%d: (%s)", #_x_, __FILE__, __LINE__); } while(0)
+    do { if (unlikely(!!(_x_))) UTIL_ConsolePrintf("[ERROR][ASSERT] %s:%s: (%d)", #_x_, __FILE__, __LINE__); } while(0)
 
 
 // stuff for Win32 vs. Linux builds
