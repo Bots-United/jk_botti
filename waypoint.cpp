@@ -3272,7 +3272,7 @@ void WaypointRouteInit(qboolean ForceRebuild)
       close(file1);
       close(file2);
 
-      if (stat1.st_mtime < stat2.st_mtime)  // is ".wpt" older than ".matrix" file?
+      if (stat1.st_mtime <= stat2.st_mtime)  // is ".wpt" older than or as old as ".matrix" file?
       {
          UTIL_ConsolePrintf("[matrix load] - loading jk_botti waypoint path matrix\n");
 
