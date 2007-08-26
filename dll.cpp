@@ -635,13 +635,13 @@ void ServerDeactivate(void)
       RETURN_META (MRES_IGNORED);
    
    // automatic saving in autowaypoint mode, only if there are changes!
+   if(g_auto_waypoint && g_waypoint_updated)
+      WaypointSave();
    if(wp_matrix_save_on_mapend)
    {
       WaypointSaveFloydsMatrix();
       wp_matrix_save_on_mapend = FALSE;
    }
-   if(g_auto_waypoint && g_waypoint_updated)
-      WaypointSave();
    
    UTIL_FreeFuncBreakables();
       
