@@ -2134,7 +2134,9 @@ qboolean WaypointLoad(edict_t *pEntity)
 
          header.mapname[31] = 0;
 
+#ifdef WPT_MUST_MATCH_MAPNAME
          if (strcmp(header.mapname, STRING(gpGlobals->mapname)) == 0)
+#endif
          {
             WaypointInit();  // remove any existing waypoints
             
@@ -2168,6 +2170,7 @@ qboolean WaypointLoad(edict_t *pEntity)
             
             UTIL_ConsolePrintf("- loaded: %d waypoints, %d paths\n", count_wp, count_paths);
          }
+#ifdef WPT_MUST_MATCH_MAPNAME
          else
          {
             UTIL_ConsolePrintf("%s jk_botti waypoints are not for this map!\n", filename);
@@ -2175,6 +2178,7 @@ qboolean WaypointLoad(edict_t *pEntity)
             gzclose(bfp);
             return FALSE;
          }
+#endif
       }
       else
       {
