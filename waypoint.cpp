@@ -28,6 +28,7 @@
 
 #include "bot.h"
 #include "waypoint.h"
+#include "bot_weapons.h"
 #include "bot_weapon_select.h"
 #include "player.h"
 
@@ -2706,15 +2707,17 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
    int i;
    qboolean DidAddAlready = FALSE;
    
-   //only if on ground or on ladder or under water
+   // only if on ground or on ladder or under water
    if((pEntity->v.flags & FL_ONGROUND) != FL_ONGROUND && pEntity->v.movetype != MOVETYPE_FLY && pEntity->v.waterlevel == 0)
       return;
    
    // on moving platform or train?
    if(!FNullEnt(pEntity->v.groundentity) && (pEntity->v.groundentity->v.speed > 0.0f || pEntity->v.groundentity->v.avelocity != Vector(0, 0, 0)))
-   {
       return;
-   }
+   
+   // moving with grapple (op4)
+   if(pEntity->v.movetype == MOVETYPE_FLY && players[idx].current_weapon_id == GEARBOX_WEAPON_GRAPPLE)
+      return;
 
    // more waypoints on ladders
    float target_distance = (pEntity->v.movetype == MOVETYPE_FLY) ? 65.0f : 200.0f;
