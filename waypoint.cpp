@@ -29,6 +29,7 @@
 #include "bot.h"
 #include "waypoint.h"
 #include "bot_weapon_select.h"
+#include "player.h"
 
 #include "zlib/zlib.h"
 
