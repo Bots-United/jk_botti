@@ -215,64 +215,71 @@ void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, edict_t *
       
       if (ed)
       {
-         {
-            index = UTIL_GetBotIndex(ed);
+         index = UTIL_GetBotIndex(ed);
 
-            // is this message for a bot?
-            if (index != -1)
+         // is this message for a bot?
+         if (index != -1)
+         {
+            botMsgEndFunction = NULL;  // no msg end function until known otherwise
+            botMsgIndex = index;       // index of bot receiving message
+
+            if (msg_type == FAST_GET_USER_MSG_ID (PLID, WeaponList, "WeaponList", NULL))
+               botMsgFunction = BotClient_Valve_WeaponList;
+            else if (msg_type == FAST_GET_USER_MSG_ID (PLID, CurWeapon, "CurWeapon", NULL))
+               botMsgFunction = BotClient_Valve_CurrentWeapon;
+            else if (msg_type == FAST_GET_USER_MSG_ID (PLID, AmmoX, "AmmoX", NULL))
+               botMsgFunction = BotClient_Valve_AmmoX;
+            else if (msg_type == FAST_GET_USER_MSG_ID (PLID, AmmoPickup, "AmmoPickup", NULL))
+               botMsgFunction = BotClient_Valve_AmmoPickup;
+            else if (msg_type == FAST_GET_USER_MSG_ID (PLID, WeapPickup, "WeapPickup", NULL))
+               botMsgFunction = BotClient_Valve_WeaponPickup;
+            else if (msg_type == FAST_GET_USER_MSG_ID (PLID, ItemPickup, "ItemPickup", NULL))
+               botMsgFunction = BotClient_Valve_ItemPickup;
+            else if (msg_type == FAST_GET_USER_MSG_ID (PLID, Health, "Health", NULL))
+               botMsgFunction = BotClient_Valve_Health;
+            else if (msg_type == FAST_GET_USER_MSG_ID (PLID, Battery, "Battery", NULL))
+               botMsgFunction = BotClient_Valve_Battery;
+            else if (msg_type == FAST_GET_USER_MSG_ID (PLID, Damage, "Damage", NULL))
+               botMsgFunction = BotClient_Valve_Damage;
+            else if (msg_type == FAST_GET_USER_MSG_ID (PLID, ScreenFade, "ScreenFade", NULL))
+               botMsgFunction = BotClient_Valve_ScreenFade;
+         }
+         // is this message for a player?
+         else 
+         {
+            index = ENTINDEX(ed) - 1;
+            if(index > -1 && index < gpGlobals->maxClients)
             {
                botMsgFunction = NULL;     // no msg function until known otherwise
                botMsgEndFunction = NULL;  // no msg end function until known otherwise
                botMsgIndex = index;       // index of bot receiving message
-
-               {
-                  if (msg_type == FAST_GET_USER_MSG_ID (PLID, WeaponList, "WeaponList", NULL))
-                     botMsgFunction = BotClient_Valve_WeaponList;
-                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, CurWeapon, "CurWeapon", NULL))
-                     botMsgFunction = BotClient_Valve_CurrentWeapon;
-                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, AmmoX, "AmmoX", NULL))
-                     botMsgFunction = BotClient_Valve_AmmoX;
-                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, AmmoPickup, "AmmoPickup", NULL))
-                     botMsgFunction = BotClient_Valve_AmmoPickup;
-                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, WeapPickup, "WeapPickup", NULL))
-                     botMsgFunction = BotClient_Valve_WeaponPickup;
-                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, ItemPickup, "ItemPickup", NULL))
-                     botMsgFunction = BotClient_Valve_ItemPickup;
-                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, Health, "Health", NULL))
-                     botMsgFunction = BotClient_Valve_Health;
-                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, Battery, "Battery", NULL))
-                     botMsgFunction = BotClient_Valve_Battery;
-                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, Damage, "Damage", NULL))
-                     botMsgFunction = BotClient_Valve_Damage;
-                  else if (msg_type == FAST_GET_USER_MSG_ID (PLID, ScreenFade, "ScreenFade", NULL))
-                     botMsgFunction = BotClient_Valve_ScreenFade;
-               }
             }
+            
+            if (msg_type == FAST_GET_USER_MSG_ID (PLID, CurWeapon, "CurWeapon", NULL))
+               botMsgFunction = PlayerClient_Valve_CurrentWeapon;
          }
       }
       else if (msg_dest == MSG_ALL)
       {
-         botMsgFunction = NULL;  // no msg function until known otherwise
-         botMsgIndex = -1;       // index of bot receiving message (none)
+         botMsgFunction = NULL;     // no msg function until known otherwise
+         botMsgEndFunction = NULL;  // no msg end function until known otherwise
+         botMsgIndex = -1;          // index of bot receiving message (none)
 
-         {
-            if (msg_type == SVC_INTERMISSION)
-               g_in_intermission = TRUE;
-            else if (msg_type == FAST_GET_USER_MSG_ID (PLID, DeathMsg, "DeathMsg", NULL))
-               botMsgFunction = BotClient_Valve_DeathMsg;
-         }
+         if (msg_type == SVC_INTERMISSION)
+            g_in_intermission = TRUE;
+         else if (msg_type == FAST_GET_USER_MSG_ID (PLID, DeathMsg, "DeathMsg", NULL))
+            botMsgFunction = BotClient_Valve_DeathMsg;
       }
       else
       {
          // Steam makes the WeaponList message be sent differently
 
-         botMsgFunction = NULL;  // no msg function until known otherwise
-         botMsgIndex = -1;       // index of bot receiving message (none)
+         botMsgFunction = NULL;     // no msg function until known otherwise
+         botMsgEndFunction = NULL;  // no msg end function until known otherwise
+         botMsgIndex = -1;          // index of bot receiving message (none)
 
-         {
-            if (msg_type == FAST_GET_USER_MSG_ID (PLID, WeaponList, "WeaponList", NULL))
-               botMsgFunction = BotClient_Valve_WeaponList;
-         }
+         if (msg_type == FAST_GET_USER_MSG_ID (PLID, WeaponList, "WeaponList", NULL))
+            botMsgFunction = BotClient_Valve_WeaponList;
       }
    }
 

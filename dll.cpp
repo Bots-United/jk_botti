@@ -103,6 +103,7 @@ float bot_cfg_pause_time = 0.0;
 qboolean spawn_time_reset = FALSE;
 float waypoint_time = 0.0;
 char * client_address[32];
+player_t players[32];
 
 unsigned int rnd_idnum[2] = {1, 1};
 cvar_t jk_botti_version = { "jk_botti_version", "", FCVAR_EXTDLL|FCVAR_SERVER, 0, NULL};

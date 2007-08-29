@@ -8,6 +8,7 @@
 void BotClient_Valve_WeaponList(void *p, int bot_index);
 
 void BotClient_Valve_CurrentWeapon(void *p, int bot_index);
+void PlayerClient_Valve_CurrentWeapon(void *p, int player_index);
 
 void BotClient_Valve_AmmoX(void *p, int bot_index);
 

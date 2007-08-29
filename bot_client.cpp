@@ -26,6 +26,7 @@
                        DMG_SLOWFREEZE | 0xFF000000)
 
 extern bot_t bots[32];
+extern player_t players[32];
 extern int num_logos;
 
 extern int bot_taunt_count;
@@ -151,6 +152,40 @@ void BotClient_Valve_CurrentWeapon(void *p, int bot_index)
             
             if(!found)
                bots[bot_index].current_opt_distance = 99999.0;
+         }
+      }
+   }
+}
+
+// This message is sent when a weapon is selected.
+void PlayerClient_Valve_CurrentWeapon(void *p, int player_index)
+{
+   static int state = 0;   // current state machine state
+   static int iState;
+   static int iId;
+   static int iClip;
+
+   if (state == 0)
+   {
+      state++;
+      iState = *(int *)p;  // state of the current weapon
+   }
+   else if (state == 1)
+   {
+      state++;
+      iId = *(int *)p;  // weapon ID of current weapon
+   }
+   else if (state == 2)
+   {
+      state = 0;
+
+      iClip = *(int *)p;  // ammo currently in the clip for this weapon
+
+      if (iId <= 31)
+      {
+         if (iState == 1)
+         {
+            players[player_index].current_weapon_id = iId;
          }
       }
    }
