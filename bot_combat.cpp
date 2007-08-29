@@ -1166,8 +1166,6 @@ qboolean CheckWeaponFireConditions(bot_t & pBot, const bot_weapon_select_t &sele
 }
 
 
-char s_firetype[32];
-
 //
 qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, const bot_fire_delay_t &delay, qboolean use_primary, qboolean use_secondary)
 {
