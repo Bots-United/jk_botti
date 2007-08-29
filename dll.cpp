@@ -354,6 +354,14 @@ int Spawn( edict_t *pent )
    {
       if (FIsClassname(pent, "worldspawn"))
       {
+         // clear players array 
+         //  note: posdata clean up first to prevent mem-leaks.
+         //  note2: WaypointInit (and maybe others) set different than zero init value for array object, 
+         //   memset players need to be before anything else (except posdata free)
+         for(int i = 0; i < 32; i++)
+            free_posdata_list(i);
+         memset(players, 0, sizeof(players));
+         
          // do level initialization stuff here...
          WaypointInit();
          WaypointLoad(NULL);
@@ -398,11 +406,6 @@ int Spawn( edict_t *pent )
          FreeCfgBotRecord();//reset on mapchange
 
          bot_check_time = gpGlobals->time + 5.0;
-         
-         // clear players array (note: posdata clean up first to prevent mem-leaks)
-         for(int i = 0; i < 32; i++)
-            free_posdata_list(i);
-         memset(players, 0, sizeof(players));
       }
       else if(FIsClassname(pent, "func_plat") || FIsClassname(pent, "func_door"))
       {

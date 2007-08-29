@@ -62,7 +62,6 @@ qboolean g_auto_waypoint = TRUE;
 qboolean g_path_waypoint_enable = TRUE;
 qboolean g_waypoint_updated = FALSE;
 qboolean g_waypoint_testing = FALSE;
-int last_waypoint[32];
 float f_path_time = 0.0;
 int g_lifts_added = 0;
 
@@ -226,7 +225,7 @@ void WaypointInit(void)
    num_waypoints = 0;
 
    for(i = 0; i < 32; i++)
-      last_waypoint[i] = -1;
+      players[i].last_waypoint = -1;
    
    memset(&spawnpoints, 0, sizeof(spawnpoints));
    num_spawnpoints = 0;
@@ -1550,7 +1549,7 @@ void WaypointAdd(edict_t *pEntity)
 
    // store the last used waypoint for the auto waypoint code...
    if(player_index >= 0 && player_index < gpGlobals->maxClients)
-      last_waypoint[player_index] = index;
+      players[player_index].last_waypoint = index;
 
    // set the time that this waypoint was originally displayed...
    wp_display_time[index] = gpGlobals->time;
@@ -2720,10 +2719,10 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
    float target_distance = (pEntity->v.movetype == MOVETYPE_FLY) ? 65.0f : 200.0f;
 
    // find the distance from the last used waypoint
-   if(last_waypoint[idx] == -1)
+   if(players[idx].last_waypoint == -1)
       distance = 99999.0f;
    else
-      distance = (waypoints[last_waypoint[idx]].origin - pEntity->v.origin).Length();
+      distance = (waypoints[players[idx].last_waypoint].origin - pEntity->v.origin).Length();
 
    if (distance >= target_distance)
    {
@@ -2753,7 +2752,7 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
          
          // special code that does linking of two waypoints that are unreachable to each other
          // and are reachable to this location. Other end is waypoint with one or none path.
-         if(distance < target_distance && distance >= 64.0f && onepath_wpt == -1 && i != last_waypoint[idx] && WaypointNumberOfPaths(i) <= 1)
+         if(distance < target_distance && distance >= 64.0f && onepath_wpt == -1 && i != players[idx].last_waypoint && WaypointNumberOfPaths(i) <= 1)
          {
             onepath_wpt = i;
          }
