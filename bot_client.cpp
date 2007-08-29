@@ -18,6 +18,7 @@
 #include "bot_client.h"
 #include "bot_weapons.h"
 #include "bot_weapon_select.h"
+#include "player.h"
 
 // types of damage to ignore...
 #define IGNORE_DAMAGE (DMG_CRUSH | DMG_BURN | DMG_FREEZE | DMG_FALL | \
@@ -26,7 +27,6 @@
                        DMG_SLOWFREEZE | 0xFF000000)
 
 extern bot_t bots[32];
-extern player_t players[32];
 extern int num_logos;
 
 extern int bot_taunt_count;

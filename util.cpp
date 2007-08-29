@@ -16,13 +16,11 @@
 #include "usercmd.h"
 #include "bot.h"
 #include "bot_func.h"
+#include "player.h"
 
 
 extern bot_t bots[32];
 extern qboolean is_team_play;
-
-float last_time_not_facing_wall[32];
-float last_time_dead[32];
 
 breakable_list_t *g_breakable_list = NULL;
 
@@ -240,7 +238,7 @@ void SaveAliveStatus(edict_t * pPlayer)
       return;
    
    if(!IsAlive(pPlayer))
-      last_time_dead[idx] = gpGlobals->time;
+      players[idx].last_time_dead = gpGlobals->time;
 }
 
 //
@@ -259,7 +257,7 @@ float UTIL_GetTimeSinceRespawn(edict_t * pPlayer)
    }
    else
    {
-      return(gpGlobals->time - last_time_dead[idx]);
+      return(gpGlobals->time - players[idx].last_time_dead);
    }
 }
 
@@ -296,21 +294,21 @@ void CheckPlayerChatProtection(edict_t * pPlayer)
    // skip bots
    if (FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT))
    {
-      last_time_not_facing_wall[idx] = gpGlobals->time;
+      players[idx].last_time_not_facing_wall = gpGlobals->time;
       return;
    }
    
    // use of any buttons will reset protection
    if((pPlayer->v.button & ~(IN_SCORE | IN_DUCK)) != 0)
    {
-      last_time_not_facing_wall[idx] = gpGlobals->time;
+      players[idx].last_time_not_facing_wall = gpGlobals->time;
       return;
    }
    
    // is not facing wall?
    if(!IsPlayerFacingWall(pPlayer))
    {
-      last_time_not_facing_wall[idx] = gpGlobals->time;
+      players[idx].last_time_not_facing_wall = gpGlobals->time;
       return;
    }
    
@@ -319,7 +317,7 @@ void CheckPlayerChatProtection(edict_t * pPlayer)
    // is moving
    if(pPlayer->v.velocity.Length() > 1.0)
    {
-      last_time_not_facing_wall[idx] = gpGlobals->time;
+      players[idx].last_time_not_facing_wall = gpGlobals->time;
       return;
    }*/
 }
@@ -333,7 +331,7 @@ qboolean IsPlayerChatProtected(edict_t * pPlayer)
    if(idx < 0 || idx >= gpGlobals->maxClients)
       return(FALSE);
    
-   if(last_time_not_facing_wall[idx] + 2.0 < gpGlobals->time)
+   if(players[idx].last_time_not_facing_wall + 2.0 < gpGlobals->time)
    {
       return TRUE;
    }

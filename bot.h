@@ -302,10 +302,6 @@ typedef struct
    int total_counter;
 } bot_t;
 
-typedef struct {
-   int current_weapon_id;
-} player_t;
-
 #define MAX_TEAMS 32
 #define MAX_TEAMNAME_LENGTH 16
 

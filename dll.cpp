@@ -25,6 +25,7 @@
 #include "bot_weapon_select.h"
 #include "bot_sound.h"
 #include "version.h"
+#include "player.h"
 
 #include "bot_query_hook.h"
 
@@ -47,8 +48,6 @@ extern qboolean b_observer_mode;
 extern qboolean b_botdontshoot;
 extern qboolean g_in_intermission;
 extern BOOL wp_matrix_save_on_mapend;
-extern float last_time_not_facing_wall[32];
-extern float last_time_dead[32];
 
 extern char g_team_list[TEAMPLAY_TEAMLISTLENGTH];
 extern char g_team_names[MAX_TEAMS][MAX_TEAMNAME_LENGTH];
@@ -82,9 +81,7 @@ int bot_reaction_time = 2;
 int min_bots = -1;
 int max_bots = -1;
 int num_bots = 0;
-int prev_num_bots = 0;
-edict_t *clients[32];
-char *client_addresses[32];
+int prev_num_bots = 0;;
 edict_t *listenserver_edict = NULL;
 float welcome_time = 0.0;
 qboolean welcome_sent = FALSE;
@@ -102,7 +99,6 @@ qboolean need_to_open_cfg = TRUE;
 float bot_cfg_pause_time = 0.0;
 qboolean spawn_time_reset = FALSE;
 float waypoint_time = 0.0;
-char * client_address[32];
 player_t players[32];
 
 unsigned int rnd_idnum[2] = {1, 1};
@@ -274,7 +270,7 @@ void GameDLLInit( void )
    //before anything else detect submod
    submod_id = CheckSubMod();
    
-   memset(clients, 0, sizeof(clients));
+   memset(players, 0, sizeof(players));
 
    // initialize the bots array of structures...
    memset(bots, 0, sizeof(bots));
@@ -359,9 +355,6 @@ int Spawn( edict_t *pent )
       if (FIsClassname(pent, "worldspawn"))
       {
          // do level initialization stuff here...
-         for(int i = 0; i < 32; i++)
-            free_posdata_list(i);
-
          WaypointInit();
          WaypointLoad(NULL);
          
@@ -406,8 +399,10 @@ int Spawn( edict_t *pent )
 
          bot_check_time = gpGlobals->time + 5.0;
          
-         memset(last_time_not_facing_wall, 0, sizeof(last_time_not_facing_wall));
-         memset(last_time_dead, 0, sizeof(last_time_dead));
+         // clear players array (note: posdata clean up first to prevent mem-leaks)
+         for(int i = 0; i < 32; i++)
+            free_posdata_list(i);
+         memset(players, 0, sizeof(players));
       }
       else if(FIsClassname(pent, "func_plat") || FIsClassname(pent, "func_door"))
       {
@@ -547,7 +542,7 @@ void jkbotti_ClientPutInServer( edict_t *pEntity )
    int idx = ENTINDEX(pEntity) - 1;
 
    if (idx < gpGlobals->maxClients && idx >= 0)
-      clients[idx] = pEntity;  // store this clients edict in the clients array
+      players[idx].pEdict = pEntity;  // store this clients edict in the player array
    else
    {
       UTIL_ConsolePrintf("Error! ClientPutInServer pEntity invalid!");
@@ -584,7 +579,7 @@ void CmdStart( const edict_t *player, const struct usercmd_s *cmd, unsigned int 
    // check if connected
    for(int i = 0; i < gpGlobals->maxClients; i++)
    {
-      if(player == clients[i])
+      if(player == players[i].pEdict)
          RETURN_META (MRES_IGNORED);
    }
    
@@ -607,7 +602,7 @@ void ClientDisconnect( edict_t *pEntity )
       int idx = ENTINDEX(pEntity) - 1;
 
       if (idx < gpGlobals->maxClients && idx >= 0)
-         clients[idx] = NULL;
+         players[idx].pEdict = NULL;
 
       for (i=0; i < 32; i++)
       {

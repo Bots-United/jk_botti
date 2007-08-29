@@ -24,6 +24,7 @@
 #include "bot_weapon_select.h"
 #include "waypoint.h"
 #include "bot_sound.h"
+#include "player.h"
 
 extern bot_weapon_t weapon_defs[MAX_WEAPONS];
 extern qboolean b_observer_mode;
@@ -44,21 +45,6 @@ typedef struct select_list_s
    qboolean use_primary, use_secondary;
    int percent_start, percent_end, select_index;
 } select_list_t;
-
-typedef struct posdata_s 
-{
-   float time;
-   qboolean was_alive;
-   qboolean ducking;
-   Vector origin;
-   Vector velocity;
-   //Vector accel;
-   posdata_s * older;
-   posdata_s * newer;
-} posdata_t;
-
-posdata_t * pos_latest[32];
-posdata_t * pos_oldest[32];
 
 
 //
@@ -344,7 +330,7 @@ void free_posdata_list(int idx)
 {
    posdata_t * next;
    
-   next = pos_latest[idx];
+   next = players[idx].position_latest;
    
    while(next) 
    {
@@ -354,36 +340,36 @@ void free_posdata_list(int idx)
       free(curr);
    }
    
-   pos_latest[idx] = 0;
-   pos_oldest[idx] = 0;
+   players[idx].position_latest = 0;
+   players[idx].position_oldest = 0;
 }
 
 
 //
 void add_next_posdata(int idx, edict_t *pEdict)
 {
-   posdata_t * curr_latest = pos_latest[idx];
+   posdata_t * curr_latest = players[idx].position_latest;
    
-   pos_latest[idx] = (posdata_t*)calloc(1, sizeof(posdata_t));
+   players[idx].position_latest = (posdata_t*)calloc(1, sizeof(posdata_t));
    
    if(curr_latest) 
    {
-      curr_latest->newer = pos_latest[idx];
+      curr_latest->newer = players[idx].position_latest;
    }
    
-   pos_latest[idx]->older = curr_latest;
-   pos_latest[idx]->newer = 0;
+   players[idx].position_latest->older = curr_latest;
+   players[idx].position_latest->newer = 0;
    
-   pos_latest[idx]->origin = pEdict->v.origin;
-   pos_latest[idx]->velocity = pEdict->v.basevelocity + pEdict->v.velocity;   
+   players[idx].position_latest->origin = pEdict->v.origin;
+   players[idx].position_latest->velocity = pEdict->v.basevelocity + pEdict->v.velocity;   
    
-   pos_latest[idx]->was_alive = !!IsAlive(pEdict);
-   pos_latest[idx]->ducking = (pEdict->v.flags & FL_DUCKING) == FL_DUCKING;
+   players[idx].position_latest->was_alive = !!IsAlive(pEdict);
+   players[idx].position_latest->ducking = (pEdict->v.flags & FL_DUCKING) == FL_DUCKING;
    
-   pos_latest[idx]->time = gpGlobals->time;
+   players[idx].position_latest->time = gpGlobals->time;
    
-   if(!pos_oldest[idx])
-      pos_oldest[idx] = pos_latest[idx];
+   if(!players[idx].position_oldest)
+      players[idx].position_oldest = players[idx].position_latest;
 }
 
 
@@ -392,7 +378,7 @@ void timetrim_posdata(int idx)
 {
    posdata_t * list;
    
-   if(!(list = pos_oldest[idx]))
+   if(!(list = players[idx].position_oldest))
       return;
    
    while(list) 
@@ -407,7 +393,7 @@ void timetrim_posdata(int idx)
          
          list = next;
          list->older = 0;
-         pos_oldest[idx] = list;
+         players[idx].position_oldest = list;
       }
       else 
       {
@@ -416,10 +402,10 @@ void timetrim_posdata(int idx)
       }
    }
    
-   if(!pos_oldest[idx]) 
+   if(!players[idx].position_oldest) 
    {
-      pos_oldest[idx] = 0;
-      pos_latest[idx] = 0;
+      players[idx].position_oldest = 0;
+      players[idx].position_latest = 0;
    }
 }
 
@@ -505,14 +491,14 @@ Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean witho
       return(Vector(0,0,0));
    
    idx = ENTINDEX(pPlayer) - 1;
-   if(idx < 0 || idx >= gpGlobals->maxClients || !pos_latest[idx] || !pos_oldest[idx])
+   if(idx < 0 || idx >= gpGlobals->maxClients || !players[idx].position_latest || !players[idx].position_oldest)
       return(UTIL_GetOrigin(pPlayer));
    
    // get prediction time based on bot skill
    time = gpGlobals->time - skill_settings[pBot.bot_skill].prediction_latency; // with tint of randomness
    
    // find position data slots that are around 'time'
-   newer = pos_latest[idx];
+   newer = players[idx].position_latest;
    older = 0;
    while(newer) 
    {
@@ -535,7 +521,7 @@ Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean witho
    
    if(!older) 
    {
-      return(TracePredictedMovement(pBot, pPlayer, pos_oldest[idx]->origin, pos_oldest[idx]->velocity, fabs(gpGlobals->time - pos_oldest[idx]->time) * AHEAD_MULTIPLIER, pos_oldest[idx]->ducking, without_velocity)); 
+      return(TracePredictedMovement(pBot, pPlayer, players[idx].position_oldest->origin, players[idx].position_oldest->velocity, fabs(gpGlobals->time - players[idx].position_oldest->time) * AHEAD_MULTIPLIER, players[idx].position_oldest->ducking, without_velocity)); 
    }
    
    if(!newer) 
@@ -589,11 +575,11 @@ qboolean GetPredictedIsAlive(edict_t * pPlayer, float time)
    int idx;
    
    idx = ENTINDEX(pPlayer) - 1;
-   if(idx < 0 || idx >= gpGlobals->maxClients || !pos_latest[idx] || !pos_oldest[idx])
+   if(idx < 0 || idx >= gpGlobals->maxClients || !players[idx].position_latest || !players[idx].position_oldest)
       return(!!IsAlive(pPlayer));
    
    // find position data slots that are around 'time'
-   newer = pos_latest[idx];
+   newer = players[idx].position_latest;
    while(newer) 
    {
       if(newer->time > time) 

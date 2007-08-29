@@ -22,17 +22,11 @@
 #include "bot_weapon_select.h"
 #include "waypoint.h"
 #include "bot_sound.h"
+#include "player.h"
 
-
-typedef struct player_sound_list_s 
-{ 
-   int body_volume, weapon_volume, target_volume; 
-} player_sound_list_t;
 
 static CSoundEnt sSoundEnt;
 CSoundEnt *pSoundEnt = &sSoundEnt;
-
-static player_sound_list_t PlayerSoundList[32];
 
 
 //
@@ -44,13 +38,13 @@ void SaveSound(edict_t * pEdict, const Vector & origin, int volume, int channel)
    {
       if(channel == CHAN_WEAPON)
       {
-         if(PlayerSoundList[idx].weapon_volume < volume)
-            PlayerSoundList[idx].weapon_volume = volume;
+         if(players[idx].weapon_volume < volume)
+            players[idx].weapon_volume = volume;
       }
       else
       {
-         if(PlayerSoundList[idx].body_volume < volume)
-            PlayerSoundList[idx].body_volume = volume;
+         if(players[idx].body_volume < volume)
+            players[idx].body_volume = volume;
       }
       
       return;
@@ -66,9 +60,9 @@ void ResetSound(edict_t * pEdict)
    int idx = ENTINDEX(pEdict) - 1;
    if(idx >= 0 && idx < gpGlobals->maxClients)
    {
-      PlayerSoundList[idx].body_volume = 0;
-      PlayerSoundList[idx].weapon_volume = 0;
-      PlayerSoundList[idx].target_volume = 0;
+      players[idx].body_volume = 0;
+      players[idx].weapon_volume = 0;
+      players[idx].target_volume = 0;
    }
    else
       return;
@@ -110,33 +104,33 @@ void UpdatePlayerSound(edict_t * pEdict)
 
    // now calculate the best target volume for the sound. If the player's weapon
    // is louder than his body/movement, use the weapon volume, else, use the body volume.
-   iBodyVolume = PlayerSoundList[idx].body_volume;
+   iBodyVolume = players[idx].body_volume;
    
    // decay body volume over time 
-   PlayerSoundList[idx].body_volume = (int)(PlayerSoundList[idx].body_volume - 250 * gpGlobals->frametime);
-   if ( PlayerSoundList[idx].body_volume < 0 )
+   players[idx].body_volume = (int)(players[idx].body_volume - 250 * gpGlobals->frametime);
+   if ( players[idx].body_volume < 0 )
    {
-      PlayerSoundList[idx].body_volume = 0;
+      players[idx].body_volume = 0;
    }
 
    // convert player move speed and actions into sound audible by monsters.
-   if ( PlayerSoundList[idx].weapon_volume  > iBodyVolume )
+   if ( players[idx].weapon_volume  > iBodyVolume )
    {
-      PlayerSoundList[idx].target_volume = PlayerSoundList[idx].weapon_volume;
+      players[idx].target_volume = players[idx].weapon_volume;
 
       // OR in the bits for COMBAT sound if the weapon is being louder than the player. 
       pSound->m_iType |= bits_SOUND_COMBAT;
    }
    else
    {
-      PlayerSoundList[idx].target_volume = iBodyVolume;
+      players[idx].target_volume = iBodyVolume;
    }
 
    // decay weapon volume over time so bits_SOUND_COMBAT stays set for a while
-   PlayerSoundList[idx].weapon_volume = (int)(PlayerSoundList[idx].weapon_volume - 250 * gpGlobals->frametime);
-   if ( PlayerSoundList[idx].weapon_volume < 0 )
+   players[idx].weapon_volume = (int)(players[idx].weapon_volume - 250 * gpGlobals->frametime);
+   if ( players[idx].weapon_volume < 0 )
    {
-      PlayerSoundList[idx].weapon_volume = 0;
+      players[idx].weapon_volume = 0;
    }
 
 
@@ -146,17 +140,17 @@ void UpdatePlayerSound(edict_t * pEdict)
    // to hear a sound, especially if they don't listen every frame.
    iVolume = pSound->m_iVolume;
 
-   if ( PlayerSoundList[idx].target_volume > iVolume )
+   if ( players[idx].target_volume > iVolume )
    {
-      iVolume = PlayerSoundList[idx].target_volume;
+      iVolume = players[idx].target_volume;
    }
-   else if ( iVolume > PlayerSoundList[idx].target_volume )
+   else if ( iVolume > players[idx].target_volume )
    {
       iVolume = (int)(iVolume - 250 * gpGlobals->frametime);
 
-      if ( iVolume < PlayerSoundList[idx].target_volume )
+      if ( iVolume < players[idx].target_volume )
       {
-         iVolume = PlayerSoundList[idx].target_volume;
+         iVolume = players[idx].target_volume;
       }
    }
 
@@ -174,7 +168,7 @@ void UpdatePlayerSound(edict_t * pEdict)
       UTIL_ParticleEffect ( pEdict->v.origin + v_forward * iVolume, Vector(0, 0, 0), 255, 25 ); 
       UTIL_ParticleEffect ( pEdict->v.origin, Vector(0, 0, 0), 150, 25 ); 
       
-      ALERT ( at_console, "%d/%d\n", iVolume, PlayerSoundList[idx].target_volume );
+      ALERT ( at_console, "%d/%d\n", iVolume, players[idx].target_volume );
    }
 }
 
