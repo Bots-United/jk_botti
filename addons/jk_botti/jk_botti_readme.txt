@@ -68,6 +68,8 @@ CPU intensive operation this can only be done on map change.
    team-balance code.
  * Changed to only check existance of player model file on listenserver 
    when creating bots.
+ * Changed save order of waypoint .wpt and .matrix files so that matrix 
+   doesn't have to be calculated extra time.
 
 1.30:
  * Fixed Severians MOD detection with teamplay.
