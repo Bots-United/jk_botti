@@ -49,13 +49,15 @@
 #define W_IFL_AMMO_SPORE      (1<<30)
 
 // weapon types
-#define WEAPON_FIRE  (1<<1)
-#define WEAPON_MELEE (1<<2)
-#define WEAPON_THROW (1<<3)
-#define WEAPON_ZOOM (1<<4)
-#define WEAPON_FIRE_ZOOM (WEAPON_FIRE|WEAPON_ZOOM)
-#define WEAPON_AT_FEET (1<<5)
+#define WEAPON_FIRE         (1<<0)
+#define WEAPON_MELEE        (1<<1)
+#define WEAPON_THROW        (1<<2)
+#define WEAPON_ZOOM         (1<<3)
+#define WEAPON_FIRE_ZOOM    (WEAPON_FIRE|WEAPON_ZOOM)
+#define WEAPON_AT_FEET      (1<<4)
 #define WEAPON_FIRE_AT_FEET (WEAPON_FIRE|WEAPON_AT_FEET)
+#define WEAPON_AIMSPOT      (1<<5)
+#define WEAPON_AIMDUCK      (1<<6)
 
 // submod support flags
 #define WEAPON_SUBMOD_HLDM (1<<0)
@@ -104,6 +106,9 @@ typedef struct
    int  waypoint_flag;
    int  ammo1_waypoint_flag;
    int  ammo2_waypoint_flag;
+   
+   qboolean  ammo1_on_repickup; // getting same weapon gives ammo instead
+   qboolean  ammo2_on_repickup;
 } bot_weapon_select_t;
 
 typedef struct
@@ -151,8 +156,9 @@ extern void BotSelectAttack(bot_t &pBot, const bot_weapon_select_t &select, qboo
 extern qboolean IsValidWeaponChoose(bot_t &pBot, const bot_weapon_select_t &select);
 extern qboolean IsValidPrimaryAttack(bot_t &pBot, const bot_weapon_select_t &select, const float distance, const float height, const qboolean always_in_range);
 extern qboolean IsValidSecondaryAttack(bot_t &pBot, const bot_weapon_select_t &select, const float distance, const float height, const qboolean always_in_range);
-extern qboolean BotGetGoodWeaponCount(bot_t &pBot, const int stop_count);
-extern int BotGetLowAmmoFlags(bot_t &pBot);
+extern int BotGetLowAmmoFlags(bot_t &pBot, const qboolean OnlyCarrying);
 extern int BotGetBetterWeaponChoice(bot_t &pBot, const bot_weapon_select_t &current, const bot_weapon_select_t *pSelect, const float distance, const float height, qboolean *use_primary, qboolean *use_secondary);
-extern qboolean BotAllWeaponsRunningOutOfAmmo(bot_t &pBot);
+extern qboolean BotAllWeaponsRunningOutOfAmmo(bot_t &pBot, const qboolean GoodWeaponsOnly);
 extern qboolean IsValidToFireAtTheMoment(bot_t &pBot, const bot_weapon_select_t &select);
+extern qboolean BotWeaponCanAttack(bot_t &pBot, const qboolean GoodWeaponsOnly);
+extern qboolean BotIsCarryingWeapon(bot_t &pBot, const bot_weapon_select_t &select);

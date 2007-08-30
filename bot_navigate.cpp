@@ -342,7 +342,8 @@ int BotFindWaypointGoal( bot_t &pBot )
       return index;
    }
 
-   if (pBot.pBotEnemy == NULL && pBot.pFindSoundEnt != NULL)
+   if (pBot.pBotEnemy == NULL && 
+      (pBot.pFindSoundEnt != NULL && pBot.b_has_enough_ammo_for_good_weapon && !BotLowHealth(pBot)))
    {  // find a waypoint near interesting sound
       index = WaypointFindNearest(pBot.pFindSoundEnt, 512);
 
@@ -409,7 +410,7 @@ int BotFindWaypointGoal( bot_t &pBot )
          }
       }
 
-      if (!pBot.b_longjump && skill_settings[pBot.bot_skill].can_longjump)
+      if (!BotLowHealth(pBot) && !pBot.b_longjump && skill_settings[pBot.bot_skill].can_longjump)
       {   // find a longjump module
          temp_index = WaypointFindNearestGoal(pEdict, pBot.curr_waypoint_index, W_FL_LONGJUMP, pExclude);
 
@@ -434,7 +435,7 @@ int BotFindWaypointGoal( bot_t &pBot )
       }
 
       // find new weapon if only have shitty weapons or running out of ammo on all weapons 
-      if (BotGetGoodWeaponCount(pBot, 1) == 0 || BotAllWeaponsRunningOutOfAmmo(pBot))
+      if (!BotLowHealth(pBot) && BotAllWeaponsRunningOutOfAmmo(pBot, TRUE))
       {
          // find weapons that bot can use
          select_index = -1;
@@ -466,8 +467,8 @@ int BotFindWaypointGoal( bot_t &pBot )
          }
       }
       
-      // get flags for all ammo that are low
-      if ((ammoflags = BotGetLowAmmoFlags(pBot)) != 0)
+      // get flags for ammo that are low, primarily ammo that can we can use with current weapons
+      else if (!BotLowHealth(pBot) && ((ammoflags = BotGetLowAmmoFlags(pBot, TRUE)) != 0 || (ammoflags = BotGetLowAmmoFlags(pBot, FALSE)) != 0))
       {
          // find ammo for that we don't have enough yet
          temp_index = WaypointFindNearestGoal(pEdict, pBot.curr_waypoint_index, W_FL_AMMO, ammoflags, pExclude);
@@ -482,8 +483,6 @@ int BotFindWaypointGoal( bot_t &pBot )
                pBot.wpt_goal_type = WPT_GOAL_AMMO;
             }
          }
-         
-         
       } 
    }
    else if (pBot.pBotEnemy != NULL)
@@ -508,7 +507,7 @@ int BotFindWaypointGoal( bot_t &pBot )
 
    if (index != -1)
    {
-/*      switch (pBot.wpt_goal_type)
+      /*switch (pBot.wpt_goal_type)
       {
          case WPT_GOAL_HEALTH:
             UTIL_ConsolePrintf("[%s] %s", pBot.name, "I am going for some health!\n");

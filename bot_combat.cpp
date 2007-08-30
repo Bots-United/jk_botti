@@ -160,8 +160,22 @@ void BotAimPost( bot_t &pBot )
       pBot.f_special_shoot_angle = 0.0;
    }
    
+   // special case for m249
+   if(pBot.current_weapon.iId == GEARBOX_WEAPON_M249)
+   {
+      if((pBot.pEdict->v.flags & FL_DUCKING) == FL_DUCKING)
+         pBot.f_recoil /= 4;
+   }
+   // special case for eagle
+   else if(pBot.current_weapon.iId == GEARBOX_WEAPON_EAGLE)
+   {
+      if(pBot.secondary_state != 0)
+         pBot.f_recoil /= 15;
+   }
+   
    // add any recoil left to punch angle now
    pBot.pEdict->v.punchangle.x += pBot.f_recoil;
+   
    pBot.f_recoil = 0;
 }
 
@@ -1111,14 +1125,14 @@ qboolean CheckWeaponFireConditions(bot_t & pBot, const bot_weapon_select_t &sele
    edict_t *pEdict = pBot.pEdict;
    
    //
-   if (select.type == WEAPON_MELEE)
+   if ((select.type & WEAPON_MELEE) == WEAPON_MELEE)
    {
       // check if bot needs to duck down to hit enemy...
       if (fabs(pBot.pBotEnemy->v.origin.z - pEdict->v.origin.z) > 16 &&
           (pBot.pBotEnemy->v.origin - pEdict->v.origin).Length() < 64)
          pBot.f_duck_time = gpGlobals->time + 1.0;
    }
-   else if(select.type == WEAPON_THROW && !HaveRoomForThrow(pBot))
+   else if((select.type & WEAPON_THROW) == WEAPON_THROW && !HaveRoomForThrow(pBot))
    {
       return FALSE;
    }
@@ -1143,10 +1157,6 @@ qboolean CheckWeaponFireConditions(bot_t & pBot, const bot_weapon_select_t &sele
       if(!ok)
          use_primary = !(use_secondary = FALSE);
    }
-      
-   // use secondary once to enable zoom
-   if(use_primary && (select.type & WEAPON_FIRE_ZOOM) == WEAPON_FIRE_ZOOM && pEdict->v.fov == 0)
-      use_primary = !(use_secondary = TRUE);
    
    return TRUE;
 }
@@ -1167,7 +1177,24 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, 
    // Check if weapon can be fired and setup bot for firing this weapon
    if(!CheckWeaponFireConditions(pBot, select, use_primary, use_secondary))
       return FALSE;
+
+   // use secondary once to enable zoom
+   if(use_primary && (select.type & WEAPON_FIRE_ZOOM) == WEAPON_FIRE_ZOOM && pEdict->v.fov == 0)
+      use_primary = !(use_secondary = TRUE);
    
+   // use secondary once to enable aimspot
+   if(use_primary && (select.type & WEAPON_AIMSPOT) == WEAPON_AIMSPOT && pBot.secondary_state == 0)
+   {
+      use_primary = !(use_secondary = TRUE);
+      pBot.secondary_state = 1;
+   }
+   
+   //duck for better aim
+   if((select.type & WEAPON_AIMDUCK) == WEAPON_AIMDUCK)
+   {
+      pBot.f_duck_time = gpGlobals->time + 0.25f;
+   }
+
    if (use_primary)
    {
       pEdict->v.button |= IN_ATTACK;  // use primary attack
@@ -1444,6 +1471,8 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
    if(pBot.f_weaponchange_time >= gpGlobals->time && pBot.current_weapon_index >= 0 && weapon_choice == 0)
       return FALSE;
 
+   pBot.current_weapon_index = -1; // forget current weapon
+
    //
    // 1. check which weapons are available and with which percents
    //
@@ -1454,15 +1483,11 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
    select_index = -1;
    while (pSelect[++select_index].iId)
    {
-      // skip currently selected weapon.. it wasn't good enough earlier so it isn't now either
-      if(pBot.current_weapon_index >= 0 && pBot.current_weapon_index == select_index)
-      {
-         pBot.current_weapon_index = -1; // forget current weapon
-         continue;
-      }
-         
       // Check if we can use this weapon
       if(!(weapon_choice == pSelect[select_index].iId || weapon_choice == 0))
+         continue;
+ 
+      if(pSelect[select_index].avoid_this_gun)
          continue;
 
       if(!IsValidWeaponChoose(pBot, pSelect[select_index]) ||
@@ -1493,6 +1518,8 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
       next->percent_start = total_percent;
       next->percent_end = total_percent + pSelect[select_index].use_percent;
       next->select_index = select_index;
+      
+      //UTIL_ConsolePrintf("add: %d .. %d [%s]", total_percent, total_percent + pSelect[select_index].use_percent, pSelect[select_index].weapon_name);
       
       total_percent += pSelect[select_index].use_percent;
       
@@ -1534,6 +1561,8 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
          use_primary = next->use_primary;
          use_secondary = next->use_secondary;
          select_index = next->select_index;
+         
+         //UTIL_ConsolePrintf("choose: %d [%s]", choose, pSelect[select_index].weapon_name);
          
          if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
             return FALSE; //error

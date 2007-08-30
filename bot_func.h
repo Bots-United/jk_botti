@@ -55,6 +55,8 @@ qboolean BotEdgeForward( bot_t &pBot, const Vector &v_move_dir );
 qboolean BotEdgeRight( bot_t &pBot, const Vector &v_move_dir );
 qboolean BotEdgeLeft( bot_t &pBot, const Vector &v_move_dir );
 
+qboolean BotLowHealth( bot_t &pBot );
+void BotResetReactionTime(bot_t &pBot);
 void BotKick(bot_t &pBot);
 void BotCheckTeamplay(void);
 edict_t *BotFindEnemy( bot_t &pBot );

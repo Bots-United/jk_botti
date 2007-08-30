@@ -124,19 +124,19 @@ void BotClient_Valve_CurrentWeapon(void *p, int bot_index)
       {
          if (iState == 1)
          {
-            bots[bot_index].current_weapon.iId = iId;
-            bots[bot_index].current_weapon.iClip = iClip;
-
-            // update the ammo counts for this weapon...
-            bots[bot_index].current_weapon.iAmmo1 =
-               bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo1];
-            bots[bot_index].current_weapon.iAmmo2 =
-               bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo2];
-            
             bot_weapon_select_t *pSelect = NULL;
             bot_fire_delay_t *pDelay = NULL;
             int found = 0;
             
+            bots[bot_index].current_weapon.iId = iId;
+            bots[bot_index].current_weapon.iClip = iClip;
+            
+            bots[bot_index].secondary_state = 0;
+
+            // update the ammo counts for this weapon...
+            bots[bot_index].current_weapon.iAmmo1 = bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo1];
+            bots[bot_index].current_weapon.iAmmo2 = bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo2];
+
             pSelect = &weapon_select[0];
             pDelay = &fire_delay[0];
             
@@ -145,6 +145,7 @@ void BotClient_Valve_CurrentWeapon(void *p, int bot_index)
                if(iId == pSelect[i].iId) 
                	{
                   bots[bot_index].current_opt_distance = pSelect[i].opt_distance;
+                  bots[bot_index].current_weapon_index = i;
                   found = 1;
                	  break;
                }
@@ -339,6 +340,8 @@ void BotClient_Valve_Damage(void *p, int bot_index)
          // ignore certain types of damage...
          if (damage_bits & IGNORE_DAMAGE)
             return;
+
+         bots[bot_index].f_last_time_attacked = gpGlobals->time;
 
          // if the bot doesn't have an enemy and someone is shooting at it then
          // turn in the attacker's direction...

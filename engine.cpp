@@ -70,7 +70,7 @@ event_info_t g_event_info[] = {
    {-1, "events/snarkfire.sc",		0.0,   {0, 0}},
 //from gearbox
    {-1, "events/egon_effect.sc",	0.0,   {0, 0}},
-   {-1, "events/eagle.sc",		0.90,  {-10.0, -10.0}},
+   {-1, "events/eagle.sc",		0.90,  {-20.0, -20.0}},
    {-1, "events/pipewrench.sc",		0.8,   {0, 0}},
    {-1, "events/m249.sc",		0.96,  {-7.0, 7.0}},
    {-1, "events/shock.sc",		0.96,  {0.0, 2.0}},

@@ -56,6 +56,7 @@ extern int g_num_teams;
 extern qboolean g_team_limit;
 
 int submod_id = SUBMOD_HLDM;
+int submod_weaponflag = WEAPON_SUBMOD_HLDM;
 
 int m_spriteTexture = 0;
 int default_bot_skill = 2;
@@ -269,6 +270,7 @@ void GameDLLInit( void )
 {
    //before anything else detect submod
    submod_id = CheckSubMod();
+   submod_weaponflag = SubmodToSubmodWeaponFlag(submod_id);
    
    memset(players, 0, sizeof(players));
 

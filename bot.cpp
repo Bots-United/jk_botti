@@ -83,6 +83,13 @@ qboolean b_botdontshoot = FALSE;
 
 
 //
+qboolean BotLowHealth( bot_t &pBot )
+{
+   return(pBot.pEdict->v.health + 0.8f * pBot.pEdict->v.armorvalue < VALVE_MAX_NORMAL_HEALTH * 0.5f);
+}
+
+
+//
 void BotKick(bot_t &pBot)
 {
    char cmd[64];
@@ -133,6 +140,11 @@ void BotSpawnInit( bot_t &pBot )
    pBot.b_on_ladder = 0;
    pBot.b_in_water = 0;
    pBot.b_ducking = 0;
+   pBot.b_has_enough_ammo_for_good_weapon = 0;
+   
+   pBot.f_last_time_attacked = 0;
+   
+   pBot.secondary_state = 0;
 
    pBot.blinded_time = 0.0;
    pBot.f_max_speed = CVAR_GET_FLOAT("sv_maxspeed");
@@ -2151,43 +2163,97 @@ void BotThink( bot_t &pBot )
       BotLookForDrop( pBot );
    }
 
+   // reset pause time if being attacked
+   if((gpGlobals->time - pBot.f_last_time_attacked) < 1.0f)
+      pBot.f_pause_time = 0;
+
    // turn towards ideal_pitch by pitch_speed degrees
    pitch_degrees = BotChangePitch( pBot, pEdict->v.pitch_speed );
 
    // turn towards ideal_yaw by yaw_speed degrees
    yaw_degrees = BotChangeYaw( pBot, pEdict->v.yaw_speed );
    
-   // get enemy
-   pBot.pBotEnemy = (b_botdontshoot == 0) ? BotFindEnemy( pBot ) : NULL; // clear enemy pointer (no ememy for you!)
-
-   if(pBot.pBotEnemy == NULL)
+   // Only need to check ammo, since ammo check for weapons includes weapons ;)
+   pBot.b_has_enough_ammo_for_good_weapon = !BotAllWeaponsRunningOutOfAmmo(pBot, TRUE);
+   
+   if((pBot.b_has_enough_ammo_for_good_weapon && !BotLowHealth(pBot)) || pBot.f_last_time_attacked < gpGlobals->time + 3.0f)
    {
-      // try find sound enemy (something that bot will track)
-      BotFindSoundEnemy(pBot);
-      
-      // if has zoom weapon and zooming click off zoom
-      if(pBot.current_weapon_index != -1 && 
-         weapon_select[pBot.current_weapon_index].type == WEAPON_FIRE_ZOOM && 
-         pEdict->v.fov != 0 &&
-         !(pEdict->v.button & (IN_ATTACK|IN_ATTACK2)))
+      // get enemy
+      pBot.pBotEnemy = (b_botdontshoot == 0) ? BotFindEnemy( pBot ) : NULL; // clear enemy pointer (no ememy for you!)
+
+      if(pBot.pBotEnemy == NULL)
       {
-         pEdict->v.button |= IN_ATTACK2;
+         // try find sound enemy (something that bot will track)
+         BotFindSoundEnemy(pBot);
+      
+         // if has zoom weapon and zooming, click off zoom
+         if(pBot.current_weapon_index != -1 && 
+            (weapon_select[pBot.current_weapon_index].type & WEAPON_FIRE_ZOOM) == WEAPON_FIRE_ZOOM && 
+            pEdict->v.fov != 0 &&
+            !(pEdict->v.button & (IN_ATTACK|IN_ATTACK2)))
+         {
+            pEdict->v.button |= IN_ATTACK2;
+         }
+         
+         // if has aim spot weapon and have spot on, click spot off
+         if(pBot.current_weapon_index != -1 && 
+            (weapon_select[pBot.current_weapon_index].type & WEAPON_AIMSPOT) == WEAPON_AIMSPOT &&
+            pBot.secondary_state != 0 &&
+            !(pEdict->v.button & (IN_ATTACK|IN_ATTACK2)))
+         {
+            pEdict->v.button |= IN_ATTACK2;
+            pBot.secondary_state = 0;
+         }
       }
    }
 
-   // does an enemy exist?
+   qboolean DidShootAtEnemy = FALSE;
+
+   // does have an enemy?
    if (pBot.pBotEnemy != NULL)
    {
-      BotShootAtEnemy( pBot );  // shoot at the enemy
-         
-      pBot.f_pause_time = 0;  // dont't pause if enemy exists
-         
-      // check if bot is on a ladder
-      if (pBot.b_on_ladder)
+      if(BotWeaponCanAttack(pBot, FALSE) && (!BotLowHealth(pBot) || pBot.f_last_time_attacked < gpGlobals->time + 3.0f))
       {
-         // bot is stuck on a ladder... jump off ladder
-         pEdict->v.button |= IN_JUMP;
+         BotShootAtEnemy( pBot );  // shoot at the enemy
+         DidShootAtEnemy = (pBot.pBotEnemy != NULL);
+         
+         pBot.f_pause_time = 0;  // dont't pause if enemy exists
+         
+         // check if bot is on a ladder
+         if (pBot.b_on_ladder)
+         {
+            // bot is stuck on a ladder... jump off ladder
+            pEdict->v.button |= IN_JUMP;
+         }
       }
+      else
+      {
+         //
+         pBot.f_pause_time = 0;
+         
+         // need waypoint away from enemy?
+         edict_t *pAvoidEnemy = pBot.pBotEnemy;
+         
+         // don't have an enemy anymore so null out the pointer...
+         pBot.pBotEnemy = NULL;
+         
+         int enemy_waypoint = WaypointFindNearest(pAvoidEnemy, REACHABLE_RANGE);
+         int self_waypoint = WaypointFindNearest(pEdict, REACHABLE_RANGE);
+      	 
+         if(enemy_waypoint != -1 && self_waypoint != -1)
+         {
+            int runaway_waypoint = WaypointFindRunawayPath(self_waypoint, enemy_waypoint);
+            
+            pBot.curr_waypoint_index = -1;  // forget about this waypoint
+            pBot.waypoint_goal = runaway_waypoint; 
+            pBot.f_waypoint_goal_time = gpGlobals->time + 5.0f;
+         }
+      }
+   }
+   
+   if(DidShootAtEnemy)
+   {
+      // do nothing
    }
    else if (pBot.f_pause_time > gpGlobals->time)  // is bot "paused"?
    {   	

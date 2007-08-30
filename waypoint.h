@@ -128,5 +128,6 @@ int WaypointSlowFloydsState(void);
 int WaypointSlowFloyds(void);
 int WaypointSlowFloyds(unsigned short *shortest_path, unsigned short *from_to);
 qboolean WaypointIsRouteValid(int src, int dest);
+int WaypointFindRunawayPath(int runner, int enemy);
 
 #endif // WAYPOINT_H

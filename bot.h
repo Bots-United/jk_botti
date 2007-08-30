@@ -167,6 +167,9 @@ typedef struct
    qboolean b_on_ladder;
    qboolean b_in_water;
    qboolean b_ducking;
+   qboolean b_has_enough_ammo_for_good_weapon;
+   
+   int secondary_state;
 
    // things from pev in CBasePlayer...
    float idle_angle;
@@ -226,6 +229,8 @@ typedef struct
    float f_bot_see_enemy_time;
    float f_bot_find_enemy_time;
    edict_t *pFindSoundEnt;
+   
+   float f_last_time_attacked;
 
    edict_t *killer_edict;
    qboolean  b_bot_say;

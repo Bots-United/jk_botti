@@ -63,6 +63,11 @@ CPU intensive operation this can only be done on map change.
 --------------------
 1.40:
  * Add support for Opposing Force Deathmatch.
+ * Bugfixes to goal selection and weapon selection.
+ * Bot now understands that it can get more ammo by picking up same weapon 
+   again.
+ * Bot avoids combat if it doesn't have good weapon or doesn't have enough
+   health.
  * Changed optimization flags from '-O3 -funroll-loops' to '-O2'.
  * Output warning message when model given for bot creation is replaced by 
    team-balance code.
