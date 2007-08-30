@@ -510,7 +510,7 @@ qboolean BotGetGoodWeaponCount(bot_t &pBot, const int stop_count)
       if(!IsValidWeaponChoose(pBot, pSelect[select_index]))
          continue;
       
-      if(pSelect[select_index].avoid_this_gun || pSelect[select_index].type != WEAPON_FIRE)
+      if(pSelect[select_index].avoid_this_gun || (pSelect[select_index].type & WEAPON_FIRE) != WEAPON_FIRE)
          continue;
       
       // don't do distance check, check if enough ammo

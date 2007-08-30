@@ -1145,7 +1145,7 @@ qboolean CheckWeaponFireConditions(bot_t & pBot, const bot_weapon_select_t &sele
    }
       
    // use secondary once to enable zoom
-   if(use_primary && select.type == WEAPON_FIRE_ZOOM && pEdict->v.fov == 0)
+   if(use_primary && (select.type & WEAPON_FIRE_ZOOM) == WEAPON_FIRE_ZOOM && pEdict->v.fov == 0)
       use_primary = !(use_secondary = TRUE);
    
    return TRUE;
@@ -1674,7 +1674,7 @@ void BotShootAtEnemy( bot_t &pBot )
    v_predicted_pos = UTIL_AdjustOriginWithExtent(pBot, GetPredictedPlayerPosition(pBot, pBot.pBotEnemy), pBot.pBotEnemy);
 
    // do we need to aim at the feet?
-   if (pBot.current_weapon_index != -1 && weapon_select[pBot.current_weapon_index].type == WEAPON_FIRE_AT_FEET)
+   if (pBot.current_weapon_index != -1 && (weapon_select[pBot.current_weapon_index].type & WEAPON_FIRE_AT_FEET) == WEAPON_FIRE_AT_FEET)
    {
       Vector v_src, v_dest;
       TraceResult tr;
