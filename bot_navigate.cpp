@@ -434,7 +434,7 @@ int BotFindWaypointGoal( bot_t &pBot )
       }
 
       // find new weapon if only have shitty weapons or running out of ammo on all weapons 
-      if (BotGetGoodWeaponCount(pBot, 1) || BotAllWeaponsRunningOutOfAmmo(pBot))
+      if (BotGetGoodWeaponCount(pBot, 1) == 0 || BotAllWeaponsRunningOutOfAmmo(pBot))
       {
          // find weapons that bot can use
          select_index = -1;
