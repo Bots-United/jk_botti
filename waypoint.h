@@ -88,14 +88,11 @@ typedef struct path {
 // waypoint function prototypes...
 void WaypointInit(void);
 int  WaypointFindPath(PATH **pPath, int *path_index, int waypoint_index);
-int  WaypointFindNearest(edict_t *pEntity, float distance);
-int  WaypointFindNearest(Vector v_src, edict_t *pEntity, float range);
-int  WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags, int exclude[]);
-int  WaypointFindNearestGoal(Vector v_src, edict_t *pEntity, float range, int flags);
+int  WaypointFindNearest(const Vector &v_origin, const Vector &v_offset, edict_t *pEntity, float range);
+int  WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags, int exclude[], float range, const Vector *pv_src);
 int  WaypointFindRandomGoal(edict_t *pEntity, int flags, int itemflags, int exclude[]);
-int  WaypointFindRandomGoal(Vector v_src, edict_t *pEntity, float range, int flags);
 int  WaypointFindNearestAiming(Vector v_origin);
-void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index);
+void WaypointSearchItems(edict_t *pEntity, const Vector &v_origin, int wpt_index);
 void WaypointAdd(edict_t *pEntity);
 void WaypointAddAiming(edict_t *pEntity);
 int  WaypointAddTesting(const Vector &vecOrigin, int flags, int itemflags, qboolean MakePaths);
@@ -126,35 +123,58 @@ int WaypointSlowFloyds(unsigned short *shortest_path, unsigned short *from_to);
 qboolean WaypointIsRouteValid(int src, int dest);
 int WaypointFindRunawayPath(int runner, int enemy);
 
+// find the nearest waypoint to the player and return the index (-1 if not found)
+inline int WaypointFindNearest(edict_t *pEntity, float range)
+{
+   return WaypointFindNearest(pEntity->v.origin, pEntity->v.view_ofs, pEntity, range);
+}
+
+//
+inline int WaypointFindNearest(const Vector &v_src, edict_t *pEntity, float range)
+{
+   return WaypointFindNearest(v_src, Vector(0, 0, 0), pEntity, range);
+}
+
+//
+inline int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags, int exclude[])
+{
+   return WaypointFindNearestGoal(pEntity, src, flags, itemflags, exclude, 0.0f, NULL);
+}
+
+//
+inline int WaypointFindNearestGoal(const Vector &v_src, edict_t *pEntity, float range, int flags)
+{
+   return WaypointFindNearestGoal(pEntity, -1, flags, 0, NULL, range, &v_src);
+}
+
+//
 inline int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int exclude[])
 {
    return WaypointFindNearestGoal(pEntity, src, flags, 0, exclude);
 }
 
+//
 inline int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags)
 {
    return WaypointFindNearestGoal(pEntity, src, flags, itemflags, NULL);
 }
 
+//
 inline int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags)
 {
    return WaypointFindNearestGoal(pEntity, src, flags, 0, NULL);
 }
 
+//
 inline int WaypointFindRandomGoal(edict_t *pEntity, int flags)
 {
    return WaypointFindRandomGoal(pEntity, flags, 0, NULL); 
 }
 
+//
 inline int WaypointFindRandomGoal(edict_t *pEntity, int flags, int exclude[]) 
 { 
    return WaypointFindRandomGoal(pEntity, flags, 0, exclude); 
-}
-
-// find the nearest waypoint to the player and return the index (-1 if not found)
-inline int WaypointFindNearest(edict_t *pEntity, float range)
-{
-   return WaypointFindNearest(pEntity->v.origin + pEntity->v.view_ofs, pEntity, range);
 }
 
 #endif // WAYPOINT_H
