@@ -56,8 +56,6 @@
 #define WEAPON_FIRE_ZOOM    (WEAPON_FIRE|WEAPON_ZOOM)
 #define WEAPON_AT_FEET      (1<<4)
 #define WEAPON_FIRE_AT_FEET (WEAPON_FIRE|WEAPON_AT_FEET)
-#define WEAPON_AIMSPOT      (1<<5)
-#define WEAPON_AIMDUCK      (1<<6)
 
 // submod support flags
 #define WEAPON_SUBMOD_HLDM (1<<0)

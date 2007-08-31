@@ -169,7 +169,7 @@ typedef struct
    qboolean b_ducking;
    qboolean b_has_enough_ammo_for_good_weapon;
    
-   int secondary_state;
+   int eagle_secondary_state;
 
    // things from pev in CBasePlayer...
    float idle_angle;

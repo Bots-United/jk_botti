@@ -130,8 +130,6 @@ void BotClient_Valve_CurrentWeapon(void *p, int bot_index)
             
             bots[bot_index].current_weapon.iId = iId;
             bots[bot_index].current_weapon.iClip = iClip;
-            
-            bots[bot_index].secondary_state = 0;
 
             // update the ammo counts for this weapon...
             bots[bot_index].current_weapon.iAmmo1 = bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo1];

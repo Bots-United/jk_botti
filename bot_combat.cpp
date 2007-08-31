@@ -169,7 +169,7 @@ void BotAimPost( bot_t &pBot )
    // special case for eagle
    else if(pBot.current_weapon.iId == GEARBOX_WEAPON_EAGLE)
    {
-      if(pBot.secondary_state != 0)
+      if(pBot.eagle_secondary_state != 0)
          pBot.f_recoil /= 15;
    }
    
@@ -1183,14 +1183,14 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, 
       use_primary = !(use_secondary = TRUE);
    
    // use secondary once to enable aimspot
-   if(use_primary && (select.type & WEAPON_AIMSPOT) == WEAPON_AIMSPOT && pBot.secondary_state == 0)
+   if(use_primary && select.iId == GEARBOX_WEAPON_EAGLE && pBot.eagle_secondary_state == 0)
    {
       use_primary = !(use_secondary = TRUE);
-      pBot.secondary_state = 1;
+      pBot.eagle_secondary_state = 1;
    }
    
    //duck for better aim
-   if((select.type & WEAPON_AIMDUCK) == WEAPON_AIMDUCK)
+   if(select.iId == GEARBOX_WEAPON_M249)
    {
       pBot.f_duck_time = gpGlobals->time + 0.25f;
    }

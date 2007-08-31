@@ -144,7 +144,7 @@ void BotSpawnInit( bot_t &pBot )
    
    pBot.f_last_time_attacked = 0;
    
-   pBot.secondary_state = 0;
+   pBot.eagle_secondary_state = 0;
 
    pBot.blinded_time = 0.0;
    pBot.f_max_speed = CVAR_GET_FLOAT("sv_maxspeed");
@@ -2197,12 +2197,12 @@ void BotThink( bot_t &pBot )
          
          // if has aim spot weapon and have spot on, click spot off
          if(pBot.current_weapon_index != -1 && 
-            (weapon_select[pBot.current_weapon_index].type & WEAPON_AIMSPOT) == WEAPON_AIMSPOT &&
-            pBot.secondary_state != 0 &&
+            weapon_select[pBot.current_weapon_index].iId == GEARBOX_WEAPON_EAGLE &&
+            pBot.eagle_secondary_state != 0 &&
             !(pEdict->v.button & (IN_ATTACK|IN_ATTACK2)))
          {
             pEdict->v.button |= IN_ATTACK2;
-            pBot.secondary_state = 0;
+            pBot.eagle_secondary_state = 0;
          }
       }
    }
