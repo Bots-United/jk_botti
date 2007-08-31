@@ -377,26 +377,30 @@ inline void fast_random_seed(unsigned int seed)
 /* supports range INT_MIN, INT_MAX */
 inline int RANDOM_LONG2(int lLow, int lHigh) 
 {
+   const double c_divider = ((unsigned long long)1) << 32; // div by (1<<32)
    double rnd;
    
    if(unlikely(lLow >= lHigh))
       return(lLow);
    
    rnd = fast_generate_random();
-   rnd = (rnd * ((double)lHigh - (double)lLow + 1.0)) / 4294967296.0; // div by (1<<32)
+   rnd *= (double)lHigh - (double)lLow + 1.0;
+   rnd /= c_divider; // div by (1<<32)
    
    return (int)(rnd + lLow);
 }
 
 inline float RANDOM_FLOAT2(float flLow, float flHigh) 
 {
+   const double c_divider = (((unsigned long long)1) << 32) - 1; // div by (1<<32)-1
    double rnd;
    
    if(unlikely(flLow >= flHigh))
       return(flLow);
    
    rnd = fast_generate_random();
-   rnd = rnd * (flHigh - flLow) / 4294967295.0; // div by (1<<32)-1
+   rnd *= (double)flHigh - (double)flLow;
+   rnd /= c_divider; // div by (1<<32)-1
    
    return (float)(rnd + flLow);
 }
