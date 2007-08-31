@@ -793,50 +793,6 @@ void WaypointAddLift(edict_t * pent, const Vector &start, const Vector &end)
 }
 
 
-// find the nearest waypoint to the player and return the index (-1 if not found)
-int WaypointFindNearest(edict_t *pEntity, float range)
-{
-   int i, min_index;
-   float distance;
-   float min_distance;
-   TraceResult tr;
-
-   if (num_waypoints < 1)
-      return -1;
-
-   // find the nearest waypoint...
-
-   min_index = -1;
-   min_distance = 99999.0;
-
-   for (i=0; i < num_waypoints; i++)
-   {
-      if (waypoints[i].flags & W_FL_DELETED)
-         continue;  // skip any deleted waypoints
-
-      if (waypoints[i].flags & W_FL_AIMING)
-         continue;  // skip any aiming waypoints
-
-      distance = (waypoints[i].origin - pEntity->v.origin).Length();
-
-      if ((distance < min_distance) && (distance < range))
-      {
-         // if waypoint is visible from current position (even behind head)...
-         UTIL_TraceMove( pEntity->v.origin + pEntity->v.view_ofs, waypoints[i].origin,
-                         ignore_monsters, pEntity->v.pContainingEntity, &tr );
-
-         if (tr.flFraction >= 1.0f)
-         {
-            min_index = i;
-            min_distance = distance;
-         }
-      }
-   }
-
-   return min_index;
-}
-
-
 // find the nearest waypoint to the source postition and return the index
 int WaypointFindNearest(Vector v_src, edict_t *pEntity, float range)
 {
@@ -881,7 +837,7 @@ int WaypointFindNearest(Vector v_src, edict_t *pEntity, float range)
 }
 
 
-int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags)
+int WaypointFindNearestGoal(Vector v_src, edict_t *pEntity, float range, int flags)
 {
    int index, min_index;
    float distance, min_distance;
@@ -896,9 +852,6 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags)
 
    for (index=0; index < num_waypoints; index++)
    {
-      if (index == src)
-         continue;  // skip the source waypoint
-
       if (waypoints[index].flags & W_FL_DELETED)
          continue;  // skip any deleted waypoints
 
@@ -907,67 +860,17 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags)
 
       if ((waypoints[index].flags & flags) != flags)
          continue;  // skip this waypoint if the flags don't match
-
+      
       if (waypoints[index].flags & (W_FL_LONGJUMP | W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
       {
-         edict_t *wpt_item = WaypointFindItem(index);
+         edict_t *wpt_item = WaypointFindItem(index);   
          if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0))
             continue;
       }
+      
+      distance = (waypoints[index].origin - v_src).Length();
 
-      distance = WaypointDistanceFromTo(src, index);
-
-      if (distance < min_distance)
-      {
-         min_index = index;
-         min_distance = distance;
-      }
-   }
-
-   return min_index;
-}
-
-
-int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags)
-{
-   int index, min_index;
-   float distance, min_distance;
-
-   if (num_waypoints < 1)
-      return -1;
-
-   // find the nearest waypoint with the matching flags...
-
-   min_index = -1;
-   min_distance = 99999;
-
-   for (index=0; index < num_waypoints; index++)
-   {
-      if (index == src)
-         continue;  // skip the source waypoint
-
-      if (waypoints[index].flags & W_FL_DELETED)
-         continue;  // skip any deleted waypoints
-
-      if (waypoints[index].flags & W_FL_AIMING)
-         continue;  // skip any aiming waypoints
-
-      if ((waypoints[index].flags & flags) != flags)
-         continue;  // skip this waypoint if the flags don't match
-
-      if (itemflags && !(waypoints[index].itemflags & itemflags))
-      	 continue;  // skip this weapoint if no match for itemflags
-
-      if (waypoints[index].flags & (W_FL_LONGJUMP | W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
-      {
-         edict_t *wpt_item = WaypointFindItem(index);
-         if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0))
-            continue;
-      }
-
-      distance = WaypointDistanceFromTo(src, index);
-
-      if (distance < min_distance)
+      if ((distance < range) && (distance < min_distance))
       {
          min_index = index;
          min_distance = distance;
@@ -1006,21 +909,24 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags,
       if ((waypoints[index].flags & flags) != flags)
          continue;  // skip this waypoint if the flags don't match
 
-      if (itemflags && !(waypoints[index].itemflags & itemflags))
+      if ((waypoints[index].itemflags & itemflags) != itemflags)
       	 continue;  // skip this weapoint if no match for itemflags
-
-      exclude_index = 0;
-      while (exclude[exclude_index])
+      
+      if (exclude != NULL)
       {
+         int exclude_index = 0;
+         while (exclude[exclude_index])
+         {
+            if (index == exclude[exclude_index])
+               break;  // found a match, break out of while loop
+
+            exclude_index++;
+         }
+         
          if (index == exclude[exclude_index])
-            break;  // found a match, break out of while loop
-
-         exclude_index++;
+            continue;  // skip any index that matches exclude list
       }
-
-      if (index == exclude[exclude_index])
-         continue;  // skip any index that matches exclude list
-
+      
       if (waypoints[index].flags & (W_FL_LONGJUMP | W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
       {
          edict_t *wpt_item = WaypointFindItem(index);
@@ -1041,121 +947,19 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags,
 }
 
 
-int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int exclude[])
+int WaypointFindRandomGoal(edict_t *pEntity, int flags, int itemflags, int exclude[])
 {
-   int index, min_index;
-   float distance, min_distance;
+   int index;
+   int * indexes;
+   int count = 0;
    int exclude_index;
 
    if (num_waypoints < 1)
       return -1;
 
-   // find the nearest waypoint with the matching flags...
-
-   min_index = -1;
-   min_distance = 99999;
-
-   for (index=0; index < num_waypoints; index++)
-   {
-      if (index == src)
-         continue;  // skip the source waypoint
-
-      if (waypoints[index].flags & W_FL_DELETED)
-         continue;  // skip any deleted waypoints
-
-      if (waypoints[index].flags & W_FL_AIMING)
-         continue;  // skip any aiming waypoints
-
-      if ((waypoints[index].flags & flags) != flags)
-         continue;  // skip this waypoint if the flags don't match
-
-      exclude_index = 0;
-      while (exclude[exclude_index])
-      {
-         if (index == exclude[exclude_index])
-            break;  // found a match, break out of while loop
-
-         exclude_index++;
-      }
-
-      if (index == exclude[exclude_index])
-         continue;  // skip any index that matches exclude list
-      
-      if (waypoints[index].flags & (W_FL_LONGJUMP| W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
-      {
-         edict_t *wpt_item = WaypointFindItem(index);   
-         if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0))
-            continue;
-      }
-      
-      distance = WaypointDistanceFromTo(src, index);
-
-      if (distance < min_distance)
-      {
-         min_index = index;
-         min_distance = distance;
-      }
-   }
-
-   return min_index;
-}
-
-
-int WaypointFindNearestGoal(Vector v_src, edict_t *pEntity, float range, int flags)
-{
-   int index, min_index;
-   float distance, min_distance;
-
-   if (num_waypoints < 1)
-      return -1;
-
-   // find the nearest waypoint with the matching flags...
-
-   min_index = -1;
-   min_distance = 99999;
-
-   for (index=0; index < num_waypoints; index++)
-   {
-      if (waypoints[index].flags & W_FL_DELETED)
-         continue;  // skip any deleted waypoints
-
-      if (waypoints[index].flags & W_FL_AIMING)
-         continue;  // skip any aiming waypoints
-
-      if ((waypoints[index].flags & flags) != flags)
-         continue;  // skip this waypoint if the flags don't match
-      
-      if (waypoints[index].flags & (W_FL_LONGJUMP| W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
-      {
-         edict_t *wpt_item = WaypointFindItem(index);   
-         if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0))
-            continue;
-      }
-      
-      distance = (waypoints[index].origin - v_src).Length();
-
-      if ((distance < range) && (distance < min_distance))
-      {
-         min_index = index;
-         min_distance = distance;
-      }
-   }
-
-   return min_index;
-}
-
-
-int WaypointFindRandomGoal(edict_t *pEntity, int flags)
-{
-   int index;
-   int indexes[50];
-   int count = 0;
-
-   if (num_waypoints < 1)
-      return -1;
+   indexes = (int*)alloca(sizeof(int)*num_waypoints);
 
    // find all the waypoints with the matching flags...
-
    for (index=0; index < num_waypoints; index++)
    {
       if (waypoints[index].flags & W_FL_DELETED)
@@ -1167,14 +971,32 @@ int WaypointFindRandomGoal(edict_t *pEntity, int flags)
       if ((waypoints[index].flags & flags) != flags)
          continue;  // skip this waypoint if the flags don't match
 
-      if (waypoints[index].flags & (W_FL_LONGJUMP| W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
+      if ((waypoints[index].itemflags & itemflags) != itemflags)
+      	 continue;  // skip this weapoint if no match for itemflags
+      
+      if (exclude != NULL)
+      {
+         int exclude_index = 0;
+         while (exclude[exclude_index])
+         {
+            if (index == exclude[exclude_index])
+               break;  // found a match, break out of while loop
+
+            exclude_index++;
+         }
+         
+         if (index == exclude[exclude_index])
+            continue;  // skip any index that matches exclude list
+      }
+      
+      if (waypoints[index].flags & (W_FL_LONGJUMP | W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
       {
          edict_t *wpt_item = WaypointFindItem(index);   
          if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0))
             continue;
       }
-      
-      if (count < 50)
+
+      if (count < num_waypoints)
       {
          indexes[count] = index;
 
@@ -1190,78 +1012,20 @@ int WaypointFindRandomGoal(edict_t *pEntity, int flags)
    return indexes[index];
 }
 
-
-int WaypointFindRandomGoal(edict_t *pEntity, int flags, int exclude[])
-{
-   int index;
-   int indexes[200];
-   int count = 0;
-   int exclude_index;
-
-   if (num_waypoints < 1)
-      return -1;
-
-   // find all the waypoints with the matching flags...
-
-   for (index=0; index < num_waypoints; index++)
-   {
-      if (waypoints[index].flags & W_FL_DELETED)
-         continue;  // skip any deleted waypoints
-
-      if (waypoints[index].flags & W_FL_AIMING)
-         continue;  // skip any aiming waypoints
-
-      if ((waypoints[index].flags & flags) != flags)
-         continue;  // skip this waypoint if the flags don't match
-      
-      if (waypoints[index].flags & (W_FL_LONGJUMP| W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
-      {
-         edict_t *wpt_item = WaypointFindItem(index);   
-         if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0))
-            continue;
-      }
-      
-      exclude_index = 0;
-      while (exclude[exclude_index])
-      {
-         if (index == exclude[exclude_index])
-            break;  // found a match, break out of while loop
-
-         exclude_index++;
-      }
-
-      if (index == exclude[exclude_index])
-         continue;  // skip any index that matches exclude list
-
-      if (count < 200)
-      {
-         indexes[count] = index;
-
-         count++;
-      }
-   }
-
-   if (count == 0)  // no matching waypoints found
-      return -1;
-
-   index = RANDOM_LONG2(1, count) - 1;
-
-   return indexes[index];
-}
-
-
+/*
 int WaypointFindRandomGoal(Vector v_src, edict_t *pEntity, float range, int flags)
 {
    int index;
-   int indexes[200];
+   int * indexes;
    int count = 0;
    float distance;
 
    if (num_waypoints < 1)
       return -1;
 
-   // find all the waypoints with the matching flags...
+   indexes = (int*)alloca(sizeof(int)*num_waypoints);
 
+   // find all the waypoints with the matching flags...
    for (index=0; index < num_waypoints; index++)
    {
       if (waypoints[index].flags & W_FL_DELETED)
@@ -1273,7 +1037,7 @@ int WaypointFindRandomGoal(Vector v_src, edict_t *pEntity, float range, int flag
       if ((waypoints[index].flags & flags) != flags)
          continue;  // skip this waypoint if the flags don't match
       
-      if (waypoints[index].flags & (W_FL_LONGJUMP| W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
+      if (waypoints[index].flags & (W_FL_LONGJUMP | W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
       {
          edict_t *wpt_item = WaypointFindItem(index);   
          if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0))
@@ -1282,7 +1046,7 @@ int WaypointFindRandomGoal(Vector v_src, edict_t *pEntity, float range, int flag
       
       distance = (waypoints[index].origin - v_src).Length();
 
-      if ((distance < range) && (count < 200))
+      if ((distance < range) && (count < num_waypoints))
       {
          indexes[count] = index;
 
@@ -1297,7 +1061,7 @@ int WaypointFindRandomGoal(Vector v_src, edict_t *pEntity, float range, int flag
 
    return indexes[index];
 }
-
+*/
 
 int WaypointFindNearestAiming(Vector v_origin)
 {
@@ -1315,7 +1079,7 @@ int WaypointFindNearestAiming(Vector v_origin)
       if (waypoints[index].flags & W_FL_DELETED)
          continue;  // skip any deleted waypoints
 
-      if ((waypoints[index].flags & W_FL_AIMING) == 0)
+      if (!(waypoints[index].flags & W_FL_AIMING))
          continue;  // skip any NON aiming waypoints
 
       distance = (v_origin - waypoints[index].origin).Length();
