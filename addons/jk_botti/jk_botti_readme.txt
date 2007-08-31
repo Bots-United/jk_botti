@@ -68,7 +68,7 @@ CPU intensive operation this can only be done on map change.
    again.
  * Bot avoids combat if it doesn't have good weapon or doesn't have enough
    health.
- * Changed optimization flags from '-O3 -funroll-loops' to '-O2'.
+ * Changed optimization flags from '-O3' to '-O2'.
  * Output warning message when model given for bot creation is replaced by 
    team-balance code.
  * Changed to only check existance of player model file on listenserver 
