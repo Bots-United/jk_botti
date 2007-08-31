@@ -387,7 +387,7 @@ inline int RANDOM_LONG2(int lLow, int lHigh)
    rnd *= (double)lHigh - (double)lLow + 1.0;
    rnd /= c_divider; // div by (1<<32)
    
-   return (int)(rnd + lLow);
+   return (int)(rnd + (double)lLow);
 }
 
 inline float RANDOM_FLOAT2(float flLow, float flHigh) 
@@ -402,7 +402,7 @@ inline float RANDOM_FLOAT2(float flLow, float flHigh)
    rnd *= (double)flHigh - (double)flLow;
    rnd /= c_divider; // div by (1<<32)-1
    
-   return (float)(rnd + flLow);
+   return (float)(rnd + (double)flLow);
 }
 
 
