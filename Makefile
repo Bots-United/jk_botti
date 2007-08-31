@@ -27,7 +27,7 @@ BASEFLAGS =
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
 else
-	OPTFLAGS = -O2 -fomit-frame-pointer -ffast-math
+	OPTFLAGS = -O2 -fomit-frame-pointer -ffast-math -funroll-loops
 endif
 
 INCLUDES = -I"./metamod" \
@@ -76,9 +76,6 @@ clean:
 distclean:
 	rm -f Rules.depend ${TARGET}.dll ${TARGET}_i386.so addons/jk_botti/dlls/* zlib/*.exe
 	(cd zlib; make distclean; cd ..)
-
-waypoint.o: waypoint.cpp
-	${CPP} ${CPPFLAGS} -funroll-loops -c $< -o $@
 
 %.o: %.cpp
 	${CPP} ${CPPFLAGS} -c $< -o $@
