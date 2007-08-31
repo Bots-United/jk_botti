@@ -458,14 +458,14 @@ Vector AddPredictionVelocityVaritation(bot_t &pBot, const Vector & velocity)
 
 
 // Prevent bots from shooting at on ground when aiming on falling player that hits ground (Z axis fixup only)
-Vector TracePredictedMovement(bot_t &pBot, edict_t *pPlayer, Vector v_src, Vector v_velocity, float time, qboolean ducking, qboolean without_velocity)
+Vector TracePredictedMovement(bot_t &pBot, edict_t *pPlayer, const Vector &v_src, const Vector &cv_velocity, float time, qboolean ducking, qboolean without_velocity)
 {
    if(without_velocity)
       return(v_src);
    
-   Vector v_dest;
+   Vector v_dest, v_velocity;
    
-   v_velocity = AddPredictionVelocityVaritation(pBot, v_velocity);
+   v_velocity = AddPredictionVelocityVaritation(pBot, cv_velocity);
    v_dest = v_src + v_velocity * time;
 
    TraceResult tr;
@@ -670,7 +670,7 @@ qboolean FCanShootInHead(edict_t * pEdict, edict_t * pTarget, const Vector & v_d
 
 
 //
-edict_t *FindEnemyNearestToPoint(Vector v_point, float radius, edict_t * pBotEdict)
+edict_t *FindEnemyNearestToPoint(const Vector &v_point, float radius, edict_t * pBotEdict)
 {
    float nearestdistance = radius + 1;
    edict_t * pNearestEnemy = NULL;
