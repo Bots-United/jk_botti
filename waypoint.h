@@ -97,6 +97,7 @@ int  WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int exclude[]
 int  WaypointFindNearestGoal(Vector v_src, edict_t *pEntity, float range, int flags);
 int  WaypointFindRandomGoal(edict_t *pEntity, int flags);
 int  WaypointFindRandomGoal(edict_t *pEntity, int flags, int exclude[]);
+int  WaypointFindRandomGoal(edict_t *pEntity, int flags, int itemflags, int exclude[]);
 int  WaypointFindRandomGoal(Vector v_src, edict_t *pEntity, float range, int flags);
 int  WaypointFindNearestAiming(Vector v_origin);
 void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index);
