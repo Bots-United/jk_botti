@@ -17,6 +17,8 @@
 #include "bot_client.h"
 #include "bot_func.h"
 #include "bot_sound.h"
+#include "bot_weapons.h"
+#include "bot_weapon_select.h"
 
 extern enginefuncs_t g_engfuncs;
 extern bot_t bots[32];
@@ -135,7 +137,7 @@ void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventi
    {
       int ivolume = (int)(1000*pei->volume);
       
-      SaveSound((edict_t*)pInvoker, pInvoker->v.origin, ivolume, CHAN_WEAPON);
+      SaveSound((edict_t*)pInvoker, pInvoker->v.origin, ivolume, CHAN_WEAPON, 5.0f);
    }
    
    // event causes client recoil?
@@ -157,12 +159,26 @@ void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventi
    RETURN_META (MRES_IGNORED);
 }
 
-void pfnEmitSound(edict_t *entity, int channel, const char *sample, /*int*/float volume, float attenuation, int fFlags, int pitch)
+void pfnEmitSound(edict_t *entity, int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch)
 {
    if (gpGlobals->deathmatch)
    {
       int ivolume = (int)(1000*volume);
-      SaveSound((edict_t*)entity, entity->v.origin, ivolume, channel);
+      const char *classname = (const char *)STRING(entity->v.classname);
+      float duration = 5.0f;
+      
+      if (strncmp("item_health", classname, 11) == 0)
+         duration = 8.0f;
+      else if (strncmp("item_battery", classname, 12) == 0)
+         duration = 8.0f;
+      else if (GetAmmoItemFlag(classname) != 0)
+         duration = 8.0f;
+      else if (GetWeaponItemFlag(classname) != 0 && (entity->v.owner == NULL))
+         duration = 8.0f;
+      else if (strcmp("item_longjump", classname) == 0)
+         duration = 8.0f;
+      
+      SaveSound(entity, entity->v.origin, ivolume, channel, duration);
    }
 
    RETURN_META (MRES_IGNORED);

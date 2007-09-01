@@ -561,8 +561,6 @@ void jkbotti_ClientPutInServer( edict_t *pEntity )
       RETURN_META (MRES_IGNORED);
    }
    
-   ResetSound(pEntity);
-
    RETURN_META (MRES_IGNORED);
 }
 
@@ -629,8 +627,6 @@ void ClientDisconnect( edict_t *pEntity )
             break;
          }
       }
-      
-      ResetSound(pEntity);
    }
 
    RETURN_META (MRES_IGNORED);
@@ -691,7 +687,7 @@ void new_PM_PlaySound(int channel, const char *sample, float volume, float atten
          if(!FNullEnt(pPlayer))
          {
             int ivolume = (int)(1000*((volume+1)/2));
-            SaveSound(pPlayer, pPlayer->v.origin, ivolume, channel);
+            SaveSound(pPlayer, pPlayer->v.origin, ivolume, channel, 5.0f);
          }
       }
    }

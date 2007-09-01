@@ -24,27 +24,17 @@
 #include "bot_sound.h"
 #include "player.h"
 
-
 static CSoundEnt sSoundEnt;
 CSoundEnt *pSoundEnt = &sSoundEnt;
 
-
 //
-void SaveSound(edict_t * pEdict, const Vector & origin, int volume, int channel) 
+void SaveSound(edict_t * pEdict, const Vector & origin, int volume, int channel, float flDuration) 
 {
    // save player sounds to player list
    int idx = ENTINDEX(pEdict) - 1;
    if(idx >= 0 && idx < gpGlobals->maxClients)
    {
-      CSound * pSound = CSoundEnt::GetClientChannelSound( idx, channel );
-      
-      if(pSound)
-      {
-         pSound->m_vecOrigin = origin;
-         pSound->m_iVolume = volume;
-         pSound->m_flExpireTime = gpGlobals->time + 5.0;
-         pSound->m_iBotOwner = UTIL_GetBotIndex(pEdict);
-      }
+      CSoundEnt::InsertSound(pEdict, channel, origin, volume, flDuration, UTIL_GetBotIndex(pEdict));
       
       return;
    }
@@ -74,24 +64,7 @@ void SaveSound(edict_t * pEdict, const Vector & origin, int volume, int channel)
       }
    }
    
-   CSoundEnt::InsertSound(origin, volume, 5.0, bot_index);
-}
-
-// reset player sounds list and global sound list for player
-void ResetSound(edict_t * pEdict)
-{
-   int idx = ENTINDEX(pEdict) - 1;
-   if(idx < 0 || idx > gpGlobals->maxClients)
-      return;
-   
-   // reset global sound list for player
-   CSound * pSound = CSoundEnt::GetClientChannelSound( idx, 0 );
-   while(pSound)
-   {
-       CSoundEnt::FreeSound(pSound);
-       
-       pSound = CSoundEnt::GetClientChannelSound( idx, 0 );
-   }
+   CSoundEnt::InsertSound(pEdict, channel, origin, volume, flDuration, bot_index);
 }
 
 //=========================================================
@@ -104,7 +77,7 @@ void CSound :: Clear ( void )
    m_flExpireTime = 0;
    m_iNext = SOUNDLIST_EMPTY;
    m_iNextAudible = 0;
-   m_iClient = -1;
+   m_pEdict = NULL;
    m_iBotOwner = -1;
    m_iChannel = 0;
 }
@@ -139,7 +112,7 @@ void CSoundEnt :: Think ( void )
 {
    int iSound;
    int iPreviousSound;
-   float add_time = 0.1f;
+   float add_time = 1.0f/15.0f;
    
    m_nextthink = gpGlobals->time + add_time;// how often to check the sound list.
 
@@ -160,14 +133,15 @@ void CSoundEnt :: Think ( void )
       else
       {
          iPreviousSound = iSound;
-         
-         // reduce sound volume over time
-         m_SoundPool[ iSound ].m_iVolume = (int)(m_SoundPool[ iSound ].m_iVolume - 250 * add_time);
-         if(m_SoundPool[ iSound ].m_iVolume <= 0)
+                  
+         if(!FNullEnt(m_SoundPool[ iSound ].m_pEdict))
          {
-            m_SoundPool[ iSound ].m_iVolume = 0;
-            m_SoundPool[ iSound ].m_flExpireTime = gpGlobals->time;
+            // update origin of moving sound
+            if(FClassnameIs(m_SoundPool[ iSound ].m_pEdict, "rpg_rocket"))
+               m_SoundPool[ iSound ].m_vecOrigin = m_SoundPool[ iSound ].m_pEdict->v.origin;
          }
+         else
+            m_SoundPool[ iSound ].m_pEdict = NULL;
          
          iSound = m_SoundPool[ iSound ].m_iNext;
       }
@@ -191,7 +165,10 @@ void CSoundEnt :: Think ( void )
       
          if(pCurrentSound->m_iVolume > 0)
          {
-            UTIL_ParticleEffect ( pCurrentSound->m_vecOrigin, Vector(0, 0, 0), (m_SoundPool[ iSound ].m_iClient != -1)?150:250, 25 ); 
+            int idx = ENTINDEX(m_SoundPool[ iSound ].m_pEdict) - 1;
+            qboolean is_player = (idx >= 0 && idx < gpGlobals->maxClients);
+            
+            UTIL_ParticleEffect ( pCurrentSound->m_vecOrigin, Vector(0, 0, 0), (is_player)?150:250, 25 ); 
          }
       
          iSound = pCurrentSound->m_iNext;
@@ -264,7 +241,7 @@ int CSoundEnt :: IAllocSound( void )
 // InsertSound - Allocates a free sound and fills it with 
 // sound info.
 //=========================================================
-void CSoundEnt :: InsertSound ( const Vector &vecOrigin, int iVolume, float flDuration, int iBotOwner )
+void CSoundEnt :: InsertSound ( edict_t* pEdict, int channel, const Vector &vecOrigin, int iVolume, float flDuration, int iBotOwner )
 {
    int iThisSound;
 
@@ -273,24 +250,34 @@ void CSoundEnt :: InsertSound ( const Vector &vecOrigin, int iVolume, float flDu
       // no sound ent!
       return;
    }
-
-   iThisSound = pSoundEnt->IAllocSound();
-
-   if ( iThisSound == SOUNDLIST_EMPTY )
+   
+   CSound *pSound;
+   
+   if(pEdict)
    {
-      if(pSoundEnt->m_bDebug)
-         UTIL_ConsolePrintf( "Could not AllocSound() for InsertSound() (DLL)\n" );
-      return;
+      pSound = GetEdictChannelSound( pEdict, channel );
    }
+   else
+   {
+      iThisSound = pSoundEnt->IAllocSound();
 
-   CSound *pSound = CSoundEnt::SoundPointerForIndex( iThisSound );
+      if ( iThisSound == SOUNDLIST_EMPTY )
+      {
+         if(pSoundEnt->m_bDebug)
+            UTIL_ConsolePrintf( "Could not AllocSound() for InsertSound() (DLL)\n" );
+         return;
+      }
+
+      pSound = CSoundEnt::SoundPointerForIndex( iThisSound );
+   }
    
    if(pSound)
    {
       pSound->m_vecOrigin = vecOrigin;
       pSound->m_iVolume = iVolume;
       pSound->m_flExpireTime = gpGlobals->time + flDuration;
-      pSound->m_iClient = -1;
+      pSound->m_pEdict = pEdict;
+      pSound->m_iChannel = channel;
       pSound->m_iBotOwner = iBotOwner;
    }
    
@@ -331,13 +318,13 @@ void CSoundEnt::FreeSound(CSound *pSound)
 // GetClientChannelSound - Get existing active sound or
 // create new one.
 //=========================================================
-CSound *CSoundEnt::GetClientChannelSound( int iClient, int iChannel )
+CSound *CSoundEnt::GetEdictChannelSound( edict_t * pEdict, int iChannel )
 {
    int iSound = pSoundEnt->ActiveList(); 
 
    while ( iSound != SOUNDLIST_EMPTY )
    {
-      if(iClient == pSoundEnt->m_SoundPool[ iSound ].m_iClient)
+      if(pEdict == pSoundEnt->m_SoundPool[ iSound ].m_pEdict)
          if(iChannel == 0 || iChannel == pSoundEnt->m_SoundPool[ iSound ].m_iChannel)
             break;
       
@@ -354,7 +341,7 @@ CSound *CSoundEnt::GetClientChannelSound( int iClient, int iChannel )
       if ( iSound == SOUNDLIST_EMPTY )
       {
          if(pSoundEnt->m_bDebug)
-            UTIL_ConsolePrintf( "Could not AllocSound() for GetClientChannelSound() (DLL)\n" );
+            UTIL_ConsolePrintf( "Could not AllocSound() for GetEdictChannelSound() (DLL)\n" );
          return NULL;
       }
       
@@ -362,7 +349,7 @@ CSound *CSoundEnt::GetClientChannelSound( int iClient, int iChannel )
       
       if(pSound)
       {
-         pSoundEnt->m_SoundPool[ iSound ].m_iClient = iClient;
+         pSoundEnt->m_SoundPool[ iSound ].m_pEdict = pEdict;
          pSoundEnt->m_SoundPool[ iSound ].m_iChannel = iChannel;
       }
    }

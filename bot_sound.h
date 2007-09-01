@@ -23,14 +23,15 @@ public:
 	void	Clear ( void );
 	void	Reset ( void );
 
-	Vector	m_vecOrigin;	// sound's location in space
-	int	m_iVolume;	// how loud the sound is
-	int     m_iClient;
-	int     m_iChannel;
-	int     m_iBotOwner;
-	float	m_flExpireTime;	// when the sound should be purged from the list
-	int	m_iNext;	// index of next sound in this list ( Active or Free )
-	int	m_iNextAudible;	// temporary link that monsters use to build a list of audible sounds
+	Vector	  m_vecOrigin;		// sound's location in space
+	int	  m_iVolume;		// how loud the sound is
+	edict_t * m_pEdict;
+	int       m_iChannel;
+	int       m_iBotOwner;
+
+	float	  m_flExpireTime;	// when the sound should be purged from the list
+	int	  m_iNext;		// index of next sound in this list ( Active or Free )
+	int	  m_iNextAudible;	// temporary link that monsters use to build a list of audible sounds
 };
 
 //=========================================================
@@ -45,13 +46,13 @@ public:
 	void 		Think( void );
 	void 		Initialize ( void );
 	
-	static void	InsertSound ( const Vector &vecOrigin, int iVolume, float flDuration, int iBotOwner );
+	static void	InsertSound ( edict_t * pEdict, int channel, const Vector &vecOrigin, int iVolume, float flDuration, int iBotOwner );
 	static void	FreeSound ( int iSound, int iPrevious );
 	static int	ActiveList( void );// return the head of the active list
 	static int	FreeList( void );// return the head of the free list
 	static CSound*	SoundPointerForIndex( int iIndex );// return a pointer for this index in the sound list
 	static int	ClientSoundIndex ( edict_t *pClient );
-	static CSound*  GetClientChannelSound( int iClient, int iChannel );
+	static CSound*  GetEdictChannelSound( edict_t *pEdict, int iChannel );
 	static void     FreeSound( CSound* pSound );
 
 	BOOL		IsEmpty( void ) { return m_iActiveSound == SOUNDLIST_EMPTY; }
@@ -72,7 +73,6 @@ private:
 
 extern CSoundEnt *pSoundEnt;
 
-extern void SaveSound(edict_t * pEdict, const Vector & origin, int volume, int channel);
-extern void ResetSound(edict_t * pEdict);
+extern void SaveSound(edict_t * pEdict, const Vector & origin, int volume, int channel, float flDuration);
 
 #endif
