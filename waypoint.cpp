@@ -853,7 +853,14 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags,
    // find the nearest waypoint with the matching flags...
 
    min_index = -1;
-   min_distance = 99999;
+   
+   if(pv_src != NULL)
+   {
+      JKASSERT(src != -1);
+      min_distance = 99999;
+   }
+   else
+      min_distance = WAYPOINT_UNREACHABLE;
 
    for (index=0; index < num_waypoints; index++)
    {
@@ -892,10 +899,7 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags,
       }
 
       if (pv_src != NULL)
-      {
-         JKASSERT(src != -1);
          distance = (waypoints[index].origin - *pv_src).Length();
-      }
       else
          distance = WaypointDistanceFromTo(src, index);
       
