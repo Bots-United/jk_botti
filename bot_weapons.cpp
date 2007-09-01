@@ -550,12 +550,47 @@ ammo_low_t BotSecondaryAmmoLow(bot_t &pBot, const bot_weapon_select_t &select)
    return(AMMO_OK);
 }
 
+//
+qboolean BotGetGoodWeaponCount(bot_t &pBot, const int stop_count)
+{
+   bot_weapon_select_t * pSelect = &weapon_select[0];
+   int select_index;
+   int good_count = 0;
+   
+   // loop through all the weapons until terminator is found...
+   select_index = -1;
+   while (pSelect[++select_index].iId) 
+   {
+      if(!BotIsCarryingWeapon(pBot, pSelect[select_index].iId))
+         continue;
+      
+      if(!IsValidWeaponChoose(pBot, pSelect[select_index]))
+         continue;
+      
+      if(pSelect[select_index].avoid_this_gun || pSelect[select_index].type != WEAPON_FIRE)
+         continue;
+      
+      // don't do distance check, check if enough ammo
+      if(!IsValidSecondaryAttack(pBot, pSelect[select_index], 0.0, 0.0, TRUE) &&
+         !IsValidPrimaryAttack(pBot, pSelect[select_index], 0.0, 0.0, TRUE))
+         continue;
+      
+      // not bad gun
+      if(++good_count == stop_count)
+         return(good_count);
+   }
+   
+   return(good_count);
+}
+
 // 
-int BotGetLowAmmoFlags(bot_t &pBot, const qboolean OnlyCarrying)
+int BotGetLowAmmoFlags(bot_t &pBot, int *weapon_flags, const qboolean OnlyCarrying)
 {
    bot_weapon_select_t * pSelect = &weapon_select[0];
    int select_index;
    int ammoflags = 0;
+   if(weapon_flags)
+      *weapon_flags = 0;
    
    // loop through all the weapons until terminator is found...
    select_index = -1;
@@ -572,8 +607,8 @@ int BotGetLowAmmoFlags(bot_t &pBot, const qboolean OnlyCarrying)
       {
          ammoflags |= pSelect[select_index].ammo1_waypoint_flag;
          
-         if(pSelect[select_index].ammo1_on_repickup)
-            ammoflags |= pSelect[select_index].waypoint_flag;
+         if(pSelect[select_index].ammo1_on_repickup && weapon_flags)
+            *weapon_flags |= pSelect[select_index].waypoint_flag;
       }
       
       // low secondary ammo?
@@ -581,8 +616,8 @@ int BotGetLowAmmoFlags(bot_t &pBot, const qboolean OnlyCarrying)
       {
          ammoflags |= pSelect[select_index].ammo2_waypoint_flag;
          
-         if(pSelect[select_index].ammo2_on_repickup)
-            ammoflags |= pSelect[select_index].waypoint_flag;
+         if(pSelect[select_index].ammo2_on_repickup && weapon_flags)
+            *weapon_flags |= pSelect[select_index].waypoint_flag;
       }
    }
    

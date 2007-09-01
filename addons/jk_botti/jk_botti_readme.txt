@@ -63,12 +63,15 @@ CPU intensive operation this can only be done on map change.
 --------------------
 1.40:
  * Add support for Opposing Force Deathmatch.
- * Bugfixes to goal selection and weapon selection.
+ * Tuned skill 1 bot to be more leet, skill 2 is now about same as old skill 1.
+ * Bugfixes to goal selection and weapon selection, results huge improvement
+   how bot work on when not given good weapons on spawn (which is typical on
+   Severian's MOD). 
  * Bot now understands that it can get more ammo by picking up same weapon 
    again.
  * Bot avoids combat if it doesn't have good weapon or doesn't have enough
    health.
- * Changed optimization flags from '-O3' to '-O2'.
+ * Changed optimization flags from '-O3 -funroll-loops' to '-O2'.
  * Output warning message when model given for bot creation is replaced by 
    team-balance code.
  * Changed to only check existance of player model file on listenserver 

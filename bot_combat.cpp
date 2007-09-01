@@ -775,7 +775,8 @@ qboolean BotFindSoundEnemy( bot_t &pBot )
    {
       pCurrentSound = CSoundEnt::SoundPointerForIndex( iSound );
       if ( pCurrentSound &&
-         ( pCurrentSound->m_vecOrigin - pEdict->v.origin ).Length() <= pCurrentSound->m_iVolume * hearingSensitivity )
+         ( pCurrentSound->m_vecOrigin - pEdict->v.origin ).Length() <= pCurrentSound->m_iVolume * hearingSensitivity &&
+         !FVisible(pCurrentSound->m_vecOrigin, pEdict, (edict_t**)NULL) )
       {
          // can hear this sound, find enemy nearest sound
          edict_t * pMonsterOrPlayer = FindEnemyNearestToPoint(pCurrentSound->m_vecOrigin, 100*skill_settings[pBot.bot_skill].hearing_sensitivity, pEdict);

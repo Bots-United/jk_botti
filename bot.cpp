@@ -141,6 +141,7 @@ void BotSpawnInit( bot_t &pBot )
    pBot.b_in_water = 0;
    pBot.b_ducking = 0;
    pBot.b_has_enough_ammo_for_good_weapon = 0;
+   pBot.b_low_health = 0;
    
    pBot.f_last_time_attacked = 0;
    
@@ -2063,6 +2064,8 @@ void BotThink( bot_t &pBot )
    pBot.b_on_ladder = pEdict->v.movetype == MOVETYPE_FLY;
    pBot.b_in_water = pEdict->v.waterlevel == 2 || pEdict->v.waterlevel == 3;
    pBot.b_ducking = (pEdict->v.flags & FL_DUCKING) == FL_DUCKING;
+   
+   pBot.b_low_health = BotLowHealth(pBot);
 
    // does bot need to say a message and time to say a message?
    if ((pBot.b_bot_say) && (pBot.f_bot_say < gpGlobals->time))
@@ -2176,7 +2179,7 @@ void BotThink( bot_t &pBot )
    // Only need to check ammo, since ammo check for weapons includes weapons ;)
    pBot.b_has_enough_ammo_for_good_weapon = !BotAllWeaponsRunningOutOfAmmo(pBot, TRUE);
    
-   if((pBot.b_has_enough_ammo_for_good_weapon && !BotLowHealth(pBot)) || pBot.f_last_time_attacked < gpGlobals->time + 3.0f)
+   if((pBot.b_has_enough_ammo_for_good_weapon && !pBot.b_low_health) || pBot.f_last_time_attacked < gpGlobals->time + 3.0f)
    {
       // get enemy
       pBot.pBotEnemy = (b_botdontshoot == 0) ? BotFindEnemy( pBot ) : NULL; // clear enemy pointer (no ememy for you!)
@@ -2212,7 +2215,7 @@ void BotThink( bot_t &pBot )
    // does have an enemy?
    if (pBot.pBotEnemy != NULL)
    {
-      if(BotWeaponCanAttack(pBot, FALSE) && (!BotLowHealth(pBot) || pBot.f_last_time_attacked < gpGlobals->time + 3.0f))
+      if(BotWeaponCanAttack(pBot, FALSE) && (!pBot.b_low_health || pBot.f_last_time_attacked < gpGlobals->time + 3.0f))
       {
          BotShootAtEnemy( pBot );  // shoot at the enemy
          DidShootAtEnemy = (pBot.pBotEnemy != NULL);

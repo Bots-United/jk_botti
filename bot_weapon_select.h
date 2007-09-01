@@ -154,9 +154,10 @@ extern void BotSelectAttack(bot_t &pBot, const bot_weapon_select_t &select, qboo
 extern qboolean IsValidWeaponChoose(bot_t &pBot, const bot_weapon_select_t &select);
 extern qboolean IsValidPrimaryAttack(bot_t &pBot, const bot_weapon_select_t &select, const float distance, const float height, const qboolean always_in_range);
 extern qboolean IsValidSecondaryAttack(bot_t &pBot, const bot_weapon_select_t &select, const float distance, const float height, const qboolean always_in_range);
-extern int BotGetLowAmmoFlags(bot_t &pBot, const qboolean OnlyCarrying);
+extern int BotGetLowAmmoFlags(bot_t &pBot, int *weapon_flags, const qboolean OnlyCarrying);
 extern int BotGetBetterWeaponChoice(bot_t &pBot, const bot_weapon_select_t &current, const bot_weapon_select_t *pSelect, const float distance, const float height, qboolean *use_primary, qboolean *use_secondary);
 extern qboolean BotAllWeaponsRunningOutOfAmmo(bot_t &pBot, const qboolean GoodWeaponsOnly);
 extern qboolean IsValidToFireAtTheMoment(bot_t &pBot, const bot_weapon_select_t &select);
 extern qboolean BotWeaponCanAttack(bot_t &pBot, const qboolean GoodWeaponsOnly);
 extern qboolean BotIsCarryingWeapon(bot_t &pBot, const bot_weapon_select_t &select);
+extern qboolean BotGetGoodWeaponCount(bot_t &pBot, const int stop_count);

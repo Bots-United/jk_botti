@@ -140,13 +140,13 @@ void WaypointDebug(void)
 }
 
 
-int GetReachableFlags(int i1, int i2)
+inline int GetReachableFlags(int i1, int i2)
 {
    return((waypoints[i1].flags | waypoints[i2].flags) & (W_FL_LADDER | W_FL_CROUCH));
 }
 
 
-int GetReachableFlags(edict_t * pEntity, int i1)
+inline int GetReachableFlags(edict_t * pEntity, int i1)
 {
    int flags = waypoints[i1].flags & (W_FL_LADDER | W_FL_CROUCH);
    
@@ -163,7 +163,7 @@ int GetReachableFlags(edict_t * pEntity, int i1)
 }
 
 
-int GetReachableFlags(int i1, edict_t * pEntity)
+inline int GetReachableFlags(int i1, edict_t * pEntity)
 {
    return(GetReachableFlags(pEntity, i1));
 }
@@ -437,7 +437,7 @@ void WaypointMakePathsWith(int index)
       if (i == index)
          continue;  // skip the waypoint that was just added
 
-      if (waypoints[i].flags & W_FL_DELETED || waypoints[i].flags & W_FL_AIMING)
+      if (waypoints[i].flags & (W_FL_DELETED | W_FL_AIMING))
          continue;  // skip any aiming waypoints
  
       // don't allow paths TO lift-end
@@ -599,7 +599,7 @@ void WaypointAddSpawnObjects(void)
       
       // Check if there is waypoint near already
       for(j = 0; j < num_waypoints; j++) {
-         if (!(waypoints[j].flags & W_FL_DELETED || waypoints[j].flags & W_FL_AIMING)) 
+         if (!(waypoints[j].flags & (W_FL_DELETED | W_FL_AIMING))) 
          {
             if((waypoints[j].origin - spawnpoints[i].origin).Length() < 50.0) 
             {
@@ -796,7 +796,7 @@ void WaypointAddLift(edict_t * pent, const Vector &start, const Vector &end)
 
 
 // find the nearest waypoint to the source postition and return the index
-int WaypointFindNearest(const Vector &v_origin, const Vector &v_offset, edict_t *pEntity, float range)
+int WaypointFindNearest(const Vector &v_origin, const Vector &v_offset, edict_t *pEntity, float range, qboolean b_traceline)
 {
    int index, min_index;
    float distance;
@@ -824,7 +824,10 @@ int WaypointFindNearest(const Vector &v_origin, const Vector &v_offset, edict_t 
       if ((distance < min_distance) && (distance < range))
       {
          // if waypoint is visible from source position...
-         UTIL_TraceMove( v_origin + v_offset, waypoints[index].origin, ignore_monsters, pEntity->v.pContainingEntity, &tr );
+         if(b_traceline)
+            UTIL_TraceLine( v_origin + v_offset, waypoints[index].origin, ignore_monsters, pEntity->v.pContainingEntity, &tr );
+         else
+            UTIL_TraceMove( v_origin + v_offset, waypoints[index].origin, ignore_monsters, pEntity->v.pContainingEntity, &tr );
 
          if (tr.flFraction >= 1.0f)
          {
@@ -857,16 +860,13 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags,
       if (index == src)
          continue;  // skip the source waypoint
 
-      if (waypoints[index].flags & W_FL_DELETED)
-         continue;  // skip any deleted waypoints
+      if (waypoints[index].flags & (W_FL_DELETED | W_FL_AIMING))
+         continue;  // skip any deleted && aiming waypoints
 
-      if (waypoints[index].flags & W_FL_AIMING)
-         continue;  // skip any aiming waypoints
-
-      if ((waypoints[index].flags & flags) != flags)
+      if (flags && !(waypoints[index].flags & flags))
          continue;  // skip this waypoint if the flags don't match
 
-      if ((waypoints[index].itemflags & itemflags) != itemflags)
+      if (itemflags && !(waypoints[index].itemflags & itemflags))
       	 continue;  // skip this weapoint if no match for itemflags
       
       if (exclude != NULL)
@@ -883,10 +883,7 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags,
          if (index == exclude[exclude_index])
             continue;  // skip any index that matches exclude list
       }
-      
-      if (pv_src != NULL && (waypoints[index].origin - *pv_src).Length() > range)
-         continue;
-      
+
       if (waypoints[index].flags & (W_FL_LONGJUMP | W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
       {
          edict_t *wpt_item = WaypointFindItem(index);
@@ -894,7 +891,16 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags,
             continue;
       }
 
-      distance = WaypointDistanceFromTo(src, index);
+      if (pv_src != NULL)
+      {
+         JKASSERT(src != -1);
+         distance = (waypoints[index].origin - *pv_src).Length();
+      }
+      else
+         distance = WaypointDistanceFromTo(src, index);
+      
+      if (range > 0.0f && distance >= range)
+         continue;
 
       if (distance < min_distance)
       {
@@ -908,30 +914,27 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags,
 
 
 //
-int WaypointFindRandomGoal(edict_t *pEntity, int flags, int itemflags, int exclude[])
+int WaypointFindRandomGoal(int *out_indexes, int max_indexes, edict_t *pEntity, int flags, int itemflags, int exclude[])
 {
    int index;
    int * indexes;
    int count = 0;
 
-   if (num_waypoints < 1)
-      return -1;
+   if (num_waypoints < 1 || max_indexes <= 0 || out_indexes == NULL)
+      return 0;
 
    indexes = (int*)alloca(sizeof(int)*num_waypoints);
 
    // find all the waypoints with the matching flags...
    for (index=0; index < num_waypoints; index++)
    {
-      if (waypoints[index].flags & W_FL_DELETED)
-         continue;  // skip any deleted waypoints
+      if (waypoints[index].flags & (W_FL_DELETED | W_FL_AIMING))
+         continue;  // skip any deleted&aiming waypoints
 
-      if (waypoints[index].flags & W_FL_AIMING)
-         continue;  // skip any aiming waypoints
-
-      if ((waypoints[index].flags & flags) != flags)
+      if (flags && !(waypoints[index].flags & flags))
          continue;  // skip this waypoint if the flags don't match
 
-      if ((waypoints[index].itemflags & itemflags) != itemflags)
+      if (itemflags && !(waypoints[index].itemflags & itemflags))
       	 continue;  // skip this weapoint if no match for itemflags
       
       if (exclude != NULL)
@@ -965,11 +968,24 @@ int WaypointFindRandomGoal(edict_t *pEntity, int flags, int itemflags, int exclu
    }
 
    if (count == 0)  // no matching waypoints found
-      return -1;
+      return 0;
 
-   index = RANDOM_LONG2(0, count - 1);
+   if (count <= max_indexes)
+   {
+      // simplest case, we just enough or less indexes to give
+      for(int i = 0; i < count; i++)
+         out_indexes[i] = indexes[i];
+      
+      return(count);
+   }
 
-   return indexes[index];
+   // we have extra.. take randomly
+   int out_count = 0;
+   
+   for(int i = 0; i < max_indexes; i++)
+      out_indexes[out_count] = indexes[RANDOM_LONG2(0, count - 1)];
+
+   return max_indexes;
 }
 
 
@@ -1404,8 +1420,7 @@ void WaypointDelete(edict_t *pEntity)
 
    //..
 
-   if ((waypoints[index].flags & W_FL_SNIPER) ||
-       (waypoints[index].flags & W_FL_JUMP))
+   if (waypoints[index].flags & W_FL_SNIPER || waypoints[index].flags & W_FL_JUMP)
    {
       int i;
       int min_index = -1;
@@ -1720,7 +1735,7 @@ qboolean WaypointFixOldWaypoints(void)
    //Remove invalid paths
    for(k = 0; k < num_waypoints; k++)
    {
-      if(waypoints[k].flags & W_FL_AIMING || waypoints[k].flags & W_FL_DELETED)
+      if(waypoints[k].flags & (W_FL_AIMING | W_FL_DELETED))
          continue;
       
       PATH *p = paths[k];
@@ -2293,11 +2308,8 @@ int WaypointFindReachable(edict_t *pEntity, float range)
 
    for (i=0; i < num_waypoints; i++)
    {
-      if (waypoints[i].flags & W_FL_DELETED)
-         continue;  // skip any deleted waypoints
-
-      if (waypoints[i].flags & W_FL_AIMING)
-         continue;  // skip any aiming waypoints
+      if (waypoints[i].flags & (W_FL_DELETED | W_FL_AIMING))
+         continue;  // skip any deleted & aiming waypoints
 
       distance = (waypoints[i].origin - pEntity->v.origin).Length();
 
@@ -2413,13 +2425,7 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
       // check that no other reachable waypoints are nearby...
       for (i=0; i < num_waypoints; i++)
       {
-         if (waypoints[i].flags & W_FL_DELETED)
-            continue;
-
-         if (waypoints[i].flags & W_FL_AIMING)
-            continue;
-         
-         if (waypoints[i].flags & W_FL_LIFT_END)
+         if (waypoints[i].flags & (W_FL_DELETED|W_FL_AIMING|W_FL_LIFT_END))
             continue;
 
          if (!WaypointReachable(pEntity->v.origin, waypoints[i].origin, GetReachableFlags(pEntity, i)))
@@ -2452,13 +2458,7 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
          // and are reachable to this location. Other end is waypoint with one or none path.
          for (i=0; i < num_waypoints; i++)
          {
-            if (waypoints[i].flags & W_FL_DELETED)
-               continue;
-
-            if (waypoints[i].flags & W_FL_AIMING)
-               continue;
-
-            if (waypoints[i].flags & W_FL_LIFT_END)
+            if (waypoints[i].flags & (W_FL_DELETED|W_FL_AIMING|W_FL_LIFT_END))
                continue;
 
             // distance between isn't too much
@@ -2487,13 +2487,7 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
          // check waypoints around this area, then add waypoint if route between waypoints is more than 1000.0 units
          for (i=0; i < num_waypoints; i++)
          {
-            if (waypoints[i].flags & W_FL_DELETED)
-               continue;
-
-            if (waypoints[i].flags & W_FL_AIMING)
-               continue;
-
-            if (waypoints[i].flags & W_FL_LIFT_END)
+            if (waypoints[i].flags & (W_FL_DELETED|W_FL_AIMING|W_FL_LIFT_END))
                continue;
 
             if((waypoints[i].origin - pEntity->v.origin).Length() < 64.0f)
@@ -2507,13 +2501,7 @@ void WaypointAutowaypointing(int idx, edict_t *pEntity)
             // distance between isn't too much
             for (int k=0; k < num_waypoints; k++)
             {
-               if (waypoints[k].flags & W_FL_DELETED)
-                  continue;
-
-               if (waypoints[k].flags & W_FL_AIMING)
-                  continue;
-            
-               if (waypoints[k].flags & W_FL_LIFT_END)
+               if (waypoints[k].flags & (W_FL_DELETED|W_FL_AIMING|W_FL_LIFT_END))
                   continue;
                
                if((waypoints[k].origin - pEntity->v.origin).Length() < 64.0f)
@@ -2570,7 +2558,7 @@ void WaypointThink(edict_t *pEntity)
    {
       for (i=0; i < num_waypoints; i++)
       {
-         if ((waypoints[i].flags & W_FL_DELETED) == W_FL_DELETED || waypoints[i].flags & W_FL_AIMING )
+         if (waypoints[i].flags & (W_FL_DELETED|W_FL_AIMING))
             continue;
 
          distance = (waypoints[i].origin - pEntity->v.origin).Length();
@@ -3182,11 +3170,8 @@ int WaypointFindRunawayPath(int runner, int enemy)
 
    for (index=0; index < num_waypoints; index++)
    {
-      if (waypoints[index].flags & W_FL_DELETED)
-         continue;  // skip any deleted waypoints
-
-      if (waypoints[index].flags & W_FL_AIMING)
-         continue;  // skip any aiming waypoints
+      if (waypoints[index].flags & (W_FL_DELETED|W_FL_AIMING))
+         continue;  // skip any deleted&aiming waypoints
 
       runner_distance = WaypointDistanceFromTo(runner, index);
       enemy_distance = WaypointDistanceFromTo(runner, index);
