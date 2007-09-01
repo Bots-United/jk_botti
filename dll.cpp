@@ -102,6 +102,9 @@ qboolean spawn_time_reset = FALSE;
 float waypoint_time = 0.0;
 player_t players[32];
 
+static void (*old_PM_PlaySound)(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch) = NULL;
+static struct playermove_s *old_ppmove = NULL;
+
 unsigned int rnd_idnum[2] = {1, 1};
 cvar_t jk_botti_version = { "jk_botti_version", "", FCVAR_EXTDLL|FCVAR_SERVER, 0, NULL};
 
@@ -255,6 +258,10 @@ C_DLLEXPORT int Meta_Detach (PLUG_LOADTIME now, PL_UNLOAD_REASON reason)
       free_posdata_list(i);
    UTIL_FreeFuncBreakables();
    FreeCfgBotRecord();
+   
+   // remove pm_move hook
+   if(old_ppmove)
+      old_ppmove->PM_PlaySound = old_PM_PlaySound;
    
    // try remove hook
    if(!unhook_sendto_function())
@@ -660,9 +667,6 @@ void PlayerPostThink_Post( edict_t *pEdict )
       
    //Gather player positions for ping prediction
    GatherPlayerData(pEdict);
-      
-   //Sound update
-   UpdatePlayerSound(pEdict);
    
    //Store check IsAlive
    SaveAliveStatus(pEdict);
@@ -670,8 +674,6 @@ void PlayerPostThink_Post( edict_t *pEdict )
    RETURN_META (MRES_HANDLED);
 }
 
-
-static void (*old_PM_PlaySound)(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch);
 
 void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch) 
 {
@@ -686,10 +688,10 @@ void new_PM_PlaySound(int channel, const char *sample, float volume, float atten
       {
          pPlayer = INDEXENT(idx+1);
    
-         if(pPlayer && !pPlayer->free)
+         if(!FNullEnt(pPlayer))
          {
-            int ivolume = (int)(1000*volume);
-            SaveSound(pPlayer, pPlayer->v.origin, ivolume, CHAN_BODY);
+            int ivolume = (int)(1000*((volume+1)/2));
+            SaveSound(pPlayer, pPlayer->v.origin, ivolume, channel);
          }
       }
    }
@@ -710,6 +712,7 @@ void PM_Move(struct playermove_s *ppmove, qboolean server)
       {
          old_PM_PlaySound = ppmove->PM_PlaySound;
          ppmove->PM_PlaySound = &new_PM_PlaySound;
+         old_ppmove = ppmove;
       }
    }
    

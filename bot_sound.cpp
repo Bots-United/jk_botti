@@ -36,142 +36,63 @@ void SaveSound(edict_t * pEdict, const Vector & origin, int volume, int channel)
    int idx = ENTINDEX(pEdict) - 1;
    if(idx >= 0 && idx < gpGlobals->maxClients)
    {
-      if(channel == CHAN_WEAPON)
+      CSound * pSound = CSoundEnt::GetClientChannelSound( idx, channel );
+      
+      if(pSound)
       {
-         if(players[idx].weapon_volume < volume)
-            players[idx].weapon_volume = volume;
-      }
-      else
-      {
-         if(players[idx].body_volume < volume)
-            players[idx].body_volume = volume;
+         pSound->m_vecOrigin = origin;
+         pSound->m_iVolume = volume;
+         pSound->m_flExpireTime = gpGlobals->time + 5.0;
+         pSound->m_iBotOwner = UTIL_GetBotIndex(pEdict);
       }
       
       return;
    }
       
-   CSoundEnt::InsertSound(bits_SOUND_COMBAT, origin, volume, 5.0);
+   float min_distance = 50.0;
+   int bot_index = -1;
+   
+   // check if bot is close to sound and mark as owner if it is
+   for (int i = 0; i < 32; i++)
+   {
+      if(bots[i].is_used)
+      {
+         // is owner of object?
+         if(pEdict->v.owner == bots[i].pEdict)
+         {
+            bot_index = i;
+            break;
+         }
+         
+         float distance = (bots[i].pEdict->v.origin - origin).Length();
+         
+         if(distance < min_distance)
+         {
+            min_distance = distance;
+            bot_index = i;
+         }
+      }
+   }
+   
+   CSoundEnt::InsertSound(origin, volume, 5.0, bot_index);
 }
 
 // reset player sounds list and global sound list for player
 void ResetSound(edict_t * pEdict)
 {
-   // reset player sounds list
    int idx = ENTINDEX(pEdict) - 1;
-   if(idx >= 0 && idx < gpGlobals->maxClients)
-   {
-      players[idx].body_volume = 0;
-      players[idx].weapon_volume = 0;
-      players[idx].target_volume = 0;
-   }
-   else
+   if(idx < 0 || idx > gpGlobals->maxClients)
       return;
    
    // reset global sound list for player
-   CSound * pSound = CSoundEnt::SoundPointerForIndex( idx );
-   if(pSound)
+   CSound * pSound = CSoundEnt::GetClientChannelSound( idx, 0 );
+   while(pSound)
    {
-       pSound->m_vecOrigin = Vector(0, 0, 0);
-       pSound->m_iType = 0;
-       pSound->m_iVolume = 0;
+       CSoundEnt::FreeSound(pSound);
+       
+       pSound = CSoundEnt::GetClientChannelSound( idx, 0 );
    }
 }
-
-// update player sounds
-void UpdatePlayerSound(edict_t * pEdict)
-{
-   int iBodyVolume;
-   int iVolume;
-   CSound *pSound;
-   
-   int idx = ENTINDEX(pEdict) - 1;
-   if(idx < 0 || idx >= gpGlobals->maxClients)
-   {
-      return;
-   }
-
-   pSound = CSoundEnt::SoundPointerForIndex( idx );
-
-   if ( !pSound )
-   {
-      if(pSoundEnt && pSoundEnt->m_bDebug)
-         UTIL_ConsolePrintf ( "Client lost reserved sound!\n" );
-      return;
-   }
-
-   pSound->m_iType = bits_SOUND_NONE;
-
-
-   // now calculate the best target volume for the sound. If the player's weapon
-   // is louder than his body/movement, use the weapon volume, else, use the body volume.
-   iBodyVolume = players[idx].body_volume;
-   
-   // decay body volume over time 
-   players[idx].body_volume = (int)(players[idx].body_volume - 250 * gpGlobals->frametime);
-   if ( players[idx].body_volume < 0 )
-   {
-      players[idx].body_volume = 0;
-   }
-
-   // convert player move speed and actions into sound audible by monsters.
-   if ( players[idx].weapon_volume  > iBodyVolume )
-   {
-      players[idx].target_volume = players[idx].weapon_volume;
-
-      // OR in the bits for COMBAT sound if the weapon is being louder than the player. 
-      pSound->m_iType |= bits_SOUND_COMBAT;
-   }
-   else
-   {
-      players[idx].target_volume = iBodyVolume;
-   }
-
-   // decay weapon volume over time so bits_SOUND_COMBAT stays set for a while
-   players[idx].weapon_volume = (int)(players[idx].weapon_volume - 250 * gpGlobals->frametime);
-   if ( players[idx].weapon_volume < 0 )
-   {
-      players[idx].weapon_volume = 0;
-   }
-
-
-   // if target volume is greater than the player sound's current volume, we paste the new volume in 
-   // immediately. If target is less than the current volume, current volume is not set immediately to the
-   // lower volume, rather works itself towards target volume over time. This gives monsters a much better chance
-   // to hear a sound, especially if they don't listen every frame.
-   iVolume = pSound->m_iVolume;
-
-   if ( players[idx].target_volume > iVolume )
-   {
-      iVolume = players[idx].target_volume;
-   }
-   else if ( iVolume > players[idx].target_volume )
-   {
-      iVolume = (int)(iVolume - 250 * gpGlobals->frametime);
-
-      if ( iVolume < players[idx].target_volume )
-      {
-         iVolume = players[idx].target_volume;
-      }
-   }
-
-   pSound->m_vecOrigin = pEdict->v.origin;
-   pSound->m_iType |= bits_SOUND_PLAYER;
-   pSound->m_iVolume = iVolume;
-
-   if(pSoundEnt && pSoundEnt->m_bDebug == 2)
-   {
-      Vector v_forward = UTIL_AnglesToForward ( pEdict->v.angles );
-      v_forward.z = 0;
-      
-      //Below are a couple of useful little bits that make it easier to determine just how much noise the 
-      // player is making. 
-      UTIL_ParticleEffect ( pEdict->v.origin + v_forward * iVolume, Vector(0, 0, 0), 255, 25 ); 
-      UTIL_ParticleEffect ( pEdict->v.origin, Vector(0, 0, 0), 150, 25 ); 
-      
-      ALERT ( at_console, "%d/%d\n", iVolume, players[idx].target_volume );
-   }
-}
-
 
 //=========================================================
 // CSound - Clear - zeros all fields for a sound
@@ -179,11 +100,13 @@ void UpdatePlayerSound(edict_t * pEdict)
 void CSound :: Clear ( void )
 {
    m_vecOrigin = Vector(0, 0, 0);
-   m_iType = 0;
    m_iVolume = 0;
    m_flExpireTime = 0;
    m_iNext = SOUNDLIST_EMPTY;
    m_iNextAudible = 0;
+   m_iClient = -1;
+   m_iBotOwner = -1;
+   m_iChannel = 0;
 }
 
 //=========================================================
@@ -193,35 +116,8 @@ void CSound :: Clear ( void )
 void CSound :: Reset ( void )
 {
    m_vecOrigin = Vector(0, 0, 0);
-   m_iType = 0;
    m_iVolume = 0;
    m_iNext = SOUNDLIST_EMPTY;
-}
-
-//=========================================================
-// FIsSound - returns TRUE if the sound is an Audible sound
-//=========================================================
-BOOL CSound :: FIsSound ( void )
-{
-   if ( m_iType & ( bits_SOUND_COMBAT | bits_SOUND_WORLD | bits_SOUND_PLAYER | bits_SOUND_DANGER ) )
-   {
-      return TRUE;
-   }
-
-   return FALSE;
-}
-
-//=========================================================
-// FIsScent - returns TRUE if the sound is actually a scent
-//=========================================================
-BOOL CSound :: FIsScent ( void )
-{
-   if ( m_iType & ( bits_SOUND_CARCASS | bits_SOUND_MEAT | bits_SOUND_GARBAGE ) )
-   {
-      return TRUE;
-   }
-
-   return FALSE;
 }
 
 //=========================================================
@@ -243,7 +139,7 @@ void CSoundEnt :: Think ( void )
 {
    int iSound;
    int iPreviousSound;
-   float add_time = 0.3 * RANDOM_FLOAT2(0.99, 1.01);
+   float add_time = 0.1f;
    
    m_nextthink = gpGlobals->time + add_time;// how often to check the sound list.
 
@@ -252,7 +148,7 @@ void CSoundEnt :: Think ( void )
 
    while ( iSound != SOUNDLIST_EMPTY )
    {
-      if ( m_SoundPool[ iSound ].m_flExpireTime <= gpGlobals->time && m_SoundPool[ iSound ].m_flExpireTime != SOUND_NEVER_EXPIRE )
+      if ( m_SoundPool[ iSound ].m_flExpireTime <= gpGlobals->time )
       {
          int iNext = m_SoundPool[ iSound ].m_iNext;
 
@@ -265,15 +161,12 @@ void CSoundEnt :: Think ( void )
       {
          iPreviousSound = iSound;
          
-         if(m_SoundPool[ iSound ].m_flExpireTime != SOUND_NEVER_EXPIRE)
+         // reduce sound volume over time
+         m_SoundPool[ iSound ].m_iVolume = (int)(m_SoundPool[ iSound ].m_iVolume - 250 * add_time);
+         if(m_SoundPool[ iSound ].m_iVolume <= 0)
          {
-            // reduce sound volume over time
-            m_SoundPool[ iSound ].m_iVolume = (int)(m_SoundPool[ iSound ].m_iVolume - 250 * add_time);
-            if(m_SoundPool[ iSound ].m_iVolume <= 0)
-            {
-               m_SoundPool[ iSound ].m_iVolume = 0;
-               m_SoundPool[ iSound ].m_flExpireTime = gpGlobals->time;
-            }
+            m_SoundPool[ iSound ].m_iVolume = 0;
+            m_SoundPool[ iSound ].m_flExpireTime = gpGlobals->time;
          }
          
          iSound = m_SoundPool[ iSound ].m_iNext;
@@ -297,18 +190,13 @@ void CSoundEnt :: Think ( void )
          pCurrentSound = CSoundEnt::SoundPointerForIndex( iSound );
       
          if(pCurrentSound->m_iVolume > 0)
-            UTIL_ParticleEffect ( pCurrentSound->m_vecOrigin, Vector(0, 0, 0), (m_SoundPool[ iSound ].m_flExpireTime != SOUND_NEVER_EXPIRE)?150:250, 25 ); 
+         {
+            UTIL_ParticleEffect ( pCurrentSound->m_vecOrigin, Vector(0, 0, 0), (m_SoundPool[ iSound ].m_iClient != -1)?150:250, 25 ); 
+         }
       
          iSound = pCurrentSound->m_iNext;
       }
    }
-}
-
-//=========================================================
-// Precache - dummy function
-//=========================================================
-void CSoundEnt :: Precache ( void )
-{
 }
 
 //=========================================================
@@ -349,7 +237,7 @@ void CSoundEnt :: FreeSound ( int iSound, int iPrevious )
 int CSoundEnt :: IAllocSound( void )
 {
    int iNewSound;
-
+   
    if ( m_iFreeSound == SOUNDLIST_EMPTY )
    {
       // no free sound!
@@ -376,7 +264,7 @@ int CSoundEnt :: IAllocSound( void )
 // InsertSound - Allocates a free sound and fills it with 
 // sound info.
 //=========================================================
-void CSoundEnt :: InsertSound ( int iType, const Vector &vecOrigin, int iVolume, float flDuration )
+void CSoundEnt :: InsertSound ( const Vector &vecOrigin, int iVolume, float flDuration, int iBotOwner )
 {
    int iThisSound;
 
@@ -395,13 +283,91 @@ void CSoundEnt :: InsertSound ( int iType, const Vector &vecOrigin, int iVolume,
       return;
    }
 
-   pSoundEnt->m_SoundPool[ iThisSound ].m_vecOrigin = vecOrigin;
-   pSoundEnt->m_SoundPool[ iThisSound ].m_iType = iType;
-   pSoundEnt->m_SoundPool[ iThisSound ].m_iVolume = iVolume;
-   pSoundEnt->m_SoundPool[ iThisSound ].m_flExpireTime = gpGlobals->time + flDuration;
+   CSound *pSound = CSoundEnt::SoundPointerForIndex( iThisSound );
+   
+   if(pSound)
+   {
+      pSound->m_vecOrigin = vecOrigin;
+      pSound->m_iVolume = iVolume;
+      pSound->m_flExpireTime = gpGlobals->time + flDuration;
+      pSound->m_iClient = -1;
+      pSound->m_iBotOwner = iBotOwner;
+   }
    
    if(pSoundEnt->m_bDebug == 2)
       UTIL_ParticleEffect ( vecOrigin, Vector(0, 0, 0), 50, 25 ); 
+}
+
+//=========================================================
+// FreeSound - free sound
+//=========================================================
+void CSoundEnt::FreeSound(CSound *pSound)
+{
+   int iThisSound = pSound - &pSoundEnt->m_SoundPool[0];
+   
+   if(iThisSound < 0 || iThisSound >= MAX_WORLD_SOUNDS)
+   {
+      return;
+   }
+   
+   int iPreviousSound = SOUNDLIST_EMPTY;
+   int iSound = pSoundEnt->ActiveList(); 
+
+   while ( iSound != SOUNDLIST_EMPTY )
+   {
+      if ( iThisSound == iSound )
+      {
+         // move this sound back into the free list
+         pSoundEnt->FreeSound( iSound, iPreviousSound );
+         
+         return;
+      }
+      
+      iSound = pSoundEnt->m_SoundPool[ iSound ].m_iNext;
+   }
+}
+
+//=========================================================
+// GetClientChannelSound - Get existing active sound or
+// create new one.
+//=========================================================
+CSound *CSoundEnt::GetClientChannelSound( int iClient, int iChannel )
+{
+   int iSound = pSoundEnt->ActiveList(); 
+
+   while ( iSound != SOUNDLIST_EMPTY )
+   {
+      if(iClient == pSoundEnt->m_SoundPool[ iSound ].m_iClient)
+         if(iChannel == 0 || iChannel == pSoundEnt->m_SoundPool[ iSound ].m_iChannel)
+            break;
+      
+      iSound = pSoundEnt->m_SoundPool[ iSound ].m_iNext;
+   }
+   
+   if(iSound == SOUNDLIST_EMPTY)
+   {
+      if(iChannel == 0)
+         return NULL;
+      
+      iSound = pSoundEnt->IAllocSound();
+      
+      if ( iSound == SOUNDLIST_EMPTY )
+      {
+         if(pSoundEnt->m_bDebug)
+            UTIL_ConsolePrintf( "Could not AllocSound() for GetClientChannelSound() (DLL)\n" );
+         return NULL;
+      }
+      
+      CSound *pSound = CSoundEnt::SoundPointerForIndex( iSound );
+      
+      if(pSound)
+      {
+         pSoundEnt->m_SoundPool[ iSound ].m_iClient = iClient;
+         pSoundEnt->m_SoundPool[ iSound ].m_iChannel = iChannel;
+      }
+   }
+   
+   return &pSoundEnt->m_SoundPool[ iSound ];
 }
 
 //=========================================================
@@ -411,8 +377,7 @@ void CSoundEnt :: InsertSound ( int iType, const Vector &vecOrigin, int iVolume,
 void CSoundEnt :: Initialize ( void )
 {
    int i;
-   int iSound;
-
+   
 #ifdef _DEBUG
    m_bDebug = TRUE;
 #else
@@ -430,22 +395,6 @@ void CSoundEnt :: Initialize ( void )
    }
 
    m_SoundPool[ i - 1 ].m_iNext = SOUNDLIST_EMPTY;// terminate the list here.
-
-   
-   // now reserve enough sounds for each client
-   for ( i = 0 ; i < gpGlobals->maxClients ; i++ )
-   {
-      iSound = pSoundEnt->IAllocSound();
-
-      if ( iSound == SOUNDLIST_EMPTY )
-      {
-         if(m_bDebug)
-            UTIL_ConsolePrintf( "Could not AllocSound() for Client Reserve! (DLL)\n" );
-         return;
-      }
-
-      pSoundEnt->m_SoundPool[ iSound ].m_flExpireTime = SOUND_NEVER_EXPIRE;
-   }
 
    if ( CVAR_GET_FLOAT("displaysoundlist") == 1 )
    {

@@ -761,22 +761,20 @@ qboolean BotFindSoundEnemy( bot_t &pBot )
    int iSound;
    float hearingSensitivity;
    CSound *pCurrentSound;
-   int sound_count;
    edict_t *pNewFindSoundEnt = NULL;
 
    float nearestdistance = 99999;
 
    iSound = CSoundEnt::ActiveList();
-   sound_count = 1;
    
    hearingSensitivity = skill_settings[pBot.bot_skill].hearing_sensitivity;
    
-   while ( iSound != SOUNDLIST_EMPTY && sound_count < MAX_WORLD_SOUNDS ) 
+   while ( iSound != SOUNDLIST_EMPTY ) 
    {
       pCurrentSound = CSoundEnt::SoundPointerForIndex( iSound );
       if ( pCurrentSound &&
          ( pCurrentSound->m_vecOrigin - pEdict->v.origin ).Length() <= pCurrentSound->m_iVolume * hearingSensitivity &&
-         !FVisible(pCurrentSound->m_vecOrigin, pEdict, (edict_t**)NULL) )
+         pCurrentSound->m_iBotOwner == (&pBot - &bots[0]) )
       {
          // can hear this sound, find enemy nearest sound
          edict_t * pMonsterOrPlayer = FindEnemyNearestToPoint(pCurrentSound->m_vecOrigin, 100*skill_settings[pBot.bot_skill].hearing_sensitivity, pEdict);
@@ -812,17 +810,16 @@ qboolean BotFindSoundEnemy( bot_t &pBot )
       }
       
       iSound = pCurrentSound->m_iNext;
-      sound_count++;
    }
    
-   if(iSound != SOUNDLIST_EMPTY && sound_count > MAX_WORLD_SOUNDS)
+   /*if(iSound != SOUNDLIST_EMPTY && sound_count > MAX_WORLD_SOUNDS)
    {
       //sound system error, reset
       UTIL_ConsolePrintf("run in to critical sound system error, sound system reseted.");
       
       *pSoundEnt = CSoundEnt();
       pSoundEnt->Spawn();
-   }
+   }*/
 
    // draw green beam
    /*if(pNewEnemy)

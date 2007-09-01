@@ -311,20 +311,18 @@ int GetSoundWaypoint( bot_t &pBot )
    int index = -1;
    int iSound;
    CSound *pCurrentSound;
-   int sound_count;
    float mindistance;
    
    iSound = CSoundEnt::ActiveList();
-   sound_count = 1;
    mindistance = 99999.0f;
    
-   while (iSound != SOUNDLIST_EMPTY && sound_count < MAX_WORLD_SOUNDS) 
+   while (iSound != SOUNDLIST_EMPTY)
    {
       pCurrentSound = CSoundEnt::SoundPointerForIndex( iSound );
       
       if (pCurrentSound && 
           (pCurrentSound->m_vecOrigin - pEdict->v.origin).Length() <= pCurrentSound->m_iVolume * skill_settings[pBot.bot_skill].hearing_sensitivity &&
-          !FVisible(pCurrentSound->m_vecOrigin, pEdict, (edict_t**)NULL))
+          pCurrentSound->m_iBotOwner == (&pBot - &bots[0]))
       {
          int temp_index = WaypointFindNearest(pCurrentSound->m_vecOrigin, pEdict, REACHABLE_RANGE, TRUE);
          
@@ -342,7 +340,6 @@ int GetSoundWaypoint( bot_t &pBot )
       }
       
       iSound = pCurrentSound->m_iNext;
-      sound_count++;
    }
    
    return index;
