@@ -892,6 +892,8 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
          
          CHECK_AND_SET_BOTSKILL_FLOAT(turn_skill) // BotAim turn_skill, how good bot is at aiming on enemy origin.
          CHECK_AND_SET_BOTSKILL_FLOAT(hearing_sensitivity) // how well bot hears sounds
+         CHECK_AND_SET_BOTSKILL_FLOAT(track_sound_time_min) // how long bot tracks one sound
+         CHECK_AND_SET_BOTSKILL_FLOAT(track_sound_time_max)
          
          CHECK_AND_SET_BOTSKILL_FLOAT(respawn_react_delay) // delay on players after respawn
          CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_min[0]) // reaction delay settings ([0] is for bot_reaction 1, [1] for 2, etc)

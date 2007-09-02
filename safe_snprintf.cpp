@@ -16,6 +16,15 @@
 
 #include "safe_snprintf.h"
 
+// Manual branch optimization for GCC 3.0.0 and newer
+#if !defined(__GNUC__) || __GNUC__ < 3
+	#define likely(x) (x)
+	#define unlikely(x) (x)
+#else
+	#define likely(x) __builtin_expect((long int)!!(x), true)
+	#define unlikely(x) __builtin_expect((long int)!!(x), false)
+#endif
+
 // Microsoft's msvcrt.dll:vsnprintf is buggy and so is vsnprintf on some glibc versions.
 // We use wrapper function to fix bugs.
 //  from: http://sourceforge.net/tracker/index.php?func=detail&aid=1083721&group_id=2435&atid=102435
@@ -123,34 +132,34 @@ void safevoid_vsnprintf(char* s, size_t n, const char *format, va_list ap)
 { 
 	int res;
 	
-	if(!s || n <= 0)
+	if(unlikely(!s) || unlikely(n <= 0))
 		return;
 	
 	// If the format string is empty, nothing to do.
-	if(!format || !*format) 
+	if(unlikely(!format) || unlikely(!*format))
 	{
 		s[0]=0;
 		return;
 	}
-	else if(format[0] == '%' && format[1] == 's' && format[2] == '\0')
+	else if(likely(format[0] == '%') && likely(format[1] == 's') && likely(format[2] == '\0'))
 	{
 		//special case for handling "%s" fast!
 		const char *str = va_arg(ap, const char *);
 		size_t i;
 		
-		if(!str)
+		if(unlikely(!str))
 			str = "(null)";
 		
 		i = 0;
-		while(str[i] != '\0' && i < n)
+		while(likely(str[i] != '\0') && likely(i < n))
 		{
 			s[i] = str[i];
 			i++;
 		}
 		
-		if(i < n)
+		if(likely(i < n))
 			s[i] = '\0';
-		else if(i == n)
+		else if(likely(i == n))
 			s[i-1] = '\0';
 		
 		return;

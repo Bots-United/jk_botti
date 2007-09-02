@@ -130,10 +130,14 @@ void BotSpawnInit( bot_t &pBot )
 
    pBot.f_random_waypoint_time = gpGlobals->time;
    pBot.waypoint_goal = -1;
+   pBot.wpt_goal_type = WPT_GOAL_NONE;
    pBot.f_waypoint_goal_time = 0.0;
    pBot.prev_waypoint_distance = 0.0;
    pBot.f_last_item_found = 0.0;
 
+   pBot.pTrackSoundEdict = NULL;
+   pBot.f_track_sound_time = 0.0;
+   
    memset(pBot.exclude_points, 0, sizeof(pBot.exclude_points));
 
    pBot.b_on_ground = 0;
@@ -173,13 +177,9 @@ void BotSpawnInit( bot_t &pBot )
 
    pBot.f_exit_water_time = 0.0;
 
-   pBot.pFindSoundEnt = NULL;
-
    pBot.pBotEnemy = NULL;
    pBot.f_bot_see_enemy_time = gpGlobals->time;
-   pBot.f_bot_find_enemy_time = gpGlobals->time;
-
-   pBot.wpt_goal_type = WPT_GOAL_NONE;
+   pBot.v_bot_see_enemy_origin = Vector(-99999,-99999,-99999);
 
    pBot.f_duck_time = 0.0;
    
@@ -915,8 +915,11 @@ void BotPickLogo(bot_t &pBot)
 }
 
 
-void BotSprayLogo(edict_t *pEntity, char *logo_name)
+void BotSprayLogo(bot_t &pBot)
 {
+   edict_t * pEntity = pBot.pEdict;
+   char *logo_name = pBot.logo_name;
+   
    int index;
    TraceResult pTrace;
    Vector v_src, v_dest;
@@ -1633,7 +1636,7 @@ void BotJustWanderAround(bot_t &pBot, float moved_distance)
 
       if (tr.flFraction < 1.0f)
       {
-         BotSprayLogo(pEdict, pBot.logo_name);
+         BotSprayLogo(pBot);
 
          pBot.b_spray_logo = FALSE;
 
@@ -2182,13 +2185,10 @@ void BotThink( bot_t &pBot )
    if((pBot.b_has_enough_ammo_for_good_weapon && !pBot.b_low_health) || pBot.f_last_time_attacked < gpGlobals->time + 3.0f)
    {
       // get enemy
-      pBot.pBotEnemy = (b_botdontshoot == 0) ? BotFindEnemy( pBot ) : NULL; // clear enemy pointer (no ememy for you!)
+      BotFindEnemy( pBot );
 
       if(pBot.pBotEnemy == NULL)
-      {
-         // try find sound enemy (something that bot will track)
-         BotFindSoundEnemy(pBot);
-      
+      {      
          // if has zoom weapon and zooming, click off zoom
          if(pBot.current_weapon_index != -1 && 
             (weapon_select[pBot.current_weapon_index].type & WEAPON_FIRE_ZOOM) == WEAPON_FIRE_ZOOM && 
@@ -2238,18 +2238,23 @@ void BotThink( bot_t &pBot )
          edict_t *pAvoidEnemy = pBot.pBotEnemy;
          
          // don't have an enemy anymore so null out the pointer...
-         pBot.pBotEnemy = NULL;
+         BotRemoveEnemy(pBot, FALSE);
          
-         int enemy_waypoint = WaypointFindNearest(pAvoidEnemy, REACHABLE_RANGE);
-         int self_waypoint = WaypointFindNearest(pEdict, REACHABLE_RANGE);
+         int enemy_waypoint = WaypointFindNearest(pAvoidEnemy, 1024);
+         int self_waypoint = WaypointFindNearest(pEdict, 1024);
       	 
          if(enemy_waypoint != -1 && self_waypoint != -1)
          {
             int runaway_waypoint = WaypointFindRunawayPath(self_waypoint, enemy_waypoint);
             
-            pBot.curr_waypoint_index = -1;  // forget about this waypoint
+            //if(pBot.waypoint_goal != runaway_waypoint)
+            //   UTIL_ConsolePrintf("[%s] Set runaway waypoint: %d -> %d", pBot.name, pBot.waypoint_goal, runaway_waypoint);
+            
+            pBot.wpt_goal_type = WPT_GOAL_LOCATION;
+            pBot.curr_waypoint_index = self_waypoint;
             pBot.waypoint_goal = runaway_waypoint; 
-            pBot.f_waypoint_goal_time = gpGlobals->time + 5.0f;
+            
+            pBot.f_waypoint_goal_time = gpGlobals->time + 10.0f;
          }
       }
    }

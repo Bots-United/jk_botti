@@ -17,7 +17,7 @@
 #define W_FL_CROUCH      (1<<1)  /* must crouch to reach this waypoint */
 #define W_FL_JUMP        (1<<2) /* jump waypoint */
 #define W_FL_LADDER      (1<<3)  /* waypoint on a ladder */
-//#define W_FL_OLDLIFT     (1<<4)  /* wait for lift to be down before approaching this waypoint */
+//#define W_FL_OLDLIFT   (1<<4)  /* wait for lift to be down before approaching this waypoint */
 #define W_FL_DOOR        (1<<5)  /* wait for door to open */
 
 #define W_FL_LONGJUMP    (1<<6)  /* item (longjump) */
@@ -120,80 +120,98 @@ void WaypointSlowFloydsStop(void);
 int WaypointSlowFloydsState(void);
 int WaypointSlowFloyds(void);
 int WaypointSlowFloyds(unsigned short *shortest_path, unsigned short *from_to);
-qboolean WaypointIsRouteValid(int src, int dest);
 int WaypointFindRunawayPath(int runner, int enemy);
+qboolean WaypointIsRouteValid(int src, int dest);
 
 // find the nearest waypoint to the player and return the index (-1 if not found)
 inline int WaypointFindNearest(edict_t *pEntity, float range)
 {
-   return WaypointFindNearest(pEntity->v.origin, pEntity->v.view_ofs, pEntity, range, FALSE);
+   JKASSERT(pEntity == NULL);
+   Vector origin = pEntity->v.origin;
+   Vector offset = pEntity->v.view_ofs;
+   return WaypointFindNearest(origin, offset, pEntity, range, FALSE);
 }
 
 //
 inline int WaypointFindNearest(const Vector &v_src, edict_t *pEntity, float range)
 {
+   JKASSERT(pEntity == NULL);
    return WaypointFindNearest(v_src, Vector(0, 0, 0), pEntity, range, FALSE);
 }
 
 //
 inline int WaypointFindNearest(edict_t *pEntity, float range, qboolean b_traceline)
 {
-   return WaypointFindNearest(pEntity->v.origin, pEntity->v.view_ofs, pEntity, range, b_traceline);
+   JKASSERT(pEntity == NULL);
+   Vector origin = pEntity->v.origin;
+   Vector offset = pEntity->v.view_ofs;
+   return WaypointFindNearest(origin, offset, pEntity, range, b_traceline);
 }
 
 //
 inline int WaypointFindNearest(const Vector &v_src, edict_t *pEntity, float range, qboolean b_traceline)
 {
+   JKASSERT(pEntity == NULL);
    return WaypointFindNearest(v_src, Vector(0, 0, 0), pEntity, range, b_traceline);
 }
 
 //
 inline int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags, int exclude[])
 {
+   JKASSERT(pEntity == NULL);
    return WaypointFindNearestGoal(pEntity, src, flags, itemflags, exclude, 0.0f, NULL);
 }
 
 //
 inline int WaypointFindNearestGoal(const Vector &v_src, edict_t *pEntity, float range, int flags)
 {
+   JKASSERT(pEntity == NULL);
    return WaypointFindNearestGoal(pEntity, -1, flags, 0, NULL, range, &v_src);
 }
 
 //
 inline int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int exclude[])
 {
-   return WaypointFindNearestGoal(pEntity, src, flags, 0, exclude);
+   JKASSERT(pEntity == NULL);
+   return WaypointFindNearestGoal(pEntity, src, flags, 0, exclude, 0.0f, NULL);
 }
 
 //
 inline int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags)
 {
-   return WaypointFindNearestGoal(pEntity, src, flags, itemflags, NULL);
+   JKASSERT(pEntity == NULL);
+   return WaypointFindNearestGoal(pEntity, src, flags, itemflags, NULL, 0.0f, NULL);
 }
 
 //
 inline int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags)
 {
-   return WaypointFindNearestGoal(pEntity, src, flags, 0, NULL);
+   JKASSERT(pEntity == NULL);
+   return WaypointFindNearestGoal(pEntity, src, flags, 0, NULL, 0.0f, NULL);
 }
 
 //
 inline int WaypointFindRandomGoal(edict_t *pEntity, int flags, int itemflags, int exclude[])
 {
    int index = 0;
+   JKASSERT(pEntity == NULL);
    return WaypointFindRandomGoal(&index, 1, pEntity, flags, itemflags, exclude) > 0 ? index : -1;
 }
 
 //
 inline int WaypointFindRandomGoal(edict_t *pEntity, int flags)
 {
-   return WaypointFindRandomGoal(pEntity, flags, 0, NULL); 
+   int index = 0;
+   JKASSERT(pEntity == NULL);
+   return WaypointFindRandomGoal(&index, 1, pEntity, flags, 0, NULL) > 0 ? index : -1;
 }
 
 //
 inline int WaypointFindRandomGoal(edict_t *pEntity, int flags, int exclude[]) 
 { 
-   return WaypointFindRandomGoal(pEntity, flags, 0, exclude); 
+   int index = 0;
+   JKASSERT(pEntity == NULL);
+   return WaypointFindRandomGoal(&index, 1, pEntity, flags, 0, exclude) > 0 ? index : -1;
 }
 
 #endif // WAYPOINT_H

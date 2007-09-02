@@ -32,6 +32,7 @@ extern qboolean is_team_play;
 extern qboolean checked_teamplay;
 extern int num_logos;
 extern int submod_id;
+extern qboolean b_botdontshoot;
 
 char g_team_list[TEAMPLAY_TEAMLISTLENGTH];
 char g_team_names[MAX_TEAMS][MAX_TEAMNAME_LENGTH];
@@ -745,99 +746,47 @@ edict_t *FindEnemyNearestToPoint(const Vector &v_point, float radius, edict_t * 
 }
 
 
-//
-qboolean BotFindSoundEnemy( bot_t &pBot )
+void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking )
 {
    edict_t *pEdict = pBot.pEdict;
    
-   //remove sound target if fighting
-   if(pBot.pBotEnemy != NULL)
+   JKASSERT(pBot.pBotEnemy == NULL);
+   
+   // track enemy?
+   if(b_keep_tracking)
    {
-      pBot.pFindSoundEnt = NULL;
-      return(FALSE);
-   }
-   
-   // check if time to check for sounds (if don't already have enemy)
-   int iSound;
-   float hearingSensitivity;
-   CSound *pCurrentSound;
-   edict_t *pNewFindSoundEnt = NULL;
-
-   float nearestdistance = 99999;
-
-   iSound = CSoundEnt::ActiveList();
-   
-   hearingSensitivity = skill_settings[pBot.bot_skill].hearing_sensitivity;
-   
-   while ( iSound != SOUNDLIST_EMPTY ) 
-   {
-      pCurrentSound = CSoundEnt::SoundPointerForIndex( iSound );
-      if ( pCurrentSound &&
-         ( pCurrentSound->m_vecOrigin - pEdict->v.origin ).Length() <= pCurrentSound->m_iVolume * hearingSensitivity &&
-         pCurrentSound->m_iBotOwner == (&pBot - &bots[0]) )
+      float track_time = RANDOM_FLOAT2(skill_settings[pBot.bot_skill].track_sound_time_min, skill_settings[pBot.bot_skill].track_sound_time_max);
+      
+      pBot.wpt_goal_type = WPT_GOAL_TRACK_SOUND;
+      pBot.waypoint_goal = -1;
+      
+      pBot.pTrackSoundEdict = pBot.pBotEnemy;
+      pBot.f_track_sound_time = gpGlobals->time + track_time; //TODO: bot skill 20.0f .. ~5.0f
+      
+      if(BotUpdateTrackSoundGoal(pBot) && pBot.waypoint_goal == -1)
       {
-         // can hear this sound, find enemy nearest sound
-         edict_t * pMonsterOrPlayer = FindEnemyNearestToPoint(pCurrentSound->m_vecOrigin, 100*skill_settings[pBot.bot_skill].hearing_sensitivity, pEdict);
+         int waypoint = WaypointFindNearest(pBot.pTrackSoundEdict, 1024);
          
-         if (!FNullEnt(pMonsterOrPlayer) && IsAlive(pMonsterOrPlayer))
-         {
-            Vector v_monsterplayer = UTIL_GetOriginWithExtent(pBot, pMonsterOrPlayer);
-            float distance = (v_monsterplayer - pEdict->v.origin).Length();
-            BOOL observer_skip = FALSE;
-            
-            // check observer mode
-            if(b_observer_mode)
-            {
-               int idx = ENTINDEX(pMonsterOrPlayer);
-               
-               if(idx > 1 && idx <= gpGlobals->maxClients)
-               {
-                  // not bot?
-                  if(!(FBitSet(pMonsterOrPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pMonsterOrPlayer->v.flags, FL_THIRDPARTYBOT)))
-                     observer_skip = TRUE;
-               }
-            }
-            
-            if(!observer_skip && distance < nearestdistance)
-            {
-               distance = nearestdistance;
-               pNewFindSoundEnt = pMonsterOrPlayer;
-               
-               //draw red beam
-               //UTIL_DrawBeam(pNewEnemy, v_newenemy, pEdict->v.origin, 10, 2, 250, 50, 50, 200, 10);
-            }
-         }
+         //if(pBot.waypoint_goal != waypoint)
+         //   UTIL_ConsolePrintf("[%s] Couldn't find sound to track, using edict-wpt: %d -> %d", pBot.name, pBot.waypoint_goal, waypoint);
+         
+         pBot.waypoint_goal = waypoint;
       }
-      
-      iSound = pCurrentSound->m_iNext;
    }
    
-   /*if(iSound != SOUNDLIST_EMPTY && sound_count > MAX_WORLD_SOUNDS)
-   {
-      //sound system error, reset
-      UTIL_ConsolePrintf("run in to critical sound system error, sound system reseted.");
-      
-      *pSoundEnt = CSoundEnt();
-      pSoundEnt->Spawn();
-   }*/
-
-   // draw green beam
-   /*if(pNewEnemy)
-      UTIL_DrawBeam(pNewEnemy, v_newenemy, pEdict->v.origin, 10, 2, 50, 250, 50, 200, 10);*/
-      
-   if(pNewFindSoundEnt != NULL)
-   {
-      pBot.pFindSoundEnt = pNewFindSoundEnt;
-      return TRUE;
-   }
+   // don't have an enemy anymore so null out the pointer...
+   pBot.pBotEnemy = NULL;
    
-   pBot.pFindSoundEnt = NULL;
-   return FALSE;
+   // reset reactions
+   BotResetReactionTime(pBot);
+   
+   // update bot waypoint after combat
+   pBot.curr_waypoint_index = WaypointFindNearest(pEdict, 1024);
 }
 
 
 //
-edict_t *BotFindEnemy( bot_t &pBot )
+void BotFindEnemy( bot_t &pBot )
 {
    edict_t *pent = NULL;
    edict_t *pNewEnemy; 
@@ -847,6 +796,18 @@ edict_t *BotFindEnemy( bot_t &pBot )
    int i;
 
    edict_t *pEdict = pBot.pEdict;
+   
+   if (b_botdontshoot)
+   {
+      pBot.f_bot_see_enemy_time = -1;  // so we won't keep reloading
+      pBot.v_bot_see_enemy_origin = Vector(-99999,-99999,-99999);
+
+      pEdict->v.button |= IN_RELOAD;  // press reload button
+      
+      BotRemoveEnemy(pBot, FALSE);
+      
+      return;
+   }
 
    if (pBot.pBotEnemy != NULL)  // does the bot already have an enemy?
    {
@@ -860,10 +821,7 @@ edict_t *BotFindEnemy( bot_t &pBot )
             pEdict->v.button |= IN_JUMP;
 
          // don't have an enemy anymore so null out the pointer...
-         pBot.pBotEnemy = NULL;
-         
-         // reset reactions
-         BotResetReactionTime(pBot);
+         BotRemoveEnemy(pBot, FALSE);
          
          // level look
          pEdict->v.idealpitch = 0;
@@ -891,24 +849,19 @@ edict_t *BotFindEnemy( bot_t &pBot )
 
             // keep track of when we last saw an enemy
             pBot.f_bot_see_enemy_time = gpGlobals->time;
+            pBot.v_bot_see_enemy_origin = UTIL_GetOrigin(pBot.pBotEnemy);
 
-            return (pBot.pBotEnemy);
+            return; // don't change pBot.pBotEnemy
          }
          
-         if( (pBot.f_bot_see_enemy_time > 0) && 
-             (pBot.f_bot_see_enemy_time + 2.0 >= gpGlobals->time) ) // enemy has gone out of bot's line of sight, remember enemy for 2 sec
+         // enemy has gone out of bot's line of sight
+         if( pBot.f_bot_see_enemy_time > 0 && pBot.f_bot_see_enemy_time + 0.5 >= gpGlobals->time)
          {
-            // we remember this enemy.. keep tracking
+            // start sound tracking
+            BotRemoveEnemy(pBot, TRUE);
             
-            // face the enemy
-            Vector v_enemy = vecPredEnemy - pEdict->v.origin;
-            Vector bot_angles = UTIL_VecToAngles( v_enemy );
-
-            pEdict->v.ideal_yaw = bot_angles.y;
-
-            BotFixIdealYaw(pEdict);
-
-            return (pBot.pBotEnemy);
+            // level look
+            pEdict->v.idealpitch = 0;
          }
       }
    }
@@ -1056,21 +1009,28 @@ edict_t *BotFindEnemy( bot_t &pBot )
 
       // keep track of when we last saw an enemy
       pBot.f_bot_see_enemy_time = gpGlobals->time;
+      pBot.v_bot_see_enemy_origin = UTIL_GetOrigin(pNewEnemy);
 
       BotResetReactionTime(pBot);
+      
+      //if(pBot.waypoint_goal != -1)
+      //   UTIL_ConsolePrintf("[%s] Found enemy, forget goal: %d -> %d", pBot.name, pBot.waypoint_goal, -1);
+      
+      // clear goal waypoint
+      pBot.waypoint_goal = -1;
+      pBot.wpt_goal_type = WPT_GOAL_ENEMY;
    }
 
    // has the bot NOT seen an ememy for at least 5 seconds (time to reload)?
-   if ((pBot.f_bot_see_enemy_time > 0) &&
-       ((pBot.f_bot_see_enemy_time + 5.0) <= gpGlobals->time))
+   else if ((pBot.f_bot_see_enemy_time > 0) && ((pBot.f_bot_see_enemy_time + 5.0) <= gpGlobals->time))
    {
       pBot.f_bot_see_enemy_time = -1;  // so we won't keep reloading
+      pBot.v_bot_see_enemy_origin = Vector(-99999,-99999,-99999);
 
       pEdict->v.button |= IN_RELOAD;  // press reload button
    }
    
-
-   return (pNewEnemy);
+   pBot.pBotEnemy = pNewEnemy;
 }
 
 
@@ -1738,8 +1698,8 @@ void BotShootAtEnemy( bot_t &pBot )
    // Enemy not visible?
    if(!pBot.b_combat_longjump && !FVisibleEnemy(v_enemy_aimpos, pEdict, pBot.pBotEnemy))
    {
-      pBot.pFindSoundEnt = pBot.pBotEnemy;
-      pBot.pBotEnemy = NULL;
+      BotRemoveEnemy(pBot, TRUE);
+      
       return;
    }
    
@@ -1793,14 +1753,10 @@ void BotShootAtEnemy( bot_t &pBot )
             // select the best weapon to use at this distance and fire...
             if(!BotFireWeapon(v_enemy, pBot, 0))
             {
-               pBot.pBotEnemy = NULL;
-               pBot.f_bot_find_enemy_time = gpGlobals->time + 3.0;
+               BotRemoveEnemy(pBot, TRUE);
                
                // level look
                pEdict->v.idealpitch = 0;
-                              
-               // get nearest waypoint to bot
-               pBot.curr_waypoint_index = WaypointFindNearest(pBot.pEdict, 1024);
             }
          }
       } 

@@ -22,7 +22,7 @@
 
 //
 #define JKASSERT(_x_) \
-    do { if (unlikely(!!(_x_))) UTIL_ConsolePrintf("[ERROR][ASSERT] %s:%s: (%d)", #_x_, __FILE__, __LINE__); } while(0)
+    do { if (unlikely(!!(_x_))) UTIL_AssertConsolePrintf(#_x_, __FILE__, __LINE__); } while(0)
 
 
 // stuff for Win32 vs. Linux builds
@@ -81,7 +81,7 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
 #define WPT_GOAL_AMMO		4
 #define WPT_GOAL_ITEM		5
 #define WPT_GOAL_LOCATION	8
-#define WPT_GOAL_SOUND		9
+#define WPT_GOAL_TRACK_SOUND	9
 #define WPT_GOAL_ENEMY		10
 
 // instant damage (from cbase.h)
@@ -220,6 +220,8 @@ typedef struct
    float f_waypoint_goal_time;
    float prev_waypoint_distance;
    int wpt_goal_type;
+   edict_t *pTrackSoundEdict;        // used when wpt_goal_type == WPT_GOAL_TRACK_SOUND
+   float f_track_sound_time;         // how long we track sound?
 
 #define EXCLUDE_POINTS_COUNT 10
    int exclude_points[EXCLUDE_POINTS_COUNT+1];  // ten item locations + 1 null
@@ -228,8 +230,7 @@ typedef struct
 
    edict_t *pBotEnemy;
    float f_bot_see_enemy_time;
-   float f_bot_find_enemy_time;
-   edict_t *pFindSoundEnt;
+   Vector v_bot_see_enemy_origin;
    
    float f_last_time_attacked;
 
@@ -398,6 +399,7 @@ void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2);
 void GetGameDir (char *game_dir);
 void UTIL_ServerPrintf( char *fmt, ... );
 void UTIL_ConsolePrintf( char *fmt, ... );
+void UTIL_AssertConsolePrintf(const char *file, const char *str, int line);
 char* UTIL_VarArgs2( char * string, size_t strlen, char *format, ... );
 void UTIL_DrawBeam(edict_t *pEnemy, const Vector &start, const Vector &end, int width, int noise, int red, int green, int blue, int brightness, int speed);
 int UTIL_GetClientCount(void);

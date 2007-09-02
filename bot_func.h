@@ -15,7 +15,7 @@ void BotStartGame( bot_t &pBot );
 int BotInFieldOfView( bot_t &pBot, const Vector & dest );
 qboolean BotEntityIsVisible( bot_t &pBot, const Vector & dest );
 void BotPickLogo(bot_t &pBot);
-void BotSprayLogo(edict_t *pEntity, char *logo_name);
+void BotSprayLogo(bot_t &pBot);
 void BotFindItem( bot_t &pBot );
 qboolean BotLookForMedic( bot_t &pBot );
 qboolean BotLookForGrenades( bot_t &pBot );
@@ -55,12 +55,15 @@ qboolean BotEdgeForward( bot_t &pBot, const Vector &v_move_dir );
 qboolean BotEdgeRight( bot_t &pBot, const Vector &v_move_dir );
 qboolean BotEdgeLeft( bot_t &pBot, const Vector &v_move_dir );
 
+qboolean BotUpdateTrackSoundGoal( bot_t &pBot );
+int BotGetSoundWaypoint( bot_t &pBot, edict_t *pTrackSoundEdict, edict_t ** pNewTrackSoundEdict );
+
+void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking );
 qboolean BotLowHealth( bot_t &pBot );
 void BotResetReactionTime(bot_t &pBot);
 void BotKick(bot_t &pBot);
 void BotCheckTeamplay(void);
-edict_t *BotFindEnemy( bot_t &pBot );
-qboolean BotFindSoundEnemy( bot_t &pBot );
+void BotFindEnemy( bot_t &pBot );
 Vector BotBodyTarget( edict_t *pBotEnemy, bot_t &pBot );
 qboolean BotFireWeapon( const Vector & v_enemy, bot_t &pBot, int weapon_choice );
 void BotShootAtEnemy( bot_t &pBot );

@@ -708,6 +708,12 @@ void UTIL_ConsolePrintf( char *fmt, ... )
    SERVER_PRINT( string );
 }
 
+void UTIL_AssertConsolePrintf(const char *file, const char *str, int line)
+{
+   UTIL_ConsolePrintf("[ASSERT] '%s' : '%s' : 'line %d'", file, str, line);
+   __asm__ ("int $3");
+}
+
 char* UTIL_VarArgs2( char * string, size_t strlen, char *format, ... )
 {
    va_list argptr;

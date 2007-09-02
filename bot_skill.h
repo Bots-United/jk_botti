@@ -32,8 +32,6 @@ typedef struct
    float turn_skill; // BotAim turn_skill, how good bot is at aiming on enemy origin.
    float prediction_velocity_varitation;
    
-   float hearing_sensitivity; // how well bot hears sounds
-   
    qboolean can_longjump; // and can longjump.
    
    int random_jump_frequency; // how often (out of 100 times) the bot will do random jump
@@ -53,6 +51,10 @@ typedef struct
    
    qboolean can_shoot_through_walls; // can shoot through walls by sound
    int wallshoot_frequency; // how often (out of 100 times) the bot will try attack enemy behind wall
+   
+   float hearing_sensitivity; // how well bot hears sounds
+   float track_sound_time_min; // how long bot tracks one sound
+   float track_sound_time_max;
    
 } bot_skill_settings_t;
 

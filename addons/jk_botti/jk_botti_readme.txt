@@ -64,6 +64,8 @@ CPU intensive operation this can only be done on map change.
 1.40:
  * Add support for Opposing Force Deathmatch.
  * Tuned skill 1 bot to be more leet, skill 2 is now about same as old skill 1.
+ * New sound system and sound tracking system, huge improvement in how bot
+   finds enemy that isn't visible.
  * Bugfixes to goal selection and weapon selection, results huge improvement
    how bot work on when not given good weapons on spawn (which is typical on
    Severian's MOD). 
@@ -323,7 +325,11 @@ List of available settings:
  - hearing_sensitivity
       How far away bot will hear. 0.0 hear nothing, 1.5 used for skill 1.
       Value: 0.0-1.5
-      
+ 
+ - track_sound_time_min
+ - track_sound_time_max
+      How long time in seconds bot tries to track one sound?
+ 
  - can_longjump
       Can bot at this skill level use longjump.
       Value: 0/1 (0 = no, 1 = yes)

@@ -80,6 +80,9 @@ distclean:
 waypoint.o: waypoint.cpp
 	${CPP} ${CPPFLAGS} -funroll-loops -c $< -o $@
 
+safe_snprintf.o: safe_snprintf.cpp
+	${CPP} ${CPPFLAGS} -funroll-loops -c $< -o $@
+
 %.o: %.cpp
 	${CPP} ${CPPFLAGS} -c $< -o $@
 

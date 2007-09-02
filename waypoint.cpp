@@ -993,6 +993,47 @@ int WaypointFindRandomGoal(int *out_indexes, int max_indexes, edict_t *pEntity, 
 }
 
 
+// find the nearest waypoint to the source postition and return the index
+int WaypointFindRunawayPath(int runner, int enemy)
+{
+   int index, max_index;
+   float runner_distance;
+   float enemy_distance;
+   float max_difference;
+   float difference;
+   TraceResult tr;
+
+   if (num_waypoints < 1)
+      return -1;
+
+   // find the nearest waypoint...
+
+   max_difference = 0.0;
+   max_index = -1;
+
+   for (index=0; index < num_waypoints; index++)
+   {
+      if (waypoints[index].flags & (W_FL_DELETED|W_FL_AIMING))
+         continue;  // skip any deleted&aiming waypoints
+
+      runner_distance = WaypointDistanceFromTo(runner, index);
+      enemy_distance = WaypointDistanceFromTo(runner, index);
+      
+      if(runner_distance == WAYPOINT_MAX_DISTANCE)
+         continue;
+      
+      difference = enemy_distance - runner_distance;
+      if(difference > max_difference) 
+      {
+         max_difference = difference;
+         max_index = index;
+      }
+   }
+
+   return max_index;
+}
+
+
 //
 int WaypointFindNearestAiming(Vector v_origin)
 {
@@ -3127,7 +3168,12 @@ void WaypointRouteInit(qboolean ForceRebuild)
 
 qboolean WaypointIsRouteValid(int src, int dest)
 {
-   if(!unlikely(wp_matrix_initialized) || unlikely(from_to == NULL) || unlikely(src >= (int)route_num_waypoints) || unlikely(dest >= (int)route_num_waypoints))
+   if(unlikely(!wp_matrix_initialized) || 
+      unlikely(from_to == NULL) || 
+      unlikely(src < 0) ||
+      unlikely(dest < 0) ||
+      unlikely(src >= (int)route_num_waypoints) || 
+      unlikely(dest >= (int)route_num_waypoints))
       return(FALSE);
    
    return(TRUE);
@@ -3151,45 +3197,4 @@ float WaypointDistanceFromTo(int src, int dest)
       return (float)WAYPOINT_MAX_DISTANCE;
    
    return (float)(shortest_path[src * route_num_waypoints + dest]);
-}
-
-
-// find the nearest waypoint to the source postition and return the index
-int WaypointFindRunawayPath(int runner, int enemy)
-{
-   int index, max_index;
-   float runner_distance;
-   float enemy_distance;
-   float max_difference;
-   float difference;
-   TraceResult tr;
-
-   if (num_waypoints < 1)
-      return -1;
-
-   // find the nearest waypoint...
-
-   max_difference = 0.0;
-   max_index = -1;
-
-   for (index=0; index < num_waypoints; index++)
-   {
-      if (waypoints[index].flags & (W_FL_DELETED|W_FL_AIMING))
-         continue;  // skip any deleted&aiming waypoints
-
-      runner_distance = WaypointDistanceFromTo(runner, index);
-      enemy_distance = WaypointDistanceFromTo(runner, index);
-      
-      if(runner_distance == WAYPOINT_MAX_DISTANCE)
-         continue;
-      
-      difference = enemy_distance - runner_distance;
-      if(difference > max_difference) 
-      {
-         max_difference = difference;
-         max_index = index;
-      }
-   }
-
-   return max_index;
 }

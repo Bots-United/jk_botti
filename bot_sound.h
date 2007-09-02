@@ -53,7 +53,6 @@ public:
 	static CSound*	SoundPointerForIndex( int iIndex );// return a pointer for this index in the sound list
 	static int	ClientSoundIndex ( edict_t *pClient );
 	static CSound*  GetEdictChannelSound( edict_t *pEdict, int iChannel );
-	static void     FreeSound( CSound* pSound );
 
 	BOOL		IsEmpty( void ) { return m_iActiveSound == SOUNDLIST_EMPTY; }
 	int		ISoundsInList ( int iListType );

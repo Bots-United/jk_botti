@@ -39,7 +39,7 @@ void SaveSound(edict_t * pEdict, const Vector & origin, int volume, int channel,
       return;
    }
       
-   float min_distance = 50.0;
+   float min_distance = 64.0;
    int bot_index = -1;
    
    // check if bot is close to sound and mark as owner if it is
@@ -62,6 +62,11 @@ void SaveSound(edict_t * pEdict, const Vector & origin, int volume, int channel,
             bot_index = i;
          }
       }
+   }
+   
+   if(min_distance < 64.0 || bot_index != -1)
+   {
+      //UTIL_ConsolePrintf("[%s] InsertSound(): min_distance: %.1f, bot_index: %d", bots[bot_index].name, min_distance, bot_index);
    }
    
    CSoundEnt::InsertSound(pEdict, channel, origin, volume, flDuration, bot_index);
@@ -157,21 +162,18 @@ void CSoundEnt :: Think ( void )
    if( m_bDebug == 2 )
    {
       CSound *pCurrentSound;
-      iSound = CSoundEnt::ActiveList();
-   
-      while ( iSound != SOUNDLIST_EMPTY )
+      
+      for(iSound = ActiveList(); iSound != SOUNDLIST_EMPTY; iSound = pCurrentSound->m_iNext)
       {
          pCurrentSound = CSoundEnt::SoundPointerForIndex( iSound );
       
-         if(pCurrentSound->m_iVolume > 0)
-         {
-            int idx = ENTINDEX(m_SoundPool[ iSound ].m_pEdict) - 1;
-            qboolean is_player = (idx >= 0 && idx < gpGlobals->maxClients);
+         if(pCurrentSound->m_iVolume <= 0)
+            continue;
+         
+         int idx = ENTINDEX(m_SoundPool[ iSound ].m_pEdict) - 1;
+         qboolean is_player = (idx >= 0 && idx < gpGlobals->maxClients);
             
-            UTIL_ParticleEffect ( pCurrentSound->m_vecOrigin, Vector(0, 0, 0), (is_player)?150:250, 25 ); 
-         }
-      
-         iSound = pCurrentSound->m_iNext;
+         UTIL_ParticleEffect ( pCurrentSound->m_vecOrigin, Vector(0, 0, 0), (is_player) ? 150 : 250, 25 ); 
       }
    }
 }
@@ -286,50 +288,17 @@ void CSoundEnt :: InsertSound ( edict_t* pEdict, int channel, const Vector &vecO
 }
 
 //=========================================================
-// FreeSound - free sound
-//=========================================================
-void CSoundEnt::FreeSound(CSound *pSound)
-{
-   int iThisSound = pSound - &pSoundEnt->m_SoundPool[0];
-   
-   if(iThisSound < 0 || iThisSound >= MAX_WORLD_SOUNDS)
-   {
-      return;
-   }
-   
-   int iPreviousSound = SOUNDLIST_EMPTY;
-   int iSound = pSoundEnt->ActiveList(); 
-
-   while ( iSound != SOUNDLIST_EMPTY )
-   {
-      if ( iThisSound == iSound )
-      {
-         // move this sound back into the free list
-         pSoundEnt->FreeSound( iSound, iPreviousSound );
-         
-         return;
-      }
-      
-      iSound = pSoundEnt->m_SoundPool[ iSound ].m_iNext;
-   }
-}
-
-//=========================================================
 // GetClientChannelSound - Get existing active sound or
 // create new one.
 //=========================================================
 CSound *CSoundEnt::GetEdictChannelSound( edict_t * pEdict, int iChannel )
 {
-   int iSound = pSoundEnt->ActiveList(); 
-
-   while ( iSound != SOUNDLIST_EMPTY )
-   {
+   int iSound;
+   
+   for(iSound = pSoundEnt->ActiveList(); iSound != SOUNDLIST_EMPTY; iSound = pSoundEnt->m_SoundPool[ iSound ].m_iNext)
       if(pEdict == pSoundEnt->m_SoundPool[ iSound ].m_pEdict)
          if(iChannel == 0 || iChannel == pSoundEnt->m_SoundPool[ iSound ].m_iChannel)
             break;
-      
-      iSound = pSoundEnt->m_SoundPool[ iSound ].m_iNext;
-   }
    
    if(iSound == SOUNDLIST_EMPTY)
    {
@@ -376,7 +345,8 @@ void CSoundEnt :: Initialize ( void )
    m_iActiveSound = SOUNDLIST_EMPTY;
 
    for ( i = 0 ; i < MAX_WORLD_SOUNDS ; i++ )
-   {// clear all sounds, and link them into the free sound list.
+   {
+      // clear all sounds, and link them into the free sound list.
       m_SoundPool[ i ].Clear();
       m_SoundPool[ i ].m_iNext = i + 1;
    }
@@ -464,7 +434,7 @@ int CSoundEnt :: FreeList ( void )
 // SoundPointerForIndex - returns a pointer to the instance
 // of CSound at index's position in the sound pool.
 //=========================================================
-CSound*   CSoundEnt :: SoundPointerForIndex( int iIndex )
+CSound* CSoundEnt :: SoundPointerForIndex( int iIndex )
 {
    if ( !pSoundEnt )
    {

@@ -297,6 +297,9 @@ void BotEvaluateGoal( bot_t &pBot )
    // we're dying!  Forget about our goal
    if (pBot.waypoint_goal != -1 && pEdict->v.health <= 25 && pBot.wpt_goal_type != WPT_GOAL_HEALTH)
    {
+      //if(pBot.waypoint_goal != -1)
+      //   UTIL_ConsolePrintf("[%s] Dying, forget goal: %d -> %d", pBot.name, pBot.waypoint_goal, -1);
+      
       pBot.f_waypoint_goal_time = 0;
       pBot.waypoint_goal = -1;
    }
@@ -304,7 +307,53 @@ void BotEvaluateGoal( bot_t &pBot )
 
 
 //
-int GetSoundWaypoint( bot_t &pBot )
+qboolean BotUpdateTrackSoundGoal( bot_t &pBot )
+{
+   if(pBot.wpt_goal_type != WPT_GOAL_TRACK_SOUND)
+      return FALSE;
+   
+   // check track-sound-time if we should stop tracking
+   // check if target has been erased
+   // check our state -> do we want to keep tracking
+   if((pBot.f_track_sound_time <= 0.0f && pBot.f_track_sound_time < gpGlobals->time) || 
+        !pBot.b_has_enough_ammo_for_good_weapon || pBot.b_low_health)
+   {
+      if(pBot.waypoint_goal != -1)
+      {
+         //if(!pBot.b_has_enough_ammo_for_good_weapon || pBot.b_low_health)
+         //   UTIL_ConsolePrintf("[%s] Dropped sound tracking goal because(%d -> %d): out of ammo/health", pBot.name, pBot.waypoint_goal, -1);
+         //if(pBot.f_track_sound_time <= 0.0f && pBot.f_track_sound_time < gpGlobals->time)
+         //   UTIL_ConsolePrintf("[%s] Dropped sound tracking goal because(%d -> %d): end of tracking time", pBot.name, pBot.waypoint_goal, -1);
+      }
+      
+      pBot.waypoint_goal = -1;
+      pBot.wpt_goal_type = WPT_GOAL_NONE;
+      
+      pBot.pTrackSoundEdict = NULL;
+      pBot.f_track_sound_time = -1;
+      
+      return FALSE;
+   }
+   
+   // get waypoint close to sound of track-sound-edict
+   edict_t* pNew = NULL;
+   int waypoint = BotGetSoundWaypoint( pBot, pBot.pTrackSoundEdict, &pNew );
+   
+   if(FNullEnt(pBot.pTrackSoundEdict) && !FNullEnt(pNew))
+      pBot.pTrackSoundEdict = pNew;
+   
+   // update waypoint_goal
+   //if(pBot.waypoint_goal != waypoint)
+   //   UTIL_ConsolePrintf("[%s] Updated sound tracking goal waypoint: %d -> %d", pBot.name, pBot.waypoint_goal, waypoint);
+   
+   pBot.waypoint_goal = waypoint;
+   
+   return TRUE;
+}
+
+
+//
+int BotGetSoundWaypoint( bot_t &pBot, edict_t *pTrackSoundEdict, edict_t ** pNewTrackSoundEdict )
 {
    edict_t *pEdict = pBot.pEdict;
    
@@ -312,35 +361,55 @@ int GetSoundWaypoint( bot_t &pBot )
    int iSound;
    CSound *pCurrentSound;
    float mindistance;
+   edict_t *pMinDistanceEdict = NULL;
    
-   iSound = CSoundEnt::ActiveList();
-   mindistance = 99999.0f;
-   
-   while (iSound != SOUNDLIST_EMPTY)
+   mindistance = WAYPOINT_UNREACHABLE;
+      
+   // walk through active sound linked list
+   for(iSound = CSoundEnt::ActiveList(); iSound != SOUNDLIST_EMPTY; iSound = pCurrentSound->m_iNext)
    {
       pCurrentSound = CSoundEnt::SoundPointerForIndex( iSound );
       
-      if (pCurrentSound && 
-          (pCurrentSound->m_vecOrigin - pEdict->v.origin).Length() <= pCurrentSound->m_iVolume * skill_settings[pBot.bot_skill].hearing_sensitivity &&
-          pCurrentSound->m_iBotOwner == (&pBot - &bots[0]))
-      {
-         int temp_index = WaypointFindNearest(pCurrentSound->m_vecOrigin, pEdict, REACHABLE_RANGE, TRUE);
+      if(!pCurrentSound)
+         continue;
+      
+      // ignore sounds created by bot itself
+      if(pCurrentSound->m_iBotOwner == (&pBot - &bots[0]))
+         continue;
+      
+      // we want specific waypoint?
+      if(!FNullEnt(pTrackSoundEdict) && pCurrentSound->m_pEdict != pTrackSoundEdict)
+         continue;
+      
+      // is sound too far away? (bot cannot hear)
+      float s_distance = (pCurrentSound->m_vecOrigin - pEdict->v.origin).Length();
+      if(s_distance > pCurrentSound->m_iVolume * skill_settings[pBot.bot_skill].hearing_sensitivity)
+         continue;
+      
+      int temp_index = WaypointFindNearest(pCurrentSound->m_vecOrigin, pEdict, REACHABLE_RANGE, TRUE);
          
-         // get distance
-         if (temp_index > -1 && temp_index < num_waypoints)
-         {
-            float distance = WaypointDistanceFromTo(pBot.curr_waypoint_index, temp_index);
+      // get distance
+      if (temp_index > -1 && temp_index < num_waypoints)
+      {
+         float distance;
+         
+         // use alternative way in case bot doesn't have current waypoint
+         if(pBot.curr_waypoint_index == -1)
+            distance = (pEdict->v.origin - waypoints[temp_index].origin).Length();
+         else
+            distance = WaypointDistanceFromTo(pBot.curr_waypoint_index, temp_index);
             
-            if (distance < mindistance)
-            {
-               mindistance = distance;
-               index = temp_index;
-            }
+         if (distance < mindistance)
+         {
+            mindistance = distance;
+            index = temp_index;
+            pMinDistanceEdict = FNullEnt(pCurrentSound->m_pEdict)?NULL:pCurrentSound->m_pEdict;
          }
       }
-      
-      iSound = pCurrentSound->m_iNext;
    }
+   
+   if(pNewTrackSoundEdict)
+      *pNewTrackSoundEdict = pMinDistanceEdict;
    
    return index;
 }
@@ -370,26 +439,13 @@ void BotFindWaypointGoal( bot_t &pBot )
       goto exit;
    }
    
-   if(pBot.pFindSoundEnt != NULL && pBot.b_has_enough_ammo_for_good_weapon && !pBot.b_low_health)
-   {
-      // find a waypoint near interesting sound
-      index = WaypointFindNearest(pBot.pFindSoundEnt, REACHABLE_RANGE, TRUE);
-
-      if (index != -1)
-      {
-         pBot.wpt_goal_type = WPT_GOAL_SOUND;
-         pBot.waypoint_goal = index;
-      }
-      
-      goto exit;
-   }
-   
    if (pBot.pBotEnemy == NULL)
    {
       int goal_type = 0;
       int ammoflags;
       int weaponflags;
       float mindistance = WAYPOINT_UNREACHABLE;
+      edict_t* pTrackSoundEdict = NULL;
       
       // only if not engaging
       
@@ -397,15 +453,19 @@ void BotFindWaypointGoal( bot_t &pBot )
       if(!pBot.b_low_health && pBot.b_has_enough_ammo_for_good_weapon)
       {
          // find nearest interesting sound that isn't visible
-         int temp_index = GetSoundWaypoint(pBot);
+         int temp_index = BotGetSoundWaypoint(pBot, NULL, &pTrackSoundEdict);
          
          if(temp_index != -1)
          {
-            if(RANDOM_FLOAT2(0.0, 1.0) < 0.5)
+            if(RANDOM_FLOAT2(0.0, 1.0) < 0.5f)
             {
+               float track_time = RANDOM_FLOAT2(skill_settings[pBot.bot_skill].track_sound_time_min, skill_settings[pBot.bot_skill].track_sound_time_max);
+               
                // don't try get other objects
-               pBot.wpt_goal_type = WPT_GOAL_SOUND;
+               pBot.wpt_goal_type = WPT_GOAL_TRACK_SOUND;
                pBot.waypoint_goal = temp_index;
+               pBot.pTrackSoundEdict = pTrackSoundEdict;
+               pBot.f_track_sound_time = gpGlobals->time + track_time;
                index = temp_index;
                
                goto exit;
@@ -418,7 +478,7 @@ void BotFindWaypointGoal( bot_t &pBot )
                {
                   mindistance = distance;
                   index = temp_index;
-                  goal_type = WPT_GOAL_SOUND;
+                  goal_type = WPT_GOAL_TRACK_SOUND;
                }
             }
          }
@@ -562,26 +622,33 @@ void BotFindWaypointGoal( bot_t &pBot )
          pBot.wpt_goal_type = goal_type;
          pBot.waypoint_goal = index;
          
-         if(goal_type != WPT_GOAL_SOUND)
+         if(goal_type != WPT_GOAL_TRACK_SOUND)
          {
-            // don't pick same object too often
-            for(int i = EXCLUDE_POINTS_COUNT - 1; i > 0; i--)
-               pBot.exclude_points[i] = pBot.exclude_points[i-1];
-         
-            pBot.exclude_points[0] = pBot.waypoint_goal;
+            pBot.pTrackSoundEdict = NULL;
+            pBot.f_track_sound_time = -1;
+         }
+         else
+         {
+            float track_time = RANDOM_FLOAT2(skill_settings[pBot.bot_skill].track_sound_time_min, skill_settings[pBot.bot_skill].track_sound_time_max);
+            
+            pBot.pTrackSoundEdict = pTrackSoundEdict;
+            pBot.f_track_sound_time = gpGlobals->time + track_time;
          }
          
          goto exit;
       }
    }
-   else
-   {  // find a waypoint near our enemy
-      index = WaypointFindNearest(pBot.pBotEnemy, 512);
+   else if(!FNullEnt(pBot.pBotEnemy))
+   {  
+      // find a waypoint near our enemy
+      index = WaypointFindNearest(pBot.pBotEnemy, 1024);
 
       if (index != -1)
       {
          pBot.wpt_goal_type = WPT_GOAL_ENEMY;
          pBot.waypoint_goal = index;
+         pBot.pTrackSoundEdict = NULL;
+         pBot.f_track_sound_time = -1;
          
          goto exit;
       }
@@ -590,12 +657,14 @@ void BotFindWaypointGoal( bot_t &pBot )
    // we couldn't find ANYTHING, go somewhere random
    if (index == -1)
    {
-      index = WaypointFindRandomGoal(pEdict, 0, pBot.exclude_points);
+      index = WaypointFindRandomGoal(pEdict, 0);
 
       if (index != -1)
       {
-         pBot.wpt_goal_type = WPT_GOAL_NONE;
+         pBot.wpt_goal_type = WPT_GOAL_LOCATION;
          pBot.waypoint_goal = index;
+         pBot.pTrackSoundEdict = NULL;
+         pBot.f_track_sound_time = -1;
          
          goto exit;
       }
@@ -623,14 +692,14 @@ exit:
          case WPT_GOAL_ITEM:
             UTIL_ConsolePrintf("[%s] %s", pBot.name, "I am going for an item!\n");
             break;
-         case WPT_GOAL_SOUND:
+         case WPT_GOAL_TRACK_SOUND:
             UTIL_ConsolePrintf("[%s] %s", pBot.name, "I am tracking a sound!\n");
             break;
          case WPT_GOAL_ENEMY:
             UTIL_ConsolePrintf("[%s] %s", pBot.name, "I am tracking/engaging an enemy!\n");
             break;
-         case WPT_GOAL_NONE:
-            UTIL_ConsolePrintf("[%s] %s", pBot.name, "I have a random goal!\n");
+         case WPT_GOAL_LOCATION:
+            UTIL_ConsolePrintf("[%s] %s", pBot.name, "I have a random location goal!\n");
             break;
          default:
             UTIL_ConsolePrintf("[%s] %s", pBot.name, "I have an unknown goal!\n");
@@ -665,6 +734,12 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
    if ((pBot.waypoint_goal == -1) && (pBot.f_waypoint_goal_time > gpGlobals->time + 2) &&
        (pBot.f_waypoint_goal_time != 0.0))
       pBot.f_waypoint_goal_time = 0.0;
+
+   // find new waypoint for sound we are tracking
+   if(pBot.wpt_goal_type == WPT_GOAL_TRACK_SOUND)
+   {
+      BotUpdateTrackSoundGoal(pBot);
+   }
 
    // check if we need to find a waypoint...
    if (pBot.curr_waypoint_index == -1)
@@ -887,10 +962,24 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
          }
 
          if (pBot.pBotEnemy != NULL)
-            pBot.f_waypoint_goal_time = gpGlobals->time;
+            pBot.f_waypoint_goal_time = gpGlobals->time + 0.25;
          else   // a little delay time, since we'll touch the waypoint before we actually get what it has
             pBot.f_waypoint_goal_time = gpGlobals->time + 0.25;
 
+         // don't pick same object too often
+         if(pBot.wpt_goal_type == WPT_GOAL_HEALTH || 
+            pBot.wpt_goal_type == WPT_GOAL_ARMOR || 
+            pBot.wpt_goal_type == WPT_GOAL_WEAPON || 
+            pBot.wpt_goal_type == WPT_GOAL_AMMO || 
+            pBot.wpt_goal_type == WPT_GOAL_ITEM)
+         {
+            for(int i = EXCLUDE_POINTS_COUNT - 1; i > 0; i--)
+               pBot.exclude_points[i] = pBot.exclude_points[i-1];
+            pBot.exclude_points[0] = pBot.waypoint_goal;
+         }
+
+         //UTIL_ConsolePrintf("[%s] Reach goal: %d -> %d", pBot.name, pBot.waypoint_goal, -1);
+         
          pBot.waypoint_goal = -1;  // forget this goal waypoint
          pBot.wpt_goal_type = WPT_GOAL_NONE;
       }
@@ -2219,8 +2308,7 @@ void BotLookForDrop( bot_t &pBot )
          // if we have an enemy, stop heading towards enemy...
          if (pBot.pBotEnemy)
          {
-            pBot.pBotEnemy = NULL;
-            pBot.f_bot_find_enemy_time = gpGlobals->time + 1.0;
+            BotRemoveEnemy(pBot, TRUE);
             
             // level look
             pEdict->v.idealpitch = 0;
