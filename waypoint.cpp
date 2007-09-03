@@ -1465,7 +1465,7 @@ void WaypointDelete(edict_t *pEntity)
 
    //..
 
-   if (waypoints[index].flags & W_FL_SNIPER || waypoints[index].flags & W_FL_JUMP)
+   if (/*waypoints[index].flags & W_FL_SNIPER ||*/ waypoints[index].flags & W_FL_JUMP)
    {
       int i;
       int min_index = -1;
@@ -2429,8 +2429,8 @@ void WaypointPrintInfo(edict_t *pEntity)
    if (flags & W_FL_JUMP)
       ClientPrint(pEntity, HUD_PRINTNOTIFY, "Bot will jump here\n");
 
-   if (flags & W_FL_SNIPER)
-      ClientPrint(pEntity, HUD_PRINTNOTIFY, "This is a sniper waypoint\n");
+//   if (flags & W_FL_SNIPER)
+//      ClientPrint(pEntity, HUD_PRINTNOTIFY, "This is a sniper waypoint\n");
 }
 #endif
 

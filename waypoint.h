@@ -26,7 +26,7 @@
 #define W_FL_AMMO        (1<<9)  /* ammo location */
 #define W_FL_WEAPON      (1<<10) /* weapon_ entity location */
 
-#define W_FL_SNIPER      (1<<11) /* sniper waypoint (a good sniper spot) */
+//#define W_FL_SNIPER      (1<<11) /* sniper waypoint (a good sniper spot) */
 #define W_FL_AIMING      (1<<12) /* aiming waypoint */
 
 #define W_FL_SPAWNADD    (1<<13) /* waypoint was added by spawn-object, marked to not have these trimmed on wp-save */

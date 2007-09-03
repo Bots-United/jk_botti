@@ -10,13 +10,15 @@
 ifeq ($(OS),Windows_NT)
 	CPP = gcc -mno-cygwin
 	ARCHFLAG = -march=i686 -mtune=pentium4
-	LINKFLAGS = -mdll -lwsock32 -Xlinker --add-stdcall-alias -s
+	LINKFLAGS = -mdll -lwsock32 -Xlinker --add-stdcall-alias 
+	#-s
 	DLLEND = .dll
 	ZLIB_OSFLAGS = 
 else
 	CPP = gcc-linux
 	ARCHFLAG = -march=i686 -mcpu=pentium4 -fPIC
-	LINKFLAGS = -fPIC -shared -ldl -s
+	LINKFLAGS = -fPIC -shared -ldl 
+	#-s
 	DLLEND = _i386.so
 	ZLIB_OSFLAGS = -DNO_UNDERLINE 
 endif
@@ -27,7 +29,7 @@ BASEFLAGS =
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
 else
-	OPTFLAGS = -O2 -fomit-frame-pointer -ffast-math
+	OPTFLAGS = -O2 -ffast-math -fomit-frame-pointer -g
 endif
 
 INCLUDES = -I"./metamod" \

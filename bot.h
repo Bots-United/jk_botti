@@ -231,7 +231,8 @@ typedef struct
    edict_t *pBotEnemy;
    float f_bot_see_enemy_time;
    Vector v_bot_see_enemy_origin;
-   
+   float f_next_find_visible_sound_enemy_time;
+ 
    float f_last_time_attacked;
 
    edict_t *killer_edict;

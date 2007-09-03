@@ -197,6 +197,8 @@ void BotResetReactionTime(bot_t &pBot)
 
       pBot.f_reaction_target_time = gpGlobals->time + react_delay;
    }
+   
+   pBot.f_next_find_visible_sound_enemy_time = gpGlobals->time + 0.2f;
 }
 
 
@@ -671,10 +673,11 @@ qboolean FCanShootInHead(edict_t * pEdict, edict_t * pTarget, const Vector & v_d
 
 
 //
-edict_t *FindEnemyNearestToPoint(const Vector &v_point, float radius, edict_t * pBotEdict)
+edict_t *BotFindEnemyNearestToPoint(bot_t &pBot, const Vector &v_point, float radius, edict_t * pBotEdict, Vector *v_found)
 {
    float nearestdistance = radius + 1;
    edict_t * pNearestEnemy = NULL;
+   Vector v_nearestorigin = Vector(0,0,0);
    
    // search the world for monsters...
    {
@@ -685,7 +688,8 @@ edict_t *FindEnemyNearestToPoint(const Vector &v_point, float radius, edict_t * 
             continue; // discard anything that is not a monster
          
          // this is faster check than ones below
-         float distance = (pMonster->v.origin - v_point).Length();
+         Vector v_origin = UTIL_GetOriginWithExtent(pBot, pMonster);
+         float distance = (v_origin - v_point).Length();
          if (distance >= nearestdistance)
             continue;
          
@@ -695,11 +699,12 @@ edict_t *FindEnemyNearestToPoint(const Vector &v_point, float radius, edict_t * 
          if (FIsClassname(pMonster, "monster_snark"))
             continue; // skip snarks
          
-         if (!FVisible( v_point, pMonster, pMonster ))
+         if (!FVisible( v_point, pMonster, pBotEdict ))
             continue;
 
          nearestdistance = distance;
          pNearestEnemy = pMonster;
+         v_nearestorigin = v_origin;
       }
    }
 
@@ -716,10 +721,20 @@ edict_t *FindEnemyNearestToPoint(const Vector &v_point, float radius, edict_t * 
             continue;
          
          // check first.. since this is very fast check
-         float distance = (pPlayer->v.origin - v_point).Length();
+         Vector v_origin = UTIL_GetOriginWithExtent(pBot, pPlayer);
+         float distance = (v_origin - v_point).Length();
          if (distance >= nearestdistance)
             continue;
-         
+            
+         // skip this player if not alive (i.e. dead or dying)
+         if (!IsAlive(pPlayer))
+            continue;
+              
+         // skip this player if respawned lately
+         float time_since_respawn = UTIL_GetTimeSinceRespawn(pPlayer);
+         if(time_since_respawn != -1.0 && time_since_respawn < skill_settings[pBot.bot_skill].respawn_react_delay)
+            continue;
+            
          // skip this player if facing wall
          if(IsPlayerChatProtected(pPlayer))
             continue;
@@ -729,16 +744,20 @@ edict_t *FindEnemyNearestToPoint(const Vector &v_point, float radius, edict_t * 
             continue;
 
          // see if bot can't see the player...
-         if (!FVisible( v_point, pPlayer, pPlayer))
-               continue;
+         if (!FVisible( v_point, pPlayer, pBotEdict ))
+            continue;
 
          nearestdistance = distance;
          pNearestEnemy = pPlayer;
+         v_nearestorigin = v_origin;
       }
    }
    
    if(nearestdistance <= radius)
    {
+      if(v_found)
+         *v_found = v_nearestorigin;
+      
       return(pNearestEnemy);
    }
    
@@ -746,6 +765,59 @@ edict_t *FindEnemyNearestToPoint(const Vector &v_point, float radius, edict_t * 
 }
 
 
+//
+edict_t *BotFindVisibleSoundEnemy( bot_t &pBot )
+{
+   edict_t *pEdict = pBot.pEdict;
+   
+   int iSound;
+   CSound *pCurrentSound;
+   float mindistance;
+   edict_t *pMinDistanceEdict = NULL;
+   
+   mindistance = 99999.0;
+      
+   // walk through active sound linked list
+   for(iSound = CSoundEnt::ActiveList(); iSound != SOUNDLIST_EMPTY; iSound = pCurrentSound->m_iNext)
+   {
+      pCurrentSound = CSoundEnt::SoundPointerForIndex( iSound );
+      
+      if(!pCurrentSound)
+         continue;
+      
+      // ignore sounds created by bot itself
+      if(pCurrentSound->m_iBotOwner == (&pBot - &bots[0]))
+         continue;
+      
+      // is sound too far away? (bot cannot hear)
+      float s_distance = (pCurrentSound->m_vecOrigin - pEdict->v.origin).Length();
+      if(s_distance > pCurrentSound->m_iVolume * skill_settings[pBot.bot_skill].hearing_sensitivity)
+         continue;
+
+      // more distant than what we got already?
+      float distance = (pCurrentSound->m_vecOrigin - pEdict->v.origin).Length();      
+      if (distance >= mindistance)
+         continue;
+      
+      // any enemy near sound?
+      Vector v_enemy = Vector(0,0,0);
+      edict_t * pNewEnemy = BotFindEnemyNearestToPoint(pBot, pCurrentSound->m_vecOrigin, 512.0, pEdict, &v_enemy);
+      if(FNullEnt(pNewEnemy))
+         continue;
+      
+      // is enemy visible?
+      if (!FVisible( v_enemy, pEdict, pNewEnemy ))
+         continue;
+      
+      mindistance = distance;
+      pMinDistanceEdict = pNewEnemy;
+   }
+   
+   return pMinDistanceEdict;
+}
+
+
+//
 void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking )
 {
    edict_t *pEdict = pBot.pEdict;
@@ -779,6 +851,7 @@ void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking )
    
    // reset reactions
    BotResetReactionTime(pBot);
+   pBot.f_next_find_visible_sound_enemy_time = gpGlobals->time + 0.2f;
    
    // update bot waypoint after combat
    pBot.curr_waypoint_index = WaypointFindNearest(pEdict, 1024);
@@ -997,6 +1070,18 @@ void BotFindEnemy( bot_t &pBot )
       }
    }
 
+   // check sounds for any potential targets
+   if (FNullEnt(pNewEnemy) && pBot.f_next_find_visible_sound_enemy_time <= gpGlobals->time)
+   {
+      // only run this 5fps
+      pNewEnemy = BotFindVisibleSoundEnemy(pBot);
+      
+      UTIL_ConsolePrintf("Found sound enemy!");
+      
+      pBot.f_next_find_visible_sound_enemy_time = gpGlobals->time + 0.2f;
+   }
+
+   // 
    if (pNewEnemy)
    {
       // face the enemy
@@ -1150,7 +1235,8 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, 
    //duck for better aim
    if(select.iId == GEARBOX_WEAPON_M249)
    {
-      pBot.f_duck_time = gpGlobals->time + 0.25f;
+      pBot.f_duck_time = gpGlobals->time + 0.5f;
+      pEdict->v.button |= IN_DUCK;
    }
 
    if (use_primary)

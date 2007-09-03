@@ -180,6 +180,7 @@ void BotSpawnInit( bot_t &pBot )
    pBot.pBotEnemy = NULL;
    pBot.f_bot_see_enemy_time = gpGlobals->time;
    pBot.v_bot_see_enemy_origin = Vector(-99999,-99999,-99999);
+   pBot.f_next_find_visible_sound_enemy_time = 0.0f;
 
    pBot.f_duck_time = 0.0;
    
@@ -2182,7 +2183,8 @@ void BotThink( bot_t &pBot )
    // Only need to check ammo, since ammo check for weapons includes weapons ;)
    pBot.b_has_enough_ammo_for_good_weapon = !BotAllWeaponsRunningOutOfAmmo(pBot, TRUE);
    
-   if((pBot.b_has_enough_ammo_for_good_weapon && !pBot.b_low_health) || pBot.f_last_time_attacked < gpGlobals->time + 3.0f)
+   if(BotWeaponCanAttack(pBot, FALSE) && 
+      ((pBot.b_has_enough_ammo_for_good_weapon && !pBot.b_low_health) || pBot.f_last_time_attacked < gpGlobals->time + 3.0f))
    {
       // get enemy
       BotFindEnemy( pBot );
@@ -2359,70 +2361,6 @@ void BotThink( bot_t &pBot )
          // this might be duck-jump waypoint.. check if waypoint is at lower height than current bot origin
          if(waypoints[pBot.curr_waypoint_index].origin.z < pEdict->v.origin.z)
             pEdict->v.button |= IN_DUCK;  // duck down while moving forward
-      }
-
-      // check if the waypoint is a sniper waypoint AND
-      // bot isn't currently aiming at an ememy...
-      if ((waypoints[pBot.curr_waypoint_index].flags & W_FL_SNIPER) && (pBot.pBotEnemy == NULL))
-      {
-         {
-            // check if the bot need to move back closer to the waypoint...
-
-            float distance = (pEdict->v.origin - waypoints[pBot.curr_waypoint_index].origin).Length();
-
-            if (distance > 40)
-            {
-               // turn towards the sniper waypoint and move there...
-
-               Vector v_direction = waypoints[pBot.curr_waypoint_index].origin - pEdict->v.origin;
-
-               Vector bot_angles = UTIL_VecToAngles( v_direction );
-
-               pEdict->v.ideal_yaw = bot_angles.y;
-
-               BotFixIdealYaw(pEdict);
-
-               // go slow to prevent the "loop the loop" problem...
-               pBot.f_move_speed = pBot.f_max_speed / 3;
-               pBot.b_not_maxspeed = TRUE;
-
-               pBot.f_sniper_aim_time = 0.0;  // reset aiming time
-               
-               // save the previous speed (for checking if stuck)
-               pBot.f_prev_speed = pBot.f_move_speed;
-
-               f_strafe_speed = 0.0;
-               
-               BotRunPlayerMove(pBot, pEdict->v.v_angle, pBot.f_move_speed,
-                                            f_strafe_speed, 0, pEdict->v.button, 0, (byte)pBot.msecval);
-               
-               return;
-            }
-
-            // check if it's time to adjust aim yet...
-            if (pBot.f_sniper_aim_time <= gpGlobals->time)
-            {
-               int aim_index;
-
-               aim_index = WaypointFindNearestAiming(waypoints[pBot.curr_waypoint_index].origin);
-
-               if (aim_index != -1)
-               {
-                  Vector v_aim = waypoints[aim_index].origin - waypoints[pBot.curr_waypoint_index].origin;
-
-                  Vector aim_angles = UTIL_VecToAngles( v_aim );
-
-                  aim_angles.y += RANDOM_LONG2(0, 30) - 15;
-
-                  pEdict->v.ideal_yaw = aim_angles.y;
-
-                  BotFixIdealYaw(pEdict);
-               }
-
-               // don't adjust aim again until after a few seconds...
-               pBot.f_sniper_aim_time = gpGlobals->time + RANDOM_FLOAT2(3.0, 5.0);
-            }
-         }
       }
    }
    

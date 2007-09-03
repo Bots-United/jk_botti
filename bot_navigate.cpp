@@ -922,34 +922,6 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
          pEdict->v.button |= IN_JUMP;  // jump here
       }
 
-      // check if the waypoint is a sniper waypoint...
-      if (waypoints[pBot.curr_waypoint_index].flags & W_FL_SNIPER)
-      {
-         {
-            int aim_index;
-
-            aim_index = WaypointFindNearestAiming(waypoints[pBot.curr_waypoint_index].origin);
-
-            if (aim_index != -1)
-            {
-               Vector v_aim = waypoints[aim_index].origin - waypoints[pBot.curr_waypoint_index].origin;
-
-               Vector aim_angles = UTIL_VecToAngles( v_aim );
-
-               pEdict->v.ideal_yaw = aim_angles.y;
-
-               BotFixIdealYaw(pEdict);
-            }
-
-            pBot.f_pause_time = gpGlobals->time + RANDOM_FLOAT2(20.0, 30.0);
-
-            // fix f_waypoint_time so bot won't think it is stuck
-            pBot.f_waypoint_time = pBot.f_pause_time;
-
-            return TRUE;
-         }
-      }
-
       // check if the bot has reached the goal waypoint...
       if (pBot.curr_waypoint_index == pBot.waypoint_goal)
       {
