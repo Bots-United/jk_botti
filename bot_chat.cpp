@@ -96,11 +96,11 @@ void BotChatTaunt(bot_t &pBot, edict_t *victim_edict)
       if (bot_taunt[taunt_index].can_modify)
          BotChatText(bot_taunt[taunt_index].text, chat_text, sizeof(chat_text));
       else
-         safevoid_snprintf(chat_text, sizeof(chat_text), "%s", bot_taunt[taunt_index].text);
+         safe_strcopy(chat_text, sizeof(chat_text), bot_taunt[taunt_index].text);
 
       if (victim_edict->v.netname)
       {
-         safevoid_snprintf(temp_name, sizeof(temp_name), "%s", STRING(victim_edict->v.netname));
+         safe_strcopy(temp_name, sizeof(temp_name), STRING(victim_edict->v.netname));
 
          BotChatName(temp_name, chat_name, sizeof(chat_name));
       }
@@ -169,11 +169,11 @@ void BotChatWhine(bot_t &pBot)
          if (bot_whine[whine_index].can_modify)
             BotChatText(bot_whine[whine_index].text, chat_text, sizeof(chat_text));
          else
-            safevoid_snprintf(chat_text, sizeof(chat_text), "%s", bot_whine[whine_index].text);
+            safe_strcopy(chat_text, sizeof(chat_text), bot_whine[whine_index].text);
 
          if (pBot.killer_edict->v.netname)
          {
-            safevoid_snprintf(temp_name, sizeof(temp_name), "%s", STRING(pBot.killer_edict->v.netname));
+            safe_strcopy(temp_name, sizeof(temp_name), STRING(pBot.killer_edict->v.netname));
 
             BotChatName(temp_name, chat_name, sizeof(chat_name));
          }
@@ -242,9 +242,9 @@ void BotChatTalk(bot_t &pBot)
          if (bot_chat[chat_index].can_modify)
             BotChatText(bot_chat[chat_index].text, chat_text, sizeof(chat_text));
          else
-            safevoid_snprintf(chat_text, sizeof(chat_text), "%s", bot_chat[chat_index].text);
+            safe_strcopy(chat_text, sizeof(chat_text), bot_chat[chat_index].text);
 
-         safevoid_snprintf(chat_name, sizeof(chat_name), "%s", STRING(pBot.pEdict->v.netname));
+         safe_strcopy(chat_name, sizeof(chat_name), STRING(pBot.pEdict->v.netname));
 
          bot_name = STRING(pEdict->v.netname);
 
@@ -326,12 +326,12 @@ void LoadBotChat(void)
       {
          if (buffer[0] == '!')
          {
-            safevoid_snprintf(bot_chat[bot_chat_count].text, sizeof(bot_chat[bot_chat_count].text), "%s", &buffer[1]);
+            safe_strcopy(bot_chat[bot_chat_count].text, sizeof(bot_chat[bot_chat_count].text), &buffer[1]);
             bot_chat[bot_chat_count].can_modify = FALSE;
          }
          else
          {
-            safevoid_snprintf(bot_chat[bot_chat_count].text, sizeof(bot_chat[bot_chat_count].text), "%s", buffer);
+            safe_strcopy(bot_chat[bot_chat_count].text, sizeof(bot_chat[bot_chat_count].text), buffer);
             bot_chat[bot_chat_count].can_modify = TRUE;
          }
 
@@ -343,12 +343,12 @@ void LoadBotChat(void)
       {
          if (buffer[0] == '!')
          {
-            safevoid_snprintf(bot_taunt[bot_taunt_count].text, sizeof(bot_taunt[bot_taunt_count].text), "%s", &buffer[1]);
+            safe_strcopy(bot_taunt[bot_taunt_count].text, sizeof(bot_taunt[bot_taunt_count].text), &buffer[1]);
             bot_taunt[bot_taunt_count].can_modify = FALSE;
          }
          else
          {
-            safevoid_snprintf(bot_taunt[bot_taunt_count].text, sizeof(bot_taunt[bot_taunt_count].text), "%s", buffer);
+            safe_strcopy(bot_taunt[bot_taunt_count].text, sizeof(bot_taunt[bot_taunt_count].text), buffer);
             bot_taunt[bot_taunt_count].can_modify = TRUE;
          }
 
@@ -360,12 +360,12 @@ void LoadBotChat(void)
       {
          if (buffer[0] == '!')
          {
-            safevoid_snprintf(bot_whine[bot_whine_count].text, sizeof(bot_whine[bot_whine_count].text), "%s", &buffer[1]);
+            safe_strcopy(bot_whine[bot_whine_count].text, sizeof(bot_whine[bot_whine_count].text), &buffer[1]);
             bot_whine[bot_whine_count].can_modify = FALSE;
          }
          else
          {
-            safevoid_snprintf(bot_whine[bot_whine_count].text, sizeof(bot_whine[bot_whine_count].text), "%s", buffer);
+            safe_strcopy(bot_whine[bot_whine_count].text, sizeof(bot_whine[bot_whine_count].text), buffer);
             bot_whine[bot_whine_count].can_modify = TRUE;
          }
 
@@ -409,7 +409,7 @@ int BotChatTrimTag(const char *original_name, char *out_name, int sizeof_out_nam
    char in_name[80];
    int result = 0;
 
-   safevoid_snprintf(in_name, sizeof(in_name), "%s", original_name);
+   safe_strcopy(in_name, sizeof(in_name), original_name);
 
    for (i=0; i < NUM_TAGS; i++)
    {
@@ -431,13 +431,13 @@ int BotChatTrimTag(const char *original_name, char *out_name, int sizeof_out_nam
       }
    }
 
-   safevoid_snprintf(out_name, sizeof_out_name, "%s", in_name);
+   safe_strcopy(out_name, sizeof_out_name, in_name);
 
    BotTrimBlanks(out_name, in_name, sizeof(in_name));
 
    if (strlen(in_name) == 0)  // is name just a tag?
    {
-      safevoid_snprintf(in_name, sizeof(in_name), "%s", original_name);
+      safe_strcopy(in_name, sizeof(in_name), original_name);
       
       /*
       // strip just the tag part...
@@ -480,7 +480,7 @@ void BotDropCharacter(const char *in_string, char *out_string, int sizeof_out_st
    char *src, *dest;
    qboolean is_bad;
 
-   safevoid_snprintf(out_string, sizeof_out_string, "%s", in_string);
+   safe_strcopy(out_string, sizeof_out_string, in_string);
 
    len = strlen(out_string);
    if(len < 2)
@@ -513,7 +513,7 @@ void BotSwapCharacter(const char *in_string, char *out_string, int sizeof_out_st
    char temp;
    qboolean is_bad;
 
-   safevoid_snprintf(out_string, sizeof_out_string, "%s", in_string);
+   safe_strcopy(out_string, sizeof_out_string, in_string);
 
    len = strlen(out_string);
    if(len < 3) // must be 3, 1+1 for swap + zero must now swap = 3
@@ -545,7 +545,7 @@ void BotChatName(const char *original_name, char *out_name, int sizeof_out_name)
    //always remove [lvlX] tag
    if(strncmp(original_name, "[lvl", 4) == 0 && original_name[4] >= '0' && original_name[4] <= '5' && original_name[5] == ']')
    {
-      safevoid_snprintf(temp_lvlXless_name, sizeof(temp_lvlXless_name), "%s", &original_name[6]);
+      safe_strcopy(temp_lvlXless_name, sizeof(temp_lvlXless_name), &original_name[6]);
       original_name = temp_lvlXless_name;
    }
 
@@ -553,16 +553,16 @@ void BotChatName(const char *original_name, char *out_name, int sizeof_out_name)
    {
       char temp_name[80];
 
-      safevoid_snprintf(temp_name, sizeof(temp_name), "%s", original_name);
+      safe_strcopy(temp_name, sizeof(temp_name), original_name);
 
       while (BotChatTrimTag(temp_name, out_name, sizeof_out_name))
       {
-         safevoid_snprintf(temp_name, sizeof(temp_name), "%s", out_name);
+         safe_strcopy(temp_name, sizeof(temp_name), out_name);
       }
    }
    else
    {
-      safevoid_snprintf(out_name, sizeof_out_name, "%s", original_name);
+      safe_strcopy(out_name, sizeof_out_name, original_name);
    }
 
    if (RANDOM_LONG2(1, 100) <= bot_chat_lower_percent)
@@ -583,7 +583,7 @@ void BotChatText(const char *in_text, char *out_text, int sizeof_out_text)
    char temp_text[81];
    int count;
 
-   safevoid_snprintf(temp_text, sizeof(temp_text), "%s", in_text);
+   safe_strcopy(temp_text, sizeof(temp_text), in_text);
 
    if (RANDOM_LONG2(1, 100) <= bot_chat_drop_percent)
    {
@@ -592,7 +592,7 @@ void BotChatText(const char *in_text, char *out_text, int sizeof_out_text)
       while (count)
       {
          BotDropCharacter(temp_text, out_text, sizeof_out_text);
-         safevoid_snprintf(temp_text, sizeof(temp_text), "%s", out_text);
+         safe_strcopy(temp_text, sizeof(temp_text), out_text);
          count--;
       }
    }
@@ -604,7 +604,7 @@ void BotChatText(const char *in_text, char *out_text, int sizeof_out_text)
       while (count)
       {
          BotSwapCharacter(temp_text, out_text, sizeof_out_text);
-         safevoid_snprintf(temp_text, sizeof(temp_text), "%s", out_text);
+         safe_strcopy(temp_text, sizeof(temp_text), out_text);
          count--;
       }
    }
@@ -619,7 +619,7 @@ void BotChatText(const char *in_text, char *out_text, int sizeof_out_text)
       }
    }
 
-   safevoid_snprintf(out_text, sizeof_out_text, "%s", temp_text);
+   safe_strcopy(out_text, sizeof_out_text, temp_text);
 }
 
 
@@ -643,7 +643,7 @@ void BotChatGetPlayers(void)
 
             if (*pName != 0)
             {
-               safevoid_snprintf(player_names[player_count], sizeof(player_names[player_count]), "%s", pName);
+               safe_strcopy(player_names[player_count], sizeof(player_names[player_count]), pName);
 
                player_count++;
             }

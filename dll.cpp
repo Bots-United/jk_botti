@@ -573,7 +573,7 @@ void CmdStart( const edict_t *player, const struct usercmd_s *cmd, unsigned int 
    if(bot_index != -1)
    {
       if(bots[bot_index].name[0] == 0)  // name filled in yet?
-         safevoid_snprintf(bots[bot_index].name, sizeof(bots[bot_index].name), "%s", STRING(bots[bot_index].pEdict->v.netname));
+         safe_strcopy(bots[bot_index].name, sizeof(bots[bot_index].name), STRING(bots[bot_index].pEdict->v.netname));
       
       if(bots[bot_index].userid <= 0)  // user id filled in yet?
          bots[bot_index].userid = GETPLAYERUSERID(bots[bot_index].pEdict);
@@ -798,7 +798,7 @@ void StartFrame( void )
 
       // check if jk_botti_mapname.cfg file exists...
       if(stricmp(STRING(gpGlobals->mapname), "logo") == 0)
-         safevoid_snprintf(mapname, sizeof(mapname), "%s", "_jk_botti_logo.cfg");
+         safe_strcopy(mapname, sizeof(mapname), "_jk_botti_logo.cfg");
       else
          safevoid_snprintf(mapname, sizeof(mapname), "jk_botti_%s.cfg", STRING(gpGlobals->mapname));
       

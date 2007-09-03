@@ -46,7 +46,7 @@ void BotClient_Valve_WeaponList(void *p, int bot_index)
    if (state == 0)
    {
       state++;
-      safevoid_snprintf(bot_weapon.szClassname, sizeof(bot_weapon.szClassname), "%s", (char *)p);
+      safe_strcopy(bot_weapon.szClassname, sizeof(bot_weapon.szClassname), (char *)p);
    }
    else if (state == 1)
    {
@@ -270,7 +270,7 @@ void BotClient_Valve_ItemPickup(void *p, int bot_index)
 {
    char itemname[64];
    
-   safevoid_snprintf(itemname, sizeof(itemname), "%s", (char *)p);
+   safe_strcopy(itemname, sizeof(itemname), (char *)p);
 
    if (strcmp(itemname, "item_longjump") == 0)
    {

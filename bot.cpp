@@ -281,7 +281,7 @@ void BotNameInit( void )
 
          if (name_buffer[0] != 0)
          {
-            safevoid_snprintf(bot_names[number_names], sizeof(bot_names[number_names]), "%s", name_buffer);
+            safe_strcopy(bot_names[number_names], sizeof(bot_names[number_names]), name_buffer);
 
             number_names++;
          }
@@ -342,7 +342,7 @@ void BotPickName( char *name_buffer, int sizeof_name_buffer )
       }
    }
 
-   safevoid_snprintf(name_buffer, sizeof_name_buffer, "%s", bot_names[name_index]);
+   safe_strcopy(name_buffer, sizeof_name_buffer, bot_names[name_index]);
 }
 
 
@@ -438,7 +438,7 @@ char * GetSpecificTeam(char * teamstr, size_t slen, qboolean get_smallest, qbool
       if(get_largest && find_count == 0)
          return(NULL);
       
-      safevoid_snprintf(teamstr, slen, "%s", g_team_names[find_index]);
+      safe_strcopy(teamstr, slen, g_team_names[find_index]);
       return(teamstr);
    }
    
@@ -506,11 +506,11 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
             bot_skins[i].skin_used = FALSE;
       }
 
-      safevoid_snprintf(c_skin, sizeof(c_skin), "%s", bot_skins[index].model_name);
+      safe_strcopy(c_skin, sizeof(c_skin), bot_skins[index].model_name);
    }
    else
    {
-      safevoid_snprintf(c_skin, sizeof(c_skin), "%s", skin);
+      safe_strcopy(c_skin, sizeof(c_skin), skin);
    }
 
    for (i = 0; c_skin[i] != 0; i++)
@@ -557,7 +557,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
    
    if ((name != NULL) && (*name != 0))
    {
-      safevoid_snprintf(c_name, sizeof(c_name), "%s", name);
+      safe_strcopy(c_name, sizeof(c_name), name);
    }
    else
    {
@@ -566,7 +566,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
       else
       {
          // copy the name of the model to the bot's name...
-         safevoid_snprintf(c_name, sizeof(c_name), "%s", c_skin);
+         safe_strcopy(c_name, sizeof(c_name), c_skin);
       }
    }
    
@@ -703,7 +703,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
       pBot.f_create_time = gpGlobals->time;
       pBot.name[0] = 0;  // name not set by server yet
 
-      safevoid_snprintf(pBot.skin, sizeof(pBot.skin), "%s", c_skin);
+      safe_strcopy(pBot.skin, sizeof(pBot.skin), c_skin);
 
       pBot.top_color = top_color;
       pBot.bottom_color = bottom_color;
@@ -859,7 +859,7 @@ void BotLogoInit(void)
 
          if (logo_buffer[0] != 0)
          {
-            safevoid_snprintf(bot_logos[num_logos], sizeof(bot_logos[num_logos]), "%s", logo_buffer);
+            safe_strcopy(bot_logos[num_logos], sizeof(bot_logos[num_logos]), logo_buffer);
 
             num_logos++;
          }
@@ -912,7 +912,7 @@ void BotPickLogo(bot_t &pBot)
       check_count++;
    }
 
-   safevoid_snprintf(pBot.logo_name, sizeof(pBot.logo_name), "%s", bot_logos[logo_index]);
+   safe_strcopy(pBot.logo_name, sizeof(pBot.logo_name), bot_logos[logo_index]);
 }
 
 
@@ -1014,7 +1014,7 @@ void BotFindItem( bot_t &pBot )
    {
       can_pickup = FALSE;  // assume can't use it until known otherwise
 
-      safevoid_snprintf(item_name, sizeof(item_name), "%s", STRING(pent->v.classname));
+      safe_strcopy(item_name, sizeof(item_name), STRING(pent->v.classname));
 
       // see if this is a "func_" type of entity (func_button, etc.)...
       if (strncmp("func_", item_name, 5) == 0)
@@ -2001,7 +2001,7 @@ void BotThink( bot_t &pBot )
    pEdict->v.flags |= FL_THIRDPARTYBOT | FL_FAKECLIENT;
 
    if(pBot.name[0] == 0)  // name filled in yet?
-      safevoid_snprintf(pBot.name, sizeof(pBot.name), "%s", STRING(pEdict->v.netname));
+      safe_strcopy(pBot.name, sizeof(pBot.name), STRING(pEdict->v.netname));
    if(pBot.userid <= 0)  // user id filled in yet?
       pBot.userid = GETPLAYERUSERID(pEdict);
 

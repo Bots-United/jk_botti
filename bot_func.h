@@ -60,7 +60,7 @@ int BotGetSoundWaypoint( bot_t &pBot, edict_t *pTrackSoundEdict, edict_t ** pNew
 
 void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking );
 qboolean BotLowHealth( bot_t &pBot );
-void BotResetReactionTime(bot_t &pBot);
+void BotResetReactionTime(bot_t &pBot, qboolean have_slow_reaction = FALSE);
 void BotKick(bot_t &pBot);
 void BotCheckTeamplay(void);
 void BotFindEnemy( bot_t &pBot );

@@ -79,7 +79,7 @@ HANDLE FindDirectory(HANDLE hFile, char *dirname, int sizeof_dirname, char *dirs
          }
       }
 
-      safevoid_snprintf(dirname, sizeof_dirname, "%s", pFindFileData.cFileName);
+      safe_strcopy(dirname, sizeof_dirname, pFindFileData.cFileName);
 
       return hFile;
    }
@@ -102,7 +102,7 @@ HANDLE FindDirectory(HANDLE hFile, char *dirname, int sizeof_dirname, char *dirs
          }
       }
 
-      safevoid_snprintf(dirname, sizeof_dirname, "%s", pFindFileData.cFileName);
+      safe_strcopy(dirname, sizeof_dirname, pFindFileData.cFileName);
 
       return hFile;
    }
@@ -132,7 +132,7 @@ DIR *FindDirectory(DIR *directory, char *dirname, int sizeof_dirname, char *dirs
       {
          if (stat_str.st_mode & S_IFDIR)
          {
-            safevoid_snprintf(dirname, sizeof_dirname, "%s", dirent->d_name);
+            safe_strcopy(dirname, sizeof_dirname, dirent->d_name);
             return directory;
          }
       }
@@ -170,8 +170,8 @@ void LoadBotModels(void)
 
    for (index=0; index < number_skins; index++)
    {
-      safevoid_snprintf(bot_skins[index].model_name, sizeof(bot_skins[index].model_name), "%s", default_bot_models[index]);
-      safevoid_snprintf(bot_skins[index].bot_name, sizeof(bot_skins[index].bot_name), "%s", default_bot_names[index]);
+      safe_strcopy(bot_skins[index].model_name, sizeof(bot_skins[index].model_name), default_bot_models[index]);
+      safe_strcopy(bot_skins[index].bot_name, sizeof(bot_skins[index].bot_name), default_bot_names[index]);
    }
 
    // find the directory name of the currently running MOD...
@@ -214,10 +214,10 @@ void LoadBotModels(void)
          if (index == number_skins)
          {
             // add this model to the bot_skins array...
-            safevoid_snprintf(bot_skins[number_skins].model_name, sizeof(bot_skins[number_skins].model_name), "%s", dirname);
+            safe_strcopy(bot_skins[number_skins].model_name, sizeof(bot_skins[number_skins].model_name), dirname);
 
             dirname[0] = toupper(dirname[0]);
-            safevoid_snprintf(bot_skins[number_skins].bot_name, sizeof(bot_skins[number_skins].bot_name), "%s", dirname);
+            safe_strcopy(bot_skins[number_skins].bot_name, sizeof(bot_skins[number_skins].bot_name), dirname);
 
             number_skins++;
          }

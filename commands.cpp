@@ -1155,7 +1155,7 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
 
    if (!arg2 || !*arg2)
    {
-      safevoid_snprintf(g_argv, sizeof(g_argv), "%s", arg1);
+      safe_strcopy(g_argv, sizeof(g_argv), arg1);
       null_terminate_buffer(g_argv, sizeof(g_argv));
       
       fake_arg_count = 1;
@@ -1175,18 +1175,18 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
       fake_arg_count = 3;
    }
    
-   safevoid_snprintf(g_arg1, sizeof(g_arg1), "%s", arg1);
+   safe_strcopy(g_arg1, sizeof(g_arg1), arg1);
    null_terminate_buffer(g_arg1, sizeof(g_arg1));
    
    if (arg2 && *arg2)
    {
-      safevoid_snprintf(g_arg2, sizeof(g_arg2), "%s", arg2);
+      safe_strcopy(g_arg2, sizeof(g_arg2), arg2);
       null_terminate_buffer(g_arg2, sizeof(g_arg2));
    }
    
    if (arg3 && *arg3)
    {
-      safevoid_snprintf(g_arg3, sizeof(g_arg3), "%s", arg3);
+      safe_strcopy(g_arg3, sizeof(g_arg3), arg3);
       null_terminate_buffer(g_arg3, sizeof(g_arg3));
    }
    

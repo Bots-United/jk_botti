@@ -25,6 +25,27 @@
 	#define unlikely(x) __builtin_expect((long int)!!(x), false)
 #endif
 
+// Acts very much like safevoid_snprintf(dst, dst_size, "%s", src)
+//    if src is null "(null)" is written
+//    returns dst
+char * safe_strcopy(char * dst, size_t dst_size, const char *src)
+{
+   size_t i;
+   
+   if(unlikely(!src))
+      src = "(null)";
+   
+   for(i = 0; likely(src[i] != '\0') && likely(i < dst_size); i++)
+      dst[i] = src[i];
+   
+   if(likely(i < dst_size))
+   	dst[i] = '\0';
+   else if(likely(i == dst_size))
+   	dst[i-1] = '\0';
+   
+   return dst;
+}
+
 // Microsoft's msvcrt.dll:vsnprintf is buggy and so is vsnprintf on some glibc versions.
 // We use wrapper function to fix bugs.
 //  from: http://sourceforge.net/tracker/index.php?func=detail&aid=1083721&group_id=2435&atid=102435
@@ -139,29 +160,6 @@ void safevoid_vsnprintf(char* s, size_t n, const char *format, va_list ap)
 	if(unlikely(!format) || unlikely(!*format))
 	{
 		s[0]=0;
-		return;
-	}
-	else if(likely(format[0] == '%') && likely(format[1] == 's') && likely(format[2] == '\0'))
-	{
-		//special case for handling "%s" fast!
-		const char *str = va_arg(ap, const char *);
-		size_t i;
-		
-		if(unlikely(!str))
-			str = "(null)";
-		
-		i = 0;
-		while(likely(str[i] != '\0') && likely(i < n))
-		{
-			s[i] = str[i];
-			i++;
-		}
-		
-		if(likely(i < n))
-			s[i] = '\0';
-		else if(likely(i == n))
-			s[i-1] = '\0';
-		
 		return;
 	}
 	

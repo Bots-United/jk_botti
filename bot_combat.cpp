@@ -182,7 +182,7 @@ void BotAimPost( bot_t &pBot )
 
 
 //
-void BotResetReactionTime(bot_t &pBot) 
+void BotResetReactionTime(bot_t &pBot, qboolean have_slow_reaction) 
 {
    if (pBot.reaction_time >= 1 && pBot.reaction_time <= 3)
    {
@@ -194,6 +194,9 @@ void BotResetReactionTime(bot_t &pBot)
       float delay_max = skill_settings[pBot.bot_skill].react_delay_max[index];
 
       react_delay = RANDOM_FLOAT2(delay_min, delay_max);
+      
+      if(have_slow_reaction)
+         react_delay *= 4;
 
       pBot.f_reaction_target_time = gpGlobals->time + react_delay;
    }
@@ -234,7 +237,7 @@ void RecountTeams(void)
 
    // Copy all of the teams from the teamlist
    // make a copy because strtok is destructive
-   safevoid_snprintf(teamlist, sizeof(teamlist), "%s", g_team_list);
+   safe_strcopy(teamlist, sizeof(teamlist), g_team_list);
    
    pName = teamlist;
    pName = strtok( pName, ";" );
@@ -242,7 +245,7 @@ void RecountTeams(void)
    {
       if ( GetTeamIndex( pName ) < 0 )
       {
-         safevoid_snprintf(g_team_names[g_num_teams], sizeof(g_team_names[g_num_teams]), "%s", pName);
+         safe_strcopy(g_team_names[g_num_teams], sizeof(g_team_names[g_num_teams]), pName);
          g_num_teams++;
          
          if(g_num_teams == MAX_TEAMS)
@@ -285,7 +288,7 @@ void RecountTeams(void)
             tm = g_num_teams;
             g_num_teams++;
             g_team_scores[tm] = 0;
-            safevoid_snprintf(g_team_names[tm], sizeof(g_team_names[tm]), "%s", pTeamName);
+            safe_strcopy(g_team_names[tm], sizeof(g_team_names[tm]), pTeamName);
          }
       }
 
@@ -312,7 +315,7 @@ void BotCheckTeamplay(void)
    // get team list, exactly as in teamplay_gamerules.cpp
    if(is_team_play)
    {
-      safevoid_snprintf(g_team_list, sizeof(g_team_list), "%s", CVAR_GET_STRING("mp_teamlist"));
+      safe_strcopy(g_team_list, sizeof(g_team_list), CVAR_GET_STRING("mp_teamlist"));
       
       edict_t *pWorld = INDEXENT(0);
       if ( pWorld && pWorld->v.team )
@@ -322,7 +325,7 @@ void BotCheckTeamplay(void)
             const char *pTeamList = STRING(pWorld->v.team);
             if ( pTeamList && *pTeamList )
             {
-               safevoid_snprintf(g_team_list, sizeof(g_team_list), "%s", pTeamList);
+               safe_strcopy(g_team_list, sizeof(g_team_list), pTeamList);
             }
          }
       }
@@ -673,40 +676,13 @@ qboolean FCanShootInHead(edict_t * pEdict, edict_t * pTarget, const Vector & v_d
 
 
 //
-edict_t *BotFindEnemyNearestToPoint(bot_t &pBot, const Vector &v_point, float radius, edict_t * pBotEdict, Vector *v_found)
+edict_t *BotFindEnemyNearestToPoint(bot_t &pBot, const Vector &v_point, float radius, Vector *v_found)
 {
-   float nearestdistance = radius + 1;
+   edict_t *pBotEdict = pBot.pEdict;
+   
+   float nearestdistance = radius;
    edict_t * pNearestEnemy = NULL;
    Vector v_nearestorigin = Vector(0,0,0);
-   
-   // search the world for monsters...
-   {
-      edict_t *pMonster = NULL;
-      while (!FNullEnt (pMonster = UTIL_FindEntityInSphere (pMonster, v_point, radius)))
-      {
-         if (!(pMonster->v.flags & FL_MONSTER) || pMonster->v.takedamage == DAMAGE_NO)
-            continue; // discard anything that is not a monster
-         
-         // this is faster check than ones below
-         Vector v_origin = UTIL_GetOriginWithExtent(pBot, pMonster);
-         float distance = (v_origin - v_point).Length();
-         if (distance >= nearestdistance)
-            continue;
-         
-         if (FIsClassname(pMonster, "hornet"))
-            continue; // skip hornets
-         
-         if (FIsClassname(pMonster, "monster_snark"))
-            continue; // skip snarks
-         
-         if (!FVisible( v_point, pMonster, pBotEdict ))
-            continue;
-
-         nearestdistance = distance;
-         pNearestEnemy = pMonster;
-         v_nearestorigin = v_origin;
-      }
-   }
 
    // search the world for players...
    for (int i = 1; i <= gpGlobals->maxClients; i++)
@@ -719,22 +695,22 @@ edict_t *BotFindEnemyNearestToPoint(bot_t &pBot, const Vector &v_point, float ra
       {
          if ((b_observer_mode) && !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
             continue;
-         
+
          // check first.. since this is very fast check
-         Vector v_origin = UTIL_GetOriginWithExtent(pBot, pPlayer);
+         Vector v_origin = pPlayer->v.origin;
          float distance = (v_origin - v_point).Length();
-         if (distance >= nearestdistance)
+         if (distance > nearestdistance)
             continue;
-            
+
          // skip this player if not alive (i.e. dead or dying)
          if (!IsAlive(pPlayer))
             continue;
-              
+
          // skip this player if respawned lately
          float time_since_respawn = UTIL_GetTimeSinceRespawn(pPlayer);
          if(time_since_respawn != -1.0 && time_since_respawn < skill_settings[pBot.bot_skill].respawn_react_delay)
             continue;
-            
+
          // skip this player if facing wall
          if(IsPlayerChatProtected(pPlayer))
             continue;
@@ -801,7 +777,7 @@ edict_t *BotFindVisibleSoundEnemy( bot_t &pBot )
       
       // any enemy near sound?
       Vector v_enemy = Vector(0,0,0);
-      edict_t * pNewEnemy = BotFindEnemyNearestToPoint(pBot, pCurrentSound->m_vecOrigin, 512.0, pEdict, &v_enemy);
+      edict_t * pNewEnemy = BotFindEnemyNearestToPoint(pBot, pCurrentSound->m_vecOrigin, 512.0, &v_enemy);
       if(FNullEnt(pNewEnemy))
          continue;
       
@@ -1070,13 +1046,22 @@ void BotFindEnemy( bot_t &pBot )
       }
    }
 
+   qboolean is_sound_enemy = FALSE;
+
    // check sounds for any potential targets
    if (FNullEnt(pNewEnemy) && pBot.f_next_find_visible_sound_enemy_time <= gpGlobals->time)
    {
       // only run this 5fps
       pNewEnemy = BotFindVisibleSoundEnemy(pBot);
       
-      UTIL_ConsolePrintf("Found sound enemy!");
+      if(pNewEnemy)
+      {
+         //char msg[32];
+         //safevoid_snprintf(msg, sizeof(msg), "Found sound enemy! %d", RANDOM_LONG2(0,0x7fffffff));
+         //UTIL_HostSay(pEdict, 0, msg);
+         
+         is_sound_enemy = TRUE;
+      }
       
       pBot.f_next_find_visible_sound_enemy_time = gpGlobals->time + 0.2f;
    }
@@ -1096,7 +1081,7 @@ void BotFindEnemy( bot_t &pBot )
       pBot.f_bot_see_enemy_time = gpGlobals->time;
       pBot.v_bot_see_enemy_origin = UTIL_GetOrigin(pNewEnemy);
 
-      BotResetReactionTime(pBot);
+      BotResetReactionTime(pBot, is_sound_enemy);
       
       //if(pBot.waypoint_goal != -1)
       //   UTIL_ConsolePrintf("[%s] Found enemy, forget goal: %d -> %d", pBot.name, pBot.waypoint_goal, -1);

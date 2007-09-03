@@ -1135,7 +1135,7 @@ void WaypointSearchItems(edict_t *pEntity, const Vector &v_origin, int wpt_index
       // make sure entity is visible...
       if (tr.flFraction >= 1.0f)
       {
-         safevoid_snprintf(item_name, sizeof(item_name), "%s", STRING(pent->v.classname));
+         safe_strcopy(item_name, sizeof(item_name), STRING(pent->v.classname));
 
          if ((strncmp("item_health", item_name, 11) == 0) || strncmp("func_healthcharger", item_name, 18) == 0 ||
              (strncmp("item_battery", item_name, 12) == 0) || strncmp("func_recharge", item_name, 13) == 0||
@@ -1147,7 +1147,7 @@ void WaypointSearchItems(edict_t *pEntity, const Vector &v_origin, int wpt_index
 
             if (distance < min_distance)
             {
-               safevoid_snprintf(nearest_name, sizeof(nearest_name), "%s", item_name);
+               safe_strcopy(nearest_name, sizeof(nearest_name), item_name);
 
                nearest_pent = pent;
 
@@ -1234,7 +1234,7 @@ edict_t *WaypointFindItem( int wpt_index )
       // make sure entity is visible...
       if ((tr.flFraction >= 1.0f) || (tr.pHit == pent) || !(pent->v.effects & EF_NODRAW) || !(pent->v.frame > 0))
       {
-         safevoid_snprintf(item_name, sizeof(item_name), "%s", STRING(pent->v.classname));
+         safe_strcopy(item_name, sizeof(item_name), STRING(pent->v.classname));
          
          if(((waypoints[wpt_index].flags & W_FL_HEALTH) && (strncmp("item_health", item_name, 11) == 0) || strncmp("func_healthcharger", item_name, 18) == 0) ||
             ((waypoints[wpt_index].flags & W_FL_ARMOR) && (strncmp("item_battery", item_name, 12) == 0) || strncmp("func_recharge", item_name, 13) == 0) ||
@@ -2080,7 +2080,7 @@ void WaypointSave(void)
    //
    WaypointTrim();
 
-   safevoid_snprintf(header.filetype, sizeof(header.filetype), "%s", WAYPOINT_MAGIC);
+   safe_strcopy(header.filetype, sizeof(header.filetype), WAYPOINT_MAGIC);
 
    header.waypoint_file_version = WAYPOINT_VERSION;
    header.waypoint_file_subversion = WPF_SUBVERSION_1_10;
@@ -2089,10 +2089,9 @@ void WaypointSave(void)
    header.number_of_waypoints = num_waypoints;
 
    memset(header.mapname, 0, sizeof(header.mapname));
-   safevoid_snprintf(header.mapname, sizeof(header.mapname), "%s", STRING(gpGlobals->mapname));
+   safe_strcopy(header.mapname, sizeof(header.mapname), STRING(gpGlobals->mapname));
 
    safevoid_snprintf(mapname, sizeof(mapname), "%s.wpt", STRING(gpGlobals->mapname));
-
    UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/waypoints", mapname);
 
    UTIL_ConsolePrintf("Saving waypoint file: %s\n", filename);
