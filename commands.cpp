@@ -912,6 +912,7 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
          CHECK_AND_SET_BOTSKILL_INT(random_duck_frequency) // how often (out of 100 times) the bot will do random duck jumping in combat mode
          CHECK_AND_SET_BOTSKILL_INT(random_longjump_frequency) // how often (out of 100 times) the bot will do random longjump instead of random jump
 
+#if 0
          CHECK_AND_SET_BOTSKILL_QBOOLEAN(can_taujump) // can tau jump?
          CHECK_AND_SET_BOTSKILL_INT(attack_taujump_frequency) // how often (out of 100 times) the bot will do tau jump at far away enemy
          CHECK_AND_SET_BOTSKILL_INT(flee_taujump_frequency) // how often (out of 100 times) the bot will taujump away from enemy
@@ -919,6 +920,7 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
          CHECK_AND_SET_BOTSKILL_FLOAT(flee_taujump_distance) // max distance to flee enemy from
          CHECK_AND_SET_BOTSKILL_FLOAT(flee_taujump_health) // how much bot has health left when tries to escape
          CHECK_AND_SET_BOTSKILL_FLOAT(flee_taujump_escape_distance) // how long way bot tries to move away
+#endif
          
          CHECK_AND_SET_BOTSKILL_QBOOLEAN(can_shoot_through_walls) // can shoot through walls by sound
          CHECK_AND_SET_BOTSKILL_INT(wallshoot_frequency) // how often (out of 100 times) the bot will try attack enemy behind wall
