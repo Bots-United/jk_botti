@@ -13,15 +13,13 @@ jk_botti 1.40
 This is 1.40 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
 You are free to use code for any of your needs.
 
-Credits:
- * Based on HPB bot 4.0 by botman.
- * Uses BotAim code by Pierre-Marie Baty.
- * Uses code from GraveBot by Caleb 'Ghoul' Delnay. (part of goal selection
-   system, longjumping)
+jk_botti is computer gamer for multiplayer mode of Half-Life (HLDM) and has 
+strong support for various submods of HLDM, modifications that change game on 
+serverside but doesn't require client modifications.
 
-This bot aims to:
- * Lower CPU usage compared to HPB_bot.
- * Be more interesting opponent than other bots found there (try it)
+jk_botti aims to:
+ * Lower CPU usage compared to other HLDM bots.
+ * Be more interesting opponent than other bots found there
     * More humanlike aiming, hard to keep track on target making movement changes
     * More random combat movement, random jumping, better strafing
     * Hear player footsteps/firing weapons
@@ -58,6 +56,12 @@ added waypoints will not be effective until map change. This is because
 jk_botti needs to recreate route matrixes with new waypoints and since this is
 CPU intensive operation this can only be done on map change.
 
+Credits:
+ * Based on HPB bot 4.0 by botman.
+ * Uses BotAim code by Pierre-Marie Baty.
+ * Uses code from GraveBot by Caleb 'Ghoul' Delnay. (part of goal selection
+   system, longjumping)
+
 --------------------
 2. What's new
 --------------------
@@ -79,7 +83,7 @@ CPU intensive operation this can only be done on map change.
  * Changed to only check existance of player model file on listenserver 
    when creating bots.
  * Changed save order of waypoint .wpt and .matrix files so that matrix 
-   doesn't have to be calculated extra time.
+   doesn't have to be calculated one extra time.
 
 1.30:
  * Fixed Severians MOD detection with teamplay.
