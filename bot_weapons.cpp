@@ -287,12 +287,14 @@ void InitWeaponSelect(int submod_id)
    
    if(SUBMOD_SEVS == submod_id)
    {
+#if 0
       bot_weapon_select_t * shotgun = GetWeaponSelect(VALVE_WEAPON_SHOTGUN);
       
       if(!shotgun)
          return;
       
       shotgun->primary_fire_percent = 25;
+#endif
    }
    else if(SUBMOD_BUBBLEMOD == submod_id)
    {
@@ -826,34 +828,3 @@ float ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(float distance, float
    
    return(launch_angle);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

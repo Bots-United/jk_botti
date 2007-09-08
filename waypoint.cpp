@@ -15,7 +15,7 @@
 #include <fcntl.h>
 
 #ifndef __linux__
-#include <sys\stat.h>
+#include <sys/stat.h>
 #else
 #include <string.h>
 #include <sys/stat.h>
@@ -56,9 +56,18 @@ float wp_display_time[MAX_WAYPOINTS];
 WAYPOINT spawnpoints[MAX_WAYPOINTS / 2];
 int num_spawnpoints = 0;
 
+// memory storage for matrix arrays
+unsigned short waypoint_matrix_mem_array_shortest_path[MAX_WAYPOINT_MATRIX];
+unsigned short waypoint_matrix_mem_array_from_to_array[MAX_WAYPOINT_MATRIX];
+
 // debuging settings
 qboolean g_waypoint_on = FALSE;
 qboolean g_path_waypoint = FALSE;
+
+//
+static Vector block_list[MAX_WAYPOINTS];
+static int block_list_endlist = 0;
+static const int block_list_size = MAX_WAYPOINTS;
 
 // 
 qboolean g_waypoint_paths = FALSE;  // have any paths been allocated?
@@ -76,27 +85,12 @@ BOOL wp_matrix_initialized = FALSE;
 BOOL wp_matrix_save_on_mapend = FALSE;
 
 
-static Vector * block_list = NULL;
-static int block_list_endlist = 0;
-static int block_list_size = 0;
-
 
 void WaypointAddBlock(const Vector &origin)
 {
    if(block_list_endlist == block_list_size)
    {
-      //resize block_list
-      int newsize = block_list_size + 64;
-      
-      Vector * temp = (Vector *)realloc(block_list, newsize * sizeof(Vector));
-      if(!temp) 
-      {
-         UTIL_ConsolePrintf("Couldn't grow block list");
-         return;
-      }
-      
-      block_list = temp;
-      block_list_size = newsize;
+      return;
    }
    
    block_list[block_list_endlist++] = origin;
@@ -205,12 +199,6 @@ void WaypointInit(void)
    // have any waypoint path nodes been allocated yet?
    if (g_waypoint_paths)
       WaypointFree();  // must free previously allocated path memory
-
-   if (shortest_path != NULL)
-      free(shortest_path);
-
-   if (from_to != NULL)
-      free(from_to);
    
    shortest_path = NULL;
    from_to = NULL;
@@ -234,12 +222,8 @@ void WaypointInit(void)
    memset(&spawnpoints, 0, sizeof(spawnpoints));
    num_spawnpoints = 0;
    
-   if(block_list)
-      free(block_list);
-   
-   block_list = NULL;
+   memset(block_list, 0, sizeof(block_list));
    block_list_endlist = 0;
-   block_list_size = 0;
    
    g_lifts_added = 0;
 }
@@ -665,15 +649,10 @@ void WaypointAddSpawnObjects(void)
    if(g_lifts_added || count)
    {
       WaypointSlowFloydsStop();
-      
-      if (shortest_path != NULL)
-         free(shortest_path);
-
-      if (from_to != NULL)
-         free(from_to);
    
       shortest_path = NULL;
       from_to = NULL;
+      
       wp_matrix_initialized = FALSE;
       
       WaypointRouteInit(TRUE);
@@ -2959,6 +2938,8 @@ void WaypointRouteInit(qboolean ForceRebuild)
    // save number of current waypoints in case waypoints get added later
    route_num_waypoints = num_waypoints;
    array_size = route_num_waypoints * route_num_waypoints;
+   
+   JKASSERT(array_size > MAX_WAYPOINT_MATRIX);
 
    //
    safevoid_snprintf(mapname, sizeof(mapname), "%s.matrix", STRING(gpGlobals->mapname));
@@ -2988,15 +2969,11 @@ void WaypointRouteInit(qboolean ForceRebuild)
       {
          UTIL_ConsolePrintf("[matrix load] - loading jk_botti waypoint path matrix\n");
 
-         shortest_path = (unsigned short *)calloc(1, sizeof(unsigned short) * array_size);
+         shortest_path = waypoint_matrix_mem_array_shortest_path;
+         memset(shortest_path, 0, sizeof(unsigned short) * array_size);
 
-         if (shortest_path == NULL)
-            UTIL_ConsolePrintf("[matrix load] - Error allocating memory for shortest path!\n");
-
-         from_to = (unsigned short *)calloc(1, sizeof(unsigned short) * array_size);
-
-         if (from_to == NULL)
-            UTIL_ConsolePrintf("[matrix load] - Error allocating memory for from to matrix!\n");
+         from_to = waypoint_matrix_mem_array_from_to_array;
+         memset(from_to, 0, sizeof(unsigned short) * array_size);
 
          bfp = gzopen(filename2, "rb");
 
@@ -3006,13 +2983,10 @@ void WaypointRouteInit(qboolean ForceRebuild)
             num_items = gzread(bfp, header, 16);
             if(num_items != 16 || strcmp(header, "jkbotti_matrixA\0") != 0)
             {
-               // if couldn't read enough data, free memory to recalculate it
+               // if couldn't read enough data
                UTIL_ConsolePrintf("[matrix load] - error reading first matrix file header, recalculating...\n");
 
-               free(shortest_path);
                shortest_path = NULL;
-               
-               free(from_to);
                from_to = NULL;
             }
             else
@@ -3021,13 +2995,10 @@ void WaypointRouteInit(qboolean ForceRebuild)
 
                if (num_items != array_size)
                {
-                  // if couldn't read enough data, free memory to recalculate it
+                  // if couldn't read enough data
                   UTIL_ConsolePrintf("[matrix load] - error reading enough path items, recalculating...\n");
 
-                  free(shortest_path);
                   shortest_path = NULL;
-
-                  free(from_to);
                   from_to = NULL;
                }
                else
@@ -3036,13 +3007,10 @@ void WaypointRouteInit(qboolean ForceRebuild)
                   num_items = gzread(bfp, header, 16);
                   if(num_items != 16 || strcmp(header, "jkbotti_matrixB\0") != 0)
                   {
-                     // if couldn't read enough data, free memory to recalculate it
+                     // if couldn't read enough data
                      UTIL_ConsolePrintf("[matrix load] - error reading second matrix file header, recalculating...\n");
 
-                     free(shortest_path);
                      shortest_path = NULL;
-                     
-                     free(from_to);
                      from_to = NULL;
                   }
                   else
@@ -3051,13 +3019,10 @@ void WaypointRouteInit(qboolean ForceRebuild)
    
                      if (num_items != array_size)
                      {
-                        // if couldn't read enough data, free memory to recalculate it
+                        // if couldn't read enough data
                         UTIL_ConsolePrintf("[matrix load] - error reading enough path items, recalculating...\n");
 
-                        free(shortest_path);
                         shortest_path = NULL;
-
-                        free(from_to);
                         from_to = NULL;
                      }
                      
@@ -3073,10 +3038,7 @@ void WaypointRouteInit(qboolean ForceRebuild)
          {
             UTIL_ConsolePrintf("[matrix load] - Error reading waypoint paths!\n");
 
-            free(shortest_path);
             shortest_path = NULL;
-
-            free(from_to);
             from_to = NULL;
          }
       }
@@ -3090,16 +3052,12 @@ void WaypointRouteInit(qboolean ForceRebuild)
    {
       UTIL_ConsolePrintf("[matrix calc] - calculating jk_botti waypoint path matrix\n");
 
-      shortest_path = (unsigned short *)calloc(1, sizeof(unsigned short) * array_size);
-
-      if (shortest_path == NULL)
-         UTIL_ConsolePrintf("[matrix calc] - Error allocating memory for shortest path!\n");
-
-      from_to = (unsigned short *)calloc(1, sizeof(unsigned short) * array_size);
-
-      if (from_to == NULL)
-         UTIL_ConsolePrintf("[matrix calc] - Error allocating memory for from to matrix!\n");
-
+      shortest_path = waypoint_matrix_mem_array_shortest_path;
+      memset(shortest_path, 0, sizeof(unsigned short) * array_size);
+      
+      from_to = waypoint_matrix_mem_array_from_to_array;
+      memset(from_to, 0, sizeof(unsigned short) * array_size);
+      
       pShortestPath = shortest_path;
       pFromTo = from_to;
 

@@ -25,12 +25,14 @@ typedef struct
    float shootcone_diameter; // bot tries to fire when aim line is less than [diameter / 2] apart from target 
    float shootcone_minangle; // OR angle between bot aim line and line to target is less than angle set here
       
-   // Bot doesn't use real origin of target player but instead use data from earlier
-   // and does latency prediction based on this data to get player origin. These settings
-   // specify ammount of latency used at this skill level.
-   float prediction_latency;
    float turn_skill; // BotAim turn_skill, how good bot is at aiming on enemy origin.
-   float prediction_velocity_varitation;
+   float aimangle_varitation; // how steady bot's hand is (how much randomness we add to bot aim angle?
+   
+   // Bot doesn't use real origin of target player but instead use ping emulation based on recorded old position data of player. 
+   // These settings specify ammount of latency and randomness used at different skill levels.
+   float ping_emu_latency; // ping emulation in seconds
+   float ping_emu_speed_varitation; // percent
+   float ping_emu_position_varitation; // units from target center
    
    qboolean can_longjump; // and can longjump.
    
@@ -38,7 +40,8 @@ typedef struct
    int random_jump_duck_frequency; // how often (out of 100 times) the bot will do random duck when random jumping
    int random_duck_frequency; // how often (out of 100 times) the bot will do random duck jumping in combat mode
    int random_longjump_frequency; // how often (out of 100 times) the bot will do random longjump instead of random jump
-   
+
+#if 0
    qboolean can_taujump; // can tau jump? (waypoint taujump, attack/flee taujump)
    
    int attack_taujump_frequency; // how often (out of 100 times) the bot will do tau jump at far away enemy
@@ -48,10 +51,11 @@ typedef struct
    float flee_taujump_distance; // max distance to flee enemy from
    float flee_taujump_health; // how much bot has health left when tries to escape
    float flee_taujump_escape_distance; // how long way bot tries to move away
-   
+
    qboolean can_shoot_through_walls; // can shoot through walls by sound
    int wallshoot_frequency; // how often (out of 100 times) the bot will try attack enemy behind wall
-   
+#endif
+
    float hearing_sensitivity; // how well bot hears sounds
    float track_sound_time_min; // how long bot tracks one sound
    float track_sound_time_max;
@@ -61,4 +65,3 @@ typedef struct
 extern bot_skill_settings_t skill_settings[5];
 
 void ResetSkillsToDefault(void);
-

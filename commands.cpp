@@ -891,6 +891,12 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
          CHECK_AND_SET_BOTSKILL_FLOAT(shootcone_minangle) // OR angle between bot aim line and line to target is less than angle set here
          
          CHECK_AND_SET_BOTSKILL_FLOAT(turn_skill) // BotAim turn_skill, how good bot is at aiming on enemy origin.
+         CHECK_AND_SET_BOTSKILL_FLOAT(aimangle_varitation); // how much varitation we want to add to aim angle.
+   
+         CHECK_AND_SET_BOTSKILL_FLOAT(ping_emu_latency) // how much ping latency bot brain has.
+         CHECK_AND_SET_BOTSKILL_FLOAT(ping_emu_speed_varitation) // how well bot can predict target speed.
+         CHECK_AND_SET_BOTSKILL_FLOAT(ping_emu_position_varitation) // how well bot can predict target position.
+   
          CHECK_AND_SET_BOTSKILL_FLOAT(hearing_sensitivity) // how well bot hears sounds
          CHECK_AND_SET_BOTSKILL_FLOAT(track_sound_time_min) // how long bot tracks one sound
          CHECK_AND_SET_BOTSKILL_FLOAT(track_sound_time_max)
@@ -920,10 +926,10 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
          CHECK_AND_SET_BOTSKILL_FLOAT(flee_taujump_distance) // max distance to flee enemy from
          CHECK_AND_SET_BOTSKILL_FLOAT(flee_taujump_health) // how much bot has health left when tries to escape
          CHECK_AND_SET_BOTSKILL_FLOAT(flee_taujump_escape_distance) // how long way bot tries to move away
-#endif
          
          CHECK_AND_SET_BOTSKILL_QBOOLEAN(can_shoot_through_walls) // can shoot through walls by sound
          CHECK_AND_SET_BOTSKILL_INT(wallshoot_frequency) // how often (out of 100 times) the bot will try attack enemy behind wall
+#endif
 
          if(!got_match) 
          {

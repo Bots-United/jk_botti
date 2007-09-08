@@ -5,9 +5,6 @@ RunInTerminal=true
 [Project State]
 clean before build=false
 
-[filelist]
-0=/home/jussi/sources/jk_botti/jk_botti-git/bot.cpp
-
 [filenumbers]
 0=2871
 
@@ -18,6 +15,9 @@ clean before build=false
 filter.file.unmatch=*.so *.o *.a *.la
 filter.file.ignore.hidden=0
 filter.dir.ignore.hidden=0
+
+[filelist]
+0=/home/jussi/sources/jk_botti/jk_botti-git/bot.cpp
 
 [Project Tree]
 0=0

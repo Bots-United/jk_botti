@@ -117,6 +117,8 @@ typedef struct
 
 typedef struct breakable_list_s 
 {
+   qboolean inuse;
+   
    struct breakable_list_s * next;
    qboolean material_breakable;
    edict_t *pEdict;

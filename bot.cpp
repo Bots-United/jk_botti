@@ -2841,26 +2841,26 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
          target_angle.x = -pEdict->v.v_angle.x;
          target_angle.y = UTIL_WrapAngle(pEdict->v.v_angle.y + 30 * (mod * i));
          target_angle.z = pEdict->v.v_angle.z;
-
+         
          // trace a hull toward the current waypoint the distance of a longjump (depending on gravity)
          UTIL_TraceMove(vecSrc, vecSrc + UTIL_AnglesToForward(target_angle) * max_lj_distance, dont_ignore_monsters, pEdict, &tr);
-            
+         
          // make sure it's clear
          if (tr.flFraction >= 1.0f)
          {
             //UTIL_ConsolePrintf("%s - Clear longjump path found\n", STRING(pEdict->v.netname));
             pBot.b_combat_longjump = TRUE;
-               
+            
             pEdict->v.ideal_yaw += 30 * mod;
-               
+            
             BotFixIdealYaw(pEdict);
-               
+            
             break;
          }
       }
-         
+      
       pBot.f_combat_longjump = gpGlobals->time + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
-         
+      
       if(pBot.b_combat_longjump)
       {
          pBot.prev_random_type = 3;

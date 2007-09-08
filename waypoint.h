@@ -10,6 +10,7 @@
 #include <limits.h>
 
 #define MAX_WAYPOINTS 1024
+#define MAX_WAYPOINT_MATRIX (MAX_WAYPOINTS*MAX_WAYPOINTS)
 
 #define REACHABLE_RANGE 400.0f
 

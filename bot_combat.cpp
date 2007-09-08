@@ -115,9 +115,14 @@ void BotPointGun(bot_t &pBot)
    else
       pEdict->v.yaw_speed -= pEdict->v.pitch_speed / (1 + turn_skill);
 
+   // add skill aim randomness
+   float fov = (pEdict->v.fov <= 0) ? pEdict->v.fov : 85.0;
+   float var = skill_settings[pBot.bot_skill].aimangle_varitation * (fov / 85.0);
+   Vector v_rnd = Vector(RANDOM_FLOAT2(-var, var), RANDOM_FLOAT2(-var, var), 0);
+   
    // move the aim cursor
-   pEdict->v.v_angle = UTIL_WrapAngles (pEdict->v.v_angle + Vector (pEdict->v.pitch_speed, pEdict->v.yaw_speed, 0)); 
-
+   pEdict->v.v_angle = UTIL_WrapAngles (pEdict->v.v_angle + Vector (pEdict->v.pitch_speed, pEdict->v.yaw_speed, 0) + v_rnd); 
+   
    // set the body angles to point the gun correctly
    pEdict->v.angles.x = UTIL_WrapAngle (-pEdict->v.v_angle.x / 3);
    pEdict->v.angles.y = UTIL_WrapAngle (pEdict->v.v_angle.y);
@@ -348,20 +353,42 @@ void BotCheckTeamplay(void)
 // called in clientdisconnect
 void free_posdata_list(int idx) 
 {
-   posdata_t * next;
+   memset(players[idx].posdata_mem, 0, sizeof(players[idx].posdata_mem));
    
-   next = players[idx].position_latest;
+   players[idx].position_oldest = 0;
+   players[idx].position_latest = 0;
+}
+
+
+posdata_t *get_posdata_slot(int idx)
+{
+   int i, oldest_idx = -1;
+   float oldest_time = gpGlobals->time;
    
-   while(next) 
+   for(i = 0; i < POSDATA_SIZE; i++)
    {
-      posdata_t * curr = next;
+      if(!players[idx].posdata_mem[i].inuse)
+         break;
       
-      next = curr->older;
-      free(curr);
+      if(players[idx].posdata_mem[i].time < oldest_time)
+      {
+         oldest_time = players[idx].posdata_mem[i].time;
+         oldest_idx = i;
+      }
    }
    
-   players[idx].position_latest = 0;
-   players[idx].position_oldest = 0;
+   if(i >= POSDATA_SIZE)
+   {
+      if(oldest_idx == -1)
+         return(NULL);
+      
+      i = oldest_idx;
+   }
+   
+   memset(&players[idx].posdata_mem[i], 0, sizeof(players[idx].posdata_mem[i]));
+   players[idx].posdata_mem[i].inuse = TRUE;
+   
+   return(&players[idx].posdata_mem[i]);
 }
 
 
@@ -370,9 +397,11 @@ void add_next_posdata(int idx, edict_t *pEdict)
 {
    posdata_t * curr_latest = players[idx].position_latest;
    
-   players[idx].position_latest = (posdata_t*)calloc(1, sizeof(posdata_t));
+   players[idx].position_latest = get_posdata_slot(idx);
    
-   JKASSERT(players[idx].position_latest == 0);
+   JKASSERT(players[idx].position_latest == NULL);
+   if(players[idx].position_latest == NULL)
+      return;
    
    if(curr_latest) 
    {
@@ -407,11 +436,12 @@ void timetrim_posdata(int idx)
    {
       // max + 100ms
       // max is maximum by skill + max randomness added in GetPredictedPlayerPosition()
-      if(list->time + (skill_settings[4].prediction_latency + 0.1) <= gpGlobals->time) 
+      if(list->time + (skill_settings[4].ping_emu_latency + 0.1) <= gpGlobals->time) 
       {
          posdata_t * next = list->newer;
          
-         free(list);
+         //mark slot free
+         list->inuse = FALSE;
          
          list = next;
          list->older = 0;
@@ -456,16 +486,31 @@ Vector AddPredictionVelocityVaritation(bot_t &pBot, const Vector & velocity)
    if(velocity.x == 0 && velocity.y == 0)
       return velocity;
    
-   float maxvar = (1.0 + skill_settings[pBot.bot_skill].prediction_velocity_varitation);
-   float minvar = (1.0 - skill_settings[pBot.bot_skill].prediction_velocity_varitation);
-   
+   float maxvar = (1.0 + skill_settings[pBot.bot_skill].ping_emu_speed_varitation);
+   float minvar = (1.0 - skill_settings[pBot.bot_skill].ping_emu_speed_varitation);
+
+#if 0
    Vector2D flat = Vector2D(velocity.x, velocity.y);
    
    flat = flat.Normalize() * (flat.Length() * RANDOM_FLOAT2(minvar, maxvar));
-   
+
    return Vector(flat.x, flat.y, velocity.z);
+#else
+   return velocity.Normalize() * (velocity.Length() * RANDOM_FLOAT2(minvar, maxvar));
+#endif
 }
 
+//
+Vector AddPredictionPositionVaritation(bot_t &pBot)
+{
+   Vector v_rnd_angles;
+   
+   v_rnd_angles.x = UTIL_WrapAngle(RANDOM_FLOAT2(-90, 90));
+   v_rnd_angles.y = UTIL_WrapAngle(RANDOM_FLOAT2(-180, 180));
+   v_rnd_angles.z = 0;
+   
+   return UTIL_AnglesToForward(v_rnd_angles) * skill_settings[pBot.bot_skill].ping_emu_position_varitation;
+}
 
 // Prevent bots from shooting at on ground when aiming on falling player that hits ground (Z axis fixup only)
 Vector TracePredictedMovement(bot_t &pBot, edict_t *pPlayer, const Vector &v_src, const Vector &cv_velocity, float time, qboolean ducking, qboolean without_velocity)
@@ -476,7 +521,7 @@ Vector TracePredictedMovement(bot_t &pBot, edict_t *pPlayer, const Vector &v_src
    Vector v_dest, v_velocity;
    
    v_velocity = AddPredictionVelocityVaritation(pBot, cv_velocity);
-   v_dest = v_src + v_velocity * time;
+   v_dest = v_src + v_velocity * time + AddPredictionPositionVaritation(pBot);
 
    TraceResult tr;
    UTIL_TraceHull( v_src, v_dest, ignore_monsters, (ducking) ? head_hull : human_hull, pPlayer ? pPlayer->v.pContainingEntity : NULL, &tr);
@@ -519,7 +564,7 @@ Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean witho
       return(UTIL_GetOrigin(pPlayer));
    
    // get prediction time based on bot skill
-   time = gpGlobals->time - skill_settings[pBot.bot_skill].prediction_latency; // with tint of randomness
+   time = gpGlobals->time - skill_settings[pBot.bot_skill].ping_emu_latency;
    
    // find position data slots that are around 'time'
    newer = players[idx].position_latest;

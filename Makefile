@@ -6,13 +6,18 @@
 
 ifeq ($(OSTYPE),win32)
 	CPP = /usr/bin/i586-mingw32msvc-gcc
+	AR = /usr/bin/i586-mingw32msvc-ar rc
+	RANLIB = /usr/bin/i586-mingw32msvc-ranlib
 	LINKFLAGS = -mdll -lwsock32 -Xlinker --add-stdcall-alias -s
 	DLLEND = .dll
 	ZLIB_OSFLAGS = 
 else
-	CPP = gcc -m32
+	CPP = gcc-3.4 -m32
+	AR = ar rc
+	RANLIB = ranlib
 	ARCHFLAG = -fPIC
-	LINKFLAGS = -fPIC -shared -ldl -s
+	LINKFLAGS = -fPIC -shared -ldl 
+#-s
 	DLLEND = _i386.so
 	ZLIB_OSFLAGS = -DNO_UNDERLINE 
 endif
@@ -63,16 +68,16 @@ ${TARGET}${DLLEND}: zlib/libz.a ${OBJ}
 	cp $@ addons/jk_botti/dlls/
 
 zlib/libz.a:
-	(cd zlib; CC="${CPP} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -DASMV" ./configure; make OBJA=match.o; cd ..)
+	(cd zlib; AR="${AR}" RANLIB="${RANLIB}" CC="${CPP} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -DASMV" ./configure; $(MAKE) OBJA=match.o; cd ..)
 
 clean:
 	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe 
-	(cd zlib; make clean; cd ..)
+	(cd zlib; $(MAKE) clean; cd ..)
 	rm -f zlib/Makefile
 
 distclean:
 	rm -f Rules.depend ${TARGET}.dll ${TARGET}_i386.so addons/jk_botti/dlls/* zlib/*.exe
-	(cd zlib; make distclean; cd ..)
+	(cd zlib; $(MAKE) distclean; cd ..)
 
 waypoint.o: waypoint.cpp
 	${CPP} ${CPPFLAGS} -funroll-loops -c $< -o $@

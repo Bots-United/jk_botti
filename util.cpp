@@ -18,12 +18,13 @@
 #include "bot_func.h"
 #include "player.h"
 
+#define BREAKABLE_LIST_MAX 1024
 
 extern bot_t bots[32];
 extern qboolean is_team_play;
 
 breakable_list_t *g_breakable_list = NULL;
-
+breakable_list_t breakable_list_memarray[BREAKABLE_LIST_MAX];
 
 // classic way of getting connected client count without using data collected from 'ClientPutInServer'/'ClientDisconnect'.
 int UTIL_GetClientCount(void)
@@ -123,6 +124,8 @@ void UTIL_DrawBeam(edict_t *pEnemy, const Vector &start, const Vector &end, int 
 // 
 breakable_list_t * UTIL_AddFuncBreakable(edict_t *pEdict)
 {
+   int i;
+   
    // get end of list
    breakable_list_t *prev = NULL;
    breakable_list_t *next = g_breakable_list;
@@ -132,8 +135,16 @@ breakable_list_t * UTIL_AddFuncBreakable(edict_t *pEdict)
       next = next->next;
    }
    
-   // malloc memory
-   next = (breakable_list_t*)calloc(1, sizeof(breakable_list_t));
+   // get unused slot
+   for(i = 0; i < BREAKABLE_LIST_MAX; i++)
+      if(!breakable_list_memarray[i].inuse)
+         break;
+   if(i >= BREAKABLE_LIST_MAX)
+      return(NULL);
+   
+   next = &breakable_list_memarray[i];
+   memset(next, 0, sizeof(breakable_list_t));
+   next->inuse = TRUE;
    
    // fill in data
    next->next = NULL;
@@ -169,6 +180,10 @@ void UTIL_UpdateFuncBreakable(edict_t *pEdict, const char * setting, const char 
    {
       // add new
       plist = UTIL_AddFuncBreakable(pEdict);
+      
+      JKASSERT(plist == NULL);
+      if(!plist)
+         return;
    }
    
    // check if interesting setting
@@ -182,16 +197,7 @@ void UTIL_UpdateFuncBreakable(edict_t *pEdict, const char * setting, const char 
 // called on ServerDeactivate
 void UTIL_FreeFuncBreakables(void)
 {
-   // free linked list
-   breakable_list_t *next = g_breakable_list;
-   while(next)
-   {
-      breakable_list_t *pfree = next;
-      next = next->next;
-      
-      free(pfree);
-   }
-   
+   memset(breakable_list_memarray, 0, sizeof(breakable_list_memarray));
    g_breakable_list = NULL;
 }
 
