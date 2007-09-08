@@ -1,21 +1,17 @@
 ##
-## Compiling jk_botti under CYGWIN:
-##
-## Get linux crosscompiler for cygwin: http://metamod-p.sourceforge.net/cross-compiling.on.windows.for.linux.html
-##
-##  for compiling linux: make OS=linux
-##  for compiling win32: make
+## compiling under ubuntu:
+##  for compiling linux: make 
+##  for compiling win32: make OSTYPE=win32
 ##
 
-ifeq ($(OS),Windows_NT)
+ifeq ($(OSTYPE),win32)
 	CPP = /usr/bin/i586-mingw32msvc-gcc
-	ARCHFLAG = -march=i686 -mtune=pentium4
 	LINKFLAGS = -mdll -lwsock32 -Xlinker --add-stdcall-alias -s
 	DLLEND = .dll
 	ZLIB_OSFLAGS = 
 else
 	CPP = gcc -m32
-	ARCHFLAG = -march=i686 -mcpu=pentium4 -fPIC
+	ARCHFLAG = -fPIC
 	LINKFLAGS = -fPIC -shared -ldl -s
 	DLLEND = _i386.so
 	ZLIB_OSFLAGS = -DNO_UNDERLINE 
@@ -23,6 +19,7 @@ endif
 
 TARGET = jk_botti_mm
 BASEFLAGS = 
+ARCHFLAG += -march=i686 -mtune=pentium4
 
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
