@@ -39,7 +39,7 @@ void SaveSound(edict_t * pEdict, const Vector & origin, int volume, int channel,
       return;
    }
       
-   float min_distance = 64.0;
+   float min_distance = 64.0f;
    int bot_index = -1;
    
    // check if bot is close to sound and mark as owner if it is
@@ -64,7 +64,13 @@ void SaveSound(edict_t * pEdict, const Vector & origin, int volume, int channel,
       }
    }
    
-   if(min_distance < 64.0 || bot_index != -1)
+   if(min_distance < 64.0f)
+   {
+      pEdict = bots[bot_index].pEdict;
+      channel |= 0x1000;
+   }
+   
+   if(min_distance < 64.0f || bot_index != -1)
    {
       //UTIL_ConsolePrintf("[%s] InsertSound(): min_distance: %.1f, bot_index: %d", bots[bot_index].name, min_distance, bot_index);
    }
