@@ -372,6 +372,8 @@ void add_next_posdata(int idx, edict_t *pEdict)
    
    players[idx].position_latest = (posdata_t*)calloc(1, sizeof(posdata_t));
    
+   JKASSERT(players[idx].position_latest == 0);
+   
    if(curr_latest) 
    {
       curr_latest->newer = players[idx].position_latest;
@@ -424,6 +426,8 @@ void timetrim_posdata(int idx)
    
    if(!players[idx].position_oldest) 
    {
+	  JKASSERT(players[idx].position_latest != 0);
+	  
       players[idx].position_oldest = 0;
       players[idx].position_latest = 0;
    }
