@@ -8,13 +8,13 @@
 ##
 
 ifeq ($(OS),Windows_NT)
-	CPP = gcc -mno-cygwin
+	CPP = /usr/bin/i586-mingw32msvc-gcc
 	ARCHFLAG = -march=i686 -mtune=pentium4
 	LINKFLAGS = -mdll -lwsock32 -Xlinker --add-stdcall-alias -s
 	DLLEND = .dll
 	ZLIB_OSFLAGS = 
 else
-	CPP = gcc-linux
+	CPP = gcc -m32
 	ARCHFLAG = -march=i686 -mcpu=pentium4 -fPIC
 	LINKFLAGS = -fPIC -shared -ldl -s
 	DLLEND = _i386.so
