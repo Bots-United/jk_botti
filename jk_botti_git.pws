@@ -1,0 +1,28 @@
+
+[executer]
+RunInTerminal=true
+
+[Project State]
+clean before build=false
+
+[filelist]
+0=/home/jussi/sources/jk_botti/jk_botti-git/bot.cpp
+
+[filenumbers]
+0=2871
+
+[filemarkers]
+0=
+
+[File View]
+filter.file.unmatch=*.so *.o *.a *.la
+filter.file.ignore.hidden=0
+filter.dir.ignore.hidden=0
+
+[Project Tree]
+0=0
+1=0:0
+2=0:1
+
+[File Tree]
+0=0

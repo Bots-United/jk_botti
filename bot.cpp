@@ -2868,4 +2868,3 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
       }
    }
 }
-

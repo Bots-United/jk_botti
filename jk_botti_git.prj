@@ -1,0 +1,233 @@
+# Anjuta Version 1.2.4a 
+Compatibility Level: 1 
+
+<PROJECT_DESCRIPTION_START>
+jk_botti is computer gamer for multiplayer mode of Half-Life (HLDM) and has 
+strong support for various submods of HLDM, modifications that change game on 
+serverside but doesn't require client modifications.
+
+jk_botti aims to:
+ * Lower CPU usage compared to other HLDM bots.
+ * Be more interesting opponent than other bots found there
+    * More humanlike aiming, hard to keep track on target making movement changes
+    * More random combat movement, random jumping, better strafing
+    * Hear player footsteps/firing weapons
+ * Be dedicated server targeted bot
+    * Listenserver client interfaces removed.
+    * Automatic waypoints creation.
+
+jk_botti is mostly tested with Severian's, but works with original HLDM and
+Bubblemod. As of version 1.40 jk_botti also supports Opposing Force.
+On Severian's and Bubblemod, gluon is disabled. Bot might work
+with XDM but this hasn't been tested.<PROJECT_DESCRIPTION_END>
+<CONFIG_PROGS_START>
+<CONFIG_PROGS_END>
+<CONFIG_LIBS_START>
+<CONFIG_LIBS_END>
+<CONFIG_HEADERS_START>
+<CONFIG_HEADERS_END>
+<CONFIG_CHARACTERISTICS_START>
+<CONFIG_CHARACTERISTICS_END>
+<CONFIG_LIB_FUNCS_START>
+<CONFIG_LIB_FUNCS_END>
+<CONFIG_ADDITIONAL_START>
+<CONFIG_ADDITIONAL_END>
+<CONFIG_FILES_START>
+<CONFIG_FILES_END>
+<MAKEFILE_AM_START>
+<MAKEFILE_AM_END>
+
+props.file.type=project
+
+anjuta.version=1.2.4a
+anjuta.compatibility.level=1
+
+project.name=jk_botti_git
+project.type=GENERIC
+project.target.type=EXECUTABLE
+project.version=1.40
+project.author=Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+project.source.target=jk_botti
+project.has.gettext=0
+project.gui.command=
+project.programming.language=C_C++
+project.excluded.modules=zlib
+
+project.config.extra.modules.before=
+project.config.extra.modules.after=
+project.config.blocked=1
+project.config.disable.overwriting=1 1 1 1 1 1 1 1 1 
+
+project.menu.entry=jk_botti_git Version 0.99
+project.menu.group=Application
+project.menu.comment=jk_botti_git Version 0.99
+project.menu.icon=
+project.menu.need.terminal=0
+
+project.configure.options=
+anjuta.program.arguments=
+preferences.build.option.jobs=0
+preferences.build.option.silent=0
+preferences.build.option.autosave=0
+preferences.make=make
+preferences.build.option.keep.going=1
+preferences.build.option.warn.undef=0
+preferences.autoformat.custom.style= -i8 -sc -bli0 -bl0 -cbi0 -ss
+preferences.indent.opening=0
+preferences.autoformat.disable=1
+preferences.indent.automatic=1
+preferences.use.tabs=0
+preferences.indent.size=3
+preferences.tabsize=3
+preferences.indent.closing=0
+
+module.include.name=.
+module.include.type=
+module.include.files=\
+	bot.h\
+	bot_client.h\
+	bot_func.h\
+	bot_inline_funcs.h\
+	bot_query_hook.h\
+	bot_skill.h\
+	bot_sound.h\
+	bot_weapon_select.h\
+	bot_weapons.h\
+	player.h\
+	safe_snprintf.h\
+	version.h\
+	waypoint.h\
+	common/beamdef.h\
+	common/cl_entity.h\
+	common/com_model.h\
+	common/con_nprint.h\
+	common/const.h\
+	common/crc.h\
+	common/cvardef.h\
+	common/demo_api.h\
+	common/director_cmds.h\
+	common/dlight.h\
+	common/dll_state.h\
+	common/engine_launcher_api.h\
+	common/entity_state.h\
+	common/entity_types.h\
+	common/event_api.h\
+	common/event_args.h\
+	common/event_flags.h\
+	common/exefuncs.h\
+	common/hltv.h\
+	common/in_buttons.h\
+	common/interface.h\
+	common/ivoicetweak.h\
+	common/mathlib.h\
+	common/net_api.h\
+	common/netadr.h\
+	common/nowin.h\
+	common/particledef.h\
+	common/pmtrace.h\
+	common/qfont.h\
+	common/r_efx.h\
+	common/r_studioint.h\
+	common/ref_params.h\
+	common/screenfade.h\
+	common/studio_event.h\
+	common/triangleapi.h\
+	common/usercmd.h\
+	common/weaponinfo.h\
+	engine/Sequence.h\
+	engine/anorms.h\
+	engine/archtypes.h\
+	engine/cdll_int.h\
+	engine/custom.h\
+	engine/customentity.h\
+	engine/edict.h\
+	engine/eiface.h\
+	engine/keydefs.h\
+	engine/progdefs.h\
+	engine/progs.h\
+	engine/shake.h\
+	engine/studio.h\
+	dlls/cdll_dll.h\
+	dlls/enginecallback.h\
+	dlls/extdll.h\
+	dlls/util.h\
+	dlls/vector.h\
+	pm_shared/pm_debug.h\
+	pm_shared/pm_defs.h\
+	pm_shared/pm_info.h\
+	pm_shared/pm_materials.h\
+	pm_shared/pm_movevars.h\
+	pm_shared/pm_shared.h\
+	metamod/dllapi.h\
+	metamod/engine_api.h\
+	metamod/h_export.h\
+	metamod/log_meta.h\
+	metamod/meta_api.h\
+	metamod/mhook.h\
+	metamod/mreg.h\
+	metamod/mutil.h\
+	metamod/osdep.h\
+	metamod/plinfo.h\
+	metamod/sdk_util.h\
+	metamod/support_meta.h\
+	zlib/zlib.h
+
+module.source.name=.
+module.source.type=
+module.source.files=\
+	bot.cpp\
+	bot_chat.cpp\
+	bot_client.cpp\
+	bot_combat.cpp\
+	bot_models.cpp\
+	bot_navigate.cpp\
+	bot_query_hook.cpp\
+	bot_query_hook_linux.cpp\
+	bot_query_hook_win32.cpp\
+	bot_skill.cpp\
+	bot_sound.cpp\
+	bot_weapons.cpp\
+	commands.cpp\
+	dll.cpp\
+	engine.cpp\
+	h_export.cpp\
+	safe_snprintf.cpp\
+	util.cpp\
+	waypoint.cpp
+
+module.pixmap.name=.
+module.pixmap.type=
+module.pixmap.files=
+
+module.data.name=.
+module.data.type=
+module.data.files=
+
+module.help.name=.
+module.help.type=
+module.help.files=
+
+module.doc.name=.
+module.doc.type=
+module.doc.files=
+
+module.po.files=
+
+compiler.options.supports=
+compiler.options.include.paths=\
+	.\
+	..
+compiler.options.library.paths=
+compiler.options.libraries=
+compiler.options.libraries.selected=
+compiler.options.defines=\
+	HAVE_CONFIG_H
+compiler.options.defines.selected=
+compiler.options.warning.buttons=0 0 1 1 0 1 0 0 0 0 0 0 0 1 0 0 
+compiler.options.optimize.buttons=0 0 1 0 
+compiler.options.other.buttons=1 0 
+compiler.options.other.c.flags=
+compiler.options.other.l.flags=
+compiler.options.other.l.libs=
+
+project.src.paths=
