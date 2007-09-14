@@ -73,7 +73,7 @@ typedef struct {
 #define WAYPOINT_UNREACHABLE  (USHRT_MAX)
 #define WAYPOINT_MAX_DISTANCE (USHRT_MAX-1)
 
-#define MAX_PATH_INDEX 4
+#define MAX_PATH_INDEX (MAX_WAYPOINTS)
 
 // define the structure for waypoint paths (paths are connections between
 // two waypoint nodes that indicates the bot can get from point A to point B.
@@ -81,14 +81,14 @@ typedef struct {
 // connections between two points.  There is an array called "paths" that
 // contains head pointers to these structures for each waypoint index.
 typedef struct path {
+   int last_idx_used;
    short int index[MAX_PATH_INDEX];  // indexes of waypoints (index -1 means not used)
-   struct path *next;   // link to next structure
 } PATH;
 
 
 // waypoint function prototypes...
 void WaypointInit(void);
-int  WaypointFindPath(PATH **pPath, int *path_index, int waypoint_index);
+int  WaypointFindPath(int &path_index, int waypoint_index);
 int  WaypointFindNearest(const Vector &v_origin, const Vector &v_offset, edict_t *pEntity, float range, qboolean b_traceline);
 int  WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags, int exclude[], float range, const Vector *pv_src);
 int  WaypointFindRandomGoal(int *out_indexes, int max_indexes, edict_t *pEntity, int flags, int itemflags, int exclude[]);

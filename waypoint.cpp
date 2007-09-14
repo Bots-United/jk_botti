@@ -47,7 +47,7 @@ WAYPOINT waypoints[MAX_WAYPOINTS];
 int num_waypoints;
 
 // declare the array of head pointers to the path structures...
-PATH *paths[MAX_WAYPOINTS];
+PATH paths[MAX_WAYPOINTS];
 
 // time that this waypoint was displayed (while editing)
 float wp_display_time[MAX_WAYPOINTS];
@@ -85,7 +85,7 @@ BOOL wp_matrix_initialized = FALSE;
 BOOL wp_matrix_save_on_mapend = FALSE;
 
 
-
+//
 void WaypointAddBlock(const Vector &origin)
 {
    if(block_list_endlist == block_list_size)
@@ -96,7 +96,7 @@ void WaypointAddBlock(const Vector &origin)
    block_list[block_list_endlist++] = origin;
 }
 
-
+//
 qboolean WaypointInBlockRadius(const Vector &origin)
 {
    TraceResult tr;
@@ -166,27 +166,10 @@ inline int GetReachableFlags(int i1, edict_t * pEntity)
 // free the linked list of waypoint path nodes...
 void WaypointFree(void)
 {
-   for (int i=0; i < MAX_WAYPOINTS; i++)
+   // no linked list anymore
+   for(int i=0; i < MAX_WAYPOINTS; i++)
    {
-      if (paths[i])
-      {
-         PATH *p = paths[i];
-         PATH *p_next;
-
-         while (p)  // free the linked list
-         {
-            p_next = p->next;  // save the link to next
-            free(p);
-            p = p_next;
-
-#ifdef _DEBUG
-            count++;
-            if (count > 1000) WaypointDebug();
-#endif
-         }
-
-         paths[i] = NULL;
-      }
+      memset(&paths[i], 0, sizeof(paths[i]));
    }
 }
 
@@ -209,7 +192,7 @@ void WaypointInit(void)
    for (i=0; i < MAX_WAYPOINTS; i++)
    {
       wp_display_time[i] = 0.0;
-      paths[i] = NULL;  // no paths allocated yet
+      memset(&paths[i], 0, sizeof(paths[i]));  // no paths allocated yet
    }
 
    f_path_time = 0.0;  // reset waypoint path display time
@@ -231,7 +214,6 @@ void WaypointInit(void)
 
 void WaypointAddPath(short int add_index, short int path_index)
 {
-   PATH *p, *prev;
    int i;
 
    if((waypoints[add_index].flags | waypoints[path_index].flags) & W_FL_DELETED)
@@ -240,116 +222,39 @@ void WaypointAddPath(short int add_index, short int path_index)
       return;
    }
    
-   p = paths[add_index];
-   prev = NULL;
-
-   // find an empty slot for new path_index...
-   while (p != NULL)
+   PATH &p = paths[add_index];
+   
+   for(i = 0; i < p.last_idx_used; i++)
    {
-      i = 0;
-
-      while (i < MAX_PATH_INDEX)
+      if(p.index[i] == -1 || p.index[i] == path_index)
       {
-         if (p->index[i] == -1)
-         {
-            p->index[i] = path_index;
-
-            return;
-         }
-
-         i++;
+         p.index[i] = path_index;
+         return;
       }
-
-      prev = p;     // save the previous node in linked list
-      p = p->next;  // go to next node in linked list
-
+      
 #ifdef _DEBUG
       count++;
       if (count > 100) WaypointDebug();
 #endif
    }
-
-   p = (PATH *)calloc(1, sizeof(PATH));
-
-   if (p == NULL)
-   {
-      UTIL_ConsolePrintf("%s", "Error allocating memory for path!");
-   }
-
-   p->index[0] = path_index;
-   p->index[1] = -1;
-   p->index[2] = -1;
-   p->index[3] = -1;
-   p->next = NULL;
-
-   if (prev != NULL)
-      prev->next = p;  // link new node into existing list
-
-   if (paths[add_index] == NULL)
-      paths[add_index] = p;  // save head point if necessary
-}
-
-
-void WaypointDeletePath(short int del_index)
-{
-   PATH *p;
-   int index, i;
-
-   // search all paths for this index...
-   for (index=0; index < num_waypoints; index++)
-   {
-      p = paths[index];
-
-      // search linked list for del_index...
-      while (p != NULL)
-      {
-         i = 0;
-
-         while (i < MAX_PATH_INDEX)
-         {
-            if (p->index[i] == del_index)
-            {
-               p->index[i] = -1;  // unassign this path
-            }
-
-            i++;
-         }
-
-         p = p->next;  // go to next node in linked list
-
-#ifdef _DEBUG
-         count++;
-         if (count > 100) WaypointDebug();
-#endif
-      }
-   }
+   
+   if(i >= MAX_PATH_INDEX)
+      return;
+   
+   p.index[p.last_idx_used++] = path_index;
 }
 
 
 void WaypointDeletePath(short int path_index, short int del_index)
 {
-   PATH *p;
    int i;
-
-   p = paths[path_index];
-
-   // search linked list for del_index...
-   while (p != NULL)
+   PATH &p = paths[path_index];
+   
+   for(i = 0; i < p.last_idx_used; i++)
    {
-      i = 0;
-
-      while (i < MAX_PATH_INDEX)
-      {
-         if (p->index[i] == del_index)
-         {
-            p->index[i] = -1;  // unassign this path
-         }
-
-         i++;
-      }
-
-      p = p->next;  // go to next node in linked list
-
+      if(p.index[i] == del_index)
+         p.index[i] = -1;
+      
 #ifdef _DEBUG
       count++;
       if (count > 100) WaypointDebug();
@@ -358,53 +263,26 @@ void WaypointDeletePath(short int path_index, short int del_index)
 }
 
 
+void WaypointDeletePath(short int del_index)
+{
+   int i;
+   
+   // search all paths for this index...
+   for (i=0; i < num_waypoints; i++)
+      WaypointDeletePath(i, del_index);
+}
+
+
 // find a path from the current waypoint. (pPath MUST be NULL on the
 // initial call. subsequent calls will return other paths if they exist.)
-int WaypointFindPath(PATH **pPath, int *path_index, int waypoint_index)
+int WaypointFindPath(int &path_index, int waypoint_index)
 {
-   int index;
-
-   if (*pPath == NULL)
-   {
-      *pPath = paths[waypoint_index];
-      *path_index = 0;
-   }
-
-   if (*path_index == MAX_PATH_INDEX)
-   {
-      *path_index = 0;
-
-      *pPath = (*pPath)->next;  // go to next node in linked list
-   }
-
-   while (*pPath != NULL)
-   {
-      while (*path_index < MAX_PATH_INDEX)
-      {
-         if ((*pPath)->index[*path_index] != -1)  // found a path?
-         {
-            // save the return value
-            index = (*pPath)->index[*path_index];
-
-            // set up stuff for subsequent calls...
-            (*path_index)++;
-
-            return index;
-         }
-
-         (*path_index)++;
-      }
-
-      *path_index = 0;
-
-      *pPath = (*pPath)->next;  // go to next node in linked list
-
-#ifdef _DEBUG
-      count++;
-      if (count > 100) WaypointDebug();
-#endif
-   }
-
+   PATH &p = paths[waypoint_index];
+   
+   while(++path_index < p.last_idx_used)
+      if(p.index[path_index] != -1)
+         return(p.index[path_index]);
+   
    return -1;
 }
 
@@ -1486,26 +1364,7 @@ void WaypointDelete(edict_t *pEntity)
    WaypointDeletePath(index);
 
    // free the path for this index...
-
-   if (paths[index] != NULL)
-   {
-      PATH *p = paths[index];
-      PATH *p_next;
-
-      while (p)  // free the linked list
-      {
-         p_next = p->next;  // save the link to next
-         free(p);
-         p = p_next;
-
-#ifdef _DEBUG
-         count++;
-         if (count > 100) WaypointDebug();
-#endif
-      }
-
-      paths[index] = NULL;
-   }
+   memset(&paths[index], 0, sizeof(paths[index]));
 
    // save on mapchange
    g_waypoint_updated = TRUE;
@@ -1517,8 +1376,7 @@ void WaypointDelete(edict_t *pEntity)
    wp_display_time[index] = 0.0;
 
    if(g_waypoint_on)
-      EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "weapons/mine_activate.wav", 1.0,
-                   ATTN_NORM, 0, 100);
+      EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "weapons/mine_activate.wav", 1.0, ATTN_NORM, 0, 100);
 }
 
 
@@ -1556,19 +1414,16 @@ void WaypointCreatePath(edict_t *pEntity, int cmd)
 
       if (waypoint1 == -1)
       {
-         if(g_waypoint_on) {
-            // play "cancelled" sound...
-            EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_moveselect.wav", 1.0,
-                         ATTN_NORM, 0, 100);
-         }
+         // play "cancelled" sound...
+         if(g_waypoint_on) 
+            EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_moveselect.wav", 1.0, ATTN_NORM, 0, 100);
          
          return;
       }
 
       // play "start" sound...
       if(g_waypoint_on)
-          EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_hudoff.wav", 1.0,
-                      ATTN_NORM, 0, 100);
+          EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_hudoff.wav", 1.0, ATTN_NORM, 0, 100);
 
       return;
    }
@@ -1581,8 +1436,7 @@ void WaypointCreatePath(edict_t *pEntity, int cmd)
       {
          // play "error" sound...
          if(g_waypoint_on)
-            EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_denyselect.wav", 1.0,
-                         ATTN_NORM, 0, 100);
+            EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_denyselect.wav", 1.0, ATTN_NORM, 0, 100);
 
          return;
       }
@@ -1592,8 +1446,7 @@ void WaypointCreatePath(edict_t *pEntity, int cmd)
 
       // play "done" sound...
       if(g_waypoint_on)
-          EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_hudon.wav", 1.0,
-                      ATTN_NORM, 0, 100);
+          EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_hudon.wav", 1.0, ATTN_NORM, 0, 100);
    }
 }
 
@@ -1612,16 +1465,14 @@ void WaypointRemovePath(edict_t *pEntity, int cmd)
       {
          // play "cancelled" sound...
          if(g_waypoint_on)
-            EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_moveselect.wav", 1.0,
-                         ATTN_NORM, 0, 100);
+            EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_moveselect.wav", 1.0, ATTN_NORM, 0, 100);
 
          return;
       }
 
       // play "start" sound...
       if(g_waypoint_on)
-         EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_hudoff.wav", 1.0,
-                      ATTN_NORM, 0, 100);
+         EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_hudoff.wav", 1.0, ATTN_NORM, 0, 100);
 
       return;
    }
@@ -1634,8 +1485,7 @@ void WaypointRemovePath(edict_t *pEntity, int cmd)
       {
          // play "error" sound...
          if(g_waypoint_on)
-            EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_denyselect.wav", 1.0,
-                         ATTN_NORM, 0, 100);
+            EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_denyselect.wav", 1.0, ATTN_NORM, 0, 100);
 
          return;
       }
@@ -1645,8 +1495,7 @@ void WaypointRemovePath(edict_t *pEntity, int cmd)
 
       // play "done" sound...
       if(g_waypoint_on)
-         EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_hudon.wav", 1.0,
-                      ATTN_NORM, 0, 100);
+         EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_hudon.wav", 1.0, ATTN_NORM, 0, 100);
    }
 }
 
@@ -1724,25 +1573,7 @@ qboolean WaypointFixOldWaypoints(void)
          WaypointDeletePath(index);
 
          // free the path for this index...
-         if (paths[index] != NULL)
-         {
-            PATH *p = paths[index];
-            PATH *p_next;
-
-            while (p)  // free the linked list
-            {
-               p_next = p->next;  // save the link to next
-               free(p);
-               p = p_next;
-
-#ifdef _DEBUG
-               count++;
-               if (count > 100) WaypointDebug();
-#endif
-            }
-
-            paths[index] = NULL;
-         }
+         memset(&paths[index], 0, sizeof(paths[index]));
 
          // save on mapchange
          g_waypoint_updated = TRUE;
@@ -1762,27 +1593,22 @@ qboolean WaypointFixOldWaypoints(void)
       if(waypoints[k].flags & (W_FL_AIMING | W_FL_DELETED))
          continue;
       
-      PATH *p = paths[k];
+      PATH &p = paths[k];
       qboolean Modified = FALSE;
-      while(p)
+      for(int i = 0; i < p.last_idx_used; i++)
       {
-         for(int i = 0; i < MAX_PATH_INDEX; i++)
-         {
-            if(p->index[i] == -1)
-               continue;
-            
-            if(waypoints[p->index[i]].flags & W_FL_DELETED || p->index[i] == k || 
-                !WaypointReachable(waypoints[k].origin, waypoints[p->index[i]].origin, GetReachableFlags(k, p->index[i])))
-            {
-               unreachable_path_count++;
-               
-               // remove
-               p->index[i] = -1;
-               Modified = TRUE;
-            }
-         }
+         if(p.index[i] == -1)
+            continue;
          
-         p = p->next;
+         if(waypoints[p.index[i]].flags & W_FL_DELETED || p.index[i] == k || 
+             !WaypointReachable(waypoints[k].origin, waypoints[p.index[i]].origin, GetReachableFlags(k, p.index[i])))
+         {
+            unreachable_path_count++;
+            
+            // remove
+            p.index[i] = -1;
+            Modified = TRUE;
+         }
       }
       
       if(Modified)
@@ -1952,23 +1778,12 @@ qboolean WaypointLoad(edict_t *pEntity)
 int WaypointNumberOfPaths(int index)
 {
    // count the number of paths from this node...
-   PATH *p = paths[index];
+   PATH &p = paths[index];
    int num = 0;
 
-   while (p != NULL)
-   {
-      int i = 0;
-
-      while (i < MAX_PATH_INDEX)
-      {
-         if (p->index[i] != -1)
-            num++; // count path node if it's used
-
-         i++;
-      }
-
-      p = p->next; // go to next node in linked list
-   }
+   for(int i = 0; i < p.last_idx_used; i++)
+      if (p.index[i] != -1)
+         num++;
    
    return(num);
 }
@@ -1980,26 +1795,16 @@ int WaypointIncomingPathsCount(int index, int exit_count)
    
    for(int k = 0; k < num_waypoints; k++)
    {
-      PATH *p = paths[k];
-      while (p != NULL)
-      {
-         int i = 0;
-
-         while (i < MAX_PATH_INDEX)
-         {
-            if (p->index[i] == index)
-            {
-               num++; // count path 
-               goto found_already;
-            }
-
-            i++;
-         }
-
-         p = p->next; // go to next node in linked list
-      }
+      PATH &p = paths[k];
       
-found_already:
+      for(int i = 0; i < p.last_idx_used; i++)
+      {
+         if (p.index[i] == index)
+         {
+            num++;
+            break;
+         }
+      }
       
       // exit early if we just want to know if specific number of path point to this waypoint
       if(exit_count > 0 && num >= exit_count)
@@ -2051,7 +1856,6 @@ void WaypointSave(void)
    WAYPOINT_HDR header;
    int index, i;
    short int num;
-   PATH *p;
 
    if(g_waypoint_testing || !g_waypoint_updated)
       return;
@@ -2101,23 +1905,11 @@ void WaypointSave(void)
       gzwrite(bfp, &num, sizeof(num));  // write the count
 
       // now write out each path index...
-
-      p = paths[index];
-
-      while (p != NULL)
-      {
-         i = 0;
-
-         while (i < MAX_PATH_INDEX)
-         {
-            if (p->index[i] != -1)  // save path node if it's used
-               gzwrite(bfp, &p->index[i], sizeof(p->index[0]));
-
-            i++;
-         }
-
-         p = p->next;  // go to next node in linked list
-      }
+      PATH &p = paths[index];
+      
+      for(i = 0; i < p.last_idx_used; i++)
+         if (p.index[i] != -1)  // save path node if it's used
+            gzwrite(bfp, &p.index[i], sizeof(p.index[i]));
    }
    
    UTIL_ConsolePrintf("- saved: %d waypoints, %d paths\n", count_wp, count_paths);
@@ -2649,31 +2441,20 @@ void WaypointThink(edict_t *pEntity)
          // check if player is close enough to a waypoint and time to draw path...
          if ((min_distance <= 50.0f) && (f_path_time <= gpGlobals->time))
          {
-            PATH *p;
-
             f_path_time = gpGlobals->time + 1.0;
 
-            p = paths[index];
-
-            while (p != NULL)
+            PATH &p = paths[index];
+            
+            for(i = 0; i < p.last_idx_used; i++)
             {
-               i = 0;
-
-               while (i < MAX_PATH_INDEX)
+               if (p.index[i] != -1)
                {
-                  if (p->index[i] != -1)
-                  {
-                     Vector v_src = waypoints[index].origin;
-                     Vector v_dest = waypoints[p->index[i]].origin;
-
-                     // draw a white line to this index's waypoint
-                     WaypointDrawBeam(pEntity, v_src, v_dest, 10, 2, 250, 250, 250, 200, 10);
-                  }
-
-                  i++;
+                  Vector v_src = waypoints[index].origin;
+                  Vector v_dest = waypoints[p.index[i]].origin;
+                  
+                  // draw a white line to this index's waypoint
+                  WaypointDrawBeam(pEntity, v_src, v_dest, 10, 2, 250, 250, 250, 200, 10);
                }
-
-               p = p->next;  // go to next node in linked list
             }
          }
       }
@@ -3069,46 +2850,31 @@ void WaypointRouteInit(qboolean ForceRebuild)
 
       for (row=0; row < route_num_waypoints; row++)
       {
-         if (paths[row] != NULL)
+         PATH &p = paths[row];
+         
+         for(i = 0; i < p.last_idx_used; i++)
          {
-            PATH *p = paths[row];
+            if(p.index[i] == -1)
+               continue;
+            
+            index = p.index[i];
 
-            while (p)
+            distance = (waypoints[row].origin - waypoints[index].origin).Length();
+            
+            if(waypoints[row].flags & W_FL_DELETED || waypoints[index].flags & W_FL_DELETED)
+               UTIL_ConsolePrintf("[matrix calc] - ERROR: Path to deleted waypoint detected.\n");
+
+            if (distance > WAYPOINT_MAX_DISTANCE)
+               distance = WAYPOINT_MAX_DISTANCE;
+
+            if (!(waypoints[row].flags & W_FL_LIFT_START && waypoints[index].flags & W_FL_LIFT_END) && distance > REACHABLE_RANGE)
             {
-               i = 0;
-
-               while (i < MAX_PATH_INDEX)
-               {
-                  if (p->index[i] != -1)
-                  {
-                     index = p->index[i];
-
-                     distance = (waypoints[row].origin - waypoints[index].origin).Length();
-                     
-                     if(waypoints[row].flags & W_FL_DELETED || waypoints[index].flags & W_FL_DELETED)
-                     {
-                        UTIL_ConsolePrintf("[matrix calc] - ERROR: Path to deleted waypoint detected.\n");
-                     }
-
-                     if (distance > WAYPOINT_MAX_DISTANCE)
-                        distance = WAYPOINT_MAX_DISTANCE;
-
-                     if (!(waypoints[row].flags & W_FL_LIFT_START && waypoints[index].flags & W_FL_LIFT_END) &&
-                     	distance > REACHABLE_RANGE)
-                     {
-                        UTIL_ConsolePrintf("[matrix calc] - Waypoint path distance %4.1f > %4.1f at from %d to %d:\n", distance, (float)REACHABLE_RANGE, row, index);
-                     }
-                     else
-                     {
-                        offset = row * route_num_waypoints + index;
-                        pShortestPath[offset] = (unsigned short)distance;
-                     }
-                  }
-
-                  i++;
-               }
-
-               p = p->next;  // go to next node in linked list
+               UTIL_ConsolePrintf("[matrix calc] - Waypoint path distance %4.1f > %4.1f at from %d to %d:\n", distance, (float)REACHABLE_RANGE, row, index);
+            }
+            else
+            {
+               offset = row * route_num_waypoints + index;
+               pShortestPath[offset] = (unsigned short)distance;
             }
          }
       }

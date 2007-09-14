@@ -185,8 +185,7 @@ float BotChangeYaw( bot_t &pBot, float speed )
 qboolean BotFindWaypoint( bot_t &pBot )
 {
    int index, select_index;
-   PATH *pPath = NULL;
-   int path_index;
+   int path_index = -1;
    float distance, min_distance[3];
    int min_index[3];
 
@@ -198,7 +197,7 @@ qboolean BotFindWaypoint( bot_t &pBot )
       min_index[index] = -1;
    }
 
-   index = WaypointFindPath(&pPath, &path_index, pBot.curr_waypoint_index);
+   index = WaypointFindPath(path_index, pBot.curr_waypoint_index);
 
    while (index != -1)
    {
@@ -240,7 +239,7 @@ qboolean BotFindWaypoint( bot_t &pBot )
       }
 
       // find the next path to a waypoint
-      index = WaypointFindPath(&pPath, &path_index, pBot.curr_waypoint_index);
+      index = WaypointFindPath(path_index, pBot.curr_waypoint_index);
    }
 
    select_index = -1;
@@ -2363,4 +2362,3 @@ void BotLookForDrop( bot_t &pBot )
       }
    }
 }
-

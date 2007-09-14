@@ -6,10 +6,12 @@ RunInTerminal=true
 clean before build=false
 
 [filenumbers]
-0=2871
+0=266
+1=123
 
 [filemarkers]
 0=
+1=
 
 [File View]
 filter.file.unmatch=*.so *.o *.a *.la
@@ -17,7 +19,8 @@ filter.file.ignore.hidden=0
 filter.dir.ignore.hidden=0
 
 [filelist]
-0=/home/jussi/sources/jk_botti/jk_botti-git/bot.cpp
+0=/home/jussi/sources/jk_botti/jk_botti-git/dll.cpp
+1=/home/jussi/sources/jk_botti/jk_botti-git/waypoint.cpp
 
 [Project Tree]
 0=0
