@@ -395,21 +395,22 @@ posdata_t *get_posdata_slot(int idx)
 //
 void add_next_posdata(int idx, edict_t *pEdict)
 {
-   posdata_t * curr_latest = players[idx].position_latest;
+   posdata_t * new_latest = get_posdata_slot(idx);
    
-   players[idx].position_latest = get_posdata_slot(idx);
-   
-   JKASSERT(players[idx].position_latest == NULL);
-   if(players[idx].position_latest == NULL)
+   JKASSERT(new_latest == NULL);
+   if(new_latest == NULL)
       return;
    
-   if(curr_latest) 
+   posdata_t * curr_latest = players[idx].position_latest;
+   players[idx].position_latest = new_latest;
+   
+   if(curr_latest != NULL) 
    {
       curr_latest->newer = players[idx].position_latest;
    }
    
    players[idx].position_latest->older = curr_latest;
-   players[idx].position_latest->newer = 0;
+   players[idx].position_latest->newer = NULL;
    
    players[idx].position_latest->origin = pEdict->v.origin;
    players[idx].position_latest->velocity = pEdict->v.basevelocity + pEdict->v.velocity;   
@@ -456,7 +457,7 @@ void timetrim_posdata(int idx)
    
    if(!players[idx].position_oldest) 
    {
-	  JKASSERT(players[idx].position_latest != 0);
+	   JKASSERT(players[idx].position_latest != 0);
 	  
       players[idx].position_oldest = 0;
       players[idx].position_latest = 0;
