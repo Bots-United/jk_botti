@@ -16,8 +16,7 @@ else
 	AR = ar rc
 	RANLIB = ranlib
 	ARCHFLAG = -fPIC
-	LINKFLAGS = -fPIC -shared -ldl 
-#-s
+	LINKFLAGS = -fPIC -shared -ldl -s
 	DLLEND = _i386.so
 	ZLIB_OSFLAGS = -DNO_UNDERLINE 
 endif
