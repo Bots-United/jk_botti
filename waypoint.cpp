@@ -1164,12 +1164,31 @@ void WaypointAdd(edict_t *pEntity)
       Vector v_src = waypoints[index].origin;
       Vector v_dest = waypoints[index].origin;
       
-      v_dest.z += 36/2 + 72/2 + 1;
+      /*
+      ---     
+      | |     
+      |a| --- 
+      | | |b| 
+      --- --- 
+      a = player standing hull, height 72
+      b = player ducking hull, height 72/2=36
       
-      UTIL_TraceMove(v_src, v_dest, ignore_monsters, NULL, &tr);
+      Trace ducking hull from ducking origin to top of standing hull + 1 extra unit.
+      
+      73 -         ---
+      72 -  ^      |X|
+            |      ---
+      36 - ---  -> 
+      or.- |X|   
+       0 - ---   
+      */
+      
+      v_dest.z += 36 + 1;
+      
+      UTIL_TraceDuck(v_src, v_dest, ignore_monsters, NULL, &tr);
       
       // no room to stand up
-      if (tr.flFraction < 1.0f)
+      if (tr.fAllSolid || tr.fStartSolid || tr.flFraction < 1.0f)
       {
          waypoints[index].flags |= W_FL_CROUCH;  // crouching waypoint
 
