@@ -77,13 +77,17 @@ Credits:
    again.
  * Bot avoids combat if it doesn't have good weapon or doesn't have enough
    health.
- * Changed optimization flags from '-O3 -funroll-loops' to '-O2'.
  * Output warning message when model given for bot creation is replaced by 
    team-balance code.
  * Changed to only check existance of player model file on listenserver 
    when creating bots.
  * Changed save order of waypoint .wpt and .matrix files so that matrix 
    doesn't have to be calculated one extra time.
+ * Fixed instability problems: Replaced most of dynamic memory management 
+   with static memory.
+ * Fixed buggy creation of crouch waypoint over drop (it's recommended to
+   replace server datacore.wpt with stock wpt since this bug hit most hard
+   on datacore on one specific high traffic area).
 
 1.30:
  * Fixed Severians MOD detection with teamplay.
