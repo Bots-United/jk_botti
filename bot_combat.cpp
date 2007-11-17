@@ -186,6 +186,13 @@ void BotAimPost( bot_t &pBot )
 }
 
 
+// flavour xy axis over z on finding closest enemy
+Vector GetModifiedEnemyDistance(bot_t &pBot, const Vector & distance)
+{
+   return( Vector(distance.x, distance.y, distance.z * skill_settings[pBot.bot_skill].updown_turn_ration) );
+}
+
+
 //
 void BotResetReactionTime(bot_t &pBot, qboolean have_slow_reaction) 
 {
@@ -994,7 +1001,7 @@ void BotFindEnemy( bot_t &pBot )
          
          Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBreakable->pEdict);
          
-         float distance = (v_origin - pEdict->v.origin).Length();
+         float distance = GetModifiedEnemyDistance(pBot, v_origin - pEdict->v.origin).Length();
          if (distance >= nearestdistance)
             continue;
          
@@ -1021,7 +1028,7 @@ void BotFindEnemy( bot_t &pBot )
          if (!IsAlive (pMonster))
             continue; // discard dead or dying monsters
 
-         float distance = (UTIL_GetOriginWithExtent(pBot, pMonster) - pEdict->v.origin).Length();
+         float distance = GetModifiedEnemyDistance(pBot, UTIL_GetOriginWithExtent(pBot, pMonster) - pEdict->v.origin).Length();
          if (distance >= nearestdistance)
             continue;
 
@@ -1058,7 +1065,7 @@ void BotFindEnemy( bot_t &pBot )
             if ((b_observer_mode) && !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
                continue;
             
-            float distance = (UTIL_GetOriginWithExtent(pBot, pPlayer) - pEdict->v.origin).Length();
+            float distance = GetModifiedEnemyDistance(pBot, UTIL_GetOriginWithExtent(pBot, pPlayer) - pEdict->v.origin).Length();
             if (distance >= nearestdistance)
                continue;
 
@@ -1103,6 +1110,7 @@ void BotFindEnemy( bot_t &pBot )
    {
       // only run this 5fps
       pNewEnemy = BotFindVisibleSoundEnemy(pBot);
+      pBot.f_next_find_visible_sound_enemy_time = gpGlobals->time + 0.2f;
       
       if(pNewEnemy)
       {
@@ -1112,8 +1120,6 @@ void BotFindEnemy( bot_t &pBot )
          
          is_sound_enemy = TRUE;
       }
-      
-      pBot.f_next_find_visible_sound_enemy_time = gpGlobals->time + 0.2f;
    }
 
    // 
