@@ -157,6 +157,7 @@ typedef struct
    int chat_percent;
    int taunt_percent;
    int whine_percent;
+   int endgame_percent;
    int chat_tag_percent;
    int chat_drop_percent;
    int chat_swap_percent;
@@ -242,6 +243,7 @@ typedef struct
    float f_bot_say;
    char  bot_say_msg[256];
    float f_bot_chat_time;
+   qboolean b_bot_endgame;
 
    float f_duck_time;
    

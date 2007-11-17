@@ -64,6 +64,7 @@ int bot_add_level_tag = 0;   // use [lvl%d] for bots (where %d is skill level of
 int bot_chat_percent = 10;   // percent of time to chat
 int bot_taunt_percent = 20;  // percent of time to taunt after kill
 int bot_whine_percent = 10;  // percent of time to whine after death
+int bot_endgame_percent = 40; // percent of time to chat after endgame
 int bot_logo_percent = 40;   // percent of time to spray logo after kill
 
 int bot_chat_tag_percent = 80;   // percent of the time to drop clan tag

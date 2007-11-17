@@ -31,6 +31,7 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
 void BotChatTaunt(bot_t &pBot, edict_t *victim_edict);
 void BotChatWhine(bot_t &pBot);
 void BotChatTalk(bot_t &pBot);
+void BotChatEndGame(bot_t &pBot);
 
 float BotChangePitch( bot_t &pBot, float speed );
 float BotChangeYaw( bot_t &pBot, float speed );

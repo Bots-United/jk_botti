@@ -27,14 +27,17 @@ char *tag2[NUM_TAGS]={
 int bot_chat_count;
 int bot_taunt_count;
 int bot_whine_count;
+int bot_endgame_count;
 
 bot_chat_t bot_chat[MAX_BOT_CHAT];
 bot_chat_t bot_taunt[MAX_BOT_CHAT];
 bot_chat_t bot_whine[MAX_BOT_CHAT];
+bot_chat_t bot_endgame[MAX_BOT_CHAT];
 
 int recent_bot_chat[5];
 int recent_bot_taunt[5];
 int recent_bot_whine[5];
+int recent_bot_endgame[5];
 
 int player_count;
 char player_names[32][33];  // 32 players max, 32 chars + null
@@ -254,6 +257,64 @@ void BotChatTalk(bot_t &pBot)
 }
 
 
+// endgame say
+void BotChatEndGame(bot_t &pBot)
+{
+   char chat_text[81];
+   char chat_name[64];
+   const char *bot_name;
+   
+   edict_t *pEdict = pBot.pEdict;
+   
+   if ((bot_endgame_count > 0) && RANDOM_LONG2(1,100) <= pBot.endgame_percent)
+   {
+      int endgame_index;
+      qboolean used;
+      int i, recent_count;
+
+      // set chat flag and time to chat...
+      pBot.b_bot_say = TRUE;
+      pBot.f_bot_say = gpGlobals->time + RANDOM_FLOAT2(0.4, 3.0);
+      
+      recent_count = 0;
+
+      while (recent_count < 5)
+      {
+         endgame_index = RANDOM_LONG2(0, bot_endgame_count-1);
+
+         used = FALSE;
+
+         for (i=0; i < 5; i++)
+         {
+            if (recent_bot_endgame[i] == endgame_index)
+               used = TRUE;
+         }
+
+         if (used)
+            recent_count++;
+         else
+            break;
+      }
+
+      for (i=4; i > 0; i--)
+         recent_bot_endgame[i] = recent_bot_endgame[i-1];
+
+      recent_bot_endgame[0] = endgame_index;
+
+      if (bot_endgame[endgame_index].can_modify)
+         BotChatText(bot_endgame[endgame_index].text, chat_text, sizeof(chat_text));
+      else
+         safe_strcopy(chat_text, sizeof(chat_text), bot_endgame[endgame_index].text);
+
+      safe_strcopy(chat_name, sizeof(chat_name), STRING(pBot.pEdict->v.netname));
+
+      bot_name = STRING(pEdict->v.netname);
+
+      BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, bot_name);
+   }
+}
+
+
 //
 void LoadBotChat(void)
 {
@@ -267,12 +328,14 @@ void LoadBotChat(void)
    bot_chat_count = 0;
    bot_taunt_count = 0;
    bot_whine_count = 0;
+   bot_endgame_count = 0;
 
    for (i=0; i < 5; i++)
    {
       recent_bot_chat[i] = -1;
       recent_bot_taunt[i] = -1;
       recent_bot_whine[i] = -1;
+      recent_bot_endgame[i] = -1;
    }
 
    UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/jk_botti_chat.txt", NULL);
@@ -320,8 +383,14 @@ void LoadBotChat(void)
          section = 2;
          continue;
       }
+      
+      if (strcmp(buffer, "[bot_endgame]") == 0)
+      {
+         section = 3;
+         continue;
+      }
 
-      if ((length > 0) && (section == 0) &&  // bot chat
+      if ((length > 0) && !(buffer[0] == '!' && length==1) && (section == 0) &&  // bot chat
           (bot_chat_count < MAX_BOT_CHAT))
       {
          if (buffer[0] == '!')
@@ -338,7 +407,7 @@ void LoadBotChat(void)
          bot_chat_count++;
       }
 
-      if ((length > 0) && (section == 1) &&  // bot taunt
+      if ((length > 0) && !(buffer[0] == '!' && length==1) && (section == 1) &&  // bot taunt
           (bot_taunt_count < MAX_BOT_CHAT))
       {
          if (buffer[0] == '!')
@@ -355,7 +424,7 @@ void LoadBotChat(void)
          bot_taunt_count++;
       }
 
-      if ((length > 0) && (section == 2) &&  // bot whine
+      if ((length > 0) && !(buffer[0] == '!' && length==1) && (section == 2) &&  // bot whine
           (bot_whine_count < MAX_BOT_CHAT))
       {
          if (buffer[0] == '!')
@@ -370,6 +439,23 @@ void LoadBotChat(void)
          }
 
          bot_whine_count++;
+      }
+
+      if ((length > 0) && !(buffer[0] == '!' && length==1) && (section == 3) &&  // bot endgame
+          (bot_endgame_count < MAX_BOT_CHAT))
+      {
+         if (buffer[0] == '!')
+         {
+            safe_strcopy(bot_endgame[bot_endgame_count].text, sizeof(bot_endgame[bot_endgame_count].text), &buffer[1]);
+            bot_endgame[bot_endgame_count].can_modify = FALSE;
+         }
+         else
+         {
+            safe_strcopy(bot_endgame[bot_endgame_count].text, sizeof(bot_endgame[bot_endgame_count].text), buffer);
+            bot_endgame[bot_endgame_count].can_modify = TRUE;
+         }
+
+         bot_endgame_count++;
       }
    }
 }

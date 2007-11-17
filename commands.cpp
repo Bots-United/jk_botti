@@ -61,6 +61,7 @@ extern int bot_add_level_tag;
 extern int bot_chat_percent;
 extern int bot_taunt_percent;
 extern int bot_whine_percent;
+extern int bot_endgame_percent;
 extern int bot_logo_percent;
 extern int bot_chat_tag_percent;
 extern int bot_chat_drop_percent;
@@ -472,6 +473,23 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
       }
 
       safevoid_snprintf(msg, sizeof(msg), "bot_whine_percent is %d\n", bot_whine_percent);
+      printfunc(PRINTFUNC_INFO, arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_endgame_percent"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < 0) || (temp > 100))
+            printfunc(PRINTFUNC_INFO, arg, "invalid bot_endgame_percent value!\n");
+         else
+            bot_endgame_percent = temp;
+      }
+
+      safevoid_snprintf(msg, sizeof(msg), "bot_endgame_percent is %d\n", bot_endgame_percent);
       printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;

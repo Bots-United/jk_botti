@@ -37,6 +37,7 @@ extern int bot_add_level_tag;
 extern int bot_chat_percent;
 extern int bot_taunt_percent;
 extern int bot_whine_percent;
+extern int bot_endgame_percent;
 extern int bot_logo_percent;
 extern int bot_chat_tag_percent;
 extern int bot_chat_drop_percent;
@@ -729,6 +730,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
       pBot.chat_percent = bot_chat_percent;
       pBot.taunt_percent = bot_taunt_percent;
       pBot.whine_percent = bot_whine_percent;
+      pBot.endgame_percent = bot_endgame_percent;
       pBot.chat_tag_percent = bot_chat_tag_percent;
       pBot.chat_drop_percent = bot_chat_drop_percent;
       pBot.chat_swap_percent = bot_chat_swap_percent;
@@ -745,6 +747,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
       pBot.f_bot_say = 0.0;
       pBot.bot_say_msg[0] = 0;
       pBot.f_bot_chat_time = gpGlobals->time;
+      pBot.b_bot_endgame = FALSE;
       
       // use system wide timer for connection times
       // bot will stay 30-160 minutes
@@ -2082,6 +2085,13 @@ void BotThink( bot_t &pBot )
    // in intermission.. don't do anything, freeze bot
    if(g_in_intermission)
    {
+      // endgame chat..
+      if(!pBot.b_bot_endgame)
+      {
+         pBot.b_bot_endgame = TRUE;
+         BotChatEndGame(pBot);
+      }
+      
       BotRunPlayerMove(pBot, pEdict->v.v_angle, 0, 0, 0, 0, 0, (byte)pBot.msecval);
       return;
    }

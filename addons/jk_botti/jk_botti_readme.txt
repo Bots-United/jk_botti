@@ -65,6 +65,11 @@ Credits:
 --------------------
 2. What's new
 --------------------
+1.41:
+ * Add bot endgame chatting.
+   * New setting 'bot_endgame_percent', see jk_botti.cfg
+   * New section [bot_endgame] in jk_botti_chat.txt
+
 1.40:
  * Add support for Opposing Force Deathmatch.
  * Tuned skill 1 bot to be more leet, skill 2 is now about same as old skill 1.
