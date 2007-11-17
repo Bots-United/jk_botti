@@ -105,9 +105,9 @@ void BotPointGun(bot_t &pBot)
    // influence of y movement on x axis, based on skill (less influence than x on y since it's
    // easier and more natural for the bot to "move its mouse" horizontally than vertically)
    if (pEdict->v.pitch_speed > 0)
-      pEdict->v.pitch_speed += pEdict->v.yaw_speed / (1.5 * (1 + turn_skill));
+      pEdict->v.pitch_speed += pEdict->v.yaw_speed / (skill_settings[pBot.bot_skill].updown_turn_ration * (1 + turn_skill));
    else
-      pEdict->v.pitch_speed -= pEdict->v.yaw_speed / (1.5 * (1 + turn_skill));
+      pEdict->v.pitch_speed -= pEdict->v.yaw_speed / (skill_settings[pBot.bot_skill].updown_turn_ration * (1 + turn_skill));
 
    // influence of x movement on y axis, based on skill
    if (pEdict->v.yaw_speed > 0)
