@@ -1,4 +1,4 @@
-jk_botti 1.40
+jk_botti 1.41
 -------------
 
 1. Intro
@@ -10,7 +10,7 @@ jk_botti 1.40
 1. Intro
 --------------------
 
-This is 1.40 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+This is 1.41 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
 You are free to use code for any of your needs.
 
 jk_botti is computer gamer for multiplayer mode of Half-Life (HLDM) and has 
@@ -66,6 +66,8 @@ Credits:
 2. What's new
 --------------------
 1.41:
+ * Add skill setting updown_turn_ration, setting to make bot aim up-down worse
+   than right-left.
  * Add bot endgame chatting.
    * New setting 'bot_endgame_percent', see jk_botti.cfg
    * New section [bot_endgame] in jk_botti_chat.txt
