@@ -5,14 +5,14 @@
 ##
 
 ifeq ($(OSTYPE),win32)
-	CPP = /usr/bin/i586-mingw32msvc-gcc
+	CPP = ccache /usr/bin/i586-mingw32msvc-gcc
 	AR = /usr/bin/i586-mingw32msvc-ar rc
 	RANLIB = /usr/bin/i586-mingw32msvc-ranlib
 	LINKFLAGS = -mdll -lwsock32 -Xlinker --add-stdcall-alias -s
 	DLLEND = .dll
 	ZLIB_OSFLAGS = 
 else
-	CPP = gcc-3.4 -m32
+	CPP = ccache gcc-3.4 -m32
 	AR = ar rc
 	RANLIB = ranlib
 	ARCHFLAG = -fPIC
