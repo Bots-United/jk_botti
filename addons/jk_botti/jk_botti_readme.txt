@@ -330,6 +330,11 @@ List of available settings:
       BotAim turn_skill, how good bot is at aiming on enemy.
       Value: 0.5-4 (0.5 = bad, 4 = very fast)
 
+ - updown_turn_ration
+      How much slower bots aims up and down than side ways?
+      Value: 1-10 (1 = bot aims up/downwards as fast as sideways, 10 = bot aim 
+                   almost level, default for level 1 bot = 2.0, level 5 = 3.0)
+
  - hearing_sensitivity
       How far away bot will hear. 0.0 hear nothing, 1.5 used for skill 1.
       Value: 0.0-1.5

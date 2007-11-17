@@ -238,7 +238,7 @@ inline float UTIL_WrapAngle360(float angle)
    return ((360.0 / bits) * ((int64_t)(angle * (bits / 360.0)) & (bits-1)));
 }
 
-inline float UTIL_WrapAngle(float angle)
+/*inline float UTIL_WrapAngle(float angle)
 {
    // this function returns angle normalized to the range [-180 < angle <= 180]
    angle = UTIL_WrapAngle360(angle);
@@ -247,6 +247,20 @@ inline float UTIL_WrapAngle(float angle)
       angle -= 360.0;
 
    return (angle);
+}*/
+
+inline float UTIL_WrapAngle(float angle)
+{
+   // this function returns an angle normalized to the range [-180 < angle <= 180]
+   
+   angle += 180.0;
+   const unsigned int bits = 0x80000000;
+   angle = -180.0 + ((360.0 / bits) * ((int64_t)(angle * (bits / 360.0)) & (bits-1)));
+   
+   if(angle == -180.0f)
+      angle = 180.0;
+   
+   return(angle);
 }
 
 inline Vector UTIL_WrapAngles(const Vector & angles)
