@@ -67,10 +67,6 @@ void BotChatTaunt(bot_t &pBot, edict_t *victim_edict)
       qboolean used;
       int i, recent_count;
 
-      // set chat flag and time to chat...
-      pBot.b_bot_say = TRUE;
-      pBot.f_bot_say = gpGlobals->time + 5.0 + RANDOM_FLOAT2(0.0, 5.0);
-
       recent_count = 0;
 
       while (recent_count < 5)
@@ -113,6 +109,10 @@ void BotChatTaunt(bot_t &pBot, edict_t *victim_edict)
       bot_name = STRING(pBot.pEdict->v.netname);
 
       BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, bot_name);
+
+      // set chat flag and time to chat (typing one character takes 0.2sec) ...
+      pBot.b_bot_say = TRUE;
+      pBot.f_bot_say = gpGlobals->time + RANDOM_FLOAT2(0.5, 1.0) + strlen(pBot.bot_say_msg) * RANDOM_FLOAT2(0.2, 0.3);
    }
 }
 
@@ -140,10 +140,6 @@ void BotChatWhine(bot_t &pBot)
 
       if ((RANDOM_LONG2(1,100) <= pBot.whine_percent))
       {
-         // set chat flag and time to chat...
-         pBot.b_bot_say = TRUE;
-         pBot.f_bot_say = gpGlobals->time + 5.0 + RANDOM_FLOAT2(0.0, 5.0);
-
          recent_count = 0;
 
          while (recent_count < 5)
@@ -186,6 +182,10 @@ void BotChatWhine(bot_t &pBot)
          bot_name = STRING(pEdict->v.netname);
 
          BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, bot_name);
+
+         // set chat flag and time to chat (typing one character takes 0.2sec) ...
+         pBot.b_bot_say = TRUE;
+         pBot.f_bot_say = gpGlobals->time + RANDOM_FLOAT2(0.5, 1.0) + strlen(pBot.bot_say_msg) * RANDOM_FLOAT2(0.2, 0.3);
       }
    }
 }
@@ -212,10 +212,6 @@ void BotChatTalk(bot_t &pBot)
          int chat_index;
          qboolean used;
          int i, recent_count;
-
-         // set chat flag and time to chat...
-         pBot.b_bot_say = TRUE;
-         pBot.f_bot_say = gpGlobals->time + 5.0 + RANDOM_FLOAT2(0.0, 5.0);
 
          recent_count = 0;
 
@@ -252,6 +248,10 @@ void BotChatTalk(bot_t &pBot)
          bot_name = STRING(pEdict->v.netname);
 
          BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, bot_name);
+
+         // set chat flag and time to chat (typing one character takes 0.2sec) ...
+         pBot.b_bot_say = TRUE;
+         pBot.f_bot_say = gpGlobals->time + RANDOM_FLOAT2(0.5, 1.0) + strlen(pBot.bot_say_msg) * RANDOM_FLOAT2(0.2, 0.3);
       }
    }
 }
@@ -271,10 +271,6 @@ void BotChatEndGame(bot_t &pBot)
       int endgame_index;
       qboolean used;
       int i, recent_count;
-
-      // set chat flag and time to chat...
-      pBot.b_bot_say = TRUE;
-      pBot.f_bot_say = gpGlobals->time + RANDOM_FLOAT2(0.4, 3.0);
       
       recent_count = 0;
 
@@ -311,6 +307,10 @@ void BotChatEndGame(bot_t &pBot)
       bot_name = STRING(pEdict->v.netname);
 
       BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, bot_name);
+
+      // set chat flag and time to chat (typing one character takes 0.2sec) ...
+      pBot.b_bot_say = TRUE;
+      pBot.f_bot_say = gpGlobals->time + RANDOM_FLOAT2(0.3, 2.0) + strlen(pBot.bot_say_msg) * RANDOM_FLOAT2(0.2, 0.3);
    }
 }
 
