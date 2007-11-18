@@ -484,7 +484,8 @@ edict_t *DBG_EntOfVars( const entvars_t *pev )
 // return team string 0 through 3 based what MOD uses for team numbers
 char * UTIL_GetTeam(edict_t *pEntity, char *teamstr, size_t slen)
 {
-   safe_strcopy(teamstr, slen, INFOKEY_VALUE(GET_INFOKEYBUFFER(pEntity), "model"));
+   char model[16] = "model";
+   safe_strcopy(teamstr, slen, INFOKEY_VALUE(GET_INFOKEYBUFFER(pEntity), model));
    
    return(teamstr);
 }
@@ -630,7 +631,7 @@ void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index)
 }
 
 
-void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2)
+void UTIL_BuildFileName_N(char *filename, int size, const char *arg1, const char *arg2)
 {
    const char * mod_dir = (submod_id == SUBMOD_OP4) ? "gearbox" : "valve";
    
@@ -661,7 +662,7 @@ void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2)
 // UTIL_LogPrintf - Prints a logged message to console.
 // Preceded by LOG: ( timestamp ) < message >
 //=========================================================
-void UTIL_LogPrintf( char *fmt, ... )
+void UTIL_LogPrintf( const char *fmt, ... )
 {
    va_list argptr;
    char string[1024];
@@ -674,7 +675,7 @@ void UTIL_LogPrintf( char *fmt, ... )
    ALERT( at_logged, "%s", string );
 }
 
-void UTIL_ServerPrintf( char *fmt, ... )
+void UTIL_ServerPrintf( const char *fmt, ... )
 {
    va_list argptr;
    char string[512];
@@ -687,7 +688,7 @@ void UTIL_ServerPrintf( char *fmt, ... )
    SERVER_PRINT( string );
 }
 
-void UTIL_ConsolePrintf( char *fmt, ... )
+void UTIL_ConsolePrintf( const char *fmt, ... )
 {
    va_list argptr;
    char string[512];
@@ -720,7 +721,7 @@ void UTIL_AssertConsolePrintf(const char *file, const char *str, int line)
    __asm__ ("int $3");
 }
 
-char* UTIL_VarArgs2( char * string, size_t strlen, char *format, ... )
+char* UTIL_VarArgs2( char * string, size_t strlen, const char *format, ... )
 {
    va_list argptr;
    

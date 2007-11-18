@@ -198,7 +198,7 @@ void pfnChangeLevel(char* s1, char* s2)
 }
 
 
-void pfnClientCommand(edict_t* pEdict, char* szFmt, ...)
+void pfnClientCommand(edict_t* pEdict, const char* szFmt, ...)
 {
    if ((FBitSet(pEdict->v.flags, FL_FAKECLIENT) || FBitSet(pEdict->v.flags, FL_THIRDPARTYBOT)))
       RETURN_META (MRES_SUPERCEDE);

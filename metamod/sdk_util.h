@@ -63,41 +63,41 @@
 // Also, create some nice inlines for engine callback combos.
 
 // Get a setinfo value from a player entity.
-inline char *ENTITY_KEYVALUE(edict_t *entity, char *key) {
+inline char *ENTITY_KEYVALUE(edict_t *entity, const char *key) {
 	char *ifbuf=GET_INFOKEYBUFFER(entity);
-	return(INFOKEY_VALUE(ifbuf, key));
+	return(INFOKEY_VALUE(ifbuf, (char*)key));
 }
 
 // Set a setinfo value for a player entity.
-inline void ENTITY_SET_KEYVALUE(edict_t *entity, char *key, char *value) {
+inline void ENTITY_SET_KEYVALUE(edict_t *entity, const char *key, const char *value) {
 	char *ifbuf=GET_INFOKEYBUFFER(entity);
-	SET_CLIENT_KEYVALUE(ENTINDEX(entity), ifbuf, key, value);
+	SET_CLIENT_KEYVALUE(ENTINDEX(entity), ifbuf, (char*)key, (char*)value);
 }
 
 // Get a "serverinfo" value.
-inline char *SERVERINFO(char *key) {
+inline char *SERVERINFO(const char *key) {
 	edict_t *server=INDEXENT(0);
-	return(ENTITY_KEYVALUE(server, key));
+	return(ENTITY_KEYVALUE(server, (char*)key));
 }
 
 // Set a "serverinfo" value.
-inline void SET_SERVERINFO(char *key, char *value) {
+inline void SET_SERVERINFO(char *key, const char *value) {
 	edict_t *server=INDEXENT(0);
 	char *ifbuf=GET_INFOKEYBUFFER(server);
-	SET_SERVER_KEYVALUE(ifbuf, key, value);
+	SET_SERVER_KEYVALUE(ifbuf, (char*)key, (char*)value);
 }
 
 // Get a "localinfo" value.
-inline char *LOCALINFO(char *key) {
+inline char *LOCALINFO(const char *key) {
 	edict_t *server=NULL;
-	return(ENTITY_KEYVALUE(server, key));
+	return(ENTITY_KEYVALUE(server, (char*)key));
 }
 
 // Set a "localinfo" value.
-inline void SET_LOCALINFO(char *key, char *value) {
+inline void SET_LOCALINFO(const char *key, const char *value) {
 	edict_t *server=NULL;
 	char *ifbuf=GET_INFOKEYBUFFER(server);
-	SET_SERVER_KEYVALUE(ifbuf, key, value);
+	SET_SERVER_KEYVALUE(ifbuf, (char*)key, (char*)value);
 }
 
 short FixedSigned16(float value, float scale);

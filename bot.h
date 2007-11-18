@@ -400,12 +400,12 @@ qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnem
 Vector GetGunPosition(edict_t *pEdict);
 void UTIL_SelectItem(edict_t *pEdict, char *item_name);
 void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index);
-void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2);
+void UTIL_BuildFileName_N(char *filename, int size, const char *arg1, const char *arg2);
 void GetGameDir (char *game_dir);
-void UTIL_ServerPrintf( char *fmt, ... );
-void UTIL_ConsolePrintf( char *fmt, ... );
+void UTIL_ServerPrintf( const char *fmt, ... );
+void UTIL_ConsolePrintf( const char *fmt, ... );
 void UTIL_AssertConsolePrintf(const char *file, const char *str, int line);
-char* UTIL_VarArgs2( char * string, size_t strlen, char *format, ... );
+char* UTIL_VarArgs2( char * string, size_t strlen, const char *format, ... );
 void UTIL_DrawBeam(edict_t *pEnemy, const Vector &start, const Vector &end, int width, int noise, int red, int green, int blue, int brightness, int speed);
 int UTIL_GetClientCount(void);
 int UTIL_GetBotCount(void);

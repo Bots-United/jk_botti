@@ -223,7 +223,8 @@ C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, 
    LOG_MESSAGE (PLID, "%s: plugin attaching", Plugin_info.name);
 
    // ask the engine to register the server commands this plugin uses
-   REG_SVR_COMMAND ("jk_botti", jk_botti_ServerCommand);
+   char cmd[16] = "jk_botti";
+   REG_SVR_COMMAND (cmd, jk_botti_ServerCommand);
    
    // init random
    fast_random_seed(time(0) ^ (unsigned long)&bots[0] ^ sizeof(bots));
