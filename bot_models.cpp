@@ -33,7 +33,7 @@ int number_skins;
 
 
 // default player models for various MODs...
-const char *default_bot_models[VALVE_MAX_SKINS + GEARBOX_MAX_SKINS] = {
+char *default_bot_models[VALVE_MAX_SKINS + GEARBOX_MAX_SKINS] = {
    "barney", "gina", "gman", "gordon", "helmet",
    "hgrunt", "recon", "robo", "scientist", "zombie",
    
@@ -42,7 +42,7 @@ const char *default_bot_models[VALVE_MAX_SKINS + GEARBOX_MAX_SKINS] = {
 };
 
 // default names for each of the above player models...
-const char *default_bot_names[VALVE_MAX_SKINS + GEARBOX_MAX_SKINS] = {
+char *default_bot_names[VALVE_MAX_SKINS + GEARBOX_MAX_SKINS] = {
    "Barney", "Gina", "G-Man", "Gordon", "Helmet",
    "H-Grunt", "Recon", "Robo", "Scientist", "Zombie",
    

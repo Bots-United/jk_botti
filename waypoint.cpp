@@ -2940,4 +2940,3 @@ float WaypointDistanceFromTo(int src, int dest)
    
    return (float)(shortest_path[src * route_num_waypoints + dest]);
 }
-

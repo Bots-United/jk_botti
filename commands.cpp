@@ -84,7 +84,7 @@ cfg_bot_record_t * cfg_bot_record;
 #define PRINTFUNC_INFO 1
 #define PRINTFUNC_ERROR 2
 
-typedef void (*printfunc_t)(int printtype, void *arg, const char *msg);
+typedef void (*printfunc_t)(int printtype, void *arg, char *msg);
 
 
 // 
@@ -1224,7 +1224,7 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
 }
 
 
-static void print_to_console_config(int printtype, void *, const char * msg) 
+static void print_to_console_config(int printtype, void *, char * msg) 
 {
    if(printtype == PRINTFUNC_ERROR)
       UTIL_ConsolePrintf("line[%d] config error: %s", bot_cfg_linenumber, msg);
@@ -1394,7 +1394,7 @@ void ProcessBotCfgFile(void)
 }
 
 
-static void print_to_server_output(int, void *, const char * msg) 
+static void print_to_server_output(int, void *, char * msg) 
 {
    UTIL_ConsolePrintf("%s", msg);
 }

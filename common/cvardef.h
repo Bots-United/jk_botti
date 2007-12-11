@@ -27,8 +27,8 @@
 
 typedef struct cvar_s
 {
-	const char	*name;
-	const char	*string;
+	char	*name;
+	char	*string;
 	int		flags;
 	float	value;
 	struct cvar_s *next;

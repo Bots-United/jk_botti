@@ -104,8 +104,8 @@ typedef struct
 // Engine hands this to DLLs for functionality callbacks
 typedef struct enginefuncs_s
 {
-	int			(*pfnPrecacheModel)			(const char* s);
-	int			(*pfnPrecacheSound)			(const char* s);
+	int			(*pfnPrecacheModel)			(char* s);
+	int			(*pfnPrecacheSound)			(char* s);
 	void		(*pfnSetModel)				(edict_t *e, const char *m);
 	int			(*pfnModelIndex)			(const char *m);
 	int			(*pfnModelFrames)			(int modelIndex);
@@ -145,7 +145,7 @@ typedef struct enginefuncs_s
 	void		(*pfnGetAimVector)			(edict_t* ent, float speed, float *rgflReturn);
 	void		(*pfnServerCommand)			(char* str);
 	void		(*pfnServerExecute)			(void);
-	void		(*pfnClientCommand)			(edict_t* pEdict, const char* szFmt, ...);
+	void		(*pfnClientCommand)			(edict_t* pEdict, char* szFmt, ...);
 	void		(*pfnParticleEffect)		(const float *org, const float *dir, float color, float count);
 	void		(*pfnLightStyle)			(int style, char* val);
 	int			(*pfnDecalIndex)			(const char *name);
@@ -165,12 +165,12 @@ typedef struct enginefuncs_s
 	const char*	(*pfnCVarGetString)			(const char *szVarName);
 	void		(*pfnCVarSetFloat)			(const char *szVarName, float flValue);
 	void		(*pfnCVarSetString)			(const char *szVarName, const char *szValue);
-	void		(*pfnAlertMessage)			(ALERT_TYPE atype, const char *szFmt, ...);
+	void		(*pfnAlertMessage)			(ALERT_TYPE atype, char *szFmt, ...);
 #ifdef HLSDK_3_2_OLD_EIFACE
-	void		(*pfnEngineFprintf)			(FILE *pfile, const char *szFmt, ...);
+	void		(*pfnEngineFprintf)			(FILE *pfile, char *szFmt, ...);
 	void*		(*pfnPvAllocEntPrivateData)	(edict_t *pEdict, long cb);
 #else
-	void		(*pfnEngineFprintf)			(void *pfile, const char *szFmt, ...);
+	void		(*pfnEngineFprintf)			(void *pfile, char *szFmt, ...);
 	void*		(*pfnPvAllocEntPrivateData)	(edict_t *pEdict, int32 cb);
 #endif
 	void*		(*pfnPvEntPrivateData)		(edict_t *pEdict);
@@ -225,9 +225,9 @@ typedef struct enginefuncs_s
 	void		(*pfnRunPlayerMove)			(edict_t *fakeclient, const float *viewangles, float forwardmove, float sidemove, float upmove, unsigned short buttons, byte impulse, byte msec );
 	int			(*pfnNumberOfEntities)		(void);
 	char*		(*pfnGetInfoKeyBuffer)		(edict_t *e);	// passing in NULL gets the serverinfo
-	char*		(*pfnInfoKeyValue)			(char *infobuffer, const char *key);
+	char*		(*pfnInfoKeyValue)			(char *infobuffer, char *key);
 	void		(*pfnSetKeyValue)			(char *infobuffer, char *key, char *value);
-	void		(*pfnSetClientKeyValue)		(int clientIndex, char *infobuffer, const char *key, const char *value);
+	void		(*pfnSetClientKeyValue)		(int clientIndex, char *infobuffer, char *key, char *value);
 	int			(*pfnIsMapValid)			(char *filename);
 	void		(*pfnStaticDecal)			( const float *origin, int decalIndex, int entityIndex, int modelIndex );
 	int			(*pfnPrecacheGeneric)		(char* s);
