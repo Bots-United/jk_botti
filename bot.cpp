@@ -1513,12 +1513,8 @@ static void HandleWallOnRight( bot_t &pBot )
 
 
 //
-void BotJustWanderAround(bot_t &pBot, float moved_distance)
+void BotCheckLogoSpraying(bot_t &pBot)
 {
-   edict_t *pEdict = pBot.pEdict;
-
-   // no enemy, let's just wander around...
-
    // took too long trying to spray logo?...
    if ((pBot.b_spray_logo) &&
        ((pBot.f_spray_logo_time + 3.0) < gpGlobals->time))
@@ -1655,6 +1651,18 @@ void BotJustWanderAround(bot_t &pBot, float moved_distance)
       pEdict->v.idealpitch = 0;
       pEdict->v.v_angle.x = 0;
    }
+}
+
+
+//
+void BotJustWanderAround(bot_t &pBot, float moved_distance)
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   // no enemy, let's just wander around...
+
+	// logo spraying...
+	BotCheckLogoSpraying(pBot);
 
    // Check if walking to edge.. jump for it!
    if(!FBitSet(pEdict->v.button, IN_DUCK) && !FBitSet(pEdict->v.button, IN_JUMP) && pBot.b_on_ground && !pBot.b_on_ladder &&
