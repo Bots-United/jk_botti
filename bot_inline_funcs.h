@@ -41,6 +41,7 @@ inline double UTIL_GetSecs(void)
 #endif
 }
 
+#if 0
 #ifdef __GNUC__
 inline void fsincos(double x, double &s, double &c) 
 {
@@ -124,6 +125,7 @@ inline Vector UTIL_VecToAngles(const Vector &forward)
    
    return(Vector(pitch, yaw, 0));
 }
+#endif
 
 inline Vector GetGunPosition(edict_t *pEdict)
 {
@@ -231,6 +233,7 @@ inline qboolean IsAlive(const edict_t *pEdict)
    return(ret0 & ret1 & ret2 & ret3 & ret4);
 }
 
+#if 0
 inline float UTIL_WrapAngle360(float angle)
 {
    // this function returns an angle normalized to the range [0 <= angle < 360]
@@ -268,15 +271,16 @@ inline Vector UTIL_WrapAngles(const Vector & angles)
    // check for wraparound of angles
    return Vector( UTIL_WrapAngle(angles.x), UTIL_WrapAngle(angles.y), UTIL_WrapAngle(angles.z) );
 }
+#endif
 
 inline void BotFixIdealPitch(edict_t *pEdict)
 {
-   pEdict->v.idealpitch = UTIL_WrapAngle(pEdict->v.idealpitch);
+   //pEdict->v.idealpitch = UTIL_WrapAngle(pEdict->v.idealpitch);
 }
 
 inline void BotFixIdealYaw(edict_t *pEdict)
 {
-   pEdict->v.ideal_yaw = UTIL_WrapAngle(pEdict->v.ideal_yaw);
+   //pEdict->v.ideal_yaw = UTIL_WrapAngle(pEdict->v.ideal_yaw);
 }
 
 inline Vector UTIL_GetOrigin(edict_t *pEdict)
@@ -346,9 +350,9 @@ inline bot_t *UTIL_GetBotPointer(const edict_t *pEdict)
 
 inline qboolean FInViewCone(const Vector & Origin, edict_t *pEdict)
 {
-   const float fov_angle = 80;
+   const angle_t fov_angle = 80;
    
-   return(DotProduct((Origin - pEdict->v.origin).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle)) > cos(deg2rad(fov_angle)));
+   return(DotProduct((Origin - pEdict->v.origin).Normalize(), pEdict->v.v_angle.forward()) > fov_angle.cos());
 }
 
 inline qboolean FIsClassname(edict_t * pent, const char * cname)

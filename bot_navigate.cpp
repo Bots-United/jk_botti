@@ -1819,16 +1819,17 @@ qboolean BotCanDuckUnder( bot_t &pBot )
    // we can duck under it.
 
    TraceResult tr;
-   Vector v_duck, v_source, v_dest, v_forward, v_right, v_up;
+   ang3_t v_duck; 
+   Vector v_source, v_dest, v_forward, v_right, v_up;
    edict_t *pEdict = pBot.pEdict;
 
    // convert current view angle to vectors for TraceLine math...
 
    v_duck = pEdict->v.v_angle;
-   v_duck.x = 0;  // reset pitch to 0 (level horizontally)
-   v_duck.z = 0;  // reset roll to 0 (straight up and down)
+   v_duck.pitch = 0;  // reset pitch to 0 (level horizontally)
+   v_duck.roll = 0;  // reset roll to 0 (straight up and down)
 
-   UTIL_MakeVectorsPrivate( v_duck, v_forward, v_right, v_up );
+   v_duck.forward_right_up( v_forward, v_right, v_up );
 
    // use center of the body first...
 
@@ -1999,7 +2000,7 @@ qboolean BotEdgeRight( bot_t &pBot, const Vector &v_move_dir )
    if(v_forward.Length() <= 1)
       return(FALSE);
    
-   v_right = UTIL_AnglesToRight(UTIL_VecToAngles(v_forward.Normalize()));
+   v_right = ang3_t(v_forward.Normalize()).right();
    
    // trace down to ground
    v_source = pEdict->v.origin;
@@ -2059,7 +2060,7 @@ qboolean BotEdgeLeft( bot_t &pBot, const Vector &v_move_dir )
    if(v_forward.Length() <= 1)
       return(FALSE);
       
-   v_right = UTIL_AnglesToRight(UTIL_VecToAngles(v_forward.Normalize()));
+   v_right = ang3_t(v_forward.Normalize()).right();
    
    // trace down to ground
    v_source = pEdict->v.origin;
@@ -2126,7 +2127,7 @@ qboolean BotCheckWallOnLeft( bot_t &pBot )
    // do a trace to the left...
 
    v_src = pEdict->v.origin;
-   v_left = v_src + UTIL_AnglesToRight(pEdict->v.v_angle) * -40;  // 40 units to the left
+   v_left = v_src + pEdict->v.v_angle.right() * -40;  // 40 units to the left
 
    UTIL_TraceMove( v_src, v_left, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
 
@@ -2152,7 +2153,7 @@ qboolean BotCheckWallOnRight( bot_t &pBot )
    // do a trace to the right...
 
    v_src = pEdict->v.origin;
-   v_right = v_src + UTIL_AnglesToRight(pEdict->v.v_angle) * 40;  // 40 units to the right
+   v_right = v_src + pEdict->v.v_angle.right() * 40;  // 40 units to the right
 
    UTIL_TraceMove( v_src, v_right, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
 
@@ -2178,7 +2179,7 @@ qboolean BotCheckWallOnForward( bot_t &pBot )
    // do a trace to the right...
 
    v_src = pEdict->v.origin;
-   v_right = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * 40;  // 40 units to the forawrd
+   v_right = v_src + pEdict->v.v_angle.forward() * 40;  // 40 units to the forward
 
    UTIL_TraceMove( v_src, v_right, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
 
@@ -2204,7 +2205,7 @@ qboolean BotCheckWallOnBack( bot_t &pBot )
    // do a trace to the right...
 
    v_src = pEdict->v.origin;
-   v_right = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * -40;  // 40 units to the back
+   v_right = v_src + pEdict->v.v_angle.forward() * -40;  // 40 units to the back
 
    UTIL_TraceMove( v_src, v_right, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
 
@@ -2225,7 +2226,8 @@ void BotLookForDrop( bot_t &pBot )
 {
    edict_t *pEdict = pBot.pEdict;
 
-   Vector v_src, v_dest, v_ahead;
+   Vector v_src, v_dest;
+   ang3_t v_ahead;
    float scale, direction;
    TraceResult tr;
    int contents;
@@ -2235,10 +2237,10 @@ void BotLookForDrop( bot_t &pBot )
    scale = 80 + (pBot.f_max_speed / 10);
 
    v_ahead = pEdict->v.v_angle;
-   v_ahead.x = 0;  // set pitch to level horizontally
+   v_ahead.pitch = 0;  // set pitch to level horizontally
 
    v_src = pEdict->v.origin;
-   v_dest = v_src + UTIL_AnglesToForward(v_ahead) * scale;
+   v_dest = v_src + v_ahead.forward() * scale;
 
    UTIL_TraceMove( v_src, v_dest, ignore_monsters,  pEdict->v.pContainingEntity, &tr );
 
@@ -2322,17 +2324,17 @@ void BotLookForDrop( bot_t &pBot )
 
             // turn 30 degrees at a time until bot is on solid ground
             v_ahead = pEdict->v.v_angle;
-            v_ahead.x = 0;  // set pitch to level horizontally
+            v_ahead.pitch = 0;  // set pitch to level horizontally
 
             done = FALSE;
             turn_count = 0;
 
             while (!done)
             {
-               v_ahead.y = UTIL_WrapAngle(v_ahead.y + 30.0 * direction);
+               v_ahead.yaw = v_ahead.yaw + 30.0 * direction;
 
                v_src = pEdict->v.origin;
-               v_dest = v_src + UTIL_AnglesToForward(v_ahead) * scale;
+               v_dest = v_src + v_ahead.forward() * scale;
 
                UTIL_TraceMove( v_src, v_dest, ignore_monsters, 
                                pEdict->v.pContainingEntity, &tr );
@@ -2356,8 +2358,7 @@ void BotLookForDrop( bot_t &pBot )
                   done = TRUE;
             }
 
-            pBot.pEdict->v.ideal_yaw = v_ahead.y;
-            BotFixIdealYaw(pEdict);
+            pBot.pEdict->v.ideal_yaw = v_ahead.yaw;
          }
       }
    }

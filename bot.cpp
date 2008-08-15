@@ -717,8 +717,8 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
 
       pBot.need_to_initialize = FALSE;  // don't need to initialize yet
 
-      BotEnt->v.idealpitch = BotEnt->v.v_angle.x;
-      BotEnt->v.ideal_yaw = BotEnt->v.v_angle.y;
+      BotEnt->v.idealpitch = BotEnt->v.v_angle.pitch;
+      BotEnt->v.ideal_yaw = BotEnt->v.v_angle.yaw;
 
       // these should REALLY be MOD dependant...
       BotEnt->v.pitch_speed = 270;  // slightly faster than HLDM of 225
@@ -787,17 +787,19 @@ void BotReplaceConnectionTime(const char * name, float * timeslot)
 }
 
 //
-int BotInFieldOfView(bot_t &pBot, const Vector & dest)
+angle_t BotInFieldOfView(bot_t &pBot, const Vector & dest)
 {
+   return angle_t::between_vectors(dest, pBot.pEdict->v.v_angle.forward());
+#if 0
    // find angles from source to destination...
-   Vector entity_angles = UTIL_VecToAngles( dest );
+   ang3_t to_angles = dest;
 
    // make yaw angle 0 to 360 degrees if negative...
    if (entity_angles.y < 0)
       entity_angles.y += 360;
 
    // get bot's current view angle...
-   float view_angle = pBot.pEdict->v.v_angle.y;
+   float view_angle = pBot.pEdict->v.v_angle.yaw;
 
    // make view angle 0 to 360 degrees if negative...
    if (view_angle < 0)
@@ -808,13 +810,14 @@ int BotInFieldOfView(bot_t &pBot, const Vector & dest)
    // 45 degrees to the right is the limit of the normal view angle
 
    // rsm - START angle bug fix
-   int angle = abs((int)view_angle - (int)entity_angles.y);
+   int angle = abs((int)view_angle.ang - (int)entity_angles.y);
 
    if (angle > 180)
       angle = 360 - angle;
 
    return angle;
    // rsm - END
+#endif
 }
 
 
@@ -929,7 +932,7 @@ void BotSprayLogo(bot_t &pBot)
    Vector v_src, v_dest;
    
    v_src = pEntity->v.origin + pEntity->v.view_ofs;
-   v_dest = v_src + UTIL_AnglesToForward(pEntity->v.v_angle) * 80;
+   v_dest = v_src + pEntity->v.v_angle.forward() * 80;
    UTIL_TraceMove( v_src, v_dest, ignore_monsters, pEntity->v.pContainingEntity, &pTrace );
 
    index = DECAL_INDEX(logo_name);
@@ -977,7 +980,7 @@ void BotFindItem( bot_t &pBot )
    TraceResult tr;
    Vector vecStart;
    Vector vecEnd;
-   int angle_to_entity;
+   angle_t angle_to_entity;
    int itemflag, select_index;
    bot_weapon_select_t *pSelect = &weapon_select[0];
    edict_t *pEdict = pBot.pEdict;
@@ -1030,8 +1033,8 @@ void BotFindItem( bot_t &pBot )
 
          angle_to_entity = BotInFieldOfView( pBot, vecEnd - vecStart );
 
-         // check if entity is outside field of view (+/- 45 degrees)
-         if (angle_to_entity > 45)
+         // check if entity is outside field of view (+/- 55 degrees)
+         if (angle_to_entity > 55)
             continue;  // skip this item if bot can't "see" it
 
          // check if entity is a ladder (ladders are a special case)
@@ -1215,8 +1218,8 @@ void BotFindItem( bot_t &pBot )
          // find angles from bot origin to entity...
          angle_to_entity = BotInFieldOfView( pBot, vecEnd - vecStart );
 
-         // check if entity is outside field of view (+/- 45 degrees)
-         if (angle_to_entity > 45)
+         // check if entity is outside field of view (+/- 55 degrees)
+         if (angle_to_entity > 55)
             continue;  // skip this item if bot can't "see" it
 
          // check if line of sight to object is not blocked (i.e. visible)
@@ -1418,9 +1421,9 @@ endloop:
       // let's head off toward that item...
       Vector v_item = pickup_origin - pEdict->v.origin;
 
-      Vector bot_angles = UTIL_VecToAngles( v_item );
+      ang3_t bot_angles = v_item;
 
-      pEdict->v.ideal_yaw = bot_angles.y;
+      pEdict->v.ideal_yaw = bot_angles.yaw;
 
       BotFixIdealYaw(pEdict);
 
@@ -1515,6 +1518,8 @@ static void HandleWallOnRight( bot_t &pBot )
 //
 void BotCheckLogoSpraying(bot_t &pBot)
 {
+   edict_t *pEdict = pBot.pEdict;
+   
    // took too long trying to spray logo?...
    if ((pBot.b_spray_logo) &&
        ((pBot.f_spray_logo_time + 3.0) < gpGlobals->time))
@@ -1525,16 +1530,17 @@ void BotCheckLogoSpraying(bot_t &pBot)
 
    if (pBot.b_spray_logo)  // trying to spray a logo?
    {
-      Vector v_src, v_dest, angle;
+      Vector v_src, v_dest;
+      ang3_t angle, bot_angles;
       TraceResult tr;
 
       // find the nearest wall to spray logo on (or floor)...
 
       angle = pEdict->v.v_angle;
-      angle.x = 0;  // pitch is level horizontally
+      angle.pitch = 0;  // pitch is level horizontally
 
       v_src = pEdict->v.origin + pEdict->v.view_ofs;
-      v_dest = v_src + UTIL_AnglesToForward(angle) * 100;
+      v_dest = v_src + angle.forward() * 100;
 
       UTIL_TraceMove( v_src, v_dest, dont_ignore_monsters,
                       pEdict->v.pContainingEntity, &tr);
@@ -1554,9 +1560,9 @@ void BotCheckLogoSpraying(bot_t &pBot)
          if (tr.flFraction < 1.0f)
          {
             // set the ideal yaw and pitch...
-            Vector bot_angles = UTIL_VecToAngles(v_dest - v_src);
+            bot_angles = v_dest - v_src;
 
-            pEdict->v.ideal_yaw = bot_angles.y;
+            pEdict->v.ideal_yaw = bot_angles.yaw;
 
             BotFixIdealYaw(pEdict);
 
@@ -1572,9 +1578,9 @@ void BotCheckLogoSpraying(bot_t &pBot)
             if (tr.flFraction < 1.0f)
             {
                // set the ideal yaw and pitch...
-               Vector bot_angles = UTIL_VecToAngles(v_dest - v_src);
+               bot_angles = v_dest - v_src;
 
-               pEdict->v.ideal_yaw = bot_angles.y;
+               pEdict->v.ideal_yaw = bot_angles.yaw;
 
                BotFixIdealYaw(pEdict);
 
@@ -1590,9 +1596,9 @@ void BotCheckLogoSpraying(bot_t &pBot)
                if (tr.flFraction < 1.0f)
                {
                   // set the ideal yaw and pitch...
-                  Vector bot_angles = UTIL_VecToAngles(v_dest - v_src);
+                  bot_angles = v_dest - v_src;
 
-                  pEdict->v.ideal_yaw = bot_angles.y;
+                  pEdict->v.ideal_yaw = bot_angles.yaw;
 
                   BotFixIdealYaw(pEdict);
 
@@ -1603,10 +1609,10 @@ void BotCheckLogoSpraying(bot_t &pBot)
                   // on the ground...
 
                   angle = pEdict->v.v_angle;
-                  angle.x = 85.0f;  // 85 degrees is downward
+                  angle.pitch = 85.0f;  // 85 degrees is downward
 
                   v_src = pEdict->v.origin + pEdict->v.view_ofs;
-                  v_dest = v_src + UTIL_AnglesToForward(angle) * 80;
+                  v_dest = v_src + angle.forward() * 80;
 
                   UTIL_TraceMove( v_src, v_dest, dont_ignore_monsters,
                                   pEdict->v.pContainingEntity, &tr);
@@ -1629,7 +1635,7 @@ void BotCheckLogoSpraying(bot_t &pBot)
       // is there a wall close to us?
 
       v_src = pEdict->v.origin + pEdict->v.view_ofs;
-      v_dest = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * 80;
+      v_dest = v_src + pEdict->v.v_angle.forward() * 80;
 
       UTIL_TraceMove( v_src, v_dest, dont_ignore_monsters,
                       pEdict->v.pContainingEntity, &tr);
@@ -1649,7 +1655,7 @@ void BotCheckLogoSpraying(bot_t &pBot)
    {
       // reset pitch to 0 (level horizontally)
       pEdict->v.idealpitch = 0;
-      pEdict->v.v_angle.x = 0;
+      pEdict->v.v_angle.pitch = 0;
    }
 }
 
@@ -1678,6 +1684,13 @@ void BotJustWanderAround(bot_t &pBot, float moved_distance)
       BotFindItem( pBot );  // see if there are any visible items
    }
 
+	//
+	// TODO: check for slow satchels / slow laserspot in BotFindItem()
+	//  Then avoid theim, reuse tripmine runaway code. 
+	//  'Invalidate' current target waypoint and closest waypoint and closest 
+	//  waypoint to weapon.
+	//
+
    // check if bot sees a tripmine...
    if (pBot.b_see_tripmine)
    {
@@ -1696,9 +1709,7 @@ void BotJustWanderAround(bot_t &pBot, float moved_distance)
       }
       else  // run away!!!
       {
-         Vector tripmine_angles;
-
-         tripmine_angles = UTIL_VecToAngles( pBot.v_tripmine - pEdict->v.origin );
+         ang3_t tripmine_angles = pBot.v_tripmine - pEdict->v.origin;
 
          // face away from the tripmine
          pEdict->v.ideal_yaw += 180;  // rotate 180 degrees
@@ -1724,10 +1735,10 @@ void BotJustWanderAround(bot_t &pBot, float moved_distance)
          
          // aim at the button..
          Vector v_target = pBot.v_use_target - GetGunPosition( pEdict );
-         Vector target_angle = UTIL_VecToAngles(v_target);
+         ang3_t target_angle = v_target;
 
-         pEdict->v.idealpitch = UTIL_WrapAngle(target_angle.x);
-         pEdict->v.ideal_yaw = UTIL_WrapAngle(target_angle.y);
+         pEdict->v.idealpitch = target_angle.pitch;
+         pEdict->v.ideal_yaw = target_angle.yaw;
          
          pBot.f_move_speed = pBot.f_max_speed;
 
@@ -1758,10 +1769,10 @@ void BotJustWanderAround(bot_t &pBot, float moved_distance)
 
          // aim at the button..
          Vector v_target = pBot.v_use_target - GetGunPosition( pEdict );
-         Vector target_angle = UTIL_VecToAngles(v_target);
+         ang3_t target_angle = v_target;
 
-         pEdict->v.idealpitch = UTIL_WrapAngle(target_angle.x);
-         pEdict->v.ideal_yaw = UTIL_WrapAngle(target_angle.y);
+         pEdict->v.idealpitch = target_angle.pitch;
+         pEdict->v.ideal_yaw = target_angle.yaw;
          
          pBot.f_move_speed = pBot.f_max_speed;
 
@@ -1856,7 +1867,7 @@ void BotJustWanderAround(bot_t &pBot, float moved_distance)
             }
             else
             {
-               Vector v_forward = UTIL_AnglesToForward(pEdict->v.v_angle);
+               Vector v_forward = pEdict->v.v_angle.forward();
                
                if(RANDOM_LONG2(0,1)) 
                {
@@ -1981,7 +1992,7 @@ void BotJustWanderAround(bot_t &pBot, float moved_distance)
 }
 
 
-void BotRunPlayerMove(bot_t &pBot, const float *viewangles, float forwardmove, float sidemove, float upmove, unsigned short buttons, byte impulse, byte msec )
+void BotRunPlayerMove(bot_t &pBot, const ang3_t &viewangles, float forwardmove, float sidemove, float upmove, unsigned short buttons, byte impulse, byte msec )
 {
    /*
       Calling sequence after calling g_engfuncs.pfnRunPlayerMove:
@@ -1993,7 +2004,7 @@ void BotRunPlayerMove(bot_t &pBot, const float *viewangles, float forwardmove, f
          5. CmdEnd
    */
    BotAimPre(pBot);
-   g_engfuncs.pfnRunPlayerMove( pBot.pEdict, viewangles, forwardmove, sidemove, upmove, buttons, impulse, msec);
+   g_engfuncs.pfnRunPlayerMove( pBot.pEdict, (const float*)&viewangles, forwardmove, sidemove, upmove, buttons, impulse, msec);
    BotAimPost(pBot);
 }
 
@@ -2104,6 +2115,18 @@ void BotThink( bot_t &pBot )
       return;
    }
 
+   // bot in spectator mode.. press fire to spawn
+   if (pBot.bInSpectatorMode)
+   {
+      BotSpawnInit(pBot);
+      
+      pBot.bInSpectatorMode = FALSE;
+      pEdict->v.button = IN_ATTACK;
+      
+      BotRunPlayerMove(pBot, pEdict->v.v_angle, 0, 0, 0, pEdict->v.button, 0, (byte)pBot.msecval);
+      return;
+   }
+   
    // if the bot is dead, randomly press fire to respawn...
    if ((pEdict->v.health < 1) || (pEdict->v.deadflag != DEAD_NO))
    {
@@ -2120,7 +2143,7 @@ void BotThink( bot_t &pBot )
       if (RANDOM_LONG2(1, 100) <= 50)
          pEdict->v.button = IN_ATTACK;
             
-      BotRunPlayerMove(pBot, pEdict->v.v_angle, pBot.f_move_speed, 0, 0, pEdict->v.button, 0, (byte)pBot.msecval);
+      BotRunPlayerMove(pBot, pEdict->v.v_angle, 0, 0, 0, pEdict->v.button, 0, (byte)pBot.msecval);
 
       return;
    }
@@ -2156,7 +2179,7 @@ void BotThink( bot_t &pBot )
    }
    else
    {
-      pBot.idle_angle = pEdict->v.v_angle.y;
+      pBot.idle_angle = pEdict->v.v_angle.yaw;
    }
 
    // set to max speed
@@ -2313,10 +2336,10 @@ void BotThink( bot_t &pBot )
    {
       Vector v_to_wp = waypoints[pBot.curr_waypoint_index].origin - GetGunPosition( pEdict );
       
-      Vector wp_angle = UTIL_VecToAngles(v_to_wp);
+      ang3_t wp_angle = v_to_wp;
       
-      pEdict->v.idealpitch = UTIL_WrapAngle(wp_angle.x);
-      pEdict->v.ideal_yaw = UTIL_WrapAngle(wp_angle.y);
+      pEdict->v.idealpitch = wp_angle.pitch;
+      pEdict->v.ideal_yaw = wp_angle.yaw;
       
       pBot.f_move_speed = 50.0f;
       pBot.b_not_maxspeed = TRUE;
@@ -2438,11 +2461,11 @@ void BotThink( bot_t &pBot )
       
       if(0)
       {
-         Vector v_angle = pEdict->v.v_angle;
-         v_angle.x = 0;
+         ang3_t v_angle = pEdict->v.v_angle;
+         v_angle.pitch = 0;
          
-         Vector v_right = UTIL_AnglesToRight(v_angle);
-         Vector v_forward = UTIL_AnglesToForward(v_angle);
+         Vector v_right = v_angle.right();
+         Vector v_forward = v_angle.forward();
          
          Vector v_beam = v_forward * calc.y + v_right * calc.x;
          UTIL_DrawBeam(0, pEdict->v.origin, pEdict->v.origin + v_beam, 10, 2, 250, 50, 50, 200, 10);
@@ -2498,7 +2521,7 @@ void BotDoStrafe(bot_t &pBot)
       
       if(pBot.f_dont_avoid_wall_time <= gpGlobals->time)
       {
-         Vector v_forward = UTIL_AnglesToForward(pEdict->v.v_angle);
+         Vector v_forward = pEdict->v.v_angle.forward();
          
          // check for walls, left and right
          if(pBot.f_strafe_direction > 0.0f)
@@ -2537,10 +2560,10 @@ void BotDoStrafe(bot_t &pBot)
          if(pEdict->v.velocity.Make2D().Length() > 20.0f)
          {
       	    // First kill off sideways movement
-      	    float move_dir = UTIL_VecToAngles(pEdict->v.velocity).y;
-      	    float look_dir = pEdict->v.v_angle.y;
+      	    angle_t move_dir = ang3_t(pEdict->v.velocity).yaw;
+      	    angle_t look_dir = pEdict->v.v_angle.yaw;
       	    
-      	    float angle_diff = UTIL_WrapAngle(move_dir - look_dir);
+      	    angle_t angle_diff = move_dir - look_dir;
       	    
       	    if(angle_diff > 135.0f || angle_diff <= 135.0f)
       	    {
@@ -2573,12 +2596,12 @@ void BotDoStrafe(bot_t &pBot)
             Vector v_wp = waypoints[pBot.curr_waypoint_index].origin;
             Vector v_dir = (v_wp - pEdict->v.origin);
          
-            Vector v_angles = UTIL_VecToAngles(v_dir);
+            ang3_t v_angles = v_dir;
          
-            float waypoint_dir = v_angles.y;
-            float look_dir = pEdict->v.v_angle.y;
+            angle_t waypoint_dir = v_angles.yaw;
+            angle_t look_dir = pEdict->v.v_angle.yaw;
          
-            float angle_diff = UTIL_WrapAngle(waypoint_dir - look_dir);
+            angle_t angle_diff = waypoint_dir - look_dir;
          
       	    if(angle_diff > 135.0f || angle_diff <= 135.0f)
       	    {
@@ -2636,7 +2659,7 @@ void BotDoStrafe(bot_t &pBot)
 
       if(pBot.f_dont_avoid_wall_time <= gpGlobals->time)
       {
-         Vector v_forward = UTIL_AnglesToForward(pEdict->v.v_angle);
+         Vector v_forward = pEdict->v.v_angle.forward();
          
          // check for walls, left and right
          if(pBot.f_strafe_direction > 0.0f)
@@ -2697,7 +2720,7 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
    if (pBot.b_longjump && !pBot.b_in_water && pBot.b_on_ground &&
        !FBitSet(pEdict->v.button, IN_DUCK) && !FBitSet(pEdict->v.button, IN_JUMP) &&
        pEdict->v.velocity.Length() > 50 && pBot.b_combat_longjump &&
-       fabs(pEdict->v.v_angle.y - pEdict->v.ideal_yaw) <= 10)
+       (pEdict->v.v_angle.yaw - pEdict->v.ideal_yaw).abs() <= 10)
    {
       // don't try to move for 1.0 seconds, otherwise the longjump is fucked up	
       pBot.f_longjump_time = gpGlobals->time + 1.0;
@@ -2760,7 +2783,7 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
    
    lj = (pBot.prev_random_type != 3 && pBot.b_longjump && pBot.f_combat_longjump <= gpGlobals->time && !pBot.b_combat_longjump && 
          skill_settings[pBot.bot_skill].can_longjump &&
-         pBot.pBotEnemy != NULL && fabs(pEdict->v.v_angle.y - pEdict->v.ideal_yaw) <= 30.0f &&
+         pBot.pBotEnemy != NULL && (pEdict->v.v_angle.yaw - pEdict->v.ideal_yaw).abs() <= 30.0f &&
          RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_longjump_frequency);
    
    if(lj)
@@ -2846,7 +2869,8 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
    // combat mode random longjumping
    if(lj)
    {
-      Vector vecSrc, target_angle;
+      Vector vecSrc;
+      ang3_t target_angle;
       TraceResult tr;
       int mod;
          
@@ -2856,12 +2880,12 @@ void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distanc
       // get a random angle (-30 or 30)
       for (int i = 1; i >= -1; i-=2)
       {
-         target_angle.x = -pEdict->v.v_angle.x;
-         target_angle.y = UTIL_WrapAngle(pEdict->v.v_angle.y + 30 * (mod * i));
-         target_angle.z = pEdict->v.v_angle.z;
+         target_angle.pitch = -pEdict->v.v_angle.pitch;
+         target_angle.yaw   = pEdict->v.v_angle.yaw + 30 * (mod * i);
+         target_angle.roll  = pEdict->v.v_angle.roll;
          
          // trace a hull toward the current waypoint the distance of a longjump (depending on gravity)
-         UTIL_TraceMove(vecSrc, vecSrc + UTIL_AnglesToForward(target_angle) * max_lj_distance, dont_ignore_monsters, pEdict, &tr);
+         UTIL_TraceMove(vecSrc, vecSrc + target_angle.forward() * max_lj_distance, dont_ignore_monsters, pEdict, &tr);
          
          // make sure it's clear
          if (tr.flFraction >= 1.0f)

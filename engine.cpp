@@ -228,6 +228,7 @@ void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, edict_t *
       static int Damage = 0;
       static int ScreenFade = 0;
       static int DeathMsg = 0;
+      static int TextMsg = 0;
       
       if (ed)
       {
@@ -259,6 +260,8 @@ void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, edict_t *
                botMsgFunction = BotClient_Valve_Damage;
             else if (msg_type == FAST_GET_USER_MSG_ID (PLID, ScreenFade, "ScreenFade", NULL))
                botMsgFunction = BotClient_Valve_ScreenFade;
+            else if (msg_type == FAST_GET_USER_MSG_ID (PLID, TextMsg, "TextMsg", NULL))
+               botMsgFunction = BotClient_Valve_TextMsg;
          }
          // is this message for a player?
          else 

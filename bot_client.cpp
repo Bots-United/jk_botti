@@ -347,9 +347,9 @@ void BotClient_Valve_Damage(void *p, int bot_index)
          {
             // face the attacker...
             Vector v_enemy = damage_origin - bots[bot_index].pEdict->v.origin;
-            Vector bot_angles = UTIL_VecToAngles( v_enemy );
+            ang3_t bot_angles = v_enemy;
 
-            bots[bot_index].pEdict->v.ideal_yaw = bot_angles.y;
+            bots[bot_index].pEdict->v.ideal_yaw = bot_angles.yaw;
 
             BotFixIdealYaw(bots[bot_index].pEdict);
          
@@ -464,5 +464,30 @@ void BotClient_Valve_ScreenFade(void *p, int bot_index)
    else
    {
       state++;
+   }
+}
+
+// detect observer mode
+void BotClient_Valve_TextMsg(void *p, int bot_index)
+{
+   static int state = 0;   // current state machine state
+   static int msg_dest;
+
+   if (state == 0)
+   {
+      state++;
+      msg_dest = *(int *)p;
+   }
+   else if (state == 1)
+   {
+      char *msg = (char*)p;
+      
+      if (msg_dest != HUD_PRINTCENTER)
+         return;
+      
+      if (!strncmp(msg, "#Spec_Mode", 10)) 
+      {
+         bots[bot_index].bInSpectatorMode = TRUE;
+      }
    }
 }

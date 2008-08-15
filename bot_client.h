@@ -27,3 +27,5 @@ void BotClient_Valve_Damage(void *p, int bot_index);
 void BotClient_Valve_DeathMsg(void *p, int bot_index);
 
 void BotClient_Valve_ScreenFade(void *p, int bot_index);
+
+void BotClient_Valve_TextMsg(void *p, int bot_index);

@@ -28,7 +28,7 @@ ARCHFLAG += -march=i686 -mtune=pentium4
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
 else
-	OPTFLAGS = -O2 -ffast-math -fomit-frame-pointer -g
+	OPTFLAGS = -O2 -ffast-math -fomit-frame-pointer -funit-at-a-time -g 
 endif
 
 INCLUDES = -I"./metamod" \

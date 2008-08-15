@@ -1296,14 +1296,14 @@ void WaypointAddAiming(edict_t *pEntity)
 
    waypoints[index].itemflags = 0; 
 
-   Vector v_angle;
+   ang3_t v_angle;
    
-   v_angle.y = pEntity->v.v_angle.y;
-   v_angle.x = 0;  // reset pitch to horizontal
-   v_angle.z = 0;  // reset roll to level
+   v_angle.yaw = pEntity->v.v_angle.yaw;
+   v_angle.pitch = 0;  // reset pitch to horizontal
+   v_angle.roll = 0;  // reset roll to level
 
    // store the origin (location) of this waypoint (use entity origin)
-   waypoints[index].origin = pEntity->v.origin + UTIL_AnglesToForward(v_angle) * 25;
+   waypoints[index].origin = pEntity->v.origin + v_angle.forward() * 25;
 
    // set the time that this waypoint was originally displayed...
    wp_display_time[index] = gpGlobals->time;

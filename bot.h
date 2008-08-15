@@ -141,6 +141,7 @@ typedef struct
    
    edict_t *pEdict;
    qboolean need_to_initialize;
+   qboolean bInSpectatorMode;
    
    char name[BOT_NAME_LEN];
    char skin[BOT_SKIN_LEN];
@@ -176,7 +177,7 @@ typedef struct
    int eagle_secondary_state;
 
    // things from pev in CBasePlayer...
-   float idle_angle;
+   angle_t idle_angle;
    float idle_angle_time;
    float blinded_time;
 
@@ -303,7 +304,7 @@ typedef struct
    float f_weaponchange_time;
    
    qboolean b_set_special_shoot_angle;
-   float f_special_shoot_angle;
+   angle_t f_special_shoot_angle;
 
    bot_current_weapon_t current_weapon;  // one current weapon for each bot
    int m_rgAmmo[MAX_AMMO_SLOTS];  // total ammo amounts (1 array for each bot)
@@ -385,7 +386,7 @@ edict_t *UTIL_FindEntityByClassname( edict_t *pentStart, const char *szName );
 edict_t *UTIL_FindEntityByTarget( edict_t *pentStart, const char *szName );
 edict_t *UTIL_FindEntityByTargetname( edict_t *pentStart, const char *szName );
 
-void ClientPrint( edict_t *pEdict, int msg_dest, const char *msg_name);
+void ClientPrint( edict_t *pEdict, int msg_dest, const char *msg_name, const char *param1 = NULL, const char *param2 = NULL, const char *param3 = NULL, const char *param4 = NULL );
 void UTIL_SayText( const char *pText, edict_t *pEdict );
 void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message );
 char* UTIL_GetTeam(edict_t *pEntity, char *teamstr, size_t slen);
