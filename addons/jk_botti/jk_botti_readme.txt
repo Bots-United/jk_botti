@@ -66,7 +66,6 @@ Credits:
 2. What's new
 --------------------
 1.41:
- * Fixed bots to spawn on OZ DM.
  * Add skill setting updown_turn_ration, setting to make bot aim up-down worse
    than right-left.
  * Add bot endgame chatting.

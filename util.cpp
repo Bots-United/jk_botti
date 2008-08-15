@@ -275,14 +275,14 @@ qboolean IsPlayerFacingWall(edict_t * pPlayer)
    Vector v_forward, EyePosition;
 	
    EyePosition = pPlayer->v.origin + pPlayer->v.view_ofs;
-   v_forward = pPlayer->v.v_angle.forward();
+   v_forward = UTIL_AnglesToForward(pPlayer->v.v_angle);
    
    UTIL_TraceLine(EyePosition, EyePosition + gpGlobals->v_forward * 48, ignore_monsters, ignore_glass, pPlayer, &tr);
    
    if (tr.flFraction >= 1.0f) 
       return(FALSE);
 
-   if (DotProduct(gpGlobals->v_forward, tr.vecPlaneNormal) > cos(angle_t(60).rad())) //60deg
+   if (DotProduct(gpGlobals->v_forward, tr.vecPlaneNormal) > -0.5f) //60deg
       return(FALSE);
 
    return(TRUE);
@@ -346,7 +346,7 @@ qboolean IsPlayerChatProtected(edict_t * pPlayer)
 }
 
 
-void ClientPrint(edict_t *pEntity, int msg_dest, const char *msg_name, const char *param1, const char *param2, const char *param3, const char *param4)
+void ClientPrint( edict_t *pEntity, int msg_dest, const char *msg_name)
 {       
    if (GET_USER_MSG_ID (PLID, "TextMsg", NULL) <= 0)
       REG_USER_MSG ("TextMsg", -1);
@@ -354,14 +354,7 @@ void ClientPrint(edict_t *pEntity, int msg_dest, const char *msg_name, const cha
    MESSAGE_BEGIN( MSG_ONE, GET_USER_MSG_ID (PLID, "TextMsg", NULL), NULL, pEntity );
 
    WRITE_BYTE( msg_dest );
-      WRITE_STRING( msg_name );
-      if ( param1 )         WRITE_STRING( param1 );
-      if ( param2 )
-         WRITE_STRING( param2 );
-      if ( param3 )
-         WRITE_STRING( param3 );
-      if ( param4 )
-         WRITE_STRING( param4 );
+   WRITE_STRING( msg_name );
    MESSAGE_END();
 }
 
@@ -561,7 +554,7 @@ qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnem
    return(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ));
    
    // construct sideways vector
-   Vector v_right = ang3_t(vecOrigin - GetGunPosition(pEdict)).right();
+   Vector v_right = UTIL_AnglesToRight(UTIL_VecToAngles(vecOrigin - GetGunPosition(pEdict)));
 
    // check if right side of player is visible
    Vector right_offset = v_right * (pEnemy->v.maxs.x - 4);
@@ -600,7 +593,7 @@ qboolean FInShootCone(const Vector & Origin, edict_t *pEdict, float distance, fl
       return TRUE;
    
    // angle between forward-view-vector and vector to player (as cos(angle))
-   float flDot = DotProduct( (Origin - (pEdict->v.origin + pEdict->v.view_ofs)).Normalize(), pEdict->v.v_angle.forward() );
+   float flDot = DotProduct( (Origin - (pEdict->v.origin + pEdict->v.view_ofs)).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle) );
    if(flDot > cos(deg2rad(min_angle))) // smaller angle, bigger cosine
       return TRUE;
    

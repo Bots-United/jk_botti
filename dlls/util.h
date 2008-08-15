@@ -205,16 +205,16 @@ inline BOOL FClassnameIs(entvars_t* pev, const char* szClassname)
 
 // Misc. Prototypes
 extern void                     UTIL_SetSize                    (entvars_t* pev, const Vector &vecMin, const Vector &vecMax);
-//extern float            UTIL_VecToYaw                   (const Vector &vec);
-//extern Vector           UTIL_VecToAngles                (const Vector &vec);
-//extern float            UTIL_AngleMod                   (float a);
-//extern float            UTIL_AngleDiff                  ( float destAngle, float srcAngle );
+extern float            UTIL_VecToYaw                   (const Vector &vec);
+extern Vector           UTIL_VecToAngles                (const Vector &vec);
+extern float            UTIL_AngleMod                   (float a);
+extern float            UTIL_AngleDiff                  ( float destAngle, float srcAngle );
 
 #define UTIL_EntitiesInPVS(pent)                        (*g_engfuncs.pfnEntitiesInPVS)(pent)
-//extern void                     UTIL_MakeVectors                (const Vector &vecAngles);
+extern void                     UTIL_MakeVectors                (const Vector &vecAngles);
 
-//extern void                     UTIL_MakeAimVectors             ( const Vector &vecAngles ); // like MakeVectors, but assumes pitch isn't inverted
-//extern void                     UTIL_MakeInvVectors             ( const Vector &vec, globalvars_t *pgv );
+extern void                     UTIL_MakeAimVectors             ( const Vector &vecAngles ); // like MakeVectors, but assumes pitch isn't inverted
+extern void                     UTIL_MakeInvVectors             ( const Vector &vec, globalvars_t *pgv );
 
 extern void                     UTIL_SetOrigin                  ( entvars_t* pev, const Vector &vecOrigin );
 extern void                     UTIL_EmitAmbientSound   ( edict_t *entity, const Vector &vecOrigin, const char *samp, float vol, float attenuation, int fFlags, int pitch );

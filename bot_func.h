@@ -12,7 +12,7 @@
 void BotSpawnInit( bot_t &pBot );
 void BotCreate( const char *skin, const char *name, int skill, int top_color, int bottom_color, int cfg_bot_index );
 void BotStartGame( bot_t &pBot );
-angle_t BotInFieldOfView( bot_t &pBot, const Vector & dest );
+int BotInFieldOfView( bot_t &pBot, const Vector & dest );
 qboolean BotEntityIsVisible( bot_t &pBot, const Vector & dest );
 void BotPickLogo(bot_t &pBot);
 void BotSprayLogo(bot_t &pBot);

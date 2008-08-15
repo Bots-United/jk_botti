@@ -20,8 +20,6 @@
 #endif /* not __MINGW32__ */
 #endif
 
-#include "vector.h"
-
 typedef struct
 {	
 	float		time;
@@ -72,10 +70,10 @@ typedef struct entvars_s
 							     //  client can predict conveyors correctly.  Server zeroes it, so we need to store here, too.
 	vec3_t		movedir;
 
-	ang3_t		angles;			// Model angles
-	ang3_t		avelocity;		// angle velocity (degrees per second)
-	ang3_t		punchangle;		// auto-decaying view angle adjustment
-	ang3_t		v_angle;		// Viewing angle (player only)
+	vec3_t		angles;			// Model angles
+	vec3_t		avelocity;		// angle velocity (degrees per second)
+	vec3_t		punchangle;		// auto-decaying view angle adjustment
+	vec3_t		v_angle;		// Viewing angle (player only)
 
 	// For parametric entities
 	vec3_t		endpos;
@@ -84,9 +82,9 @@ typedef struct entvars_s
 	float		starttime;
 
 	int			fixangle;		// 0:nothing, 1:force view angles, 2:add avelocity
-	angle_t		idealpitch;
+	float		idealpitch;
 	float		pitch_speed;
-	angle_t		ideal_yaw;
+	float		ideal_yaw;
 	float		yaw_speed;
 
 	int			modelindex;

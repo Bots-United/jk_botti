@@ -70,10 +70,10 @@ void BotPointGun(bot_t &pBot)
    // it human-like.
 
    float speed; // speed : 0.1 - 1
-   ang3_t v_deviation;
+   Vector v_deviation;
    float turn_skill = skill_settings[pBot.bot_skill].turn_skill;
    
-   v_deviation = ang3_t (pEdict->v.idealpitch, pEdict->v.ideal_yaw, 0) - pEdict->v.v_angle;
+   v_deviation = UTIL_WrapAngles (Vector (pEdict->v.idealpitch, pEdict->v.ideal_yaw, 0) - pEdict->v.v_angle);
 
    // if bot is aiming at something, aim fast, else take our time...
    if (pBot.b_combat_longjump)
@@ -96,10 +96,10 @@ void BotPointGun(bot_t &pBot)
 
    // thanks Tobias "Killaruna" Heimann and Johannes "@$3.1415rin" Lampel for this one
    pEdict->v.yaw_speed = (pEdict->v.yaw_speed * exp (log (speed / 2) * pBot.f_frame_time * 20)
-                             + speed * v_deviation.yaw.ang * (1 - exp (log (speed / 2) * pBot.f_frame_time * 20)))
+                             + speed * v_deviation.y * (1 - exp (log (speed / 2) * pBot.f_frame_time * 20)))
                             * pBot.f_frame_time * 20;
    pEdict->v.pitch_speed = (pEdict->v.pitch_speed * exp (log (speed / 2) * pBot.f_frame_time * 20)
-                               + speed * v_deviation.pitch.ang * (1 - exp (log (speed / 2) * pBot.f_frame_time * 20)))
+                               + speed * v_deviation.x * (1 - exp (log (speed / 2) * pBot.f_frame_time * 20)))
                               * pBot.f_frame_time * 20;
 
    // influence of y movement on x axis, based on skill (less influence than x on y since it's
@@ -121,12 +121,12 @@ void BotPointGun(bot_t &pBot)
    Vector v_rnd = Vector(RANDOM_FLOAT2(-var, var), RANDOM_FLOAT2(-var, var), 0);
    
    // move the aim cursor
-   pEdict->v.v_angle = pEdict->v.v_angle + Vector (pEdict->v.pitch_speed, pEdict->v.yaw_speed, 0) + v_rnd; 
+   pEdict->v.v_angle = UTIL_WrapAngles (pEdict->v.v_angle + Vector (pEdict->v.pitch_speed, pEdict->v.yaw_speed, 0) + v_rnd); 
    
    // set the body angles to point the gun correctly
-   pEdict->v.angles.pitch = -pEdict->v.v_angle.pitch / 3;
-   pEdict->v.angles.yaw   = pEdict->v.v_angle.yaw;
-   pEdict->v.angles.roll  = 0;
+   pEdict->v.angles.x = UTIL_WrapAngle (-pEdict->v.v_angle.x / 3);
+   pEdict->v.angles.y = UTIL_WrapAngle (pEdict->v.v_angle.y);
+   pEdict->v.angles.z = 0;
 }
 
 
@@ -137,16 +137,16 @@ void BotAimPre( bot_t &pBot )
    BotPointGun(pBot); // update and save this bot's view angles
       
    // wrap angles that were not wrapped in pointgun
-   pBot.pEdict->v.idealpitch.wrap_angle();
-   pBot.pEdict->v.ideal_yaw.wrap_angle();
+   pBot.pEdict->v.idealpitch = UTIL_WrapAngle(pBot.pEdict->v.idealpitch);
+   pBot.pEdict->v.ideal_yaw = UTIL_WrapAngle(pBot.pEdict->v.ideal_yaw);
    
    // special aiming angle for mp5 grenade
    if(pBot.b_set_special_shoot_angle)
    {
-      angle_t old_angle = pBot.pEdict->v.v_angle.roll;
+      float old_angle = pBot.pEdict->v.v_angle.z;
       
-      pBot.pEdict->v.v_angle.roll = pBot.f_special_shoot_angle;
-      pBot.pEdict->v.angles.pitch = -pBot.pEdict->v.v_angle.pitch / 3;
+      pBot.pEdict->v.v_angle.z = pBot.f_special_shoot_angle;
+      pBot.pEdict->v.angles.x = UTIL_WrapAngle (-pBot.pEdict->v.v_angle.x / 3);
       
       pBot.f_special_shoot_angle = old_angle;
    }
@@ -159,8 +159,8 @@ void BotAimPost( bot_t &pBot )
    // special aiming angle for mp5 grenade
    if(pBot.b_set_special_shoot_angle)
    {
-      pBot.pEdict->v.v_angle.roll = pBot.f_special_shoot_angle;
-      pBot.pEdict->v.angles.pitch = -pBot.pEdict->v.v_angle.pitch / 3;
+      pBot.pEdict->v.v_angle.z = pBot.f_special_shoot_angle;
+      pBot.pEdict->v.angles.x = UTIL_WrapAngle (-pBot.pEdict->v.v_angle.x / 3);
       
       pBot.b_set_special_shoot_angle = FALSE;
       pBot.f_special_shoot_angle = 0.0;
@@ -180,7 +180,7 @@ void BotAimPost( bot_t &pBot )
    }
    
    // add any recoil left to punch angle now
-   pBot.pEdict->v.punchangle.pitch += pBot.f_recoil;
+   pBot.pEdict->v.punchangle.x += pBot.f_recoil;
    
    pBot.f_recoil = 0;
 }
@@ -511,13 +511,13 @@ Vector AddPredictionVelocityVaritation(bot_t &pBot, const Vector & velocity)
 //
 Vector AddPredictionPositionVaritation(bot_t &pBot)
 {
-   ang3_t v_rnd_angles;
+   Vector v_rnd_angles;
    
-   v_rnd_angles.pitch = RANDOM_FLOAT2(-90, 90);
-   v_rnd_angles.yaw   = RANDOM_FLOAT2(-180, 180);
-   v_rnd_angles.roll  = 0;
+   v_rnd_angles.x = UTIL_WrapAngle(RANDOM_FLOAT2(-90, 90));
+   v_rnd_angles.y = UTIL_WrapAngle(RANDOM_FLOAT2(-180, 180));
+   v_rnd_angles.z = 0;
    
-   return v_rnd_angles.forward() * skill_settings[pBot.bot_skill].ping_emu_position_varitation;
+   return UTIL_AnglesToForward(v_rnd_angles) * skill_settings[pBot.bot_skill].ping_emu_position_varitation;
 }
 
 // Prevent bots from shooting at on ground when aiming on falling player that hits ground (Z axis fixup only)
@@ -947,9 +947,11 @@ void BotFindEnemy( bot_t &pBot )
          {            
             // face the enemy
             Vector v_enemy = vecPredEnemy - pEdict->v.origin;
-            ang3_t bot_angles = ang3_t( v_enemy );
+            Vector bot_angles = UTIL_VecToAngles( v_enemy );
 
-            pEdict->v.ideal_yaw = bot_angles.yaw;
+            pEdict->v.ideal_yaw = bot_angles.y;
+
+            BotFixIdealYaw(pEdict);
 
             // keep track of when we last saw an enemy
             pBot.f_bot_see_enemy_time = gpGlobals->time;
@@ -1125,9 +1127,11 @@ void BotFindEnemy( bot_t &pBot )
    {
       // face the enemy
       Vector v_enemy = v_newenemy - pEdict->v.origin;
-      ang3_t bot_angles = ang3_t( v_enemy );
+      Vector bot_angles = UTIL_VecToAngles( v_enemy );
 
-      pEdict->v.ideal_yaw = bot_angles.yaw;
+      pEdict->v.ideal_yaw = bot_angles.y;
+
+      BotFixIdealYaw(pEdict);
 
       // keep track of when we last saw an enemy
       pBot.f_bot_see_enemy_time = gpGlobals->time;
@@ -1828,15 +1832,24 @@ void BotShootAtEnemy( bot_t &pBot )
    
    v_enemy = v_enemy_aimpos - GetGunPosition(pEdict);
    
-   ang3_t enemy_angle = ang3_t( v_enemy );
+   Vector enemy_angle = UTIL_VecToAngles( v_enemy );
+
+   if (enemy_angle.x > 180)
+      enemy_angle.x -=360;
+
+   if (enemy_angle.y > 180)
+      enemy_angle.y -=360;
 
    // adjust the view angle pitch to aim correctly
-   enemy_angle.pitch = -enemy_angle.pitch;
+   enemy_angle.x = -enemy_angle.x;
    
    if(!pBot.b_combat_longjump)
    {
-      pEdict->v.idealpitch = enemy_angle.pitch;
-      pEdict->v.ideal_yaw = enemy_angle.yaw;
+      pEdict->v.idealpitch = enemy_angle.x;
+      BotFixIdealPitch(pEdict);
+
+      pEdict->v.ideal_yaw = enemy_angle.y;
+      BotFixIdealYaw(pEdict);
    }
    
    Vector v_enemy_xy = v_enemy;
@@ -1891,10 +1904,10 @@ qboolean BotShootTripmine( bot_t &pBot )
 
    // aim at the tripmine and fire the glock...
    Vector v_enemy = pBot.v_tripmine - GetGunPosition( pEdict );
-   ang3_t enemy_angle = ang3_t(v_enemy);
+   Vector enemy_angle = UTIL_VecToAngles(v_enemy);
 
-   pEdict->v.idealpitch = enemy_angle.pitch;
-   pEdict->v.ideal_yaw = enemy_angle.yaw;
+   pEdict->v.idealpitch = UTIL_WrapAngle(enemy_angle.x);
+   pEdict->v.ideal_yaw = UTIL_WrapAngle(enemy_angle.y);
    
    //TODO: check if glock is available!!!!
    // if not try find another weapon which can do this (type: WEAPON_FIRE or FIRE_ZOOM).
