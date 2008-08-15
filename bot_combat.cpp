@@ -115,10 +115,17 @@ void BotPointGun(bot_t &pBot)
    else
       pEdict->v.yaw_speed -= pEdict->v.pitch_speed / (1 + turn_skill);
 
+#if 0
    // add skill aim randomness
    float fov = (pEdict->v.fov <= 0) ? pEdict->v.fov : 85.0;
    float var = skill_settings[pBot.bot_skill].aimangle_varitation * (fov / 85.0);
    Vector v_rnd = Vector(RANDOM_FLOAT2(-var, var), RANDOM_FLOAT2(-var, var), 0);
+#else
+   // code above is broken, aim angle changes rapidly 30 times / second => not
+   // good especially not for low level bots with high aimangle_variation.
+   // It should change at a lot slower pace!
+   Vector v_rnd = Vector(0,0,0);
+#endif
    
    // move the aim cursor
    pEdict->v.v_angle = UTIL_WrapAngles (pEdict->v.v_angle + Vector (pEdict->v.pitch_speed, pEdict->v.yaw_speed, 0) + v_rnd); 

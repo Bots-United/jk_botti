@@ -66,13 +66,16 @@ Credits:
 2. What's new
 --------------------
 1.41:
+ * Fixed low level bot aiming (were rapidly shifting right to left)
+   * As result removed undocumented and broken setting 'aimangle_varitation'
  * Add skill setting updown_turn_ration, setting to make bot aim up-down worse
    than right-left.
  * Add bot endgame chatting.
    * New setting 'bot_endgame_percent', see jk_botti.cfg
    * New section [bot_endgame] in jk_botti_chat.txt
  * Bot 'write' long chat message for longer time now than short message.
-   
+ * Binaries now work on AMD K6 series CPUs.
+
 1.40:
  * Add support for Opposing Force Deathmatch.
  * Tuned skill 1 bot to be more leet, skill 2 is now about same as old skill 1.

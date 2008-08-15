@@ -1515,6 +1515,8 @@ static void HandleWallOnRight( bot_t &pBot )
 //
 void BotCheckLogoSpraying(bot_t &pBot)
 {
+   edict_t *pEdict = pBot.pEdict;
+
    // took too long trying to spray logo?...
    if ((pBot.b_spray_logo) &&
        ((pBot.f_spray_logo_time + 3.0) < gpGlobals->time))

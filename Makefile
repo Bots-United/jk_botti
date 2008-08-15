@@ -5,14 +5,14 @@
 ##
 
 ifeq ($(OSTYPE),win32)
-	CPP = ccache /usr/bin/i586-mingw32msvc-gcc
+	CPP = /usr/bin/i586-mingw32msvc-gcc
 	AR = /usr/bin/i586-mingw32msvc-ar rc
 	RANLIB = /usr/bin/i586-mingw32msvc-ranlib
 	LINKFLAGS = -mdll -lwsock32 -Xlinker --add-stdcall-alias -s
 	DLLEND = .dll
 	ZLIB_OSFLAGS = 
 else
-	CPP = ccache gcc-3.4 -m32
+	CPP = gcc-3.4 -m32
 	AR = ar rc
 	RANLIB = ranlib
 	ARCHFLAG = -fPIC
@@ -23,12 +23,13 @@ endif
 
 TARGET = jk_botti_mm
 BASEFLAGS = 
-ARCHFLAG += -march=i686 -mtune=pentium4
+ARCHFLAG += -march=i586 -mtune=pentium3
 
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
 else
-	OPTFLAGS = -O2 -ffast-math -fomit-frame-pointer -g
+#	OPTFLAGS = -O2 -ffast-math -fomit-frame-pointer -g
+	OPTFLAGS = -O2 -ffast-math -g
 endif
 
 INCLUDES = -I"./metamod" \

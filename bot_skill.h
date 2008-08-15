@@ -27,7 +27,7 @@ typedef struct
       
    float turn_skill; // BotAim turn_skill, how good bot is at aiming on enemy origin.
    float updown_turn_ration; // how much slower bots aims up and down than side ways?
-   float aimangle_varitation; // how steady bot's hand is (how much randomness we add to bot aim angle?
+   //float aimangle_varitation; // how steady bot's hand is (how much randomness we add to bot aim angle?)
    
    // Bot doesn't use real origin of target player but instead use ping emulation based on recorded old position data of player. 
    // These settings specify ammount of latency and randomness used at different skill levels.
