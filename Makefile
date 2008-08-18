@@ -8,21 +8,21 @@ ifeq ($(OSTYPE),win32)
 	CPP = /usr/bin/i586-mingw32msvc-gcc
 	AR = /usr/bin/i586-mingw32msvc-ar rc
 	RANLIB = /usr/bin/i586-mingw32msvc-ranlib
-	LINKFLAGS = -mdll -lwsock32 -Xlinker --add-stdcall-alias -s
+	LINKFLAGS = -mdll -lwsock32 -lstdc++ -Xlinker --add-stdcall-alias -s
 	DLLEND = .dll
-	ZLIB_OSFLAGS = 
+	ZLIB_OSFLAGS =
 else
-	CPP = gcc-3.4 -m32
+	CPP = gcc-4.2 -m32
 	AR = ar rc
 	RANLIB = ranlib
 	ARCHFLAG = -fPIC
-	LINKFLAGS = -fPIC -shared -ldl -s
+	LINKFLAGS = -fPIC -shared -ldl -lstdc++ -s
 	DLLEND = _i386.so
-	ZLIB_OSFLAGS = -DNO_UNDERLINE 
+	ZLIB_OSFLAGS = -DNO_UNDERLINE
 endif
 
 TARGET = jk_botti_mm
-BASEFLAGS = 
+BASEFLAGS = -Wall -Wno-write-strings
 ARCHFLAG += -march=i586 -mtune=pentium3
 
 ifeq ($(DBG_FLGS),1)
@@ -38,7 +38,7 @@ INCLUDES = -I"./metamod" \
 	-I"./engine" \
 	-I"./pm_shared"
 
-CFLAGS = -Wall ${BASEFLAGS} ${OPTFLAGS} ${ARCHFLAG} ${INCLUDES}
+CFLAGS = ${BASEFLAGS} ${OPTFLAGS} ${ARCHFLAG} ${INCLUDES}
 CPPFLAGS = -fno-rtti -fno-exceptions ${CFLAGS} 
 
 SRC = 	bot.cpp \
