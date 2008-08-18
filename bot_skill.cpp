@@ -212,3 +212,4 @@ void ResetSkillsToDefault(void)
 {
    memcpy(skill_settings, default_skill_settings, sizeof(skill_settings));
 }
+

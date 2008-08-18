@@ -17,7 +17,6 @@
 #include "bot_func.h"
 #include "bot_weapons.h"
 #include "bot_skill.h"
-#include "bot_weapon_select.h"
 
 extern bot_weapon_t weapon_defs[MAX_WEAPONS];
 extern int submod_id;
@@ -417,7 +416,7 @@ void BotSelectAttack(bot_t &pBot, const bot_weapon_select_t &select, qboolean &u
 }
 
 //
-qboolean BotIsCarryingWeapon(bot_t &pBot, int weapon_id)
+static qboolean BotIsCarryingWeapon(bot_t &pBot, int weapon_id)
 {
    // is the bot carrying this weapon?
    return((pBot.pEdict->v.weapons & (1 << weapon_id)) == (1 << weapon_id));
@@ -838,3 +837,4 @@ float ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(float distance, float
    
    return(launch_angle);
 }
+

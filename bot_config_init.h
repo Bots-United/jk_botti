@@ -1,3 +1,9 @@
+//
+// JK_Botti - be more human!
+//
+// bot_config_init.h
+//
+
 #define MAX_BOT_NAMES 100
 #define MAX_BOT_LOGOS 100
 

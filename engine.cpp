@@ -18,7 +18,6 @@
 #include "bot_func.h"
 #include "bot_sound.h"
 #include "bot_weapons.h"
-#include "bot_weapon_select.h"
 
 extern enginefuncs_t g_engfuncs;
 extern bot_t bots[32];

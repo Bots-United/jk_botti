@@ -17,7 +17,6 @@
 #include "bot_func.h"
 #include "bot_client.h"
 #include "bot_weapons.h"
-#include "bot_weapon_select.h"
 #include "player.h"
 
 // types of damage to ignore...

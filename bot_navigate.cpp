@@ -19,7 +19,6 @@
 #include "waypoint.h"
 #include "bot_skill.h"
 #include "bot_weapons.h"
-#include "bot_weapon_select.h"
 #include "bot_sound.h"
 
 
