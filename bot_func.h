@@ -62,6 +62,13 @@ qboolean BotCheckWallOnBack( bot_t &pBot );
 qboolean BotCheckWallOnForward( bot_t &pBot );
 void BotLookForDrop( bot_t &pBot );
 
+// commands.cpp:
+const cfg_bot_record_t * GetUnusedCfgBotRecord(void);
+void FreeCfgBotRecord(void);
+int AddToCfgBotRecord(const char *skin, const char *name, int skill, int top_color, int bottom_color);
+void ClientCommand( edict_t *pEntity );
+void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const char *arg3);
+
 // dll.cpp:
 void jkbotti_ClientPutInServer( edict_t *pEntity );
 BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ] );

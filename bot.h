@@ -58,10 +58,6 @@ typedef int BOOL;
 #define TEAMPLAY_TEAMLISTLENGTH (MAX_TEAMS*MAX_TEAMNAME_LENGTH)
 
 
-// define some function prototypes...
-void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const char *arg3);
-
-
 #define LADDER_UNKNOWN  0
 #define LADDER_UP       1
 #define LADDER_DOWN     2
@@ -419,17 +415,12 @@ float UTIL_GetTimeSinceRespawn(edict_t * pPlayer);
 void CheckPlayerChatProtection(edict_t * pPlayer);
 qboolean IsPlayerChatProtected(edict_t * pPlayer);
 
-const cfg_bot_record_t * GetUnusedCfgBotRecord(void);
-void FreeCfgBotRecord(void);
-int AddToCfgBotRecord(const char *skin, const char *name, int skill, int top_color, int bottom_color);
-
-void BotNameInit(void);
-void BotLogoInit(void);
 void UpdateClientData(const struct edict_s *ent, int sendweapons, struct clientdata_s *cd);
 void ProcessBotCfgFile(void);
 void jk_botti_ServerCommand (void);
 int CheckSubMod(void);
 
+#include "bot_func.h"
 #include "bot_inline_funcs.h"
 
 #endif // BOT_H

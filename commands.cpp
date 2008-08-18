@@ -170,7 +170,7 @@ int AddToCfgBotRecord(const char *skin, const char *name, int skill, int top_col
 }
 
 //
-void UTIL_PrintBotInfo(const printfunc_t printfunc, void * arg) 
+static void UTIL_PrintBotInfo(const printfunc_t printfunc, void * arg) 
 {
    //print out bot info
    char msg[80];
@@ -200,7 +200,7 @@ void UTIL_PrintBotInfo(const printfunc_t printfunc, void * arg)
 }
 
 //
-qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * arg, const char * pcmd, const char * arg1, const char * arg2, const char * arg3, const char * arg4, const char * arg5) 
+static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * arg, const char * pcmd, const char * arg1, const char * arg2, const char * arg3, const char * arg4, const char * arg5) 
 {
    char msg[128];
    

@@ -26,6 +26,7 @@
 #include "bot_sound.h"
 #include "version.h"
 #include "player.h"
+#include "bot_config_init.h"
 
 #include "bot_query_hook.h"
 
@@ -108,161 +109,6 @@ static struct playermove_s *old_ppmove = NULL;
 
 unsigned int rnd_idnum[2] = {1, 1};
 cvar_t jk_botti_version = { "jk_botti_version", "", FCVAR_EXTDLL|FCVAR_SERVER, 0, NULL};
-
-
-// START of Metamod stuff
-C_DLLEXPORT int GetEntityAPI2_POST (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion);
-C_DLLEXPORT int GetEngineFunctions_POST (enginefuncs_t *pengfuncsFromEngine, int *interfaceVersion);
-
-gamedll_funcs_t *gpGamedllFuncs;
-mutil_funcs_t *gpMetaUtilFuncs;
-meta_globals_t *gpMetaGlobals;
-
-META_FUNCTIONS gMetaFunctionTable =
-{
-   NULL, // pfnGetEntityAPI()
-   NULL, // pfnGetEntityAPI_Post()
-   GetEntityAPI2, // pfnGetEntityAPI2()
-   GetEntityAPI2_POST, // pfnGetEntityAPI2_Post()
-   NULL, // pfnGetNewDLLFunctions()
-   NULL, // pfnGetNewDLLFunctions_Post()
-   GetEngineFunctions, // pfnGetEngineFunctions()
-   GetEngineFunctions_POST, // pfnGetEngineFunctions_Post()
-};
-
-
-static char plugver[128];
-plugin_info_t Plugin_info = {
-   META_INTERFACE_VERSION, // interface version
-   "JK_Botti", // plugin name
-   "", // plugin version
-   __DATE__, // date of creation
-   "Jussi Kivilinna", // plugin author
-   "http://forums.bots-united.com/forumdisplay.php?f=83", // plugin URL
-   "JK_BOTTI", // plugin logtag
-   PT_STARTUP, // when loadable
-   PT_ANYTIME, // when unloadable
-};
-
-
-C_DLLEXPORT int Meta_Query (char *ifvers, plugin_info_t **pPlugInfo, mutil_funcs_t *pMetaUtilFuncs)
-{
-   // this function is the first function ever called by metamod in the plugin DLL. Its purpose
-   // is for metamod to retrieve basic information about the plugin, such as its meta-interface
-   // version, for ensuring compatibility with the current version of the running metamod.
-
-   // keep track of the pointers to metamod function tables metamod gives us
-   gpMetaUtilFuncs = pMetaUtilFuncs;
-   *pPlugInfo = &Plugin_info;
-
-   safevoid_snprintf(plugver, sizeof(plugver), "%d.%02d%s", VER_MAJOR, VER_MINOR, VER_NOTE);
-   Plugin_info.version = plugver;
-
-   // check for interface version compatibility
-   if (strcmp (ifvers, Plugin_info.ifvers) != 0)
-   {
-      int mmajor = 0, mminor = 0, pmajor = 0, pminor = 0;
-
-      //LOG_CONSOLE (PLID, "%s: meta-interface version mismatch (metamod: %s, %s: %s)", Plugin_info.name, ifvers, Plugin_info.name, Plugin_info.ifvers);
-      //LOG_MESSAGE (PLID, "%s: meta-interface version mismatch (metamod: %s, %s: %s)", Plugin_info.name, ifvers, Plugin_info.name, Plugin_info.ifvers);
-
-      // if plugin has later interface version, it's incompatible (update metamod)
-      sscanf (ifvers, "%d:%d", &mmajor, &mminor);
-      sscanf (META_INTERFACE_VERSION, "%d:%d", &pmajor, &pminor);
-
-      if ((pmajor > mmajor) || ((pmajor == mmajor) && (pminor > mminor)))
-      {
-         LOG_CONSOLE (PLID, "%s", "metamod version is too old for this plugin; update metamod");
-         LOG_ERROR (PLID, "%s", "metamod version is too old for this plugin; update metamod");
-         return (FALSE);
-      }
-
-      // if plugin has older major interface version, it's incompatible (update plugin)
-      else if (pmajor < mmajor)
-      {
-         LOG_CONSOLE (PLID, "%s", "metamod version is incompatible with this plugin; please find a newer version of this plugin");
-         LOG_ERROR (PLID, "%s", "metamod version is incompatible with this plugin; please find a newer version of this plugin");
-         return (FALSE);
-      }
-   }
-
-   return (TRUE); // tell metamod this plugin looks safe
-}
-
-
-C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, meta_globals_t *pMGlobals, gamedll_funcs_t *pGamedllFuncs)
-{
-   // this function is called when metamod attempts to load the plugin. Since it's the place
-   // where we can tell if the plugin will be allowed to run or not, we wait until here to make
-   // our initialization stuff, like registering CVARs and dedicated server commands.
-
-   // are we allowed to load this plugin now ?
-   if (now > Plugin_info.loadable)
-   {
-      LOG_CONSOLE (PLID, "%s: plugin NOT attaching (can't load plugin right now)", Plugin_info.name);
-      LOG_ERROR (PLID, "%s: plugin NOT attaching (can't load plugin right now)", Plugin_info.name);
-      return (FALSE); // returning FALSE prevents metamod from attaching this plugin
-   }
-
-   // keep track of the pointers to engine function tables metamod gives us
-   gpMetaGlobals = pMGlobals;
-   memcpy (pFunctionTable, &gMetaFunctionTable, sizeof (META_FUNCTIONS));
-   gpGamedllFuncs = pGamedllFuncs;
-
-   // print a message to notify about plugin attaching
-   LOG_CONSOLE (PLID, "%s: plugin attaching", Plugin_info.name);
-   LOG_MESSAGE (PLID, "%s: plugin attaching", Plugin_info.name);
-
-   // ask the engine to register the server commands this plugin uses
-   REG_SVR_COMMAND ("jk_botti", jk_botti_ServerCommand);
-   
-   // init random
-   fast_random_seed(time(0) ^ (unsigned long)&bots[0] ^ sizeof(bots));
-  
-   CVAR_REGISTER(&jk_botti_version);
-   CVAR_SET_STRING("jk_botti_version", Plugin_info.version);
-      
-   return (TRUE); // returning TRUE enables metamod to attach this plugin
-}
-
-
-C_DLLEXPORT int Meta_Detach (PLUG_LOADTIME now, PL_UNLOAD_REASON reason)
-{
-   // this function is called when metamod unloads the plugin. A basic check is made in order
-   // to prevent unloading the plugin if its processing should not be interrupted.
-
-   // is metamod allowed to unload the plugin ?
-   if ((now > Plugin_info.unloadable) && (reason != PNL_CMD_FORCED))
-   {
-      LOG_CONSOLE (PLID, "%s: plugin NOT detaching (can't unload plugin right now)", Plugin_info.name);
-      LOG_ERROR (PLID, "%s: plugin NOT detaching (can't unload plugin right now)", Plugin_info.name);
-      return (FALSE); // returning FALSE prevents metamod from unloading this plugin
-   }
-
-   // kick any bot off of the server after time/frag limit...
-   for (int index = 0; index < 32; index++)
-      if (bots[index].is_used)  // is this slot used?
-         BotKick(bots[index]);
-   
-   // free memory
-   WaypointInit();
-   for(int i = 0; i < 32; i++)
-      free_posdata_list(i);
-   UTIL_FreeFuncBreakables();
-   FreeCfgBotRecord();
-   
-   // remove pm_move hook
-   if(old_ppmove)
-      old_ppmove->PM_PlaySound = old_PM_PlaySound;
-   
-   // try remove hook
-   if(!unhook_sendto_function())
-      return(FALSE);
-   
-   return (TRUE); // returning TRUE enables metamod to unload this plugin
-}
-
-// END of Metamod stuff
 
 
 void GameDLLInit( void )
@@ -923,8 +769,6 @@ void StartFrame( void )
 }
 
 
-extern void ClientCommand( edict_t *pEntity );
-
 C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion)
 {
    memset(pFunctionTable, 0, sizeof (DLL_FUNCTIONS));
@@ -952,4 +796,155 @@ C_DLLEXPORT int GetEntityAPI2_POST (DLL_FUNCTIONS *pFunctionTable, int *interfac
    pFunctionTable->pfnKeyValue = DispatchKeyValue_Post;
 
    return (TRUE);
+}
+
+// engine.cpp:
+C_DLLEXPORT int GetEngineFunctions_POST (enginefuncs_t *pengfuncsFromEngine, int *interfaceVersion);
+
+gamedll_funcs_t *gpGamedllFuncs;
+mutil_funcs_t *gpMetaUtilFuncs;
+meta_globals_t *gpMetaGlobals;
+
+META_FUNCTIONS gMetaFunctionTable =
+{
+   NULL, // pfnGetEntityAPI()
+   NULL, // pfnGetEntityAPI_Post()
+   GetEntityAPI2, // pfnGetEntityAPI2()
+   GetEntityAPI2_POST, // pfnGetEntityAPI2_Post()
+   NULL, // pfnGetNewDLLFunctions()
+   NULL, // pfnGetNewDLLFunctions_Post()
+   GetEngineFunctions, // pfnGetEngineFunctions()
+   GetEngineFunctions_POST, // pfnGetEngineFunctions_Post()
+};
+
+
+static char plugver[128];
+plugin_info_t Plugin_info = {
+   META_INTERFACE_VERSION, // interface version
+   "JK_Botti", // plugin name
+   "", // plugin version
+   __DATE__, // date of creation
+   "Jussi Kivilinna", // plugin author
+   "http://forums.bots-united.com/forumdisplay.php?f=83", // plugin URL
+   "JK_BOTTI", // plugin logtag
+   PT_STARTUP, // when loadable
+   PT_ANYTIME, // when unloadable
+};
+
+
+C_DLLEXPORT int Meta_Query (char *ifvers, plugin_info_t **pPlugInfo, mutil_funcs_t *pMetaUtilFuncs)
+{
+   // this function is the first function ever called by metamod in the plugin DLL. Its purpose
+   // is for metamod to retrieve basic information about the plugin, such as its meta-interface
+   // version, for ensuring compatibility with the current version of the running metamod.
+
+   // keep track of the pointers to metamod function tables metamod gives us
+   gpMetaUtilFuncs = pMetaUtilFuncs;
+   *pPlugInfo = &Plugin_info;
+
+   safevoid_snprintf(plugver, sizeof(plugver), "%d.%02d%s", VER_MAJOR, VER_MINOR, VER_NOTE);
+   Plugin_info.version = plugver;
+
+   // check for interface version compatibility
+   if (strcmp (ifvers, Plugin_info.ifvers) != 0)
+   {
+      int mmajor = 0, mminor = 0, pmajor = 0, pminor = 0;
+
+      //LOG_CONSOLE (PLID, "%s: meta-interface version mismatch (metamod: %s, %s: %s)", Plugin_info.name, ifvers, Plugin_info.name, Plugin_info.ifvers);
+      //LOG_MESSAGE (PLID, "%s: meta-interface version mismatch (metamod: %s, %s: %s)", Plugin_info.name, ifvers, Plugin_info.name, Plugin_info.ifvers);
+
+      // if plugin has later interface version, it's incompatible (update metamod)
+      sscanf (ifvers, "%d:%d", &mmajor, &mminor);
+      sscanf (META_INTERFACE_VERSION, "%d:%d", &pmajor, &pminor);
+
+      if ((pmajor > mmajor) || ((pmajor == mmajor) && (pminor > mminor)))
+      {
+         LOG_CONSOLE (PLID, "%s", "metamod version is too old for this plugin; update metamod");
+         LOG_ERROR (PLID, "%s", "metamod version is too old for this plugin; update metamod");
+         return (FALSE);
+      }
+
+      // if plugin has older major interface version, it's incompatible (update plugin)
+      else if (pmajor < mmajor)
+      {
+         LOG_CONSOLE (PLID, "%s", "metamod version is incompatible with this plugin; please find a newer version of this plugin");
+         LOG_ERROR (PLID, "%s", "metamod version is incompatible with this plugin; please find a newer version of this plugin");
+         return (FALSE);
+      }
+   }
+
+   return (TRUE); // tell metamod this plugin looks safe
+}
+
+
+C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, meta_globals_t *pMGlobals, gamedll_funcs_t *pGamedllFuncs)
+{
+   // this function is called when metamod attempts to load the plugin. Since it's the place
+   // where we can tell if the plugin will be allowed to run or not, we wait until here to make
+   // our initialization stuff, like registering CVARs and dedicated server commands.
+
+   // are we allowed to load this plugin now ?
+   if (now > Plugin_info.loadable)
+   {
+      LOG_CONSOLE (PLID, "%s: plugin NOT attaching (can't load plugin right now)", Plugin_info.name);
+      LOG_ERROR (PLID, "%s: plugin NOT attaching (can't load plugin right now)", Plugin_info.name);
+      return (FALSE); // returning FALSE prevents metamod from attaching this plugin
+   }
+
+   // keep track of the pointers to engine function tables metamod gives us
+   gpMetaGlobals = pMGlobals;
+   memcpy (pFunctionTable, &gMetaFunctionTable, sizeof (META_FUNCTIONS));
+   gpGamedllFuncs = pGamedllFuncs;
+
+   // print a message to notify about plugin attaching
+   LOG_CONSOLE (PLID, "%s: plugin attaching", Plugin_info.name);
+   LOG_MESSAGE (PLID, "%s: plugin attaching", Plugin_info.name);
+
+   // ask the engine to register the server commands this plugin uses
+   REG_SVR_COMMAND ("jk_botti", jk_botti_ServerCommand);
+   
+   // init random
+   fast_random_seed(time(0) ^ (unsigned long)&bots[0] ^ sizeof(bots));
+  
+   CVAR_REGISTER(&jk_botti_version);
+   CVAR_SET_STRING("jk_botti_version", Plugin_info.version);
+      
+   return (TRUE); // returning TRUE enables metamod to attach this plugin
+}
+
+
+C_DLLEXPORT int Meta_Detach (PLUG_LOADTIME now, PL_UNLOAD_REASON reason)
+{
+   // this function is called when metamod unloads the plugin. A basic check is made in order
+   // to prevent unloading the plugin if its processing should not be interrupted.
+
+   // is metamod allowed to unload the plugin ?
+   if ((now > Plugin_info.unloadable) && (reason != PNL_CMD_FORCED))
+   {
+      LOG_CONSOLE (PLID, "%s: plugin NOT detaching (can't unload plugin right now)", Plugin_info.name);
+      LOG_ERROR (PLID, "%s: plugin NOT detaching (can't unload plugin right now)", Plugin_info.name);
+      return (FALSE); // returning FALSE prevents metamod from unloading this plugin
+   }
+
+   // kick any bot off of the server after time/frag limit...
+   for (int index = 0; index < 32; index++)
+      if (bots[index].is_used)  // is this slot used?
+         BotKick(bots[index]);
+   
+   // free memory
+   WaypointInit();
+   for(int i = 0; i < 32; i++)
+      free_posdata_list(i);
+   UTIL_FreeFuncBreakables();
+   FreeCfgBotRecord();
+   
+   // remove pm_move hook
+   if(old_ppmove)
+      old_ppmove->PM_PlaySound = old_PM_PlaySound;
+   
+   // try remove hook
+   if(!unhook_sendto_function())
+      return(FALSE);
+   
+   return (TRUE); // returning TRUE enables metamod to unload this plugin
 }
