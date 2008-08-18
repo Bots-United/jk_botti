@@ -4,6 +4,27 @@
 // util.h
 //
 
+void null_terminate_buffer(char *buf, const size_t maxlen);
+
+double UTIL_GetSecs(void);
+
+float UTIL_WrapAngle(float angle);
+Vector UTIL_WrapAngles(const Vector & angles);
+
+Vector UTIL_AnglesToForward(const Vector &angles);
+Vector UTIL_AnglesToRight(const Vector &angles);
+void UTIL_MakeVectorsPrivate( const Vector &angles, Vector &v_forward, Vector &v_right, Vector &v_up );
+Vector UTIL_VecToAngles(const Vector &forward);
+
+int UTIL_GetBotIndex(const edict_t *pEdict);
+bot_t *UTIL_GetBotPointer(const edict_t *pEdict);
+
+Vector UTIL_AdjustOriginWithExtent(bot_t &pBot, const Vector & v_target_origin, edict_t *pTarget);
+
+void fast_random_seed(unsigned int seed);
+int RANDOM_LONG2(int lLow, int lHigh);
+float RANDOM_FLOAT2(float flLow, float flHigh);
+
 void ClientPrint( edict_t *pEdict, int msg_dest, const char *msg_name);
 void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message );
 char* UTIL_GetTeam(edict_t *pEntity, char *teamstr, size_t slen);
