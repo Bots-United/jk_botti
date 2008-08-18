@@ -54,8 +54,7 @@ char *default_bot_names[VALVE_MAX_SKINS + GEARBOX_MAX_SKINS] = {
 #ifndef __linux__
 
 // MS-DOS directory wildcard routines...
-
-HANDLE FindDirectory(HANDLE hFile, char *dirname, int sizeof_dirname, char *dirspec)
+static HANDLE FindDirectory(HANDLE hFile, char *dirname, int sizeof_dirname, char *dirspec)
 {
    WIN32_FIND_DATA pFindFileData;
 
@@ -111,8 +110,7 @@ HANDLE FindDirectory(HANDLE hFile, char *dirname, int sizeof_dirname, char *dirs
 #else
 
 // Linux directory wildcard routines...
-
-DIR *FindDirectory(DIR *directory, char *dirname, int sizeof_dirname, char *dirspec)
+static DIR *FindDirectory(DIR *directory, char *dirname, int sizeof_dirname, char *dirspec)
 {
    char pathname[256];
    struct dirent *dirent;
@@ -142,10 +140,10 @@ DIR *FindDirectory(DIR *directory, char *dirname, int sizeof_dirname, char *dirs
    closedir(directory);
    return NULL;
 }
-
 #endif
 
 
+//
 void LoadBotModels(void)
 {
    char game_dir[256];

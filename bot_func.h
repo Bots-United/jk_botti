@@ -36,6 +36,7 @@ void BotFindEnemy( bot_t &pBot );
 void BotShootAtEnemy( bot_t &pBot );
 qboolean BotShootTripmine( bot_t &pBot );
 
+// bot_models.cpp:
 void LoadBotModels(void);
 
 float BotChangePitch( bot_t &pBot, float speed );
