@@ -85,7 +85,7 @@ event_info_t g_event_info[] = {
 
 
 //
-unsigned short pfnPrecacheEvent_Post(int type, const char* psz)
+static unsigned short pfnPrecacheEvent_Post(int type, const char* psz)
 {
    if (!gpGlobals->deathmatch)
       RETURN_META_VALUE (MRES_IGNORED, 0);
@@ -114,7 +114,7 @@ unsigned short pfnPrecacheEvent_Post(int type, const char* psz)
 
 
 //
-void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 ) 
+static void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 ) 
 {
    if (!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
@@ -158,7 +158,7 @@ void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventi
    RETURN_META (MRES_IGNORED);
 }
 
-void pfnEmitSound(edict_t *entity, int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch)
+static void pfnEmitSound(edict_t *entity, int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch)
 {
    if (gpGlobals->deathmatch)
    {
@@ -183,7 +183,7 @@ void pfnEmitSound(edict_t *entity, int channel, const char *sample, float volume
    RETURN_META (MRES_IGNORED);
 }
 
-void pfnChangeLevel(char* s1, char* s2)
+static void pfnChangeLevel(char* s1, char* s2)
 {
    if (!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
@@ -197,7 +197,7 @@ void pfnChangeLevel(char* s1, char* s2)
 }
 
 
-void pfnClientCommand(edict_t* pEdict, char* szFmt, ...)
+static void pfnClientCommand(edict_t* pEdict, char* szFmt, ...)
 {
    if ((FBitSet(pEdict->v.flags, FL_FAKECLIENT) || FBitSet(pEdict->v.flags, FL_THIRDPARTYBOT)))
       RETURN_META (MRES_SUPERCEDE);
@@ -205,12 +205,12 @@ void pfnClientCommand(edict_t* pEdict, char* szFmt, ...)
    RETURN_META (MRES_IGNORED);
 }
 
-int FAST_GET_USER_MSG_ID(plid_t plindex, int & value, const char * name, int * size) 
+static int FAST_GET_USER_MSG_ID(plid_t plindex, int & value, const char * name, int * size) 
 {
    return(value ? value : (value = GET_USER_MSG_ID(plindex, name, size)));
 }
 
-void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, edict_t *ed)
+static void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, edict_t *ed)
 {   
    if (gpGlobals->deathmatch)
    {
@@ -302,7 +302,7 @@ void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, edict_t *
 }
 
 
-void pfnMessageEnd(void)
+static void pfnMessageEnd(void)
 {
    if (gpGlobals->deathmatch)
    {
@@ -318,7 +318,7 @@ void pfnMessageEnd(void)
 }
 
 
-void pfnWriteByte(int iValue)
+static void pfnWriteByte(int iValue)
 {
    if (gpGlobals->deathmatch)
    {
@@ -331,7 +331,7 @@ void pfnWriteByte(int iValue)
 }
 
 
-void pfnWriteChar(int iValue)
+static void pfnWriteChar(int iValue)
 {
    if (gpGlobals->deathmatch)
    {
@@ -344,7 +344,7 @@ void pfnWriteChar(int iValue)
 }
 
 
-void pfnWriteShort(int iValue)
+static void pfnWriteShort(int iValue)
 {
    if (gpGlobals->deathmatch)
    {
@@ -357,7 +357,7 @@ void pfnWriteShort(int iValue)
 }
 
 
-void pfnWriteLong(int iValue)
+static void pfnWriteLong(int iValue)
 {
    if (gpGlobals->deathmatch)
    {
@@ -370,7 +370,7 @@ void pfnWriteLong(int iValue)
 }
 
 
-void pfnWriteAngle(float flValue)
+static void pfnWriteAngle(float flValue)
 {
    if (gpGlobals->deathmatch)
    {
@@ -383,7 +383,7 @@ void pfnWriteAngle(float flValue)
 }
 
 
-void pfnWriteCoord(float flValue)
+static void pfnWriteCoord(float flValue)
 {
    if (gpGlobals->deathmatch)
    {
@@ -396,7 +396,7 @@ void pfnWriteCoord(float flValue)
 }
 
 
-void pfnWriteString(const char *sz)
+static void pfnWriteString(const char *sz)
 {
    if (gpGlobals->deathmatch)
    {
@@ -409,7 +409,7 @@ void pfnWriteString(const char *sz)
 }
 
 
-void pfnWriteEntity(int iValue)
+static void pfnWriteEntity(int iValue)
 {
    if (gpGlobals->deathmatch)
    {
@@ -422,7 +422,7 @@ void pfnWriteEntity(int iValue)
 }
 
 
-void pfnClientPrintf( edict_t* pEdict, PRINT_TYPE ptype, const char *szMsg )
+static void pfnClientPrintf( edict_t* pEdict, PRINT_TYPE ptype, const char *szMsg )
 {
    if ((FBitSet(pEdict->v.flags, FL_FAKECLIENT) || FBitSet(pEdict->v.flags, FL_THIRDPARTYBOT)))
       RETURN_META (MRES_SUPERCEDE);
@@ -431,7 +431,7 @@ void pfnClientPrintf( edict_t* pEdict, PRINT_TYPE ptype, const char *szMsg )
 }
 
 
-const char *pfnCmd_Args( void )
+static const char *pfnCmd_Args( void )
 {
    if (isFakeClientCommand)
       RETURN_META_VALUE (MRES_SUPERCEDE, &g_argv[0]);
@@ -440,7 +440,7 @@ const char *pfnCmd_Args( void )
 }
 
 
-const char *pfnCmd_Argv( int argc )
+static const char *pfnCmd_Argv( int argc )
 {
    if (isFakeClientCommand)
    {
@@ -458,7 +458,7 @@ const char *pfnCmd_Argv( int argc )
 }
 
 
-int pfnCmd_Argc( void )
+static int pfnCmd_Argc( void )
 {
    if (isFakeClientCommand)
       RETURN_META_VALUE (MRES_SUPERCEDE, fake_arg_count);
@@ -467,7 +467,7 @@ int pfnCmd_Argc( void )
 }
 
 
-void pfnSetClientMaxspeed(const edict_t *pEdict, float fNewMaxspeed)
+static void pfnSetClientMaxspeed(const edict_t *pEdict, float fNewMaxspeed)
 {
    if (!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
@@ -484,7 +484,7 @@ void pfnSetClientMaxspeed(const edict_t *pEdict, float fNewMaxspeed)
 }
 
 
-int pfnGetPlayerUserId(edict_t *e )
+static int pfnGetPlayerUserId(edict_t *e )
 {
    if (gpGlobals->deathmatch)
    {
