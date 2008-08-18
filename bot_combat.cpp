@@ -49,7 +49,7 @@ typedef struct select_list_s
 
 
 //
-qboolean BotAimsAtSomething (bot_t &pBot)
+static qboolean BotAimsAtSomething (bot_t &pBot)
 {
    if(!pBot.pBotEnemy)
       return FALSE;
@@ -61,7 +61,7 @@ qboolean BotAimsAtSomething (bot_t &pBot)
 
 
 //
-void BotPointGun(bot_t &pBot)
+static void BotPointGun(bot_t &pBot)
 {
    edict_t *pEdict = pBot.pEdict;
    
@@ -183,14 +183,14 @@ void BotAimPost( bot_t &pBot )
 
 
 // flavour xy axis over z on finding closest enemy
-Vector GetModifiedEnemyDistance(bot_t &pBot, const Vector & distance)
+static Vector GetModifiedEnemyDistance(bot_t &pBot, const Vector & distance)
 {
    return( Vector(distance.x, distance.y, distance.z * skill_settings[pBot.bot_skill].updown_turn_ration) );
 }
 
 
 //
-void BotResetReactionTime(bot_t &pBot, qboolean have_slow_reaction) 
+static void BotResetReactionTime(bot_t &pBot, qboolean have_slow_reaction = FALSE) 
 {
    if (pBot.reaction_time >= 1 && pBot.reaction_time <= 3)
    {
@@ -213,146 +213,6 @@ void BotResetReactionTime(bot_t &pBot, qboolean have_slow_reaction)
 }
 
 
-//
-int GetTeamIndex( const char *pTeamName )
-{
-   if ( pTeamName && *pTeamName != 0 )
-   {
-      // try to find existing team
-      for ( int tm = 0; tm < g_num_teams; tm++ )
-      {
-         if ( !stricmp( g_team_names[tm], pTeamName ) )
-            return tm;
-      }
-   }
-   
-   return -1;   // No match
-}
-
-
-//
-void RecountTeams(void)
-{
-   if(!is_team_play)
-      return;
-	
-   // Construct teams list
-   char teamlist[TEAMPLAY_TEAMLISTLENGTH];
-   char *pName;
-
-   // loop through all teams, recounting everything
-   g_num_teams = 0;
-
-   // Copy all of the teams from the teamlist
-   // make a copy because strtok is destructive
-   safe_strcopy(teamlist, sizeof(teamlist), g_team_list);
-   
-   pName = teamlist;
-   pName = strtok( pName, ";" );
-   while ( pName != NULL && *pName )
-   {
-      if ( GetTeamIndex( pName ) < 0 )
-      {
-         safe_strcopy(g_team_names[g_num_teams], sizeof(g_team_names[g_num_teams]), pName);
-         g_num_teams++;
-         
-         if(g_num_teams == MAX_TEAMS)
-            break;
-      }
-      
-      pName = strtok( NULL, ";" );
-   }
-
-   if ( g_num_teams < 2 )
-   {
-      g_num_teams = 0;
-      g_team_limit = FALSE;
-   }
-   
-   // Sanity check
-   memset( g_team_scores, 0, sizeof(g_team_scores) );
-
-   // loop through all clients
-   for ( int i = 1; i <= gpGlobals->maxClients; i++ )
-   {
-      edict_t * plr = INDEXENT(i);
-
-      if(!plr || plr->free || FNullEnt(plr) || GETPLAYERUSERID(plr) <= 0 || STRING(plr->v.netname)[0] == 0)
-         continue;
-      
-      char teamname[MAX_TEAMNAME_LENGTH];
-      const char *pTeamName;
-      
-      pTeamName = UTIL_GetTeam(plr, teamname, sizeof(teamname));
-      
-      // try add to existing team
-      int tm = GetTeamIndex( pTeamName );
-      
-      if ( tm < 0 ) // no team match found
-      { 
-         if ( !g_team_limit && g_num_teams < MAX_TEAMS)
-         {
-            // add to new team
-            tm = g_num_teams;
-            g_num_teams++;
-            g_team_scores[tm] = 0;
-            safe_strcopy(g_team_names[tm], sizeof(g_team_names[tm]), pTeamName);
-         }
-      }
-
-      if ( tm >= 0 )
-      {
-         g_team_scores[tm] += (int)plr->v.frags;
-      }
-   }
-}
-
-
-//
-void BotCheckTeamplay(void)
-{
-   float f_team_play = CVAR_GET_FLOAT("mp_teamplay");  // teamplay enabled?
-
-   if (f_team_play > 0.0f)
-      is_team_play = TRUE;
-   else
-      is_team_play = FALSE;
-
-   checked_teamplay = TRUE;
-   
-   // get team list, exactly as in teamplay_gamerules.cpp
-   if(is_team_play)
-   {
-      safe_strcopy(g_team_list, sizeof(g_team_list), CVAR_GET_STRING("mp_teamlist"));
-      
-      edict_t *pWorld = INDEXENT(0);
-      if ( pWorld && pWorld->v.team )
-      {
-         if ( CVAR_GET_FLOAT("mp_teamoverride") != 0.0f )
-         {
-            const char *pTeamList = STRING(pWorld->v.team);
-            if ( pTeamList && *pTeamList )
-            {
-               safe_strcopy(g_team_list, sizeof(g_team_list), pTeamList);
-            }
-         }
-      }
-      
-      // Has the server set teams
-      g_team_limit = ( *g_team_list != 0 );
-      
-      RecountTeams();
-   }
-   else
-   {
-      g_team_list[0] = 0;
-      g_team_limit = FALSE;
-      
-      memset(g_team_names, 0, sizeof(g_team_names));
-   }
-}
-
-
 // called in clientdisconnect
 void free_posdata_list(int idx) 
 {
@@ -363,7 +223,7 @@ void free_posdata_list(int idx)
 }
 
 
-posdata_t *get_posdata_slot(int idx)
+static posdata_t *get_posdata_slot(int idx)
 {
    int i, oldest_idx = -1;
    float oldest_time = gpGlobals->time;
@@ -396,7 +256,7 @@ posdata_t *get_posdata_slot(int idx)
 
 
 //
-void add_next_posdata(int idx, edict_t *pEdict)
+static void add_next_posdata(int idx, edict_t *pEdict)
 {
    posdata_t * new_latest = get_posdata_slot(idx);
    
@@ -429,7 +289,7 @@ void add_next_posdata(int idx, edict_t *pEdict)
 
 
 // remove data older than max + 100ms
-void timetrim_posdata(int idx) 
+static void timetrim_posdata(int idx) 
 {
    posdata_t * list;
    
@@ -485,7 +345,7 @@ void GatherPlayerData(edict_t * pEdict)
 
 
 //
-Vector AddPredictionVelocityVaritation(bot_t &pBot, const Vector & velocity)
+static Vector AddPredictionVelocityVaritation(bot_t &pBot, const Vector & velocity)
 {
    if(velocity.x == 0 && velocity.y == 0)
       return velocity;
@@ -505,7 +365,7 @@ Vector AddPredictionVelocityVaritation(bot_t &pBot, const Vector & velocity)
 }
 
 //
-Vector AddPredictionPositionVaritation(bot_t &pBot)
+static Vector AddPredictionPositionVaritation(bot_t &pBot)
 {
    Vector v_rnd_angles;
    
@@ -516,8 +376,9 @@ Vector AddPredictionPositionVaritation(bot_t &pBot)
    return UTIL_AnglesToForward(v_rnd_angles) * skill_settings[pBot.bot_skill].ping_emu_position_varitation;
 }
 
+
 // Prevent bots from shooting at on ground when aiming on falling player that hits ground (Z axis fixup only)
-Vector TracePredictedMovement(bot_t &pBot, edict_t *pPlayer, const Vector &v_src, const Vector &cv_velocity, float time, qboolean ducking, qboolean without_velocity)
+static Vector TracePredictedMovement(bot_t &pBot, edict_t *pPlayer, const Vector &v_src, const Vector &cv_velocity, float time, qboolean ducking, qboolean without_velocity)
 {
    if(without_velocity)
       return(v_src);
@@ -537,22 +398,10 @@ Vector TracePredictedMovement(bot_t &pBot, edict_t *pPlayer, const Vector &v_src
 }
 
 
-//
-qboolean FPredictedVisible(bot_t &pBot)
-{
-   if(!pBot.pBotEnemy)
-      return(FALSE);
-   
-   Vector v_enemy = GetPredictedPlayerPosition(pBot, pBot.pBotEnemy, TRUE); //only get position
-
-   return(FVisibleEnemy(v_enemy, pBot.pEdict, pBot.pBotEnemy));
-}
-
-
 // used instead of using pBotEnemy->v.origin in aim code.
 //  if bot's aim lags behind moving target increase value of AHEAD_MULTIPLIER.
 #define AHEAD_MULTIPLIER 1.5
-Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean without_velocity) 
+static Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean without_velocity = FALSE) 
 {
    posdata_t * newer;
    posdata_t * older;
@@ -642,7 +491,20 @@ Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean witho
 
 
 //
-qboolean GetPredictedIsAlive(edict_t * pPlayer, float time) 
+qboolean FPredictedVisible(bot_t &pBot)
+{
+   if(!pBot.pBotEnemy)
+      return(FALSE);
+   
+   Vector v_enemy = GetPredictedPlayerPosition(pBot, pBot.pBotEnemy, TRUE); //only get position
+
+   return(FVisibleEnemy(v_enemy, pBot.pEdict, pBot.pBotEnemy));
+}
+
+
+#if 0
+//
+static qboolean GetPredictedIsAlive(edict_t * pPlayer, float time) 
 {
    posdata_t * newer;
    int idx;
@@ -681,7 +543,7 @@ qboolean GetPredictedIsAlive(edict_t * pPlayer, float time)
 
 
 //
-qboolean HaveSameModels(edict_t * pEnt1, edict_t * pEnt2) 
+static qboolean HaveSameModels(edict_t * pEnt1, edict_t * pEnt2) 
 {
    char *infobuffer;
    char model_name1[32];
@@ -695,10 +557,11 @@ qboolean HaveSameModels(edict_t * pEnt1, edict_t * pEnt2)
    
    return(!stricmp(model_name1, model_name2));
 }
+#endif
 
 
 //
-qboolean FCanShootInHead(edict_t * pEdict, edict_t * pTarget, const Vector & v_dest)
+static qboolean FCanShootInHead(edict_t * pEdict, edict_t * pTarget, const Vector & v_dest)
 {
    if(!FIsClassname("player", pTarget))
       return FALSE;
@@ -728,8 +591,23 @@ qboolean FCanShootInHead(edict_t * pEdict, edict_t * pTarget, const Vector & v_d
 }
 
 
+static qboolean AreTeamMates(edict_t * pOther, edict_t * pEdict) 
+{
+   // is team play enabled?
+   if (is_team_play)
+   {
+      char other_model[MAX_TEAMNAME_LENGTH];
+      char edict_model[MAX_TEAMNAME_LENGTH];
+      
+      return(!stricmp(UTIL_GetTeam(pOther, other_model, sizeof(other_model)), UTIL_GetTeam(pEdict, edict_model, sizeof(edict_model))));
+   }
+   
+   return FALSE;
+}
+
+
 //
-edict_t *BotFindEnemyNearestToPoint(bot_t &pBot, const Vector &v_point, float radius, Vector *v_found)
+static edict_t *BotFindEnemyNearestToPoint(bot_t &pBot, const Vector &v_point, float radius, Vector *v_found)
 {
    edict_t *pBotEdict = pBot.pEdict;
    
@@ -810,8 +688,9 @@ void BotUpdateHearingSensitivity(bot_t &pBot)
       pBot.f_current_hearing_sensitivity = skill_settings[pBot.bot_skill].hearing_sensitivity;
 }
 
+
 //
-float BotGetHearingSensitivity(bot_t &pBot)
+static float BotGetHearingSensitivity(bot_t &pBot)
 {
    if(pBot.f_current_hearing_sensitivity < skill_settings[pBot.bot_skill].hearing_sensitivity)
       return skill_settings[pBot.bot_skill].hearing_sensitivity;
@@ -820,7 +699,7 @@ float BotGetHearingSensitivity(bot_t &pBot)
 
 
 //
-edict_t *BotFindVisibleSoundEnemy( bot_t &pBot )
+static edict_t *BotFindVisibleSoundEnemy( bot_t &pBot )
 {
    edict_t *pEdict = pBot.pEdict;
    
@@ -1182,7 +1061,7 @@ void BotFindEnemy( bot_t &pBot )
 
 
 //
-qboolean HaveRoomForThrow(bot_t & pBot)
+static qboolean HaveRoomForThrow(bot_t & pBot)
 {
    edict_t *pEdict = pBot.pEdict;
    qboolean feet_ok, center_ok, head_ok;
@@ -1225,7 +1104,7 @@ qboolean HaveRoomForThrow(bot_t & pBot)
 
 
 //
-qboolean CheckWeaponFireConditions(bot_t & pBot, const bot_weapon_select_t &select, qboolean &use_primary, qboolean &use_secondary) 
+static qboolean CheckWeaponFireConditions(bot_t & pBot, const bot_weapon_select_t &select, qboolean &use_primary, qboolean &use_secondary) 
 {
    edict_t *pEdict = pBot.pEdict;
    
@@ -1268,7 +1147,7 @@ qboolean CheckWeaponFireConditions(bot_t & pBot, const bot_weapon_select_t &sele
 
 
 //
-qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, const bot_fire_delay_t &delay, qboolean use_primary, qboolean use_secondary)
+static qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, const bot_fire_delay_t &delay, qboolean use_primary, qboolean use_secondary)
 {
    edict_t *pEdict = pBot.pEdict;
    const int iId = select.iId;
@@ -1376,7 +1255,7 @@ qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, 
 }
 
 //
-qboolean TrySelectWeapon(bot_t &pBot, const int select_index, const bot_weapon_select_t &select, const bot_fire_delay_t &delay)
+static qboolean TrySelectWeapon(bot_t &pBot, const int select_index, const bot_weapon_select_t &select, const bot_fire_delay_t &delay)
 {   
    // select this weapon if it isn't already selected
    if (pBot.current_weapon.iId != select.iId)
@@ -1403,7 +1282,7 @@ qboolean TrySelectWeapon(bot_t &pBot, const int select_index, const bot_weapon_s
 // specifing a weapon_choice allows you to choose the weapon the bot will
 // use (assuming enough ammo exists for that weapon)
 // BotFireWeapon will return TRUE if weapon was fired, FALSE otherwise
-qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
+static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
 {
    bot_weapon_select_t *pSelect;
    bot_fire_delay_t *pDelay;
@@ -1779,21 +1658,6 @@ qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
 }
 
 
-qboolean AreTeamMates(edict_t * pOther, edict_t * pEdict) 
-{
-   // is team play enabled?
-   if (is_team_play)
-   {
-      char other_model[MAX_TEAMNAME_LENGTH];
-      char edict_model[MAX_TEAMNAME_LENGTH];
-      
-      return(!stricmp(UTIL_GetTeam(pOther, other_model, sizeof(other_model)), UTIL_GetTeam(pEdict, edict_model, sizeof(edict_model))));
-   }
-   
-   return FALSE;
-}
-
-
 void BotShootAtEnemy( bot_t &pBot )
 {
    float f_xy_distance;
@@ -1916,6 +1780,7 @@ void BotShootAtEnemy( bot_t &pBot )
    }
 }
 
+
 qboolean BotShootTripmine( bot_t &pBot )
 {
    edict_t *pEdict = pBot.pEdict;
@@ -1935,3 +1800,4 @@ qboolean BotShootTripmine( bot_t &pBot )
    //TODO: or maybe throw grenade????
    return (BotFireWeapon( v_enemy, pBot, VALVE_WEAPON_GLOCK ));
 }
+

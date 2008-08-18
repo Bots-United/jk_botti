@@ -374,11 +374,7 @@ extern bot_t bots[32];
 extern int submod_id;
 extern int m_spriteTexture;
 
-Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean without_velocity = FALSE);
-qboolean FPredictedVisible(bot_t &pBot);
-void GatherPlayerData(edict_t * pEdict);
-void free_posdata_list(int idx);
-qboolean AreTeamMates(edict_t * pOther, edict_t * pEdict);
+//qboolean AreTeamMates(edict_t * pOther, edict_t * pEdict);
 
 // new UTIL.CPP functions...
 edict_t *UTIL_FindEntityInSphere( edict_t *pentStart, const Vector & vecCenter, float flRadius );
@@ -426,9 +422,6 @@ qboolean IsPlayerChatProtected(edict_t * pPlayer);
 const cfg_bot_record_t * GetUnusedCfgBotRecord(void);
 void FreeCfgBotRecord(void);
 int AddToCfgBotRecord(const char *skin, const char *name, int skill, int top_color, int bottom_color);
-
-void RecountTeams(void);
-char * GetSpecificTeam(char * teamstr, size_t slen, qboolean get_smallest, qboolean get_largest, qboolean only_count_bots);
 
 void BotNameInit(void);
 void BotLogoInit(void);

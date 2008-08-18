@@ -482,6 +482,146 @@ char * GetSpecificTeam(char * teamstr, size_t slen, qboolean get_smallest, qbool
 }
 
 
+//
+static int GetTeamIndex( const char *pTeamName )
+{
+   if ( pTeamName && *pTeamName != 0 )
+   {
+      // try to find existing team
+      for ( int tm = 0; tm < g_num_teams; tm++ )
+      {
+         if ( !stricmp( g_team_names[tm], pTeamName ) )
+            return tm;
+      }
+   }
+   
+   return -1;   // No match
+}
+
+
+//
+static void RecountTeams(void)
+{
+   if(!is_team_play)
+      return;
+	
+   // Construct teams list
+   char teamlist[TEAMPLAY_TEAMLISTLENGTH];
+   char *pName;
+
+   // loop through all teams, recounting everything
+   g_num_teams = 0;
+
+   // Copy all of the teams from the teamlist
+   // make a copy because strtok is destructive
+   safe_strcopy(teamlist, sizeof(teamlist), g_team_list);
+   
+   pName = teamlist;
+   pName = strtok( pName, ";" );
+   while ( pName != NULL && *pName )
+   {
+      if ( GetTeamIndex( pName ) < 0 )
+      {
+         safe_strcopy(g_team_names[g_num_teams], sizeof(g_team_names[g_num_teams]), pName);
+         g_num_teams++;
+         
+         if(g_num_teams == MAX_TEAMS)
+            break;
+      }
+      
+      pName = strtok( NULL, ";" );
+   }
+
+   if ( g_num_teams < 2 )
+   {
+      g_num_teams = 0;
+      g_team_limit = FALSE;
+   }
+   
+   // Sanity check
+   memset( g_team_scores, 0, sizeof(g_team_scores) );
+
+   // loop through all clients
+   for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+   {
+      edict_t * plr = INDEXENT(i);
+
+      if(!plr || plr->free || FNullEnt(plr) || GETPLAYERUSERID(plr) <= 0 || STRING(plr->v.netname)[0] == 0)
+         continue;
+      
+      char teamname[MAX_TEAMNAME_LENGTH];
+      const char *pTeamName;
+      
+      pTeamName = UTIL_GetTeam(plr, teamname, sizeof(teamname));
+      
+      // try add to existing team
+      int tm = GetTeamIndex( pTeamName );
+      
+      if ( tm < 0 ) // no team match found
+      { 
+         if ( !g_team_limit && g_num_teams < MAX_TEAMS)
+         {
+            // add to new team
+            tm = g_num_teams;
+            g_num_teams++;
+            g_team_scores[tm] = 0;
+            safe_strcopy(g_team_names[tm], sizeof(g_team_names[tm]), pTeamName);
+         }
+      }
+
+      if ( tm >= 0 )
+      {
+         g_team_scores[tm] += (int)plr->v.frags;
+      }
+   }
+}
+
+
+//
+void BotCheckTeamplay(void)
+{
+   float f_team_play = CVAR_GET_FLOAT("mp_teamplay");  // teamplay enabled?
+
+   if (f_team_play > 0.0f)
+      is_team_play = TRUE;
+   else
+      is_team_play = FALSE;
+
+   checked_teamplay = TRUE;
+   
+   // get team list, exactly as in teamplay_gamerules.cpp
+   if(is_team_play)
+   {
+      safe_strcopy(g_team_list, sizeof(g_team_list), CVAR_GET_STRING("mp_teamlist"));
+      
+      edict_t *pWorld = INDEXENT(0);
+      if ( pWorld && pWorld->v.team )
+      {
+         if ( CVAR_GET_FLOAT("mp_teamoverride") != 0.0f )
+         {
+            const char *pTeamList = STRING(pWorld->v.team);
+            if ( pTeamList && *pTeamList )
+            {
+               safe_strcopy(g_team_list, sizeof(g_team_list), pTeamList);
+            }
+         }
+      }
+      
+      // Has the server set teams
+      g_team_limit = ( *g_team_list != 0 );
+      
+      RecountTeams();
+   }
+   else
+   {
+      g_team_list[0] = 0;
+      g_team_limit = FALSE;
+      
+      memset(g_team_names, 0, sizeof(g_team_names));
+   }
+}
+
+
 // 
 void BotCreate( const char *skin, const char *name, int skill, int top_color, int bottom_color, int cfg_bot_index )
 {
@@ -791,6 +931,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
       pBot.connect_time = UTIL_GetSecs() - pBot.stay_time * (double)RANDOM_FLOAT2(0.2, 0.8);
    }
 }
+
 
 //
 void BotReplaceConnectionTime(const char * name, float * timeslot)

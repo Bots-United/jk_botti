@@ -466,3 +466,4 @@ void BotClient_Valve_ScreenFade(void *p, int bot_index)
       state++;
    }
 }
+
