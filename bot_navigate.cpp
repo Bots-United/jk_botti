@@ -34,7 +34,7 @@ const int max_drop_height = 800;
 
 
 // returns the number of degrees left to turn toward ideal pitch...
-static float BotChangePitch( bot_t &pBot, float speed )
+float BotChangePitch( bot_t &pBot, float speed )
 {
    edict_t *pEdict = pBot.pEdict;
    float ideal;
