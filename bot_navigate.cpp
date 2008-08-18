@@ -33,8 +33,6 @@ extern bot_weapon_t weapon_defs[MAX_WEAPONS];
 const int max_drop_height = 800;
 
 
-extern void BotCheckTeamplay(void);
-
 // returns the number of degrees left to turn toward ideal pitch...
 float BotChangePitch( bot_t &pBot, float speed )
 {

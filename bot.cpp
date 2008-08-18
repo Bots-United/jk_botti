@@ -27,10 +27,6 @@
 #include <sys/stat.h>
 
 
-extern void jkbotti_ClientPutInServer( edict_t *pEntity );
-extern BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ] );
-
-
 extern WAYPOINT waypoints[MAX_WAYPOINTS];
 extern int num_waypoints;  // number of waypoints currently in use
 extern int default_bot_skill;

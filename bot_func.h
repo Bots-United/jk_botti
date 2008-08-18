@@ -39,6 +39,10 @@ qboolean BotShootTripmine( bot_t &pBot );
 // bot_models.cpp:
 void LoadBotModels(void);
 
+// dll.cpp:
+void jkbotti_ClientPutInServer( edict_t *pEntity );
+BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ] );
+
 float BotChangePitch( bot_t &pBot, float speed );
 float BotChangeYaw( bot_t &pBot, float speed );
 qboolean BotFindWaypoint( bot_t &pBot );
