@@ -27,8 +27,8 @@
 #include <sys/stat.h>
 
 
-extern void jkbotti_ClientPutInServer( edict_t *pEntity );
-extern BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ] );
+//extern void jkbotti_ClientPutInServer( edict_t *pEntity );
+//extern BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ] );
 
 
 extern WAYPOINT waypoints[MAX_WAYPOINTS];
