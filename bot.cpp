@@ -84,7 +84,7 @@ qboolean b_botdontshoot = FALSE;
 
 
 //
-static qboolean BotLowHealth( bot_t &pBot )
+qboolean BotLowHealth( bot_t &pBot )
 {
    return(pBot.pEdict->v.health + 0.8f * pBot.pEdict->v.armorvalue < VALVE_MAX_NORMAL_HEALTH * 0.5f);
 }
