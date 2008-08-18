@@ -69,6 +69,7 @@ void BotPointGun(bot_t &pBot)
    // where it wants to look. There is some kind of filtering for the view, to make 
    // it human-like.
 
+   float frame_time = pBot.f_frame_time / skill_settings[pBot.bot_skill].turn_slowness;
    float speed; // speed : 0.1 - 1
    Vector v_deviation;
    float turn_skill = skill_settings[pBot.bot_skill].turn_skill;
@@ -95,12 +96,12 @@ void BotPointGun(bot_t &pBot)
       speed = 0.2 + (turn_skill - 1) / 20; // slow aim
 
    // thanks Tobias "Killaruna" Heimann and Johannes "@$3.1415rin" Lampel for this one
-   pEdict->v.yaw_speed = (pEdict->v.yaw_speed * exp (log (speed / 2) * pBot.f_frame_time * 20)
-                             + speed * v_deviation.y * (1 - exp (log (speed / 2) * pBot.f_frame_time * 20)))
-                            * pBot.f_frame_time * 20;
-   pEdict->v.pitch_speed = (pEdict->v.pitch_speed * exp (log (speed / 2) * pBot.f_frame_time * 20)
-                               + speed * v_deviation.x * (1 - exp (log (speed / 2) * pBot.f_frame_time * 20)))
-                              * pBot.f_frame_time * 20;
+   pEdict->v.yaw_speed = (pEdict->v.yaw_speed * exp (log (speed / 2) * frame_time * 20)
+                             + speed * v_deviation.y * (1 - exp (log (speed / 2) * frame_time * 20)))
+                            * frame_time * 20;
+   pEdict->v.pitch_speed = (pEdict->v.pitch_speed * exp (log (speed / 2) * frame_time * 20)
+                               + speed * v_deviation.x * (1 - exp (log (speed / 2) * frame_time * 20)))
+                              * frame_time * 20;
 
    // influence of y movement on x axis, based on skill (less influence than x on y since it's
    // easier and more natural for the bot to "move its mouse" horizontally than vertically)
@@ -114,21 +115,9 @@ void BotPointGun(bot_t &pBot)
       pEdict->v.yaw_speed += pEdict->v.pitch_speed / (1 + turn_skill);
    else
       pEdict->v.yaw_speed -= pEdict->v.pitch_speed / (1 + turn_skill);
-
-#if 0
-   // add skill aim randomness
-   float fov = (pEdict->v.fov <= 0) ? pEdict->v.fov : 85.0;
-   float var = skill_settings[pBot.bot_skill].aimangle_varitation * (fov / 85.0);
-   Vector v_rnd = Vector(RANDOM_FLOAT2(-var, var), RANDOM_FLOAT2(-var, var), 0);
-#else
-   // code above is broken, aim angle changes rapidly 30 times / second => not
-   // good especially not for low level bots with high aimangle_variation.
-   // It should change at a lot slower pace!
-   Vector v_rnd = Vector(0,0,0);
-#endif
    
    // move the aim cursor
-   pEdict->v.v_angle = UTIL_WrapAngles (pEdict->v.v_angle + Vector (pEdict->v.pitch_speed, pEdict->v.yaw_speed, 0) + v_rnd); 
+   pEdict->v.v_angle = UTIL_WrapAngles (pEdict->v.v_angle + Vector (pEdict->v.pitch_speed, pEdict->v.yaw_speed, 0)); 
    
    // set the body angles to point the gun correctly
    pEdict->v.angles.x = UTIL_WrapAngle (-pEdict->v.v_angle.x / 3);

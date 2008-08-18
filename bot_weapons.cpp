@@ -162,6 +162,13 @@ bot_weapon_select_t valve_weapon_select[NUM_OF_WEAPON_SELECTS] =
     0, 0, 0 },
 };
 
+bot_weapon_select_t sevs_handgrenade = 
+   {VALVE_WEAPON_HANDGRENADE, WEAPON_SUBMOD_ALL, "weapon_handgrenade", WEAPON_FIRE, 1.0,
+    NOSKILL, SKILL3, FALSE, TRUE,
+    0.0, 0.0, 300.0, 700.0, 500.0,
+    20, FALSE, 0, 1, 1, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, 1, -1,
+    W_IFL_HANDGRENADE, 0, 0, TRUE, FALSE };
+
 // List of different ammo we are looking for
 bot_ammo_names_t ammo_names[] = {
    { W_IFL_AMMO_GAUSS     , "ammo_gaussclip" },
@@ -295,6 +302,9 @@ void InitWeaponSelect(int submod_id)
       
       shotgun->primary_fire_percent = 25;
 #endif
+      // sevs handgrenade has mp5 grenade for secondary attack, let bots use it
+      bot_weapon_select_t * handgrenade = GetWeaponSelect(VALVE_WEAPON_HANDGRENADE);
+      *handgrenade = sevs_handgrenade;
    }
    else if(SUBMOD_BUBBLEMOD == submod_id)
    {

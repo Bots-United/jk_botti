@@ -26,8 +26,8 @@ typedef struct
    float shootcone_minangle; // OR angle between bot aim line and line to target is less than angle set here
       
    float turn_skill; // BotAim turn_skill, how good bot is at aiming on enemy origin.
+   float turn_slowness; // Is bot's aim in slow motion?
    float updown_turn_ration; // how much slower bots aims up and down than side ways?
-   //float aimangle_varitation; // how steady bot's hand is (how much randomness we add to bot aim angle?)
    
    // Bot doesn't use real origin of target player but instead use ping emulation based on recorded old position data of player. 
    // These settings specify ammount of latency and randomness used at different skill levels.

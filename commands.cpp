@@ -909,8 +909,8 @@ qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * a
          CHECK_AND_SET_BOTSKILL_FLOAT(shootcone_minangle) // OR angle between bot aim line and line to target is less than angle set here
          
          CHECK_AND_SET_BOTSKILL_FLOAT(turn_skill) // BotAim turn_skill, how good bot is at aiming on enemy origin.
+         CHECK_AND_SET_BOTSKILL_FLOAT(turn_slowness) // Is bot's aim in slow motion?
          CHECK_AND_SET_BOTSKILL_FLOAT(updown_turn_ration) // how much slower bots aims up and down than side ways?
-//         CHECK_AND_SET_BOTSKILL_FLOAT(aimangle_varitation) // how much varitation we want to add to aim angle.
    
          CHECK_AND_SET_BOTSKILL_FLOAT(ping_emu_latency) // how much ping latency bot brain has.
          CHECK_AND_SET_BOTSKILL_FLOAT(ping_emu_speed_varitation) // how well bot can predict target speed.

@@ -52,8 +52,8 @@ typedef struct
 
 13:   
    float turn_skill; // BotAim turn_skill, how good bot is at aiming on enemy origin.
+   float turn_slowness; // Is bot's aim in slow motion?
    float updown_turn_ration; // how much slower bots aims up and down than side ways?
-   //float aimangle_varitation; // how steady bot's hand is (how much randomness we add to bot aim angle?)
 
 16:
    // Bot doesn't use real origin of target player but instead use ping emulation based on recorded old position data of player. 
@@ -106,7 +106,7 @@ bot_skill_settings_t default_skill_settings[5] = {
 //11:
      150.0, 12.5, 
 //13:
-     4.0, 2.0, //0.1, 
+     4.0, 1.0, 2.0,
 //16:
      0.060, 0.03, 2.0, 
 //19:
@@ -128,7 +128,7 @@ bot_skill_settings_t default_skill_settings[5] = {
 //11:
      175.0, 20.0, 
 //13:
-     3.0, 2.25, //0.2, 
+     3.0, 1.25, 2.25,
 //16:
      0.120, 0.04, 3.0, 
 //19:
@@ -150,7 +150,7 @@ bot_skill_settings_t default_skill_settings[5] = {
 //11:
      200.0, 25.0, 
 //13:
-     2.0, 2.50, //0.3, 
+     2.0, 1.5, 2.50,
 //16:
      0.180, 0.05, 4.0, 
 //19:
@@ -172,7 +172,7 @@ bot_skill_settings_t default_skill_settings[5] = {
 //11:
      250.0, 30.0, 
 //13:
-     1.25, 2.75, //0.4, 
+     1.25, 1.75, 2.75,
 //16:
      0.240, 0.075, 6.0, 
 //19:
@@ -194,7 +194,7 @@ bot_skill_settings_t default_skill_settings[5] = {
 //11:
      300.0, 35.0, 
 //13:
-     0.75, 3.0, //0.5, 
+     0.75, 2.0, 3.0,
 //16:
      0.300, 0.10, 8.0, 
 //19:
