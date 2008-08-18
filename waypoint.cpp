@@ -83,9 +83,29 @@ unsigned short *from_to = NULL;
 BOOL wp_matrix_initialized = FALSE;
 BOOL wp_matrix_save_on_mapend = FALSE;
 
+//
+static qboolean WaypointReachable(const Vector &v_src, const Vector &v_dest, const int reachable_flags);
+static void WaypointSlowFloydsStop(void);
+static void WaypointRouteInit(qboolean ForceRebuild);
+
 
 //
-void WaypointAddBlock(const Vector &origin)
+static qboolean WaypointIsRouteValid(int src, int dest)
+{
+   if(unlikely(!wp_matrix_initialized) || 
+      unlikely(from_to == NULL) || 
+      unlikely(src < 0) ||
+      unlikely(dest < 0) ||
+      unlikely(src >= (int)route_num_waypoints) || 
+      unlikely(dest >= (int)route_num_waypoints))
+      return(FALSE);
+   
+   return(TRUE);
+}
+
+
+//
+static void WaypointAddBlock(const Vector &origin)
 {
    if(block_list_endlist == block_list_size)
    {
@@ -96,7 +116,7 @@ void WaypointAddBlock(const Vector &origin)
 }
 
 //
-qboolean WaypointInBlockRadius(const Vector &origin)
+static qboolean WaypointInBlockRadius(const Vector &origin)
 {
    TraceResult tr;
    
@@ -118,7 +138,8 @@ qboolean WaypointInBlockRadius(const Vector &origin)
 }
 
 
-void WaypointDebug(void)
+#ifdef _DEBUG
+static void WaypointDebug(void)
 {
    int y = 1, x = 1;
 
@@ -131,15 +152,16 @@ void WaypointDebug(void)
 
    return;
 }
+#endif
 
 
-inline int GetReachableFlags(int i1, int i2)
+static inline int GetReachableFlags(int i1, int i2)
 {
    return((waypoints[i1].flags | waypoints[i2].flags) & (W_FL_LADDER | W_FL_CROUCH));
 }
 
 
-inline int GetReachableFlags(edict_t * pEntity, int i1)
+static inline int GetReachableFlags(edict_t * pEntity, int i1)
 {
    int flags = waypoints[i1].flags & (W_FL_LADDER | W_FL_CROUCH);
    
@@ -156,14 +178,14 @@ inline int GetReachableFlags(edict_t * pEntity, int i1)
 }
 
 
-inline int GetReachableFlags(int i1, edict_t * pEntity)
+static inline int GetReachableFlags(int i1, edict_t * pEntity)
 {
    return(GetReachableFlags(pEntity, i1));
 }
 
 
 // free the linked list of waypoint path nodes...
-void WaypointFree(void)
+static void WaypointFree(void)
 {
    // no linked list anymore
    for(int i=0; i < MAX_WAYPOINTS; i++)
@@ -211,7 +233,7 @@ void WaypointInit(void)
 }
 
 
-void WaypointAddPath(short int add_index, short int path_index)
+static void WaypointAddPath(short int add_index, short int path_index)
 {
    int i;
 
@@ -244,7 +266,7 @@ void WaypointAddPath(short int add_index, short int path_index)
 }
 
 
-void WaypointDeletePath(short int path_index, short int del_index)
+static void WaypointDeletePath(short int path_index, short int del_index)
 {
    int i;
    PATH &p = paths[path_index];
@@ -262,7 +284,7 @@ void WaypointDeletePath(short int path_index, short int del_index)
 }
 
 
-void WaypointDeletePath(short int del_index)
+static void WaypointDeletePath(short int del_index)
 {
    int i;
    
@@ -287,7 +309,7 @@ int WaypointFindPath(int &path_index, int waypoint_index)
 
 
 // calculate all the paths to this waypoint
-void WaypointMakePathsWith(int index)
+static void WaypointMakePathsWith(int index)
 {
    // calculate all the paths to this new waypoint
    if(!g_path_waypoint_enable)
@@ -891,7 +913,8 @@ int WaypointFindRunawayPath(int runner, int enemy)
 
 
 //
-int WaypointFindNearestAiming(Vector v_origin)
+#if 0
+static int WaypointFindNearestAiming(Vector v_origin)
 {
    int index;
    int min_index = -1;
@@ -921,10 +944,11 @@ int WaypointFindNearestAiming(Vector v_origin)
 
    return min_index;
 }
+#endif
 
 
 //
-void WaypointDrawBeam(edict_t *pEntity, const Vector &start, const Vector &end, int width,
+static void WaypointDrawBeam(edict_t *pEntity, const Vector &start, const Vector &end, int width,
         int noise, int red, int green, int blue, int brightness, int speed)
 {
    // should waypoints be visible?
@@ -957,7 +981,7 @@ void WaypointDrawBeam(edict_t *pEntity, const Vector &start, const Vector &end, 
 
 
 //
-void WaypointSearchItems(edict_t *pEntity, const Vector &v_origin, int wpt_index)
+static void WaypointSearchItems(edict_t *pEntity, const Vector &v_origin, int wpt_index)
 {
    edict_t *pent = NULL;
    float radius = 40;
@@ -1113,7 +1137,7 @@ edict_t *WaypointFindItem( int wpt_index )
 }
 
 
-void WaypointAdd(edict_t *pEntity)
+static void WaypointAdd(edict_t *pEntity)
 {
    int index;
    int player_index = ENTINDEX(pEntity) - 1;
@@ -1227,7 +1251,8 @@ void WaypointAdd(edict_t *pEntity)
 }
 
 
-int WaypointAddTesting(const Vector &vecOrigin, int flags, int itemflags, qboolean MakePaths)
+#if 0
+static int WaypointAddTesting(const Vector &vecOrigin, int flags, int itemflags, qboolean MakePaths)
 {
    int index = 0;
 
@@ -1269,7 +1294,7 @@ int WaypointAddTesting(const Vector &vecOrigin, int flags, int itemflags, qboole
 }
 
 
-void WaypointAddAiming(edict_t *pEntity)
+static void WaypointAddAiming(edict_t *pEntity)
 {
    int index;
 
@@ -1326,7 +1351,7 @@ void WaypointAddAiming(edict_t *pEntity)
 }
 
 
-void WaypointDelete(edict_t *pEntity)
+static void WaypointDelete(edict_t *pEntity)
 {
    int index;
 
@@ -1398,7 +1423,7 @@ void WaypointDelete(edict_t *pEntity)
 }
 
 
-void WaypointUpdate(edict_t *pEntity)
+static void WaypointUpdate(edict_t *pEntity)
 {
    int index;
    int mask;
@@ -1421,7 +1446,7 @@ void WaypointUpdate(edict_t *pEntity)
 
 
 // allow player to manually create a path from one waypoint to another
-void WaypointCreatePath(edict_t *pEntity, int cmd)
+static void WaypointCreatePath(edict_t *pEntity, int cmd)
 {
    static int waypoint1 = -1;  // initialized to unassigned
    static int waypoint2 = -1;  // initialized to unassigned
@@ -1470,7 +1495,7 @@ void WaypointCreatePath(edict_t *pEntity, int cmd)
 
 
 // allow player to manually remove a path from one waypoint to another
-void WaypointRemovePath(edict_t *pEntity, int cmd)
+static void WaypointRemovePath(edict_t *pEntity, int cmd)
 {
    static int waypoint1 = -1;  // initialized to unassigned
    static int waypoint2 = -1;  // initialized to unassigned
@@ -1516,9 +1541,10 @@ void WaypointRemovePath(edict_t *pEntity, int cmd)
          EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_hudon.wav", 1.0, ATTN_NORM, 0, 100);
    }
 }
+#endif
 
 
-qboolean WaypointFixOldWaypoints(void)
+static qboolean WaypointFixOldWaypoints(void)
 {
    int k;
    qboolean Changed = FALSE;
@@ -1793,7 +1819,7 @@ qboolean WaypointLoad(edict_t *pEntity)
 }
 
 
-int WaypointNumberOfPaths(int index)
+static int WaypointNumberOfPaths(int index)
 {
    // count the number of paths from this node...
    PATH &p = paths[index];
@@ -1807,7 +1833,7 @@ int WaypointNumberOfPaths(int index)
 }
 
 
-int WaypointIncomingPathsCount(int index, int exit_count)
+static int WaypointIncomingPathsCount(int index, int exit_count)
 {
    int num = 0;
    
@@ -1836,7 +1862,7 @@ int WaypointIncomingPathsCount(int index, int exit_count)
 
 
 // remove dummy waypoints, waypoints that have no paths in or out
-void WaypointTrim(void)
+static void WaypointTrim(void)
 {
    int orphan_count = 0;
 	
@@ -1936,7 +1962,7 @@ void WaypointSave(void)
 }
 
 
-qboolean WaypointReachable(const Vector &v_src, const Vector &v_dest, const int reachable_flags)
+static qboolean WaypointReachable(const Vector &v_src, const Vector &v_dest, const int reachable_flags)
 {
    TraceResult tr;
    float curr_height, last_height, waterlevel;
@@ -2223,7 +2249,7 @@ void WaypointPrintInfo(edict_t *pEntity)
 #endif
 
 
-void WaypointAutowaypointing(int idx, edict_t *pEntity)
+static void WaypointAutowaypointing(int idx, edict_t *pEntity)
 {
    float distance, min_distance;
    int i;
@@ -2480,13 +2506,7 @@ void WaypointThink(edict_t *pEntity)
 }
 
 
-void WaypointSaveFloydsMatrix(void)
-{
-   return WaypointSaveFloydsMatrix(shortest_path, from_to);
-}
-
-
-void WaypointSaveFloydsMatrix(unsigned short *shortest_path, unsigned short *from_to)
+static void WaypointSaveFloydsMatrix(unsigned short *shortest_path, unsigned short *from_to)
 {
    char filename[256];
    char mapname[64];
@@ -2565,9 +2585,9 @@ void WaypointSaveFloydsMatrix(unsigned short *shortest_path, unsigned short *fro
 }
 
 
-int WaypointSlowFloyds(void)
+void WaypointSaveFloydsMatrix(void)
 {
-   return WaypointSlowFloyds(shortest_path, from_to);
+   return WaypointSaveFloydsMatrix(shortest_path, from_to);
 }
 
 
@@ -2578,7 +2598,7 @@ static struct {
    int escaped;
 } slow_floyds = {-1,0,0,0,0,0};
 
-void WaypointSlowFloydsStop(void)
+static void WaypointSlowFloydsStop(void)
 {
    slow_floyds.state = -1;
 }
@@ -2588,7 +2608,7 @@ int WaypointSlowFloydsState(void)
    return(slow_floyds.state);
 }
 
-int WaypointSlowFloyds(unsigned short *shortest_path, unsigned short *from_to)
+static int WaypointSlowFloyds(unsigned short *shortest_path, unsigned short *from_to)
 {
    unsigned int x, y, z;
    int changed;
@@ -2712,7 +2732,13 @@ escape_return:
 }
 
 
-void WaypointRouteInit(qboolean ForceRebuild)
+int WaypointSlowFloyds(void)
+{
+   return WaypointSlowFloyds(shortest_path, from_to);
+}
+
+
+static void WaypointRouteInit(qboolean ForceRebuild)
 {
    unsigned int index;
    unsigned int array_size;
@@ -2907,20 +2933,6 @@ void WaypointRouteInit(qboolean ForceRebuild)
 }
 
 
-qboolean WaypointIsRouteValid(int src, int dest)
-{
-   if(unlikely(!wp_matrix_initialized) || 
-      unlikely(from_to == NULL) || 
-      unlikely(src < 0) ||
-      unlikely(dest < 0) ||
-      unlikely(src >= (int)route_num_waypoints) || 
-      unlikely(dest >= (int)route_num_waypoints))
-      return(FALSE);
-   
-   return(TRUE);
-}
-
-
 int WaypointRouteFromTo(int src, int dest)
 {
    // new waypoints come effective on mapchange
@@ -2939,3 +2951,4 @@ float WaypointDistanceFromTo(int src, int dest)
    
    return (float)(shortest_path[src * route_num_waypoints + dest]);
 }
+

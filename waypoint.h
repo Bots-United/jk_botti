@@ -92,37 +92,39 @@ int  WaypointFindPath(int &path_index, int waypoint_index);
 int  WaypointFindNearest(const Vector &v_origin, const Vector &v_offset, edict_t *pEntity, float range, qboolean b_traceline);
 int  WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags, int exclude[], float range, const Vector *pv_src);
 int  WaypointFindRandomGoal(int *out_indexes, int max_indexes, edict_t *pEntity, int flags, int itemflags, int exclude[]);
-int  WaypointFindNearestAiming(Vector v_origin);
-void WaypointSearchItems(edict_t *pEntity, const Vector &v_origin, int wpt_index);
-void WaypointAdd(edict_t *pEntity);
-void WaypointAddAiming(edict_t *pEntity);
-int  WaypointAddTesting(const Vector &vecOrigin, int flags, int itemflags, qboolean MakePaths);
+//void WaypointSearchItems(edict_t *pEntity, const Vector &v_origin, int wpt_index);
+//void WaypointAdd(edict_t *pEntity);
+//void WaypointAddAiming(edict_t *pEntity);
+//int  WaypointAddTesting(const Vector &vecOrigin, int flags, int itemflags, qboolean MakePaths);
 void WaypointAddLift(edict_t * pent, const Vector &start, const Vector &end);
-void WaypointDelete(edict_t *pEntity);
-void WaypointUpdate(edict_t *pEntity);
-void WaypointCreatePath(edict_t *pEntity, int cmd);
-void WaypointRemovePath(edict_t *pEntity, int cmd);
+//void WaypointDelete(edict_t *pEntity);
+//void WaypointUpdate(edict_t *pEntity);
+//void WaypointCreatePath(edict_t *pEntity, int cmd);
+//void WaypointRemovePath(edict_t *pEntity, int cmd);
 qboolean WaypointLoad(edict_t *pEntity);
 void WaypointSave(void);
-qboolean WaypointReachable(const Vector &v_src, const Vector &v_dest, const int reachable_flags);
+//qboolean WaypointReachable(const Vector &v_src, const Vector &v_dest, const int reachable_flags);
 int  WaypointFindReachable(edict_t *pEntity, float range);
-void WaypointPrintInfo(edict_t *pEntity);
 void WaypointThink(edict_t *pEntity);
 void WaypointFloyds(short *shortest_path, short *from_to);
-void WaypointRouteInit(qboolean ForceRebuild);
+//void WaypointRouteInit(qboolean ForceRebuild);
 void CollectMapSpawnItems(edict_t *pSpawn);
 void WaypointAddSpawnObjects(void);
 edict_t *WaypointFindItem( int wpt_index );
 int WaypointRouteFromTo(int src, int dest);
 float WaypointDistanceFromTo(int src, int dest);
-void WaypointSaveFloydsMatrix(unsigned short *shortest_path, unsigned short *from_to);
+//void WaypointSaveFloydsMatrix(unsigned short *shortest_path, unsigned short *from_to);
 void WaypointSaveFloydsMatrix(void);
-void WaypointSlowFloydsStop(void);
+//void WaypointSlowFloydsStop(void);
 int WaypointSlowFloydsState(void);
 int WaypointSlowFloyds(void);
-int WaypointSlowFloyds(unsigned short *shortest_path, unsigned short *from_to);
+//int WaypointSlowFloyds(unsigned short *shortest_path, unsigned short *from_to);
 int WaypointFindRunawayPath(int runner, int enemy);
-qboolean WaypointIsRouteValid(int src, int dest);
+//qboolean WaypointIsRouteValid(int src, int dest);
+
+#if _DEBUG
+void WaypointPrintInfo(edict_t *pEntity);
+#endif
 
 // find the nearest waypoint to the player and return the index (-1 if not found)
 inline int WaypointFindNearest(edict_t *pEntity, float range)
