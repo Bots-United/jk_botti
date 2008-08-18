@@ -9,24 +9,15 @@
 
 //prototypes of bot functions...
 
-//void BotSpawnInit( bot_t &pBot );
 void BotCreate( const char *skin, const char *name, int skill, int top_color, int bottom_color, int cfg_bot_index );
-void BotStartGame( bot_t &pBot );
-//int BotInFieldOfView( bot_t &pBot, const Vector & dest );
-//qboolean BotEntityIsVisible( bot_t &pBot, const Vector & dest );
-//void BotPickLogo(bot_t &pBot);
-//void BotSprayLogo(bot_t &pBot);
-//void BotFindItem( bot_t &pBot );
-//qboolean BotLookForGrenades( bot_t &pBot );
 void BotThink( bot_t &pBot );
+
 void BotPointGun(bot_t &pBot);
 void BotAimPre( bot_t &pBot );
 void BotAimPost( bot_t &pBot );
 void LoadBotModels(void);
 
-//void BotDoStrafe(bot_t &pBot);
-//void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distance);
-
+void LoadBotChat(void);
 void BotChatTaunt(bot_t &pBot, edict_t *victim_edict);
 void BotChatWhine(bot_t &pBot);
 void BotChatTalk(bot_t &pBot);
@@ -68,15 +59,6 @@ Vector BotBodyTarget( edict_t *pBotEnemy, bot_t &pBot );
 qboolean BotFireWeapon( const Vector & v_enemy, bot_t &pBot, int weapon_choice );
 void BotShootAtEnemy( bot_t &pBot );
 qboolean BotShootTripmine( bot_t &pBot );
-
-void LoadBotChat(void);
-void BotTrimBlanks(const char *in_string, char *out_string, int sizeof_out_string);
-int BotChatTrimTag(const char *original_name, char *out_name, int sizeof_out_name);
-void BotDropCharacter(const char *in_string, char *out_string, int sizeof_out_string);
-void BotSwapCharacter(const char *in_string, char *out_string, int sizeof_out_string);
-void BotChatName(const char *original_name, char *out_name, int sizeof_out_name);
-void BotChatText(const char *in_text, char *out_text, int sizeof_out_text);
-void BotChatFillInName(char *bot_say_msg, int sizeof_msg, const char *chat_text, const char *chat_name, const char *bot_name);
 
 #endif // BOT_FUNC_H
 
