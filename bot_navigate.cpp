@@ -180,7 +180,7 @@ float BotChangeYaw( bot_t &pBot, float speed )
 }
 
 
-qboolean BotFindWaypoint( bot_t &pBot )
+static qboolean BotFindWaypoint( bot_t &pBot )
 {
    int index, select_index;
    int path_index = -1;
@@ -287,7 +287,7 @@ qboolean BotFindWaypoint( bot_t &pBot )
 }
 
 
-void BotEvaluateGoal( bot_t &pBot )
+static void BotEvaluateGoal( bot_t &pBot )
 {
    edict_t *pEdict = pBot.pEdict;
 
@@ -304,53 +304,7 @@ void BotEvaluateGoal( bot_t &pBot )
 
 
 //
-qboolean BotUpdateTrackSoundGoal( bot_t &pBot )
-{
-   if(pBot.wpt_goal_type != WPT_GOAL_TRACK_SOUND)
-      return FALSE;
-   
-   // check track-sound-time if we should stop tracking
-   // check if target has been erased
-   // check our state -> do we want to keep tracking
-   if((pBot.f_track_sound_time <= 0.0f && pBot.f_track_sound_time < gpGlobals->time) || 
-        !pBot.b_has_enough_ammo_for_good_weapon || pBot.b_low_health)
-   {
-      if(pBot.waypoint_goal != -1)
-      {
-         //if(!pBot.b_has_enough_ammo_for_good_weapon || pBot.b_low_health)
-         //   UTIL_ConsolePrintf("[%s] Dropped sound tracking goal because(%d -> %d): out of ammo/health", pBot.name, pBot.waypoint_goal, -1);
-         //if(pBot.f_track_sound_time <= 0.0f && pBot.f_track_sound_time < gpGlobals->time)
-         //   UTIL_ConsolePrintf("[%s] Dropped sound tracking goal because(%d -> %d): end of tracking time", pBot.name, pBot.waypoint_goal, -1);
-      }
-      
-      pBot.waypoint_goal = -1;
-      pBot.wpt_goal_type = WPT_GOAL_NONE;
-      
-      pBot.pTrackSoundEdict = NULL;
-      pBot.f_track_sound_time = -1;
-      
-      return FALSE;
-   }
-   
-   // get waypoint close to sound of track-sound-edict
-   edict_t* pNew = NULL;
-   int waypoint = BotGetSoundWaypoint( pBot, pBot.pTrackSoundEdict, &pNew );
-   
-   if(FNullEnt(pBot.pTrackSoundEdict) && !FNullEnt(pNew))
-      pBot.pTrackSoundEdict = pNew;
-   
-   // update waypoint_goal
-   //if(pBot.waypoint_goal != waypoint)
-   //   UTIL_ConsolePrintf("[%s] Updated sound tracking goal waypoint: %d -> %d", pBot.name, pBot.waypoint_goal, waypoint);
-   
-   pBot.waypoint_goal = waypoint;
-   
-   return TRUE;
-}
-
-
-//
-int BotGetSoundWaypoint( bot_t &pBot, edict_t *pTrackSoundEdict, edict_t ** pNewTrackSoundEdict )
+static int BotGetSoundWaypoint( bot_t &pBot, edict_t *pTrackSoundEdict, edict_t ** pNewTrackSoundEdict )
 {
    edict_t *pEdict = pBot.pEdict;
    
@@ -412,7 +366,53 @@ int BotGetSoundWaypoint( bot_t &pBot, edict_t *pTrackSoundEdict, edict_t ** pNew
 }
 
 
-void BotFindWaypointGoal( bot_t &pBot )
+//
+qboolean BotUpdateTrackSoundGoal( bot_t &pBot )
+{
+   if(pBot.wpt_goal_type != WPT_GOAL_TRACK_SOUND)
+      return FALSE;
+   
+   // check track-sound-time if we should stop tracking
+   // check if target has been erased
+   // check our state -> do we want to keep tracking
+   if((pBot.f_track_sound_time <= 0.0f && pBot.f_track_sound_time < gpGlobals->time) || 
+        !pBot.b_has_enough_ammo_for_good_weapon || pBot.b_low_health)
+   {
+      if(pBot.waypoint_goal != -1)
+      {
+         //if(!pBot.b_has_enough_ammo_for_good_weapon || pBot.b_low_health)
+         //   UTIL_ConsolePrintf("[%s] Dropped sound tracking goal because(%d -> %d): out of ammo/health", pBot.name, pBot.waypoint_goal, -1);
+         //if(pBot.f_track_sound_time <= 0.0f && pBot.f_track_sound_time < gpGlobals->time)
+         //   UTIL_ConsolePrintf("[%s] Dropped sound tracking goal because(%d -> %d): end of tracking time", pBot.name, pBot.waypoint_goal, -1);
+      }
+      
+      pBot.waypoint_goal = -1;
+      pBot.wpt_goal_type = WPT_GOAL_NONE;
+      
+      pBot.pTrackSoundEdict = NULL;
+      pBot.f_track_sound_time = -1;
+      
+      return FALSE;
+   }
+   
+   // get waypoint close to sound of track-sound-edict
+   edict_t* pNew = NULL;
+   int waypoint = BotGetSoundWaypoint( pBot, pBot.pTrackSoundEdict, &pNew );
+   
+   if(FNullEnt(pBot.pTrackSoundEdict) && !FNullEnt(pNew))
+      pBot.pTrackSoundEdict = pNew;
+   
+   // update waypoint_goal
+   //if(pBot.waypoint_goal != waypoint)
+   //   UTIL_ConsolePrintf("[%s] Updated sound tracking goal waypoint: %d -> %d", pBot.name, pBot.waypoint_goal, waypoint);
+   
+   pBot.waypoint_goal = waypoint;
+   
+   return TRUE;
+}
+
+
+static void BotFindWaypointGoal( bot_t &pBot )
 {
    int index = -1;
    
@@ -2360,3 +2360,4 @@ void BotLookForDrop( bot_t &pBot )
       }
    }
 }
+

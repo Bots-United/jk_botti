@@ -39,13 +39,10 @@ qboolean BotShootTripmine( bot_t &pBot );
 // bot_models.cpp:
 void LoadBotModels(void);
 
-// dll.cpp:
-void jkbotti_ClientPutInServer( edict_t *pEntity );
-BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ] );
-
+// bot_navigate.cpp:
 float BotChangePitch( bot_t &pBot, float speed );
 float BotChangeYaw( bot_t &pBot, float speed );
-qboolean BotFindWaypoint( bot_t &pBot );
+qboolean BotUpdateTrackSoundGoal( bot_t &pBot );
 qboolean BotHeadTowardWaypoint( bot_t &pBot );
 void BotOnLadder( bot_t &pBot, float moved_distance );
 void BotUnderWater( bot_t &pBot );
@@ -55,23 +52,19 @@ void BotTurnAtWall( bot_t &pBot, TraceResult *tr, qboolean negative );
 qboolean BotCantMoveForward( bot_t &pBot, TraceResult *tr );
 qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump );
 qboolean BotCanDuckUnder( bot_t &pBot );
+qboolean BotEdgeForward( bot_t &pBot, const Vector &v_move_dir );
+qboolean BotEdgeRight( bot_t &pBot, const Vector &v_move_dir );
+qboolean BotEdgeLeft( bot_t &pBot, const Vector &v_move_dir );
 void BotRandomTurn( bot_t &pBot );
-qboolean BotFollowUser( bot_t &pBot );
 qboolean BotCheckWallOnLeft( bot_t &pBot );
 qboolean BotCheckWallOnRight( bot_t &pBot );
 qboolean BotCheckWallOnBack( bot_t &pBot );
 qboolean BotCheckWallOnForward( bot_t &pBot );
 void BotLookForDrop( bot_t &pBot );
-qboolean BotEdgeForward( bot_t &pBot, const Vector &v_move_dir );
-qboolean BotEdgeRight( bot_t &pBot, const Vector &v_move_dir );
-qboolean BotEdgeLeft( bot_t &pBot, const Vector &v_move_dir );
 
-qboolean BotUpdateTrackSoundGoal( bot_t &pBot );
-int BotGetSoundWaypoint( bot_t &pBot, edict_t *pTrackSoundEdict, edict_t ** pNewTrackSoundEdict );
-void BotUpdateHearingSensitivity(bot_t &pBot);
-
-Vector BotBodyTarget( edict_t *pBotEnemy, bot_t &pBot );
-
+// dll.cpp:
+void jkbotti_ClientPutInServer( edict_t *pEntity );
+BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ] );
 
 #endif // BOT_FUNC_H
 
