@@ -418,7 +418,7 @@ qboolean IsPlayerChatProtected(edict_t * pPlayer);
 void UpdateClientData(const struct edict_s *ent, int sendweapons, struct clientdata_s *cd);
 void ProcessBotCfgFile(void);
 void jk_botti_ServerCommand (void);
-int CheckSubMod(void);
+//int CheckSubMod(void);
 
 #include "bot_func.h"
 #include "bot_inline_funcs.h"

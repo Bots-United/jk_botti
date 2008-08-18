@@ -111,34 +111,7 @@ unsigned int rnd_idnum[2] = {1, 1};
 cvar_t jk_botti_version = { "jk_botti_version", "", FCVAR_EXTDLL|FCVAR_SERVER, 0, NULL};
 
 
-void GameDLLInit( void )
-{
-   //before anything else detect submod
-   submod_id = CheckSubMod();
-   submod_weaponflag = SubmodToSubmodWeaponFlag(submod_id);
-   
-   memset(players, 0, sizeof(players));
-
-   // initialize the bots array of structures...
-   memset(bots, 0, sizeof(bots));
-
-   //skill init
-   ResetSkillsToDefault();
-   
-   //weapon init
-   InitWeaponSelect(submod_id);
-
-   BotNameInit();
-   BotLogoInit();
-
-   LoadBotChat();
-   LoadBotModels();
-
-   RETURN_META (MRES_IGNORED);
-}
-
-
-int CheckSubMod(void)
+static int CheckSubMod(void)
 {
    int submod = 0;
    
@@ -190,12 +163,39 @@ int CheckSubMod(void)
 }
 
 
+static void GameDLLInit( void )
+{
+   //before anything else detect submod
+   submod_id = CheckSubMod();
+   submod_weaponflag = SubmodToSubmodWeaponFlag(submod_id);
+   
+   memset(players, 0, sizeof(players));
+
+   // initialize the bots array of structures...
+   memset(bots, 0, sizeof(bots));
+
+   //skill init
+   ResetSkillsToDefault();
+   
+   //weapon init
+   InitWeaponSelect(submod_id);
+
+   BotNameInit();
+   BotLogoInit();
+
+   LoadBotChat();
+   LoadBotModels();
+
+   RETURN_META (MRES_IGNORED);
+}
+
+
 static float m_height = 0;
 static float m_lip = 0;
 static Vector m_origin;
 
 
-int Spawn( edict_t *pent )
+static int Spawn( edict_t *pent )
 {
    if (gpGlobals->deathmatch)
    {
@@ -264,7 +264,7 @@ int Spawn( edict_t *pent )
 }
 
 
-int Spawn_Post( edict_t *pent )
+static int Spawn_Post( edict_t *pent )
 {
    if(!gpGlobals->deathmatch)
       RETURN_META_VALUE (MRES_IGNORED, 0);
@@ -327,7 +327,7 @@ int Spawn_Post( edict_t *pent )
 }
 
 
-void DispatchKeyValue_Post( edict_t *pentKeyvalue, KeyValueData *pkvd )
+static void DispatchKeyValue_Post( edict_t *pentKeyvalue, KeyValueData *pkvd )
 {
    if(!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
@@ -403,7 +403,7 @@ void jkbotti_ClientPutInServer( edict_t *pEntity )
 }
 
 
-void CmdStart( const edict_t *player, const struct usercmd_s *cmd, unsigned int random_seed )
+static void CmdStart( const edict_t *player, const struct usercmd_s *cmd, unsigned int random_seed )
 {
    // check if is our bot
    int bot_index = UTIL_GetBotIndex(player);
@@ -442,7 +442,7 @@ void CmdStart( const edict_t *player, const struct usercmd_s *cmd, unsigned int 
 }
 
 
-void ClientDisconnect( edict_t *pEntity )
+static void ClientDisconnect( edict_t *pEntity )
 {
    if (gpGlobals->deathmatch)
    {
@@ -471,7 +471,7 @@ void ClientDisconnect( edict_t *pEntity )
 }
 
 
-void ServerDeactivate(void)
+static void ServerDeactivate(void)
 {
    if(!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
@@ -491,7 +491,7 @@ void ServerDeactivate(void)
 }
 
 
-void PlayerPostThink_Post( edict_t *pEdict )
+static void PlayerPostThink_Post( edict_t *pEdict )
 {
    if (!gpGlobals->deathmatch) 
       RETURN_META(MRES_IGNORED);
@@ -509,7 +509,7 @@ void PlayerPostThink_Post( edict_t *pEdict )
 }
 
 
-void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch) 
+static void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch) 
 {
    if (gpGlobals->deathmatch)
    {
@@ -533,7 +533,7 @@ void new_PM_PlaySound(int channel, const char *sample, float volume, float atten
    (*old_PM_PlaySound)(channel, sample, volume, attenuation, fFlags, pitch);
 }
 
-void PM_Move(struct playermove_s *ppmove, qboolean server) 
+static void PM_Move(struct playermove_s *ppmove, qboolean server) 
 {
    if (!gpGlobals->deathmatch) 
       RETURN_META(MRES_IGNORED);
@@ -553,7 +553,7 @@ void PM_Move(struct playermove_s *ppmove, qboolean server)
    RETURN_META (MRES_HANDLED);
 }
 
-void StartFrame( void )
+static void StartFrame( void )
 {
    edict_t *pPlayer;
    int bot_index;
