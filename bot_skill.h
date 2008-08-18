@@ -4,6 +4,9 @@
 // bot_skill.h
 //
 
+#define BEST_BOT_LEVEL 0
+#define WORST_BOT_LEVEL 4
+
 typedef struct
 {
    int pause_frequency; // how often (out of 1000 times) the bot will pause, based on bot skill

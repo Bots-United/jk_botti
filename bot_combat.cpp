@@ -794,6 +794,31 @@ edict_t *BotFindEnemyNearestToPoint(bot_t &pBot, const Vector &v_point, float ra
 }
 
 
+// called on every think frame
+void BotUpdateHearingSensitivity(bot_t &pBot)
+{
+   if (pBot.pBotEnemy != NULL)
+   {
+      // have enemy, use best hearing sensitivity for all
+      pBot.f_current_hearing_sensitivity = skill_settings[BEST_BOT_LEVEL].hearing_sensitivity;
+      return;
+   }
+
+   // reduce from best to worst in 3 sec
+   pBot.f_current_hearing_sensitivity -= (skill_settings[BEST_BOT_LEVEL].hearing_sensitivity - skill_settings[WORST_BOT_LEVEL].hearing_sensitivity) * pBot.f_frame_time / 3;
+   if (pBot.f_current_hearing_sensitivity < skill_settings[pBot.bot_skill].hearing_sensitivity)
+      pBot.f_current_hearing_sensitivity = skill_settings[pBot.bot_skill].hearing_sensitivity;
+}
+
+//
+float BotGetHearingSensitivity(bot_t &pBot)
+{
+   if(pBot.f_current_hearing_sensitivity < skill_settings[pBot.bot_skill].hearing_sensitivity)
+      return skill_settings[pBot.bot_skill].hearing_sensitivity;
+   return pBot.f_current_hearing_sensitivity;
+}
+
+
 //
 edict_t *BotFindVisibleSoundEnemy( bot_t &pBot )
 {
@@ -820,7 +845,7 @@ edict_t *BotFindVisibleSoundEnemy( bot_t &pBot )
       
       // is sound too far away? (bot cannot hear)
       float s_distance = (pCurrentSound->m_vecOrigin - pEdict->v.origin).Length();
-      if(s_distance > pCurrentSound->m_iVolume * skill_settings[pBot.bot_skill].hearing_sensitivity)
+      if(s_distance > pCurrentSound->m_iVolume * BotGetHearingSensitivity(pBot))
          continue;
 
       // more distant than what we got already?

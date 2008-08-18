@@ -58,6 +58,7 @@ qboolean BotEdgeLeft( bot_t &pBot, const Vector &v_move_dir );
 
 qboolean BotUpdateTrackSoundGoal( bot_t &pBot );
 int BotGetSoundWaypoint( bot_t &pBot, edict_t *pTrackSoundEdict, edict_t ** pNewTrackSoundEdict );
+void BotUpdateHearingSensitivity(bot_t &pBot);
 
 void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking );
 qboolean BotLowHealth( bot_t &pBot );

@@ -301,6 +301,8 @@ typedef struct
    float f_reaction_target_time;  // time when enemy targeting starts
    
    float f_weaponchange_time;
+
+   float f_current_hearing_sensitivity;
    
    qboolean b_set_special_shoot_angle;
    float f_special_shoot_angle;

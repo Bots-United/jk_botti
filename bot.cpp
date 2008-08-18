@@ -237,6 +237,8 @@ void BotSpawnInit( bot_t &pBot )
    
    pBot.f_pause_look_time = 0.0;
 
+   pBot.f_current_hearing_sensitivity = -1;
+
    memset(&(pBot.current_weapon), 0, sizeof(pBot.current_weapon));
    memset(&(pBot.m_rgAmmo), 0, sizeof(pBot.m_rgAmmo));
 }
@@ -2083,6 +2085,8 @@ void BotThink( bot_t &pBot )
    pBot.b_ducking = (pEdict->v.flags & FL_DUCKING) == FL_DUCKING;
    
    pBot.b_low_health = BotLowHealth(pBot);
+
+   BotUpdateHearingSensitivity(pBot);
 
    // does bot need to say a message and time to say a message?
    if ((pBot.b_bot_say) && (pBot.f_bot_say < gpGlobals->time))
