@@ -21,6 +21,7 @@
 #include "bot_weapons.h"
 #include "bot_skill.h"
 #include "bot_weapon_select.h"
+#include "bot_config_init.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -70,21 +71,13 @@ extern qboolean g_team_limit;
 extern int number_skins;
 extern skin_t bot_skins[MAX_SKINS];
 
-#define MAX_BOT_NAMES 100
-int number_names = 0;
-char bot_names[MAX_BOT_NAMES][BOT_NAME_LEN+1];
-
-#define MAX_BOT_LOGOS 100
-int num_logos = 0;
-char bot_logos[MAX_BOT_LOGOS][16];
-
 bot_t bots[32];   // max of 32 bots in a game
 qboolean b_observer_mode = FALSE;
 qboolean b_botdontshoot = FALSE;
 
 
 //
-qboolean BotLowHealth( bot_t &pBot )
+static qboolean BotLowHealth( bot_t &pBot )
 {
    return(pBot.pEdict->v.health + 0.8f * pBot.pEdict->v.armorvalue < VALVE_MAX_NORMAL_HEALTH * 0.5f);
 }
@@ -110,7 +103,7 @@ void BotKick(bot_t &pBot)
 
 
 //
-void BotSpawnInit( bot_t &pBot )
+static void BotSpawnInit( bot_t &pBot )
 {
    pBot.bot_think_time = -1.0;
    pBot.f_last_think_time = gpGlobals->time - 0.1;
@@ -244,58 +237,98 @@ void BotSpawnInit( bot_t &pBot )
 }
 
 
-void BotNameInit( void )
+static void BotPickLogo(bot_t &pBot)
 {
-   FILE *bot_name_fp;
-   char bot_name_filename[256];
-   int str_index;
-   char name_buffer[80];
-   int length, index;
+   qboolean used;
+   int logo_index;
+   int check_count;
+   int index;
 
-   UTIL_BuildFileName_N(bot_name_filename, sizeof(bot_name_filename), "addons/jk_botti/jk_botti_names.txt", NULL);
+   pBot.logo_name[0] = 0;
 
-   bot_name_fp = fopen(bot_name_filename, "r");
+   if (num_logos == 0)
+      return;
 
-   if (bot_name_fp != NULL)
+   logo_index = RANDOM_LONG2(1, num_logos) - 1;  // zero based
+
+   // check make sure this name isn't used
+   used = TRUE;
+   check_count = 0;
+
+   while ((used) && (check_count < MAX_BOT_LOGOS))
    {
-      UTIL_ConsolePrintf("Loading %s...\n", bot_name_filename);
-      
-      while ((number_names < MAX_BOT_NAMES) &&
-             (fgets(name_buffer, 80, bot_name_fp) != NULL))
+      used = FALSE;
+
+      for (index=0; index < 32; index++)
       {
-         length = strlen(name_buffer);
-
-         if (name_buffer[length-1] == '\n')
+         if (bots[index].is_used)
          {
-            name_buffer[length-1] = 0;  // remove '\n'
-            length--;
-         }
-
-         str_index = 0;
-         while (str_index < length)
-         {
-            if ((name_buffer[str_index] < ' ') || (name_buffer[str_index] > '~') ||
-                (name_buffer[str_index] == '"'))
-            for (index=str_index; index < length; index++)
-               name_buffer[index] = name_buffer[index+1];
-
-            str_index++;
-         }
-
-         if (name_buffer[0] != 0)
-         {
-            safe_strcopy(bot_names[number_names], sizeof(bot_names[number_names]), name_buffer);
-
-            number_names++;
+            if (strcmp(bots[index].logo_name, bot_logos[logo_index]) == 0)
+            {
+               used = TRUE;
+            }
          }
       }
 
-      fclose(bot_name_fp);
+      if (used)
+         logo_index++;
+
+      if (logo_index == MAX_BOT_LOGOS)
+         logo_index = 0;
+
+      check_count++;
+   }
+
+   safe_strcopy(pBot.logo_name, sizeof(pBot.logo_name), bot_logos[logo_index]);
+}
+
+
+static void BotSprayLogo(bot_t &pBot)
+{
+   edict_t * pEntity = pBot.pEdict;
+   char *logo_name = pBot.logo_name;
+   
+   int index;
+   TraceResult pTrace;
+   Vector v_src, v_dest;
+   
+   v_src = pEntity->v.origin + pEntity->v.view_ofs;
+   v_dest = v_src + UTIL_AnglesToForward(pEntity->v.v_angle) * 80;
+   UTIL_TraceMove( v_src, v_dest, ignore_monsters, pEntity->v.pContainingEntity, &pTrace );
+
+   index = DECAL_INDEX(logo_name);
+
+   if (index < 0)
+      return;
+
+   if ((pTrace.pHit) && (pTrace.flFraction < 1.0f))
+   {
+      if (pTrace.pHit->v.solid != SOLID_BSP)
+         return;
+
+      MESSAGE_BEGIN( MSG_BROADCAST, SVC_TEMPENTITY );
+
+      if (index > 255)
+      {
+         WRITE_BYTE( TE_WORLDDECALHIGH);
+         index -= 256;
+      }
+      else
+         WRITE_BYTE( TE_WORLDDECAL );
+
+      WRITE_COORD( pTrace.vecEndPos.x );
+      WRITE_COORD( pTrace.vecEndPos.y );
+      WRITE_COORD( pTrace.vecEndPos.z );
+      WRITE_BYTE( index );
+
+      MESSAGE_END();
+
+      EMIT_SOUND_DYN2(pEntity, CHAN_VOICE, "player/sprayer.wav", 1.0, ATTN_NORM, 0, 100);
    }
 }
 
 
-void BotPickName( char *name_buffer, int sizeof_name_buffer )
+static void BotPickName( char *name_buffer, int sizeof_name_buffer )
 {
    int name_index, index;
    qboolean used;
@@ -350,7 +383,7 @@ void BotPickName( char *name_buffer, int sizeof_name_buffer )
 
 
 //
-qboolean TeamInTeamBlockList(const char * teamname)
+static qboolean TeamInTeamBlockList(const char * teamname)
 {
    if(!team_blockedlist)
       team_blockedlist = strdup("");
@@ -788,8 +821,9 @@ void BotReplaceConnectionTime(const char * name, float * timeslot)
    }
 }
 
+
 //
-int BotInFieldOfView(bot_t &pBot, const Vector & dest)
+static int BotInFieldOfView(bot_t &pBot, const Vector & dest)
 {
    // find angles from source to destination...
    Vector entity_angles = UTIL_VecToAngles( dest );
@@ -820,7 +854,7 @@ int BotInFieldOfView(bot_t &pBot, const Vector & dest)
 }
 
 
-qboolean BotEntityIsVisible( bot_t &pBot, const Vector & dest )
+static qboolean BotEntityIsVisible( bot_t &pBot, const Vector & dest )
 {
    TraceResult tr;
 
@@ -836,137 +870,8 @@ qboolean BotEntityIsVisible( bot_t &pBot, const Vector & dest )
       return FALSE;
 }
 
-void BotLogoInit(void)
-{
-   FILE *bot_logo_fp;
-   char bot_logo_filename[256];
-   char logo_buffer[80];
-   int length;
 
-   UTIL_BuildFileName_N(bot_logo_filename, sizeof(bot_logo_filename), "addons/jk_botti/jk_botti_logo.cfg", NULL);
-
-   bot_logo_fp = fopen(bot_logo_filename, "r");
-
-   if (bot_logo_fp != NULL)
-   {
-      UTIL_ConsolePrintf("Loading %s...\n", bot_logo_filename);
-      
-      while ((num_logos < MAX_BOT_LOGOS) &&
-             (fgets(logo_buffer, 80, bot_logo_fp) != NULL))
-      {
-         length = strlen(logo_buffer);
-
-         if (logo_buffer[length-1] == '\n')
-         {
-            logo_buffer[length-1] = 0;  // remove '\n'
-            length--;
-         }
-
-         if (logo_buffer[0] != 0)
-         {
-            safe_strcopy(bot_logos[num_logos], sizeof(bot_logos[num_logos]), logo_buffer);
-
-            num_logos++;
-         }
-      }
-
-      fclose(bot_logo_fp);
-   }
-}
-
-
-void BotPickLogo(bot_t &pBot)
-{
-   qboolean used;
-   int logo_index;
-   int check_count;
-   int index;
-
-   pBot.logo_name[0] = 0;
-
-   if (num_logos == 0)
-      return;
-
-   logo_index = RANDOM_LONG2(1, num_logos) - 1;  // zero based
-
-   // check make sure this name isn't used
-   used = TRUE;
-   check_count = 0;
-
-   while ((used) && (check_count < MAX_BOT_LOGOS))
-   {
-      used = FALSE;
-
-      for (index=0; index < 32; index++)
-      {
-         if (bots[index].is_used)
-         {
-            if (strcmp(bots[index].logo_name, bot_logos[logo_index]) == 0)
-            {
-               used = TRUE;
-            }
-         }
-      }
-
-      if (used)
-         logo_index++;
-
-      if (logo_index == MAX_BOT_LOGOS)
-         logo_index = 0;
-
-      check_count++;
-   }
-
-   safe_strcopy(pBot.logo_name, sizeof(pBot.logo_name), bot_logos[logo_index]);
-}
-
-
-void BotSprayLogo(bot_t &pBot)
-{
-   edict_t * pEntity = pBot.pEdict;
-   char *logo_name = pBot.logo_name;
-   
-   int index;
-   TraceResult pTrace;
-   Vector v_src, v_dest;
-   
-   v_src = pEntity->v.origin + pEntity->v.view_ofs;
-   v_dest = v_src + UTIL_AnglesToForward(pEntity->v.v_angle) * 80;
-   UTIL_TraceMove( v_src, v_dest, ignore_monsters, pEntity->v.pContainingEntity, &pTrace );
-
-   index = DECAL_INDEX(logo_name);
-
-   if (index < 0)
-      return;
-
-   if ((pTrace.pHit) && (pTrace.flFraction < 1.0f))
-   {
-      if (pTrace.pHit->v.solid != SOLID_BSP)
-         return;
-
-      MESSAGE_BEGIN( MSG_BROADCAST, SVC_TEMPENTITY );
-
-      if (index > 255)
-      {
-         WRITE_BYTE( TE_WORLDDECALHIGH);
-         index -= 256;
-      }
-      else
-         WRITE_BYTE( TE_WORLDDECAL );
-
-      WRITE_COORD( pTrace.vecEndPos.x );
-      WRITE_COORD( pTrace.vecEndPos.y );
-      WRITE_COORD( pTrace.vecEndPos.z );
-      WRITE_BYTE( index );
-
-      MESSAGE_END();
-
-      EMIT_SOUND_DYN2(pEntity, CHAN_VOICE, "player/sprayer.wav", 1.0, ATTN_NORM, 0, 100);
-   }
-}
-
-
-void BotFindItem( bot_t &pBot )
+static void BotFindItem( bot_t &pBot )
 {
    edict_t *pent = NULL;
    edict_t *pPickupEntity = NULL;
@@ -1431,7 +1336,7 @@ endloop:
 }
 
 
-qboolean BotLookForGrenades( bot_t &pBot )
+static qboolean BotLookForGrenades( bot_t &pBot )
 {
    static const char * grenade_names[] = {
       "grenade", "monster_satchel", /*"monster_snark",*/ "rpg_rocket", "hvr_rocket",
@@ -1515,7 +1420,7 @@ static void HandleWallOnRight( bot_t &pBot )
 
 
 //
-void BotCheckLogoSpraying(bot_t &pBot)
+static void BotCheckLogoSpraying(bot_t &pBot)
 {
    edict_t *pEdict = pBot.pEdict;
 
@@ -1659,14 +1564,14 @@ void BotCheckLogoSpraying(bot_t &pBot)
 
 
 //
-void BotJustWanderAround(bot_t &pBot, float moved_distance)
+static void BotJustWanderAround(bot_t &pBot, float moved_distance)
 {
    edict_t *pEdict = pBot.pEdict;
 
    // no enemy, let's just wander around...
 
-	// logo spraying...
-	BotCheckLogoSpraying(pBot);
+   // logo spraying...
+   BotCheckLogoSpraying(pBot);
 
    // Check if walking to edge.. jump for it!
    if(!FBitSet(pEdict->v.button, IN_DUCK) && !FBitSet(pEdict->v.button, IN_JUMP) && pBot.b_on_ground && !pBot.b_on_ladder &&
@@ -1985,7 +1890,441 @@ void BotJustWanderAround(bot_t &pBot, float moved_distance)
 }
 
 
-void BotRunPlayerMove(bot_t &pBot, const float *viewangles, float forwardmove, float sidemove, float upmove, unsigned short buttons, byte impulse, byte msec )
+static void BotDoStrafe(bot_t &pBot)
+{
+   edict_t *pEdict = pBot.pEdict;
+   
+   // combat strafe
+   if(pBot.pBotEnemy != NULL && FInViewCone(UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy), pEdict) && FVisibleEnemy( UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy), pEdict, pBot.pBotEnemy ))
+   {
+      // don't go too close to enemy
+      // strafe instead
+      if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].battle_strafe) 
+      {
+         if(pBot.f_strafe_time <= gpGlobals->time) 
+         {
+            pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.5, 1.2);
+            pBot.f_strafe_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
+            pBot.f_move_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
+         }
+         
+         pBot.f_move_speed = 1.0;
+      }
+      else
+      {
+         if(pBot.f_strafe_time <= gpGlobals->time) 
+         {
+            pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.5, 1.2);
+            pBot.f_strafe_direction = RANDOM_FLOAT(-0.3, 0.3);
+            
+            if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].keep_optimal_dist)
+            {
+               if((UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy) - pEdict->v.origin).Length() < pBot.current_opt_distance)
+                  pBot.f_move_direction = -1;
+               else
+                  pBot.f_move_direction = 1;
+            }
+            else
+               pBot.f_move_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
+         }
+         
+         pBot.f_move_speed = 32.0;
+      }
+      
+      if(pBot.f_dont_avoid_wall_time <= gpGlobals->time)
+      {
+         Vector v_forward = UTIL_AnglesToForward(pEdict->v.v_angle);
+         
+         // check for walls, left and right
+         if(pBot.f_strafe_direction > 0.0f)
+         {
+            if(BotCheckWallOnRight(pBot) || BotEdgeRight(pBot, v_forward))
+               pBot.f_strafe_direction = -pBot.f_strafe_direction;
+         }
+         else if(pBot.f_strafe_direction < 0.0f)
+         {
+            if(BotCheckWallOnLeft(pBot) || BotEdgeLeft(pBot, v_forward))
+               pBot.f_strafe_direction = -pBot.f_strafe_direction;
+         }
+      
+         // check for walls, back and forward
+         if(pBot.f_move_direction > 0.0f)
+         {
+            if(BotCheckWallOnForward(pBot))
+               pBot.f_move_direction = -pBot.f_move_direction;
+         }
+         else if(pBot.f_move_direction < 0.0f)
+         {
+            if(BotCheckWallOnBack(pBot))
+               pBot.f_move_direction = -pBot.f_move_direction;
+         }
+      }
+      
+      // set move direction
+      pBot.f_move_speed *= pBot.f_move_direction;
+   }
+   // ladder strage - on ladder and know about ladder
+   else if (pBot.b_on_ladder)
+   {
+      // do we have ladder waypoint?
+      if(pBot.curr_waypoint_index != -1 && waypoints[pBot.curr_waypoint_index].flags & W_FL_LADDER)
+      {
+         if(pEdict->v.velocity.Make2D().Length() > 20.0f)
+         {
+      	    // First kill off sideways movement
+      	    float move_dir = UTIL_VecToAngles(pEdict->v.velocity).y;
+      	    float look_dir = pEdict->v.v_angle.y;
+      	    
+      	    float angle_diff = UTIL_WrapAngle(move_dir - look_dir);
+      	    
+      	    if(angle_diff > 135.0f || angle_diff <= 135.0f)
+      	    {
+      	       // move forward
+      	       pBot.f_strafe_direction = 0.0;
+      	       pBot.f_move_direction = 1.0;
+      	    }
+      	    if(angle_diff > 45.0f)
+            {
+               // strafe on right
+               pBot.f_strafe_direction = -1.0;
+               pBot.f_move_direction = 1.0;
+            }
+            else if(angle_diff <= -45.0f)
+            {
+               // strafe on left          
+               pBot.f_strafe_direction = 1.0;
+               pBot.f_move_direction = 1.0;
+            }
+            else
+            {
+               // move backwards
+      	       pBot.f_strafe_direction = 0.0;
+               pBot.f_move_direction = -1.0;
+            }
+      	 }
+      	 else
+      	 {
+      	    // Then move towards waypoint sideways
+            Vector v_wp = waypoints[pBot.curr_waypoint_index].origin;
+            Vector v_dir = (v_wp - pEdict->v.origin);
+         
+            Vector v_angles = UTIL_VecToAngles(v_dir);
+         
+            float waypoint_dir = v_angles.y;
+            float look_dir = pEdict->v.v_angle.y;
+         
+            float angle_diff = UTIL_WrapAngle(waypoint_dir - look_dir);
+         
+      	    if(angle_diff > 135.0f || angle_diff <= 135.0f)
+      	    {
+      	       // move backwards
+      	       pBot.f_strafe_direction = 0.0;
+      	       pBot.f_move_direction = -1.0;
+      	    }
+      	    if(angle_diff > 45.0f)
+            {
+               // strafe on left
+               pBot.f_strafe_direction = 1.0;
+               pBot.f_move_direction = 1.0;
+            }
+            else if(angle_diff <= -45.0f)
+            {
+               // strafe on right          
+               pBot.f_strafe_direction = -1.0;
+               pBot.f_move_direction = 1.0;
+            }
+            else
+            {
+               // move forward
+      	       pBot.f_strafe_direction = 0.0;
+               pBot.f_move_direction = 1.0;
+            }
+         }
+      }
+      else
+      {
+         // move forward
+         pBot.f_strafe_direction = 0.0;
+         pBot.f_move_direction = 1.0;
+      }
+      
+      pBot.f_move_speed = 150.0f;
+      pBot.b_not_maxspeed = TRUE;
+      
+      // set move direction
+      pBot.f_move_speed *= pBot.f_move_direction;
+   }
+   // normal strafe - time to strafe yet?
+   else if (pBot.f_strafe_time < gpGlobals->time)
+   {
+      pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.1, 1.0);
+
+      if (RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].normal_strafe)
+      {
+         if (RANDOM_LONG2(1, 100) <= 50)
+            pBot.f_strafe_direction = -1.0;
+         else
+            pBot.f_strafe_direction = 1.0;
+      }
+      else
+         pBot.f_strafe_direction = 0.0 + RANDOM_FLOAT2(-0.005, 0.005);
+
+      if(pBot.f_dont_avoid_wall_time <= gpGlobals->time)
+      {
+         Vector v_forward = UTIL_AnglesToForward(pEdict->v.v_angle);
+         
+         // check for walls, left and right
+         if(pBot.f_strafe_direction > 0.0f)
+         {
+            if(BotCheckWallOnRight(pBot) || BotEdgeRight(pBot, v_forward))
+               pBot.f_strafe_direction = -pBot.f_strafe_direction;
+         }
+         else if(pBot.f_strafe_direction < 0.0f)
+         {
+            if(BotCheckWallOnLeft(pBot) || BotEdgeLeft(pBot, v_forward))
+               pBot.f_strafe_direction = -pBot.f_strafe_direction;
+         }
+      }
+   }
+}
+
+
+static void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distance)
+{
+   edict_t *pEdict = pBot.pEdict;
+   float max_lj_distance = 0.0, target_distance;
+
+   // 
+   // PART1 -- handle actions that are not finished
+   // 
+
+   // fix bot animation on longjumping
+   if (pBot.b_longjump_do_jump)
+   {
+      pBot.b_longjump_do_jump = FALSE;
+      pEdict->v.button |= IN_DUCK;
+      pEdict->v.button |= IN_JUMP;
+      
+      pBot.f_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.3, 0.5); //stay duck for some time to fix animation
+      
+      return;
+   }
+
+   // duck in mid-air after random jump!
+   if (pBot.f_random_jump_duck_time > 0.0f && pBot.f_random_jump_duck_time <= gpGlobals->time) 
+   {
+       pEdict->v.button |= IN_DUCK;  // need to duck (random duckjump)
+       
+       if(pBot.f_random_jump_duck_end > 0.0f && pBot.f_random_jump_duck_end <= gpGlobals->time) 
+       {
+          pBot.f_random_jump_duck_time = 0.0;
+          pBot.f_random_jump_duck_end = 0.0;
+          pBot.f_random_jump_time = gpGlobals->time + RANDOM_FLOAT2(0.2, 0.4);
+       }
+       
+       return;
+   }
+
+   // stop trying to longjump after half a second
+   if (pBot.f_combat_longjump < gpGlobals->time - 0.5 && pBot.b_combat_longjump)
+      pBot.b_combat_longjump = FALSE;
+
+   // longjump
+   if (pBot.b_longjump && !pBot.b_in_water && pBot.b_on_ground &&
+       !FBitSet(pEdict->v.button, IN_DUCK) && !FBitSet(pEdict->v.button, IN_JUMP) &&
+       pEdict->v.velocity.Length() > 50 && pBot.b_combat_longjump &&
+       fabs(pEdict->v.v_angle.y - pEdict->v.ideal_yaw) <= 10)
+   {
+      // don't try to move for 1.0 seconds, otherwise the longjump is fucked up	
+      pBot.f_longjump_time = gpGlobals->time + 1.0;
+      
+      // we're done trying to do a longjump
+      pBot.b_combat_longjump = FALSE;
+      
+      // don't do another one for a certain amount of time
+      if (RANDOM_LONG2(1,100) > 10)
+         pBot.f_combat_longjump = gpGlobals->time + 1.0;
+      else
+         pBot.f_combat_longjump = gpGlobals->time + RANDOM_FLOAT2(3.0, 5.0);
+      
+      // actually do the longjump
+      pEdict->v.button |= IN_DUCK;
+      pBot.b_longjump_do_jump = TRUE;
+      
+      //UTIL_ConsolePrintf("%s doing longjump! - combat\n", STRING(pEdict->v.netname));
+      return;
+   }
+
+   //
+   // PART2 -- return here if actions unfinished
+   //
+   
+   // random jump or duck or longjump?
+   if (pBot.f_random_jump_time > gpGlobals->time || 
+       pBot.f_random_duck_time > gpGlobals->time ||
+       pBot.f_combat_longjump > gpGlobals->time ||
+       pBot.b_combat_longjump) 
+   {
+      return;
+   }
+   
+   // Already jumping or ducking, or not on ground, or on ladder
+   if(FBitSet(pEdict->v.button, IN_DUCK) || FBitSet(pEdict->v.button, IN_JUMP) ||
+       !pBot.b_on_ground || pBot.b_on_ladder || pBot.b_in_water)
+   {
+      return;
+   }
+   
+   //
+   // PART3 -- start new actions, first check if contitions are right, then select, then act
+   //
+   
+   // don't jump if trying to pick up item.
+   if(pBot.pBotEnemy == NULL && !FNullEnt(pBot.pBotPickupItem) && !(pBot.pBotPickupItem->v.effects & EF_NODRAW) && !(pBot.pBotPickupItem->v.frame > 0))
+      return;
+
+   qboolean jump, duck, lj;
+   
+   // if in combat mode jump more
+   jump = (pBot.prev_random_type != 1 && pBot.f_random_jump_time <= gpGlobals->time &&
+           (moved_distance >= 10.0f || pBot.pBotEnemy != NULL) && pBot.f_move_speed > 1.0f &&
+            RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_jump_frequency);
+   
+   duck = (pBot.prev_random_type != 2 && pBot.f_random_duck_time <= gpGlobals->time &&
+           pBot.pBotEnemy != NULL && 
+           RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_duck_frequency);
+   
+   lj = (pBot.prev_random_type != 3 && pBot.b_longjump && pBot.f_combat_longjump <= gpGlobals->time && !pBot.b_combat_longjump && 
+         skill_settings[pBot.bot_skill].can_longjump &&
+         pBot.pBotEnemy != NULL && fabs(pEdict->v.v_angle.y - pEdict->v.ideal_yaw) <= 30.0f &&
+         RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_longjump_frequency);
+   
+   if(lj)
+   {
+      max_lj_distance = LONGJUMP_DISTANCE * (800 / CVAR_GET_FLOAT("sv_gravity"));
+      target_distance = (UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy) - pEdict->v.origin).Length();
+      
+      lj = (target_distance > 128.0f && target_distance < max_lj_distance);
+   }
+   
+   // ofcourse if we get multiple matches here we need to select
+   if(lj)
+   {
+      // lj happens so rarely that it overrides others
+      jump = FALSE;
+      duck = FALSE;
+   }
+   else if(jump || duck)
+   {
+      if(jump && duck)
+      {
+         jump = RANDOM_FLOAT2(0, 100) <= 50.0f;
+         duck = !jump;
+      }
+   }
+   else if(!jump && !duck && !lj)
+   {
+      switch(pBot.prev_random_type)
+      {
+      case 1:
+         pBot.f_random_jump_time = gpGlobals->time + RANDOM_FLOAT2(0.3,0.5);
+         break;
+      case 2:
+         pBot.f_random_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.3,0.5);
+         break;
+      case 3:
+         pBot.f_combat_longjump = gpGlobals->time + RANDOM_FLOAT2(0.3,0.5);
+         break;
+      default:
+         break;
+      }
+      
+      pBot.prev_random_type = 0;
+      return;
+   }
+   
+   // if in combat mode jump more
+   if(jump)
+   {
+      pEdict->v.button |= IN_JUMP;
+      
+      pBot.prev_random_type = 1;
+      //UTIL_ConsolePrintf("%s - Random jump\n", STRING(pEdict->v.netname));
+      
+      // duck mid-air?
+      if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_jump_duck_frequency)
+      {
+         //UTIL_ConsolePrintf("%s - Random duck-jump\n", STRING(pEdict->v.netname));
+         pBot.f_random_jump_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.15, 0.25);
+         pBot.f_random_jump_duck_end = pBot.f_random_jump_duck_time + RANDOM_FLOAT2(0.3, 0.5);
+         pBot.f_random_jump_time = pBot.f_random_jump_duck_end + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
+      }
+      else
+         pBot.f_random_jump_time = pBot.f_random_jump_duck_end + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
+      
+      return;
+   }
+   
+   // combat mode random ducking
+   if(duck)
+   {
+      pEdict->v.button |= IN_DUCK;
+      
+      pBot.prev_random_type = 2;
+      //UTIL_ConsolePrintf("%s - Random duck\n", STRING(pEdict->v.netname));
+      
+      pBot.f_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.3, 0.45);
+      pBot.f_random_duck_time = pBot.f_duck_time + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
+      
+      return;
+   }
+   
+   // combat mode random longjumping
+   if(lj)
+   {
+      Vector vecSrc, target_angle;
+      TraceResult tr;
+      int mod;
+         
+      vecSrc = pEdict->v.origin;
+      mod = RANDOM_LONG2(1, 100) <= 50 ? -1 : 1;
+      
+      // get a random angle (-30 or 30)
+      for (int i = 1; i >= -1; i-=2)
+      {
+         target_angle.x = -pEdict->v.v_angle.x;
+         target_angle.y = UTIL_WrapAngle(pEdict->v.v_angle.y + 30 * (mod * i));
+         target_angle.z = pEdict->v.v_angle.z;
+         
+         // trace a hull toward the current waypoint the distance of a longjump (depending on gravity)
+         UTIL_TraceMove(vecSrc, vecSrc + UTIL_AnglesToForward(target_angle) * max_lj_distance, dont_ignore_monsters, pEdict, &tr);
+         
+         // make sure it's clear
+         if (tr.flFraction >= 1.0f)
+         {
+            //UTIL_ConsolePrintf("%s - Clear longjump path found\n", STRING(pEdict->v.netname));
+            pBot.b_combat_longjump = TRUE;
+            
+            pEdict->v.ideal_yaw += 30 * mod;
+            
+            BotFixIdealYaw(pEdict);
+            
+            break;
+         }
+      }
+      
+      pBot.f_combat_longjump = gpGlobals->time + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
+      
+      if(pBot.b_combat_longjump)
+      {
+         pBot.prev_random_type = 3;
+         return;
+      }
+   }
+}
+
+
+static void BotRunPlayerMove(bot_t &pBot, const float *viewangles, float forwardmove, float sidemove, float upmove, unsigned short buttons, byte impulse, byte msec)
 {
    /*
       Calling sequence after calling g_engfuncs.pfnRunPlayerMove:
@@ -2461,434 +2800,3 @@ void BotThink( bot_t &pBot )
    return;
 }
 
-void BotDoStrafe(bot_t &pBot)
-{
-   edict_t *pEdict = pBot.pEdict;
-   
-   // combat strafe
-   if(pBot.pBotEnemy != NULL && FInViewCone(UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy), pEdict) && FVisibleEnemy( UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy), pEdict, pBot.pBotEnemy ))
-   {
-      // don't go too close to enemy
-      // strafe instead
-      if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].battle_strafe) 
-      {
-         if(pBot.f_strafe_time <= gpGlobals->time) 
-         {
-            pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.5, 1.2);
-            pBot.f_strafe_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
-            pBot.f_move_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
-         }
-         
-         pBot.f_move_speed = 1.0;
-      }
-      else
-      {
-         if(pBot.f_strafe_time <= gpGlobals->time) 
-         {
-            pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.5, 1.2);
-            pBot.f_strafe_direction = RANDOM_FLOAT(-0.3, 0.3);
-            
-            if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].keep_optimal_dist)
-            {
-               if((UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy) - pEdict->v.origin).Length() < pBot.current_opt_distance)
-                  pBot.f_move_direction = -1;
-               else
-                  pBot.f_move_direction = 1;
-            }
-            else
-               pBot.f_move_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
-         }
-         
-         pBot.f_move_speed = 32.0;
-      }
-      
-      if(pBot.f_dont_avoid_wall_time <= gpGlobals->time)
-      {
-         Vector v_forward = UTIL_AnglesToForward(pEdict->v.v_angle);
-         
-         // check for walls, left and right
-         if(pBot.f_strafe_direction > 0.0f)
-         {
-            if(BotCheckWallOnRight(pBot) || BotEdgeRight(pBot, v_forward))
-               pBot.f_strafe_direction = -pBot.f_strafe_direction;
-         }
-         else if(pBot.f_strafe_direction < 0.0f)
-         {
-            if(BotCheckWallOnLeft(pBot) || BotEdgeLeft(pBot, v_forward))
-               pBot.f_strafe_direction = -pBot.f_strafe_direction;
-         }
-      
-         // check for walls, back and forward
-         if(pBot.f_move_direction > 0.0f)
-         {
-            if(BotCheckWallOnForward(pBot))
-               pBot.f_move_direction = -pBot.f_move_direction;
-         }
-         else if(pBot.f_move_direction < 0.0f)
-         {
-            if(BotCheckWallOnBack(pBot))
-               pBot.f_move_direction = -pBot.f_move_direction;
-         }
-      }
-      
-      // set move direction
-      pBot.f_move_speed *= pBot.f_move_direction;
-   }
-   // ladder strage - on ladder and know about ladder
-   else if (pBot.b_on_ladder)
-   {
-      // do we have ladder waypoint?
-      if(pBot.curr_waypoint_index != -1 && waypoints[pBot.curr_waypoint_index].flags & W_FL_LADDER)
-      {
-         if(pEdict->v.velocity.Make2D().Length() > 20.0f)
-         {
-      	    // First kill off sideways movement
-      	    float move_dir = UTIL_VecToAngles(pEdict->v.velocity).y;
-      	    float look_dir = pEdict->v.v_angle.y;
-      	    
-      	    float angle_diff = UTIL_WrapAngle(move_dir - look_dir);
-      	    
-      	    if(angle_diff > 135.0f || angle_diff <= 135.0f)
-      	    {
-      	       // move forward
-      	       pBot.f_strafe_direction = 0.0;
-      	       pBot.f_move_direction = 1.0;
-      	    }
-      	    if(angle_diff > 45.0f)
-            {
-               // strafe on right
-               pBot.f_strafe_direction = -1.0;
-               pBot.f_move_direction = 1.0;
-            }
-            else if(angle_diff <= -45.0f)
-            {
-               // strafe on left          
-               pBot.f_strafe_direction = 1.0;
-               pBot.f_move_direction = 1.0;
-            }
-            else
-            {
-               // move backwards
-      	       pBot.f_strafe_direction = 0.0;
-               pBot.f_move_direction = -1.0;
-            }
-      	 }
-      	 else
-      	 {
-      	    // Then move towards waypoint sideways
-            Vector v_wp = waypoints[pBot.curr_waypoint_index].origin;
-            Vector v_dir = (v_wp - pEdict->v.origin);
-         
-            Vector v_angles = UTIL_VecToAngles(v_dir);
-         
-            float waypoint_dir = v_angles.y;
-            float look_dir = pEdict->v.v_angle.y;
-         
-            float angle_diff = UTIL_WrapAngle(waypoint_dir - look_dir);
-         
-      	    if(angle_diff > 135.0f || angle_diff <= 135.0f)
-      	    {
-      	       // move backwards
-      	       pBot.f_strafe_direction = 0.0;
-      	       pBot.f_move_direction = -1.0;
-      	    }
-      	    if(angle_diff > 45.0f)
-            {
-               // strafe on left
-               pBot.f_strafe_direction = 1.0;
-               pBot.f_move_direction = 1.0;
-            }
-            else if(angle_diff <= -45.0f)
-            {
-               // strafe on right          
-               pBot.f_strafe_direction = -1.0;
-               pBot.f_move_direction = 1.0;
-            }
-            else
-            {
-               // move forward
-      	       pBot.f_strafe_direction = 0.0;
-               pBot.f_move_direction = 1.0;
-            }
-         }
-      }
-      else
-      {
-         // move forward
-         pBot.f_strafe_direction = 0.0;
-         pBot.f_move_direction = 1.0;
-      }
-      
-      pBot.f_move_speed = 150.0f;
-      pBot.b_not_maxspeed = TRUE;
-      
-      // set move direction
-      pBot.f_move_speed *= pBot.f_move_direction;
-   }
-   // normal strafe - time to strafe yet?
-   else if (pBot.f_strafe_time < gpGlobals->time)
-   {
-      pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.1, 1.0);
-
-      if (RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].normal_strafe)
-      {
-         if (RANDOM_LONG2(1, 100) <= 50)
-            pBot.f_strafe_direction = -1.0;
-         else
-            pBot.f_strafe_direction = 1.0;
-      }
-      else
-         pBot.f_strafe_direction = 0.0 + RANDOM_FLOAT2(-0.005, 0.005);
-
-      if(pBot.f_dont_avoid_wall_time <= gpGlobals->time)
-      {
-         Vector v_forward = UTIL_AnglesToForward(pEdict->v.v_angle);
-         
-         // check for walls, left and right
-         if(pBot.f_strafe_direction > 0.0f)
-         {
-            if(BotCheckWallOnRight(pBot) || BotEdgeRight(pBot, v_forward))
-               pBot.f_strafe_direction = -pBot.f_strafe_direction;
-         }
-         else if(pBot.f_strafe_direction < 0.0f)
-         {
-            if(BotCheckWallOnLeft(pBot) || BotEdgeLeft(pBot, v_forward))
-               pBot.f_strafe_direction = -pBot.f_strafe_direction;
-         }
-      }
-   }
-}
-
-void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distance)
-{
-   edict_t *pEdict = pBot.pEdict;
-   float max_lj_distance = 0.0, target_distance;
-
-   // 
-   // PART1 -- handle actions that are not finished
-   // 
-
-   // fix bot animation on longjumping
-   if (pBot.b_longjump_do_jump)
-   {
-      pBot.b_longjump_do_jump = FALSE;
-      pEdict->v.button |= IN_DUCK;
-      pEdict->v.button |= IN_JUMP;
-      
-      pBot.f_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.3, 0.5); //stay duck for some time to fix animation
-      
-      return;
-   }
-
-   // duck in mid-air after random jump!
-   if (pBot.f_random_jump_duck_time > 0.0f && pBot.f_random_jump_duck_time <= gpGlobals->time) 
-   {
-       pEdict->v.button |= IN_DUCK;  // need to duck (random duckjump)
-       
-       if(pBot.f_random_jump_duck_end > 0.0f && pBot.f_random_jump_duck_end <= gpGlobals->time) 
-       {
-          pBot.f_random_jump_duck_time = 0.0;
-          pBot.f_random_jump_duck_end = 0.0;
-          pBot.f_random_jump_time = gpGlobals->time + RANDOM_FLOAT2(0.2, 0.4);
-       }
-       
-       return;
-   }
-
-   // stop trying to longjump after half a second
-   if (pBot.f_combat_longjump < gpGlobals->time - 0.5 && pBot.b_combat_longjump)
-      pBot.b_combat_longjump = FALSE;
-
-   // longjump
-   if (pBot.b_longjump && !pBot.b_in_water && pBot.b_on_ground &&
-       !FBitSet(pEdict->v.button, IN_DUCK) && !FBitSet(pEdict->v.button, IN_JUMP) &&
-       pEdict->v.velocity.Length() > 50 && pBot.b_combat_longjump &&
-       fabs(pEdict->v.v_angle.y - pEdict->v.ideal_yaw) <= 10)
-   {
-      // don't try to move for 1.0 seconds, otherwise the longjump is fucked up	
-      pBot.f_longjump_time = gpGlobals->time + 1.0;
-      
-      // we're done trying to do a longjump
-      pBot.b_combat_longjump = FALSE;
-      
-      // don't do another one for a certain amount of time
-      if (RANDOM_LONG2(1,100) > 10)
-         pBot.f_combat_longjump = gpGlobals->time + 1.0;
-      else
-         pBot.f_combat_longjump = gpGlobals->time + RANDOM_FLOAT2(3.0, 5.0);
-      
-      // actually do the longjump
-      pEdict->v.button |= IN_DUCK;
-      pBot.b_longjump_do_jump = TRUE;
-      
-      //UTIL_ConsolePrintf("%s doing longjump! - combat\n", STRING(pEdict->v.netname));
-      return;
-   }
-
-   //
-   // PART2 -- return here if actions unfinished
-   //
-   
-   // random jump or duck or longjump?
-   if (pBot.f_random_jump_time > gpGlobals->time || 
-       pBot.f_random_duck_time > gpGlobals->time ||
-       pBot.f_combat_longjump > gpGlobals->time ||
-       pBot.b_combat_longjump) 
-   {
-      return;
-   }
-   
-   // Already jumping or ducking, or not on ground, or on ladder
-   if(FBitSet(pEdict->v.button, IN_DUCK) || FBitSet(pEdict->v.button, IN_JUMP) ||
-       !pBot.b_on_ground || pBot.b_on_ladder || pBot.b_in_water)
-   {
-      return;
-   }
-   
-   //
-   // PART3 -- start new actions, first check if contitions are right, then select, then act
-   //
-   
-   // don't jump if trying to pick up item.
-   if(pBot.pBotEnemy == NULL && !FNullEnt(pBot.pBotPickupItem) && !(pBot.pBotPickupItem->v.effects & EF_NODRAW) && !(pBot.pBotPickupItem->v.frame > 0))
-      return;
-
-   qboolean jump, duck, lj;
-   
-   // if in combat mode jump more
-   jump = (pBot.prev_random_type != 1 && pBot.f_random_jump_time <= gpGlobals->time &&
-           (moved_distance >= 10.0f || pBot.pBotEnemy != NULL) && pBot.f_move_speed > 1.0f &&
-            RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_jump_frequency);
-   
-   duck = (pBot.prev_random_type != 2 && pBot.f_random_duck_time <= gpGlobals->time &&
-           pBot.pBotEnemy != NULL && 
-           RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_duck_frequency);
-   
-   lj = (pBot.prev_random_type != 3 && pBot.b_longjump && pBot.f_combat_longjump <= gpGlobals->time && !pBot.b_combat_longjump && 
-         skill_settings[pBot.bot_skill].can_longjump &&
-         pBot.pBotEnemy != NULL && fabs(pEdict->v.v_angle.y - pEdict->v.ideal_yaw) <= 30.0f &&
-         RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_longjump_frequency);
-   
-   if(lj)
-   {
-      max_lj_distance = LONGJUMP_DISTANCE * (800 / CVAR_GET_FLOAT("sv_gravity"));
-      target_distance = (UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy) - pEdict->v.origin).Length();
-      
-      lj = (target_distance > 128.0f && target_distance < max_lj_distance);
-   }
-   
-   // ofcourse if we get multiple matches here we need to select
-   if(lj)
-   {
-      // lj happens so rarely that it overrides others
-      jump = FALSE;
-      duck = FALSE;
-   }
-   else if(jump || duck)
-   {
-      if(jump && duck)
-      {
-         jump = RANDOM_FLOAT2(0, 100) <= 50.0f;
-         duck = !jump;
-      }
-   }
-   else if(!jump && !duck && !lj)
-   {
-      switch(pBot.prev_random_type)
-      {
-      case 1:
-         pBot.f_random_jump_time = gpGlobals->time + RANDOM_FLOAT2(0.3,0.5);
-         break;
-      case 2:
-         pBot.f_random_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.3,0.5);
-         break;
-      case 3:
-         pBot.f_combat_longjump = gpGlobals->time + RANDOM_FLOAT2(0.3,0.5);
-         break;
-      default:
-         break;
-      }
-      
-      pBot.prev_random_type = 0;
-      return;
-   }
-   
-   // if in combat mode jump more
-   if(jump)
-   {
-      pEdict->v.button |= IN_JUMP;
-      
-      pBot.prev_random_type = 1;
-      //UTIL_ConsolePrintf("%s - Random jump\n", STRING(pEdict->v.netname));
-      
-      // duck mid-air?
-      if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_jump_duck_frequency)
-      {
-         //UTIL_ConsolePrintf("%s - Random duck-jump\n", STRING(pEdict->v.netname));
-         pBot.f_random_jump_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.15, 0.25);
-         pBot.f_random_jump_duck_end = pBot.f_random_jump_duck_time + RANDOM_FLOAT2(0.3, 0.5);
-         pBot.f_random_jump_time = pBot.f_random_jump_duck_end + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
-      }
-      else
-         pBot.f_random_jump_time = pBot.f_random_jump_duck_end + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
-      
-      return;
-   }
-   
-   // combat mode random ducking
-   if(duck)
-   {
-      pEdict->v.button |= IN_DUCK;
-      
-      pBot.prev_random_type = 2;
-      //UTIL_ConsolePrintf("%s - Random duck\n", STRING(pEdict->v.netname));
-      
-      pBot.f_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.3, 0.45);
-      pBot.f_random_duck_time = pBot.f_duck_time + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
-      
-      return;
-   }
-   
-   // combat mode random longjumping
-   if(lj)
-   {
-      Vector vecSrc, target_angle;
-      TraceResult tr;
-      int mod;
-         
-      vecSrc = pEdict->v.origin;
-      mod = RANDOM_LONG2(1, 100) <= 50 ? -1 : 1;
-      
-      // get a random angle (-30 or 30)
-      for (int i = 1; i >= -1; i-=2)
-      {
-         target_angle.x = -pEdict->v.v_angle.x;
-         target_angle.y = UTIL_WrapAngle(pEdict->v.v_angle.y + 30 * (mod * i));
-         target_angle.z = pEdict->v.v_angle.z;
-         
-         // trace a hull toward the current waypoint the distance of a longjump (depending on gravity)
-         UTIL_TraceMove(vecSrc, vecSrc + UTIL_AnglesToForward(target_angle) * max_lj_distance, dont_ignore_monsters, pEdict, &tr);
-         
-         // make sure it's clear
-         if (tr.flFraction >= 1.0f)
-         {
-            //UTIL_ConsolePrintf("%s - Clear longjump path found\n", STRING(pEdict->v.netname));
-            pBot.b_combat_longjump = TRUE;
-            
-            pEdict->v.ideal_yaw += 30 * mod;
-            
-            BotFixIdealYaw(pEdict);
-            
-            break;
-         }
-      }
-      
-      pBot.f_combat_longjump = gpGlobals->time + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
-      
-      if(pBot.b_combat_longjump)
-      {
-         pBot.prev_random_type = 3;
-         return;
-      }
-   }
-}

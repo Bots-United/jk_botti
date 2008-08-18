@@ -9,24 +9,23 @@
 
 //prototypes of bot functions...
 
-void BotSpawnInit( bot_t &pBot );
+//void BotSpawnInit( bot_t &pBot );
 void BotCreate( const char *skin, const char *name, int skill, int top_color, int bottom_color, int cfg_bot_index );
 void BotStartGame( bot_t &pBot );
-int BotInFieldOfView( bot_t &pBot, const Vector & dest );
-qboolean BotEntityIsVisible( bot_t &pBot, const Vector & dest );
-void BotPickLogo(bot_t &pBot);
-void BotSprayLogo(bot_t &pBot);
-void BotFindItem( bot_t &pBot );
-qboolean BotLookForMedic( bot_t &pBot );
-qboolean BotLookForGrenades( bot_t &pBot );
+//int BotInFieldOfView( bot_t &pBot, const Vector & dest );
+//qboolean BotEntityIsVisible( bot_t &pBot, const Vector & dest );
+//void BotPickLogo(bot_t &pBot);
+//void BotSprayLogo(bot_t &pBot);
+//void BotFindItem( bot_t &pBot );
+//qboolean BotLookForGrenades( bot_t &pBot );
 void BotThink( bot_t &pBot );
 void BotPointGun(bot_t &pBot);
 void BotAimPre( bot_t &pBot );
 void BotAimPost( bot_t &pBot );
 void LoadBotModels(void);
 
-void BotDoStrafe(bot_t &pBot);
-void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distance);
+//void BotDoStrafe(bot_t &pBot);
+//void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distance);
 
 void BotChatTaunt(bot_t &pBot, edict_t *victim_edict);
 void BotChatWhine(bot_t &pBot);
@@ -61,7 +60,6 @@ int BotGetSoundWaypoint( bot_t &pBot, edict_t *pTrackSoundEdict, edict_t ** pNew
 void BotUpdateHearingSensitivity(bot_t &pBot);
 
 void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking );
-qboolean BotLowHealth( bot_t &pBot );
 void BotResetReactionTime(bot_t &pBot, qboolean have_slow_reaction = FALSE);
 void BotKick(bot_t &pBot);
 void BotCheckTeamplay(void);

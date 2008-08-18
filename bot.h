@@ -430,6 +430,13 @@ int AddToCfgBotRecord(const char *skin, const char *name, int skill, int top_col
 void RecountTeams(void);
 char * GetSpecificTeam(char * teamstr, size_t slen, qboolean get_smallest, qboolean get_largest, qboolean only_count_bots);
 
+void BotNameInit(void);
+void BotLogoInit(void);
+void UpdateClientData(const struct edict_s *ent, int sendweapons, struct clientdata_s *cd);
+void ProcessBotCfgFile(void);
+void jk_botti_ServerCommand (void);
+int CheckSubMod(void);
+
 #include "bot_inline_funcs.h"
 
 #endif // BOT_H

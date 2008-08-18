@@ -110,15 +110,6 @@ unsigned int rnd_idnum[2] = {1, 1};
 cvar_t jk_botti_version = { "jk_botti_version", "", FCVAR_EXTDLL|FCVAR_SERVER, 0, NULL};
 
 
-void BotNameInit(void);
-void BotLogoInit(void);
-void UpdateClientData(const struct edict_s *ent, int sendweapons, struct clientdata_s *cd);
-void ProcessBotCfgFile(void);
-void jk_botti_ServerCommand (void);
-int CheckSubMod(void);
-
-
-
 // START of Metamod stuff
 C_DLLEXPORT int GetEntityAPI2_POST (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion);
 C_DLLEXPORT int GetEngineFunctions_POST (enginefuncs_t *pengfuncsFromEngine, int *interfaceVersion);
