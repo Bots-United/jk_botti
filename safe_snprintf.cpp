@@ -181,3 +181,4 @@ void safevoid_snprintf(char* s, size_t n, const char* format, ...)
 	safevoid_vsnprintf(s, n, format, ap);
 	va_end(ap);
 }
+

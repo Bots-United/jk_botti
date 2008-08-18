@@ -23,8 +23,9 @@
 extern bot_t bots[32];
 extern qboolean is_team_play;
 
-breakable_list_t *g_breakable_list = NULL;
-breakable_list_t breakable_list_memarray[BREAKABLE_LIST_MAX];
+static breakable_list_t *g_breakable_list = NULL;
+static breakable_list_t breakable_list_memarray[BREAKABLE_LIST_MAX];
+
 
 // classic way of getting connected client count without using data collected from 'ClientPutInServer'/'ClientDisconnect'.
 int UTIL_GetClientCount(void)
@@ -122,7 +123,7 @@ void UTIL_DrawBeam(edict_t *pEnemy, const Vector &start, const Vector &end, int 
 
 
 // 
-breakable_list_t * UTIL_AddFuncBreakable(edict_t *pEdict)
+static breakable_list_t * UTIL_AddFuncBreakable(edict_t *pEdict)
 {
    int i;
    
@@ -202,7 +203,7 @@ void UTIL_FreeFuncBreakables(void)
 }
 
 //
-breakable_list_t * UTIL_FindBreakable_Internal(breakable_list_t * pbreakable)
+static breakable_list_t * UTIL_FindBreakable_Internal(breakable_list_t * pbreakable)
 {
    if(unlikely(!pbreakable))
       return(g_breakable_list);
@@ -269,7 +270,7 @@ float UTIL_GetTimeSinceRespawn(edict_t * pPlayer)
 
 
 //
-qboolean IsPlayerFacingWall(edict_t * pPlayer)
+static qboolean IsPlayerFacingWall(edict_t * pPlayer)
 {
    TraceResult tr;
    Vector v_forward, EyePosition;
@@ -359,7 +360,8 @@ void ClientPrint( edict_t *pEntity, int msg_dest, const char *msg_name)
 }
 
 
-void UTIL_SayText( const char *pText, edict_t *pEdict )
+#if 0
+static void UTIL_SayText( const char *pText, edict_t *pEdict )
 {
    if (GET_USER_MSG_ID (PLID, "SayText", NULL) <= 0)
       REG_USER_MSG ("SayText", -1);
@@ -369,6 +371,7 @@ void UTIL_SayText( const char *pText, edict_t *pEdict )
       WRITE_STRING( pText );
    MESSAGE_END();
 }
+#endif
 
 
 void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
@@ -515,7 +518,7 @@ qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit )
    return(tr.flFraction >= 1.0f);
 }
 
-qboolean FVisibleEnemyOffset( const Vector &vecOrigin, const Vector &vecOffset, edict_t *pEdict, edict_t *pEnemy )
+static qboolean FVisibleEnemyOffset( const Vector &vecOrigin, const Vector &vecOffset, edict_t *pEdict, edict_t *pEnemy )
 {
    edict_t * pHit = NULL;
    
@@ -674,7 +677,8 @@ void UTIL_LogPrintf( char *fmt, ... )
    ALERT( at_logged, "%s", string );
 }
 
-void UTIL_ServerPrintf( char *fmt, ... )
+#if 0
+static void UTIL_ServerPrintf( char *fmt, ... )
 {
    va_list argptr;
    char string[512];
@@ -686,6 +690,7 @@ void UTIL_ServerPrintf( char *fmt, ... )
    // Print to server console
    SERVER_PRINT( string );
 }
+#endif
 
 void UTIL_ConsolePrintf( char *fmt, ... )
 {
@@ -763,3 +768,4 @@ void GetGameDir (char *game_dir)
 
    return;
 }
+

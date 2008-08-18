@@ -68,6 +68,8 @@ void FreeCfgBotRecord(void);
 int AddToCfgBotRecord(const char *skin, const char *name, int skill, int top_color, int bottom_color);
 void ClientCommand( edict_t *pEntity );
 void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const char *arg3);
+void jk_botti_ServerCommand(void);
+void ProcessBotCfgFile(void);
 
 // dll.cpp:
 void jkbotti_ClientPutInServer( edict_t *pEntity );
