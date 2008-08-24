@@ -1,4 +1,4 @@
-jk_botti 1.41
+jk_botti 1.42
 -------------
 
 1. Intro
@@ -10,7 +10,7 @@ jk_botti 1.41
 1. Intro
 --------------------
 
-This is 1.41 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+This is 1.42 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
 You are free to use code for any of your needs.
 
 jk_botti is computer gamer for multiplayer mode of Half-Life (HLDM) and has 
@@ -35,9 +35,10 @@ with XDM but this hasn't been tested.
 One of my major goals with jk_botti was to lower CPU usage compared to
 HPB_bot. I used to run Severian's server on 400Mhz Celeron (later updated 
 800Mhz Athlon) and even few HPB_bots would rise cpu usage too high.
+(Update: I have new server on P3-550Mhz, with default small/medium maps
+like datacore/stalkyard with three bots I have see 15% cpu usage).
 
-Tricks used to lower CPU usage:
- * Bots think only every second frame (hardcoded limit)
+Trick(s) used to lower CPU usage:
  * bot_think_fps settings for limiting number of thinks per second 
    (default: 30fps)
 
@@ -65,6 +66,19 @@ Credits:
 --------------------
 2. What's new
 --------------------
+1.42:
+ * Tweaked low level bot skills alot, they will be more active now (run 
+   around maps) now, but not too good at combat.
+ * Bot reaction times have been adjusted to more human scale (level 1 
+   has 100ms and level 5 300ms). Times used to be less before.
+ * Removal of bot_reaction_time setting.
+   * You can still use bot_skill settings to adjust reaction times.
+ * Internal changes
+   * Compiled with newer version of gcc
+   * Made large portion of inline functions uninlined as on modern 
+     cpus/system small cache/code size is better than inlining 
+     everything manually.
+
 1.41:
  * Fixed low level bot aiming (were rapidly shifting right to left)
    * As result removed undocumented and broken setting 'aimangle_varitation'
