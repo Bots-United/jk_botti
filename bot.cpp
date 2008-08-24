@@ -40,7 +40,6 @@ extern int bot_chat_drop_percent;
 extern int bot_chat_swap_percent;
 extern int bot_chat_lower_percent;
 extern qboolean b_random_color;
-extern int bot_reaction_time;
 extern qboolean debug_minmax;
 
 extern qboolean g_in_intermission;
@@ -908,7 +907,6 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
       pBot.logo_percent = bot_logo_percent;
       pBot.f_strafe_direction = 0.0;  // not strafing
       pBot.f_strafe_time = 0.0;
-      pBot.reaction_time = bot_reaction_time;
 
       pBot.bot_skill = skill - 1;  // 0 based for array indexes
       pBot.weapon_skill = skill;

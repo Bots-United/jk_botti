@@ -191,23 +191,16 @@ static Vector GetModifiedEnemyDistance(bot_t &pBot, const Vector & distance)
 //
 static void BotResetReactionTime(bot_t &pBot, qboolean have_slow_reaction = FALSE) 
 {
-   if (pBot.reaction_time >= 1 && pBot.reaction_time <= 3)
-   {
-      float react_delay;
+   float delay_min = skill_settings[pBot.bot_skill].react_delay_min;
+   float delay_max = skill_settings[pBot.bot_skill].react_delay_max;
 
-      int index = pBot.reaction_time - 1;
+   float react_delay = RANDOM_FLOAT2(delay_min, delay_max);
 
-      float delay_min = skill_settings[pBot.bot_skill].react_delay_min[index];
-      float delay_max = skill_settings[pBot.bot_skill].react_delay_max[index];
+   if(have_slow_reaction)
+      react_delay *= 4;
 
-      react_delay = RANDOM_FLOAT2(delay_min, delay_max);
-      
-      if(have_slow_reaction)
-         react_delay *= 4;
+   pBot.f_reaction_target_time = gpGlobals->time + react_delay;
 
-      pBot.f_reaction_target_time = gpGlobals->time + react_delay;
-   }
-   
    pBot.f_next_find_visible_sound_enemy_time = gpGlobals->time + 0.2f;
 }
 

@@ -80,7 +80,6 @@ float bot_think_spf = 1.0/30.0; // == 1 / (30 fps)
 
 qboolean b_random_color = TRUE;
 float bot_check_time = 60.0;
-int bot_reaction_time = 2;
 int min_bots = -1;
 int max_bots = -1;
 int num_bots = 0;

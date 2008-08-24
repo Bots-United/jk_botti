@@ -293,7 +293,6 @@ typedef struct
    int   top_color;
    int   bottom_color;
 
-   int   reaction_time;
    float f_reaction_target_time;  // time when enemy targeting starts
    
    float f_weaponchange_time;

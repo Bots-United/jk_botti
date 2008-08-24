@@ -68,7 +68,6 @@ extern int bot_chat_drop_percent;
 extern int bot_chat_swap_percent;
 extern int bot_chat_lower_percent;
 extern qboolean b_random_color;
-extern int bot_reaction_time;
 
 qboolean isFakeClientCommand = FALSE;
 int fake_arg_count;
@@ -581,20 +580,7 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
    }
    else if (FStrEq(pcmd, "bot_reaction_time"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-
-         if ((temp < 1) || (temp > 3))
-            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_reaction_time value!\n");
-         else
-            bot_reaction_time = temp;
-      }
-
-      if (bot_reaction_time)
-         safevoid_snprintf(msg, sizeof(msg), "bot_reaction_time is %d\n", bot_reaction_time);
-      else
-         safevoid_snprintf(msg, sizeof(msg), "bot_reaction_time is DISABLED\n");
+      safevoid_snprintf(msg, sizeof(msg), "bot_reaction_time setting was removed in jk_botti v1.42, ignoring setting\n");
 
       printfunc(PRINTFUNC_INFO, arg, msg);
 
@@ -921,12 +907,8 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
          CHECK_AND_SET_BOTSKILL_FLOAT(track_sound_time_max)
          
          CHECK_AND_SET_BOTSKILL_FLOAT(respawn_react_delay) // delay on players after respawn
-         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_min[0]) // reaction delay settings ([0] is for bot_reaction 1, [1] for 2, etc)
-         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_max[0]) // 
-         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_min[1]) // 
-         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_max[1]) // 
-         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_min[2]) // 
-         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_max[2]) // 
+         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_min) // 
+         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_max) //
          
          CHECK_AND_SET_BOTSKILL_FLOAT(weaponchange_rate_min) // how fast changing weapons (min, max)
          CHECK_AND_SET_BOTSKILL_FLOAT(weaponchange_rate_max) //

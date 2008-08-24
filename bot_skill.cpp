@@ -39,8 +39,8 @@ typedef struct
 
 6: 
    float respawn_react_delay; // delay on players after respawn
-   float react_delay_min[3]; // reaction delay settings (first is for bot_reaction 1, second for 2, etc)
-   float react_delay_max[3]; 
+   float react_delay_min; // reaction delay settings (first is for bot_reaction 1, second for 2, etc)
+   float react_delay_max;
 
 9:
    float weaponchange_rate_min; // how fast changing weapons (min, max)
@@ -100,7 +100,7 @@ bot_skill_settings_t default_skill_settings[5] = {
 //0:
      1, 0.05, 0.30, 10.0, 50.0, 80, 
 //6:
-     0.6, {0.01, 0.07, 0.10}, {0.04, 0.11, 0.15}, 
+     0.6, 0.07, 0.11,
 //9:
      0.1, 0.3,
 //11:
@@ -122,7 +122,7 @@ bot_skill_settings_t default_skill_settings[5] = {
 //0:
      2, 0.10, 0.60, 6.0, 30.0, 60,
 //6:
-     0.8, {0.02, 0.09, 0.12}, {0.06, 0.14, 0.18},
+     0.8, 0.09, 0.14,
 //9:
      0.2, 0.5,
 //11:
@@ -144,7 +144,7 @@ bot_skill_settings_t default_skill_settings[5] = {
 //0:
      3, 0.15, 0.80, 4.0, 10.0, 40,
 //6:
-     1.0, {0.03, 0.12, 0.15}, {0.08, 0.18, 0.22},
+     1.0, 0.12, 0.18,
 //9:
      0.3, 0.7,
 //11:
@@ -166,7 +166,7 @@ bot_skill_settings_t default_skill_settings[5] = {
 //0:
      4, 0.20, 0.90, 2.0, 5.0, 25,
 //6:
-     1.20, {0.04, 0.14, 0.18}, {0.10, 0.21, 0.25},
+     1.20, 0.14, 0.21,
 //9:
      0.6, 1.4,
 //11:
@@ -188,7 +188,7 @@ bot_skill_settings_t default_skill_settings[5] = {
 //0:
      5, 0.25, 1.00, 0.5, 0.5, 15,
 //6:
-     1.4, {0.05, 0.17, 0.21}, {0.12, 0.25, 0.30},
+     1.4, 0.17, 0.25,
 //9:
      1.2, 2.8,
 //11:

@@ -19,8 +19,8 @@ typedef struct
    int keep_optimal_dist; // how often bot (out of 100 times) the bot try to keep at optimum distance of weapon when attacking
    
    float respawn_react_delay; // delay on players after respawn
-   float react_delay_min[3]; // reaction delay settings (first is for bot_reaction 1, second for 2, etc)
-   float react_delay_max[3]; 
+   float react_delay_min; // reaction delay settings (first is for bot_reaction 1, second for 2, etc)
+   float react_delay_max; 
    
    float weaponchange_rate_min; // how fast changing weapons (min, max)
    float weaponchange_rate_max; 

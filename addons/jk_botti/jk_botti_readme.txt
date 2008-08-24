@@ -302,15 +302,10 @@ List of available settings:
       How much bot strafes when attacking enemy. This value is percent.
       Value: 0-100
  
- - react_delay_min[0]
-   react_delay_min[1]
-   react_delay_min[2]
-   react_delay_max[0]
-   react_delay_max[1]
-   react_delay_max[2]
-      Set range of bot reaction time. [0] is for bot_reaction 1 settings, [1]
-      for bot_reaction 2, [2] for bot_reaction 3. Exact time is randomized value
-      between these two. If min is larger than max, then min is used always.
+ - react_delay_min
+   react_delay_max
+      Set range of bot reaction time. Exact time is randomized value between
+      these two. If min is larger than max, then min is used always.
       Value: 0.0-1.0
  
  - weaponchange_rate_min
