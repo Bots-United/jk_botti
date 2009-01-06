@@ -23,7 +23,7 @@ endif
 
 TARGET = jk_botti_mm
 BASEFLAGS = -Wall -Wno-write-strings
-ARCHFLAG += -march=i586 -mtune=pentium3
+ARCHFLAG += -march=i586 -mtune=generic
 
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
