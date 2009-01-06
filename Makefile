@@ -8,7 +8,7 @@ ifeq ($(OSTYPE),win32)
 	CPP = /usr/bin/i586-mingw32msvc-gcc
 	AR = /usr/bin/i586-mingw32msvc-ar rc
 	RANLIB = /usr/bin/i586-mingw32msvc-ranlib
-	LINKFLAGS = -mdll -lwsock32 -Xlinker --add-stdcall-alias -s
+	LINKFLAGS = -mdll -lm -lwsock32 -Xlinker --add-stdcall-alias -s
 	DLLEND = .dll
 	ZLIB_OSFLAGS =
 else
@@ -16,7 +16,7 @@ else
 	AR = ar rc
 	RANLIB = ranlib
 	ARCHFLAG = -fPIC
-	LINKFLAGS = -fPIC -shared -ldl -s
+	LINKFLAGS = -fPIC -shared -ldl -lm -s
 	DLLEND = _i386.so
 	ZLIB_OSFLAGS = -DNO_UNDERLINE
 endif
