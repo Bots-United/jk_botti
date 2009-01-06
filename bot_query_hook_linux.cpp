@@ -11,8 +11,6 @@
 #endif
 
 #include <sys/mman.h>
-#include <asm/page.h>
-#define PAGE_ALIGN(addr) (((addr)+PAGE_SIZE-1)&PAGE_MASK)
 #include <pthread.h>
 
 #include <memory.h>
@@ -21,6 +19,10 @@
 #include <stdio.h>
 
 #include "bot_query_hook.h"
+
+#define PAGE_SHIFT      12
+#define PAGE_SIZE       (_AC(1,UL) << PAGE_SHIFT)
+#define PAGE_MASK       (~(PAGE_SIZE-1))
 
 //
 // Linux work, based on my "Linux code for dynamic linkents" from metamod-p
