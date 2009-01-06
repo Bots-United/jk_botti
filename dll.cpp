@@ -106,7 +106,6 @@ player_t players[32];
 static void (*old_PM_PlaySound)(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch) = NULL;
 static struct playermove_s *old_ppmove = NULL;
 
-unsigned int rnd_idnum[2] = {1, 1};
 cvar_t jk_botti_version = { "jk_botti_version", "", FCVAR_EXTDLL|FCVAR_SERVER, 0, NULL};
 
 

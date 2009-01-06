@@ -22,10 +22,11 @@
 
 extern bot_t bots[32];
 extern qboolean is_team_play;
-extern unsigned int rnd_idnum[2];
 
 static breakable_list_t *g_breakable_list = NULL;
 static breakable_list_t breakable_list_memarray[BREAKABLE_LIST_MAX];
+
+static unsigned int rnd_idnum[2] = {1, 1};
 
 #ifdef __GNUC__
 inline void fsincos(double x, double &s, double &c) 
