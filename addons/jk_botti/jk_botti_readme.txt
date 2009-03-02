@@ -44,7 +44,7 @@ Trick(s) used to lower CPU usage:
 
 Aiming system on jk_botti does not use currently available and latest player
 locations for tracking and shooting enemy but instead use old data (level 1
-bot 125ms, level 5 bot 225ms old) to guess position of player. This makes 
+bot 60ms, level 5 bot 300ms old) to guess position of player. This makes 
 bot-aiming worser when player changes movement vector rapidly (jump, duck,
 change strafe direction rapidly). 
 
@@ -67,8 +67,10 @@ Credits:
 2. What's new
 --------------------
 1.42:
- * Tweaked low level bot skills alot, they will be more active now (run 
-   around maps) now, but not too good at combat.
+ * [bugfix, linux] Fixed jk_botti to be linked with libm.so
+ * Tweaked low level bot skills alot
+    * They will be more active now (run around maps) now
+    * Not too good at combat
  * Bot reaction times have been adjusted to more human scale (level 1 
    has 100ms and level 5 300ms). Times used to be less before.
  * Removal of bot_reaction_time setting.
