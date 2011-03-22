@@ -92,7 +92,7 @@ private:
 	static int fitness_sort(const CGenome *a, const CGenome *b);
 
 public:
-	CGeneticAlgorithm(double mutation_rate, double crossover_rate, int crossover_interleave):
+	CGeneticAlgorithm(double mutation_rate, double crossover_rate, int crossover_interleave = 0):
 		m_population(NULL),
 		m_total_fitness(0),
 		m_best_fitness(0),

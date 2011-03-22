@@ -298,11 +298,14 @@ void CGeneticAlgorithm::reset_fitness_values(void)
 
 int CGeneticAlgorithm::fitness_sort(const CGenome *a, const CGenome *b)
 {
+	/*
 	if (a->m_fitness < b->m_fitness)
 		return -1;
 	if (a->m_fitness > b->m_fitness)
 		return 1;
 	return 0;
+	*/
+	return (a->m_fitness > b->m_fitness) - (a->m_fitness < b->m_fitness);
 }
 
 CPopulation *CGeneticAlgorithm::epoch(CPopulation &old_pop, CPopulation &new_pop)

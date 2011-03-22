@@ -417,9 +417,9 @@ int main()
 }
 */
 
-double f(double x/*, double y, double z*/) {
-	//return (x + y + z + 1) * 10;
-	return x*6;
+double f(double x, double y, double z) {
+	return x*x;
+	//return x*6;
 }
 
 static double scale_output(double max, double min, double output)
@@ -433,37 +433,60 @@ int main()
 {
 	int i, j, k;
 	int rnd_idx;
-	double input[1];
+	double input[3];
 	double output[1];
 	double scale[1] = {100};
 	double diff = 0;
 
 	fast_random_seed(time(0) ^ (long)&diff ^ (long)&main);
 
-	CNeuralNet *nnet = new CNeuralNet(1, 1, 1, 5);
-	CPopulation population = CPopulation(20, nnet->get_num_weights());
-	CGeneticAlgorithm genalg(0.2, 0.7, 4);
+	CNeuralNet *nnet = new CNeuralNet(1, 1, 1, 4);
+	CPopulation population = CPopulation(25, nnet->get_num_weights());
+	CGeneticAlgorithm genalg(0.2, 0.7);
 
 	printf("ok\n");
 	fflush(stdout);
 
 	CGenome *best_genome;
 
-	for (k = 0; k < 1000; k++) {
+	for (k = 0; k < 5000; k++) {
 		//printf("k: %i\n", k);
-		for (i = 0; i < 1000; i++) {
-			//printf(" i: %i\n", i);
-			for (j = 0; j < population.get_size(); j++) {
-				//printf("  j: %i\n", j);
-				CGenome *genome = population.get_individual(j);
+		for (j = 0; j < population.get_size(); j++) {
+			double x, y, z, foutput;
+			CGenome *genome = population.get_individual(j);
 
-				input[0] = get_random() * 4;
+			nnet->put_weights(genome->m_genes);
 
-				nnet->put_weights(genome->m_genes);
+			for (x = -0.5; x <= 4.5; x += 1) {
+				for (y = -0.5; y <= 4.5; y += 1) {
+					for (z = -0.5; z <= 4.5; z += 1) {
+						input[0] = x;
+						input[1] = y;
+						input[2] = z;
+
+						nnet->run(input, output, scale);
+
+						foutput = f(input[0], input[1], input[2]);
+						diff = output[0] - foutput;						
+
+						genome->m_fitness += -(diff*diff)*0.0002;
+					}
+				}
+			}
+
+			//printf(" j: %i\n", j);
+			for (i = 0; i < 500; i++) {
+				//printf("  i: %i\n", i);
+				input[0] = get_random() * 5 - 0.5;
+				input[1] = get_random() * 5 - 0.5;
+				input[2] = get_random() * 5 - 0.5;
+
 				nnet->run(input, output, scale);
 
-				diff = fabs(output[0] - f(input[0]));
-				genome->m_fitness += 1 - diff / fabs(output[0]);
+				foutput = f(input[0], input[1], input[2]);
+				diff = output[0] - foutput;						
+
+				genome->m_fitness += -(diff*diff)*0.0001;
 
 				//diff = fabs(output[1] - sin(random_angle));
 				//if (diff < 1.0)
@@ -484,13 +507,15 @@ int main()
 			printf("generation: %i\n", genalg.get_generation());
 			printf("best fitness: %f\n", genome->m_fitness);
 
-			input[0] = (int)(0.4 * 9) * 0.5;
+			input[0] = 1;
+			input[1] = 2;
+			input[2] = 3;
 			nnet->run(input, output, scale);
-			printf("input: %f (=> %f)\n", input[0], f(input[0]));
+			printf("input: %f:%f:%f (=> %f)\n", input[0], input[1], input[2], f(input[0], input[1], input[2]));
 			printf("output: %f\n", output[0]);
 		}
 
-		if (k+1 < 1000) {
+		if (k+1 < 5000) {
 			CPopulation new_pop = CPopulation(population.get_size(), nnet->get_num_weights());
 			genalg.epoch(population, new_pop);
 			population.free_mem();
@@ -510,8 +535,10 @@ int main()
 
 	for (i = 0; i < 9; i++) {
 		input[0] = i * 0.5;
+		input[1] = (9 - i) * 0.5;
+		input[2] = i % 4;
 		nnet->run(input, output, scale);
-		printf("input: %f (=> %f)\n", input[0], f(input[0]));
+		printf("input: %f:%f:%f (=> %f)\n", input[0], input[1], input[2], f(input[0], input[1], input[2]));
 		printf("output: %f\n", output[0]);
 	}
 
