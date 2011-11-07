@@ -1103,8 +1103,8 @@ edict_t *WaypointFindItem( int wpt_index )
       {
          safe_strcopy(item_name, sizeof(item_name), STRING(pent->v.classname));
          
-         if(((waypoints[wpt_index].flags & W_FL_HEALTH) && (strncmp("item_health", item_name, 11) == 0) || strncmp("func_healthcharger", item_name, 18) == 0) ||
-            ((waypoints[wpt_index].flags & W_FL_ARMOR) && (strncmp("item_battery", item_name, 12) == 0) || strncmp("func_recharge", item_name, 13) == 0) ||
+         if((((waypoints[wpt_index].flags & W_FL_HEALTH) && (strncmp("item_health", item_name, 11) == 0)) || strncmp("func_healthcharger", item_name, 18) == 0) ||
+            (((waypoints[wpt_index].flags & W_FL_ARMOR) && (strncmp("item_battery", item_name, 12) == 0)) || strncmp("func_recharge", item_name, 13) == 0) ||
             ((waypoints[wpt_index].flags & W_FL_AMMO) && GetAmmoItemFlag(item_name) != 0) ||
             ((waypoints[wpt_index].flags & W_FL_LONGJUMP) && strcmp("item_longjump", item_name) == 0) ||
             ((waypoints[wpt_index].flags & W_FL_WEAPON) && GetWeaponItemFlag(item_name) != 0 && pent->v.owner == NULL))

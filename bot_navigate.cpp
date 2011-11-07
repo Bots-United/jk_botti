@@ -589,8 +589,8 @@ static void BotFindWaypointGoal( bot_t &pBot )
       }
       
       // get flags for ammo that are low, primarily ammo that can we can use with current weapons
-      else if ((ammoflags = BotGetLowAmmoFlags(pBot, &(weaponflags=0), TRUE)) != 0 && weaponflags != 0 || 
-      	       (ammoflags = BotGetLowAmmoFlags(pBot, &(weaponflags=0), FALSE)) != 0 && weaponflags != 0)
+      else if (((ammoflags = BotGetLowAmmoFlags(pBot, &(weaponflags=0), TRUE)) != 0 && weaponflags != 0) || 
+      	       ((ammoflags = BotGetLowAmmoFlags(pBot, &(weaponflags=0), FALSE)) != 0 && weaponflags != 0))
       {
          int flags = (ammoflags ? W_FL_AMMO : 0) | (weaponflags ? W_FL_WEAPON : 0);
          
