@@ -34,12 +34,6 @@
 
 //pointer size on x86-32: 4 bytes
 #define PTR_SIZE sizeof(void*)
-
-//constructs new jmp forwarder
-#define construct_jmp_instruction(x, place, target) { \
-	((unsigned char *)(x))[0] = 0xe9; \
-	*(unsigned long *)((char *)(x) + 1) = ((unsigned long)(target)) - (((unsigned long)(place)) + 5); \
-}
 	
 //opcode + sizeof pointer
 #define BYTES_SIZE (JMP_SIZE + PTR_SIZE)
@@ -59,6 +53,13 @@ static unsigned char sendto_old_bytes[BYTES_SIZE];
 
 //Mutex for our protection
 static pthread_mutex_t mutex_replacement_sendto = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+
+//constructs new jmp forwarder
+static void construct_jmp_instruction(void *x, void *place, void *target)
+{
+	((unsigned char *)x)[0] = 0xe9;
+	*(unsigned long *)((char *)x + 1) = ((unsigned long)target) - (((unsigned long)place) + 5);
+}
 
 //restores old sendto
 inline void restore_original_sendto(void)
