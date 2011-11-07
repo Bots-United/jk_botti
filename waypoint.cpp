@@ -992,11 +992,6 @@ static void WaypointSearchItems(edict_t *pEntity, const Vector &v_origin, int wp
    char nearest_name[64];
    edict_t *nearest_pent;
    int itemflag;
-   int flags_before;
-   int itemflags_before;
-   
-   flags_before = waypoints[wpt_index].flags;
-   itemflags_before = waypoints[wpt_index].itemflags;
 
    nearest_name[0] = 0;      // null out nearest_name string
    nearest_pent = NULL;
@@ -1078,12 +1073,6 @@ static void WaypointSearchItems(edict_t *pEntity, const Vector &v_origin, int wp
          waypoints[wpt_index].flags |= W_FL_LONGJUMP;
       }
    }
-   
-   // don't check flags, they can be rechecked on next mapload
-   /*if(flags_before != waypoints[wpt_index].flags || itemflags_before != waypoints[wpt_index].itemflags)
-   {  // save on mapchange
-      g_waypoint_updated = TRUE;
-   }*/
 }
 
 
@@ -1095,10 +1084,8 @@ edict_t *WaypointFindItem( int wpt_index )
    float distance;
    float min_distance;
    char item_name[64];
-   char nearest_name[64];
    edict_t *nearest_pent = NULL;
    
-   nearest_name[0] = 0;      // null out nearest_name string
    nearest_pent = NULL;
    
    min_distance = 99999.0;
@@ -2745,7 +2732,7 @@ static void WaypointRouteInit(qboolean ForceRebuild)
    unsigned int row;
    int i, offset;
    float distance;
-   unsigned short *pShortestPath, *pFromTo;
+   unsigned short *pShortestPath;
    unsigned int num_items;
    gzFile bfp;
    char filename2[256];
@@ -2884,7 +2871,6 @@ static void WaypointRouteInit(qboolean ForceRebuild)
       memset(from_to, 0, sizeof(unsigned short) * array_size);
       
       pShortestPath = shortest_path;
-      pFromTo = from_to;
 
       for (index=0; index < array_size; index++)
          pShortestPath[index] = WAYPOINT_UNREACHABLE;

@@ -124,7 +124,6 @@ void BotClient_Valve_CurrentWeapon(void *p, int bot_index)
          if (iState == 1)
          {
             bot_weapon_select_t *pSelect = NULL;
-            bot_fire_delay_t *pDelay = NULL;
             int found = 0;
             
             bots[bot_index].current_weapon.iId = iId;
@@ -135,7 +134,6 @@ void BotClient_Valve_CurrentWeapon(void *p, int bot_index)
             bots[bot_index].current_weapon.iAmmo2 = bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo2];
 
             pSelect = &weapon_select[0];
-            pDelay = &fire_delay[0];
             
             for(int i = 0; pSelect && pSelect[i].iId; i++) 
             {
@@ -161,7 +159,7 @@ void PlayerClient_Valve_CurrentWeapon(void *p, int player_index)
    static int state = 0;   // current state machine state
    static int iState;
    static int iId;
-   static int iClip;
+   //static int iClip;
 
    if (state == 0)
    {
@@ -177,7 +175,7 @@ void PlayerClient_Valve_CurrentWeapon(void *p, int player_index)
    {
       state = 0;
 
-      iClip = *(int *)p;  // ammo currently in the clip for this weapon
+      //iClip = *(int *)p;  // ammo currently in the clip for this weapon
 
       if (iId <= 31)
       {
@@ -435,7 +433,7 @@ void BotClient_Valve_ScreenFade(void *p, int bot_index)
    static int state = 0;   // current state machine state
    static int duration;
    static int hold_time;
-   static int fade_flags;
+   //static int fade_flags;
    int length;
 
    if (state == 0)
@@ -451,7 +449,7 @@ void BotClient_Valve_ScreenFade(void *p, int bot_index)
    else if (state == 2)
    {
       state++;
-      fade_flags = *(int *)p;
+      //fade_flags = *(int *)p;
    }
    else if (state == 6)
    {

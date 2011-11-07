@@ -786,7 +786,6 @@ void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking )
 //
 void BotFindEnemy( bot_t &pBot )
 {
-   edict_t *pent = NULL;
    edict_t *pNewEnemy; 
    Vector v_newenemy;
    float nearestdistance;
@@ -864,7 +863,6 @@ void BotFindEnemy( bot_t &pBot )
       }
    }
 
-   pent = NULL;
    pNewEnemy = NULL;
    v_newenemy = Vector(0,0,0);
    nearestdistance = 99999;

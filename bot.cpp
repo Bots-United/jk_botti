@@ -2480,8 +2480,6 @@ void BotThink( bot_t &pBot )
    edict_t *pEdict = pBot.pEdict;
    
    Vector v_diff;             // vector from previous to current location
-   float pitch_degrees;
-   float yaw_degrees;
    float moved_distance;      // length of v_diff vector (distance bot moved)
    TraceResult tr;
    float f_strafe_speed;
@@ -2672,10 +2670,10 @@ void BotThink( bot_t &pBot )
       pBot.f_pause_time = 0;
 
    // turn towards ideal_pitch by pitch_speed degrees
-   pitch_degrees = BotChangePitch( pBot, pEdict->v.pitch_speed );
+   BotChangePitch( pBot, pEdict->v.pitch_speed );
 
    // turn towards ideal_yaw by yaw_speed degrees
-   yaw_degrees = BotChangeYaw( pBot, pEdict->v.yaw_speed );
+   BotChangeYaw( pBot, pEdict->v.yaw_speed );
    
    // Only need to check ammo, since ammo check for weapons includes weapons ;)
    pBot.b_has_enough_ammo_for_good_weapon = !BotAllWeaponsRunningOutOfAmmo(pBot, TRUE);
