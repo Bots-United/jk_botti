@@ -1,3 +1,11 @@
 *~
 Rules.depend
 zlib/Makefile
+
+*.o
+*.so
+*.dll
+*.exe
+*.a
+zlib/example
+zlib/minigzip
