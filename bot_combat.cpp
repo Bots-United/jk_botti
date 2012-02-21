@@ -219,13 +219,18 @@ static posdata_t *get_posdata_slot(int idx)
 {
    int i, oldest_idx = -1;
    float oldest_time = gpGlobals->time;
-   
+
    for(i = 0; i < POSDATA_SIZE; i++)
    {
       if(!players[idx].posdata_mem[i].inuse)
          break;
-      
-      if(players[idx].posdata_mem[i].time < oldest_time)
+
+      /* ugly fix */
+      /* we cannot have future time, there has been some error. */
+      if (players[idx].posdata_mem[i].time > gpGlobals->time)
+          players[idx].posdata_mem[i].time = gpGlobals->time;
+
+      if (players[idx].posdata_mem[i].time <= oldest_time)
       {
          oldest_time = players[idx].posdata_mem[i].time;
          oldest_idx = i;
@@ -241,6 +246,7 @@ static posdata_t *get_posdata_slot(int idx)
    }
    
    memset(&players[idx].posdata_mem[i], 0, sizeof(players[idx].posdata_mem[i]));
+   players[idx].posdata_mem[i].time = gpGlobals->time;
    players[idx].posdata_mem[i].inuse = TRUE;
    
    return(&players[idx].posdata_mem[i]);
