@@ -154,8 +154,12 @@ mBOOL os_safe_call(REG_CMD_FN pfn);
 #ifdef linux
 	#include <limits.h>
 #elif defined(_WIN32)
-	#define NAME_MAX	255
-	#define PATH_MAX	255
+	#ifndef NAME_MAX
+		#define NAME_MAX	255
+	#endif
+	#ifndef PATH_MAX
+		#define PATH_MAX	255
+	#endif
 #endif /* linux */
 
 

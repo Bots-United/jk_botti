@@ -5,9 +5,9 @@
 ##
 
 ifeq ($(OSTYPE),win32)
-	CPP = /usr/bin/i586-mingw32msvc-gcc
-	AR = /usr/bin/i586-mingw32msvc-ar rc
-	RANLIB = /usr/bin/i586-mingw32msvc-ranlib
+	CPP = i686-w64-mingw32-gcc -m32
+	AR = i686-w64-mingw32-ar rc
+	RANLIB = i686-w64-mingw32-ranlib
 	LINKFLAGS = -mdll -lm -lwsock32 -Xlinker --add-stdcall-alias -s
 	DLLEND = .dll
 	ZLIB_OSFLAGS =
