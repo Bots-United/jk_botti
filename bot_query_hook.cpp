@@ -12,6 +12,9 @@
 #include <stdlib.h>
 #include <memory.h>
 
+#include <extdll.h>
+#include <dllapi.h>
+
 #include "bot_query_hook.h"
 
 //
@@ -110,7 +113,7 @@ ssize_t PASCAL handle_player_reply(int socket, const void *message, size_t lengt
 }
 
 // find number of bots and replace with zero
-ssize_t PASCAL handle_server_info_reply(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
+ssize_t PASCAL handle_goldsrc_server_info_reply(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
 {
 /*
 Header 		byte 	Always equal to 'm' (0x6D.)
@@ -159,30 +162,19 @@ Bots	 	byte 	Number of bots on the server.
 	ssize_t len = length - 5;
 	unsigned char * msg = (unsigned char*)newmsg + 5;
 
-	bool is_mod, handling_port;
+	bool is_mod;
 
 	// skip IP address and port
-	handling_port = false;
 	while (len > 0) {
 		if (*msg == 0) {
 			msg++;
 			len--;
 			break;
 		}
-		if (*msg == ':') {
-			if (handling_port)
-				goto out; /* huh? double port divider? */
-			handling_port = true;
-		} else if (*msg == '.') {
-			if (handling_port)
-				goto out; /* huh? dots in part? */
-		} else if (*msg < '0' || *msg > '9') {
-			goto out; /* not number */
-		}
 		msg++;
 		len--;
 	}
-	if (len <= 0 || !handling_port)
+	if (len <= 0)
 		goto out; /* something is not right here */
 
 	// skip server name
@@ -250,6 +242,8 @@ Bots	 	byte 	Number of bots on the server.
 		goto out;
 
 	// max players
+	if (*msg != gpGlobals->maxClients)
+		goto out;
 	msg++;
 	len--;
 	if (len <= 0)
@@ -367,8 +361,139 @@ Bots	 	byte 	Number of bots on the server.
 	if (len <= 0)
 		goto out;
 
-	// last entry, bots... len should be one now
-	if (len != 1)
+	// TODO: verify
+	// found bot count, replace with zero
+	*msg = 0;
+out:
+	return(call_original_sendto(socket, newmsg, length, flags, dest_addr, dest_len));
+}
+
+// find number of bots and replace with zero
+ssize_t PASCAL handle_source_server_info_reply(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
+{
+/*
+Header 		byte 	Always equal to 'I' (0x49.)
+Protocol 	byte 	Protocol version used by the server.
+Name 		string 	Name of the server.
+Map 		string 	Map the server has currently loaded.
+Folder 		string 	Name of the folder containing the game files.
+Game 		string 	Full name of the game.
+ID 		short 	Steam Application ID of game.
+Players 	byte 	Number of players on the server.
+Max. Players 	byte 	Maximum number of players the server reports it can hold.
+Bots 		byte 	Number of bots on the server.
+Server type 	byte 	Indicates the type of server:
+
+    'D' for a dedicated server
+    'L' for a non-dedicated server
+    'P' for a SourceTV server
+
+Environment 	byte 	Indicates the operating system of the server:
+
+    'L' for Linux
+    'W' for Windows
+
+Visibility 	byte 	Indicates whether the server requires a password:
+
+    0 for public
+    1 for private
+
+VAC 		byte 	Specifies whether the server uses VAC:
+
+    0 for unsecured
+    1 for secured
+
+....Continues....
+ */
+	unsigned char * newmsg = (unsigned char *)alloca(length);
+	memcpy(newmsg, message, length);
+
+	ssize_t len = length - 5;
+	unsigned char * msg = (unsigned char*)newmsg + 5;
+
+	// protocol
+	msg++;
+	len--;
+	if (len <= 0)
+		goto out;
+
+	// skip server name
+	// TODO: verify
+	while (len > 0) {
+		if (*msg == 0) {
+			msg++;
+			len--;
+			break;
+		}
+		msg++;
+		len--;
+	}
+	if (len <= 0)
+		goto out; /* something is not right here */
+
+	// skip map name
+	// TODO: verify
+	while (len > 0) {
+		if (*msg == 0) {
+			msg++;
+			len--;
+			break;
+		}
+		msg++;
+		len--;
+	}
+	if (len <= 0)
+		goto out; /* something is not right here */
+
+	// skip game folder name (valve, gearbox, etc)
+	// TODO: verify
+	while (len > 0) {
+		if (*msg == 0) {
+			msg++;
+			len--;
+			break;
+		}
+		msg++;
+		len--;
+	}
+	if (len <= 0)
+		goto out; /* something is not right here */
+
+	// skip game name (Half-life, severian's mod, might be modified by metamod-plugins)
+	while (len > 0) {
+		if (*msg == 0) {
+			msg++;
+			len--;
+			break;
+		}
+		msg++;
+		len--;
+	}
+	if (len <= 0)
+		goto out; /* something is not right here */
+
+	// steam id, short
+	msg++;
+	len--;
+	if (len <= 0)
+		goto out;
+	msg++;
+	len--;
+	if (len <= 0)
+		goto out;
+
+	// players
+	msg++;
+	len--;
+	if (len <= 0)
+		goto out;
+
+	// max players
+	if (*msg != gpGlobals->maxClients)
+		goto out;
+	msg++;
+	len--;
+	if (len <= 0)
 		goto out;
 
 	// TODO: verify
@@ -382,19 +507,32 @@ out:
 ssize_t PASCAL sendto_hook(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
 {
 	const unsigned char * orig_buf = (unsigned char*)message;
-	
+
+	if (!gpGlobals)
+		goto out;
+	if (bot_conntimes < 1)
+		goto out;
+
 	if(length > 5 && orig_buf[0] == 0xff && orig_buf[1] == 0xff && orig_buf[2] == 0xff && orig_buf[3] == 0xff)
 	{
-		// check if this is server info reply packey (ÿÿÿÿm)
-		if (orig_buf[4] == 'm' && bot_conntimes >= 1) {
-			return handle_server_info_reply(socket, message, length, flags, dest_addr, dest_len);
+		// check if this is server info reply packet (ÿÿÿÿm)
+		// old GoldSrc format
+		if (orig_buf[4] == 'm') {
+			return handle_goldsrc_server_info_reply(socket, message, length, flags, dest_addr, dest_len);
+		}
+
+		// check if this is server info reply packet (ÿÿÿÿI)
+		// new Source format (GoldSrc engine has switched to use this)
+		if (orig_buf[4] == 'I') {
+			return handle_source_server_info_reply(socket, message, length, flags, dest_addr, dest_len);
 		}
 
 		// check if this is player reply packet (ÿÿÿÿD)
-		if(orig_buf[4] == 'D' && bot_conntimes >= 1) {
+		if(orig_buf[4] == 'D') {
 			return(handle_player_reply(socket, message, length, flags, dest_addr, dest_len));
 		}
 	}
-	
+
+out:
 	return(call_original_sendto(socket, message, length, flags, dest_addr, dest_len));
 }
