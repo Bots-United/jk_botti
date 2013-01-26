@@ -12,6 +12,9 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <winsock2.h>
+#include <windows.h>
+
 #include "bot_query_hook.h"
 
 //
@@ -66,41 +69,25 @@ inline void reset_sendto_hook(void)
 // Replacement sendto function
 static ssize_t PASCAL __replacement_sendto(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
 {
-	static int is_original_restored = 0;
-	int was_original_restored = is_original_restored;
-	
-	//Lock before modifing original sendto
-	EnterCriticalSection(&mutex_replacement_sendto);
-	
-	//restore old sendto
-	if(!is_original_restored)
-	{
-		restore_original_sendto();
-		
-		is_original_restored = 1;
-	}
-	
-	ssize_t ret = sendto_hook(socket, message, length, flags, dest_addr, dest_len);
-	
-	//reset hook
-	if(!was_original_restored)
-	{
-		//reset sendto hook
-		reset_sendto_hook();
-		
-		is_original_restored = 0;
-	}
-	
-	//unlock
-	LeaveCriticalSection(&mutex_replacement_sendto);
-	
-	return(ret);
+	return sendto_hook(socket, message, length, flags, dest_addr, dest_len);
 }
 
 //
 ssize_t PASCAL call_original_sendto(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
 {
-	return (*sendto_original)(socket, message, length, flags, dest_addr, dest_len);
+	WSABUF iov = {0,};
+	iov.buf = (char*)message;
+	iov.len = length;
+	DWORD num_sent = 0;
+	int err;
+
+	err = WSASendTo(socket, &iov, 1, &num_sent, flags, dest_addr, dest_len, NULL, NULL);
+	if (err == SOCKET_ERROR) {
+		errno = WSAGetLastError();
+		return -1;
+	}
+
+	return (size_t)num_sent;
 }
 
 //

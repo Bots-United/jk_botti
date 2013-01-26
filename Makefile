@@ -8,7 +8,7 @@ ifeq ($(OSTYPE),win32)
 	CPP = i686-w64-mingw32-gcc -m32
 	AR = i686-w64-mingw32-ar rc
 	RANLIB = i686-w64-mingw32-ranlib
-	LINKFLAGS = -mdll -lm -lwsock32 -Xlinker --add-stdcall-alias -s
+	LINKFLAGS = -mdll -lm -lwsock32 -lws2_32 -Xlinker --add-stdcall-alias -s
 	DLLEND = .dll
 	ZLIB_OSFLAGS =
 else
