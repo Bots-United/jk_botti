@@ -109,6 +109,275 @@ ssize_t PASCAL handle_player_reply(int socket, const void *message, size_t lengt
 	return(call_original_sendto(socket, newmsg, length, flags, dest_addr, dest_len));
 }
 
+// find number of bots and replace with zero
+ssize_t PASCAL handle_server_info_reply(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
+{
+/*
+Header 		byte 	Always equal to 'm' (0x6D.)
+Address 	string 	IP address and port of the server.
+Name 		string 	Name of the server.
+Map 		string 	Map the server has currently loaded.
+Folder 		string 	Name of the folder containing the game files.
+Game 		string 	Full name of the game.
+Players 	byte 	Number of players on the server.
+Max. Players 	byte 	Maximum number of players the server reports it can hold.
+Protocol 	byte 	Protocol version used by the server.
+Server type 	byte 	Indicates the type of server:
+    'D' for dedicated server
+    'L' for non-dedicated server
+    'P' for a HLTV server
+Environment 	byte 	Indicates the operating system of the server:
+    'L' for Linux
+    'W' for Windows
+Visibility 	byte 	Indicates whether the server requires a password:
+    0 for public
+    1 for private
+Mod 		byte 	Indicates whether the game is a mod:
+    0 for Half-Life
+    1 for Half-Life mod
+	These fields are only present in the response if "Mod" is 1:
+	Data 		Type 	Comment
+	Link	 	string 	URL to mod website.
+	Download Link 	string 	URL to download the mod.
+	NULL	 	byte 	NULL byte (0x00)
+	Version 	long 	Version of mod installed on server.
+	Size 		long 	Space (in bytes) the mod takes up.
+	Type	 	byte 	Indicates the type of mod:
+		0 for single and multiplayer mod
+		1 for multiplayer only mod
+	DLL	 	byte 	Indicates whether mod uses its own DLL:
+		0 if it uses the Half-Life DLL
+		1 if it uses its own DLL
+VAC 		byte 	Specifies whether the server uses VAC:
+    0 for unsecured
+    1 for secured
+Bots	 	byte 	Number of bots on the server. 
+ */
+	unsigned char * newmsg = (unsigned char *)alloca(length);
+	memcpy(newmsg, message, length);
+
+	ssize_t len = length - 5;
+	unsigned char * msg = (unsigned char*)newmsg + 5;
+
+	bool is_mod, handling_port;
+
+	// skip IP address and port
+	handling_port = false;
+	while (len > 0) {
+		if (*msg == 0) {
+			msg++;
+			len--;
+			break;
+		}
+		if (*msg == ':') {
+			if (handling_port)
+				goto out; /* huh? double port divider? */
+			handling_port = true;
+		} else if (*msg == '.') {
+			if (handling_port)
+				goto out; /* huh? dots in part? */
+		} else if (*msg < '0' || *msg > '9') {
+			goto out; /* not number */
+		}
+		msg++;
+		len--;
+	}
+	if (len <= 0 || !handling_port)
+		goto out; /* something is not right here */
+
+	// skip server name
+	// TODO: verify
+	while (len > 0) {
+		if (*msg == 0) {
+			msg++;
+			len--;
+			break;
+		}
+		msg++;
+		len--;
+	}
+	if (len <= 0)
+		goto out; /* something is not right here */
+
+	// skip map name
+	// TODO: verify
+	while (len > 0) {
+		if (*msg == 0) {
+			msg++;
+			len--;
+			break;
+		}
+		msg++;
+		len--;
+	}
+	if (len <= 0)
+		goto out; /* something is not right here */
+
+	// skip game folder name (valve, gearbox, etc)
+	// TODO: verify
+	while (len > 0) {
+		if (*msg == 0) {
+			msg++;
+			len--;
+			break;
+		}
+		msg++;
+		len--;
+	}
+	if (len <= 0)
+		goto out; /* something is not right here */
+
+	// skip game name (Half-life, severian's mod, might be modified by metamod-plugins)
+	while (len > 0) {
+		if (*msg == 0) {
+			msg++;
+			len--;
+			break;
+		}
+		msg++;
+		len--;
+	}
+	if (len <= 0)
+		goto out; /* something is not right here */
+
+	// Next we have bytes: players, max.players, protocol, server type,
+	// environment, visibility, 'mod'.
+
+	// players
+	msg++;
+	len--;
+	if (len <= 0)
+		goto out;
+
+	// max players
+	msg++;
+	len--;
+	if (len <= 0)
+		goto out;
+
+	// protocol
+	msg++;
+	len--;
+	if (len <= 0)
+		goto out;
+
+	// server type, dedicated or listen
+	if (*msg != 'D' && *msg != 'd' && *msg != 'L' && *msg != 'l')
+		goto out;
+	msg++;
+	len--;
+	if (len <= 0)
+		goto out;
+
+	// environment, linux or windows
+	if (*msg != 'W' && *msg != 'W' && *msg != 'L' && *msg != 'l')
+		goto out;
+	msg++;
+	len--;
+	if (len <= 0)
+		goto out;
+
+	// visibility, 0 or 1
+	if (*msg != 0 && *msg != 1)
+		goto out;
+	msg++;
+	len--;
+	if (len <= 0)
+		goto out;
+
+	// is mod?
+	is_mod = *msg;
+	if (is_mod != 0 && is_mod != 1)
+		goto out;
+	msg++;
+	len--;
+	if (len <= 0)
+		goto out;
+
+	// if is mod, we have extra fields...
+	if (is_mod) {
+		// skip, mod homepage url
+		while (len > 0) {
+			if (*msg == 0) {
+				msg++;
+				len--;
+				break;
+			}
+			msg++;
+			len--;
+		}
+		if (len <= 0)
+			goto out; /* something is not right here */
+
+		// skip, mod download url
+		while (len > 0) {
+			if (*msg == 0) {
+				msg++;
+				len--;
+				break;
+			}
+			msg++;
+			len--;
+		}
+		if (len <= 0)
+			goto out; /* something is not right here */
+
+		// NULL
+		if (*msg != 0)
+			goto out;
+		msg++;
+		len--;
+		if (len <= 0)
+			goto out;
+
+		// long, version
+		msg+=4;
+		len-=4;
+		if (len <= 0)
+			goto out;
+
+		// long, size
+		msg+=4;
+		len-=4;
+		if (len <= 0)
+			goto out;
+
+		// type, single&multi player == 0, multi only == 1
+		if (*msg != 0 && *msg != 1)
+			goto out;
+		msg++;
+		len--;
+		if (len <= 0)
+			goto out;
+
+		// dll, 0 or 1
+		if (*msg != 0 && *msg != 1)
+			goto out;
+		msg++;
+		len--;
+		if (len <= 0)
+			goto out;
+	}
+
+	// VAC, 0 or 1
+	if (*msg != 0 && *msg != 1)
+		goto out;
+	msg++;
+	len--;
+	if (len <= 0)
+		goto out;
+
+	// last entry, bots... len should be one now
+	if (len != 1)
+		goto out;
+
+	// TODO: verify
+	// found bot count, replace with zero
+	*msg = 0;
+out:
+	return(call_original_sendto(socket, newmsg, length, flags, dest_addr, dest_len));
+}
+
 //
 ssize_t PASCAL sendto_hook(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
 {
@@ -116,9 +385,13 @@ ssize_t PASCAL sendto_hook(int socket, const void *message, size_t length, int f
 	
 	if(length > 5 && orig_buf[0] == 0xff && orig_buf[1] == 0xff && orig_buf[2] == 0xff && orig_buf[3] == 0xff)
 	{
+		// check if this is server info reply packey (ÿÿÿÿm)
+		if (orig_buf[4] == 'm' && bot_conntimes >= 1) {
+			return handle_server_info_reply(socket, message, length, flags, dest_addr, dest_len);
+		}
+
 		// check if this is player reply packet (ÿÿÿÿD)
-		if(orig_buf[4] == 'D' && bot_conntimes >= 1)
-		{
+		if(orig_buf[4] == 'D' && bot_conntimes >= 1) {
 			return(handle_player_reply(socket, message, length, flags, dest_addr, dest_len));
 		}
 	}

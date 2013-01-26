@@ -78,41 +78,24 @@ inline void reset_sendto_hook(void)
 // Replacement sendto function
 static ssize_t __replacement_sendto(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
 {
-	static int is_original_restored = 0;
-	int was_original_restored = is_original_restored;
-	
-	//Lock before modifing original sendto
-	pthread_mutex_lock(&mutex_replacement_sendto);
-	
-	//restore old sendto
-	if(!is_original_restored)
-	{
-		restore_original_sendto();
-		
-		is_original_restored = 1;
-	}
-	
-	ssize_t ret = sendto_hook(socket, message, length, flags, dest_addr, dest_len);
-	
-	//reset hook
-	if(!was_original_restored)
-	{
-		//reset sendto hook
-		reset_sendto_hook();
-		
-		is_original_restored = 0;
-	}
-	
-	//unlock
-	pthread_mutex_unlock(&mutex_replacement_sendto);
-	
-	return(ret);
+	return sendto_hook(socket, message, length, flags, dest_addr, dest_len);
 }
 
 //
 ssize_t call_original_sendto(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
 {
-	return (*sendto_original)(socket, message, length, flags, dest_addr, dest_len);
+	/* Emulate sendto using sendmsg.. this is faster than restoring/replacing sendto() code. */
+	/* Also, internally libc sendto() is wrapper around sendmsg(). */
+	struct iovec iov = {0,};
+	iov.iov_base = (void*)message;
+	iov.iov_len = length;
+	struct msghdr msg = {0,};
+	msg.msg_name = (void*)dest_addr;
+	msg.msg_namelen = dest_len;
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+
+	return sendmsg(socket, &msg, flags);
 }
 
 //
