@@ -794,12 +794,12 @@ void BotFindEnemy( bot_t &pBot )
 {
 #if DEBUG_ENEMY_SELECT
    char info[256];
+   const char *enemy_type = "";
 #endif
    edict_t *pNewEnemy; 
    Vector v_newenemy;
    float nearestdistance;
    qboolean chatprot = FALSE;
-   const char *enemy_type = 0;
    int i;
 
    edict_t *pEdict = pBot.pEdict;
@@ -874,7 +874,6 @@ void BotFindEnemy( bot_t &pBot )
    }
 
    pNewEnemy = NULL;
-   enemy_type = "";
    v_newenemy = Vector(0,0,0);
    nearestdistance = 99999;
 
@@ -904,13 +903,13 @@ void BotFindEnemy( bot_t &pBot )
 	    continue; // skip breakables with large health
          
          Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBreakable->pEdict);
+
+         // 0,0,0 is considered invalid
+         if(v_origin == Vector(0,0,0))
+            continue;
          
          float distance = GetModifiedEnemyDistance(pBot, v_origin - pEdict->v.origin).Length();
          if (distance >= nearestdistance)
-            continue;
-         
-         // 0,0,0 is considered invalid
-         if(v_origin == Vector(0,0,0))
             continue;
          
          // see if bot can't see ...
@@ -919,10 +918,10 @@ void BotFindEnemy( bot_t &pBot )
 
          nearestdistance = distance;
          pNewEnemy = pBreakable->pEdict;
-	 enemy_type = "breakable";
          v_newenemy = v_origin;
 
 #if DEBUG_ENEMY_SELECT
+	 enemy_type = "breakable";
 	 snprintf(info, sizeof(info), "%s[or:e-%.1f:%.1f:%.1f, or:o-%.1f:%.1f:%.1f, td-%.0f, s-%d, df-%d, h-%.0f]",
 		  enemy_type, v_origin.x, v_origin.y, v_origin.z,
 		  UTIL_GetOrigin(pBreakable->pEdict).x, UTIL_GetOrigin(pBreakable->pEdict).y, UTIL_GetOrigin(pBreakable->pEdict).z,
@@ -945,10 +944,6 @@ void BotFindEnemy( bot_t &pBot )
          if (!IsAlive (pMonster))
             continue; // discard dead or dying monsters
 
-         float distance = GetModifiedEnemyDistance(pBot, UTIL_GetOriginWithExtent(pBot, pMonster) - pEdict->v.origin).Length();
-         if (distance >= nearestdistance)
-            continue;
-
          // 0,0,0 is considered invalid
          if(pMonster->v.origin == Vector(0,0,0))
             continue;
@@ -962,6 +957,10 @@ void BotFindEnemy( bot_t &pBot )
          if (pMonster->v.health > 4000)
 	    continue; // skip monsters with large health
 
+         float distance = GetModifiedEnemyDistance(pBot, UTIL_GetOriginWithExtent(pBot, pMonster) - pEdict->v.origin).Length();
+         if (distance >= nearestdistance)
+            continue;
+
          vecEnd = pMonster->v.origin + pMonster->v.view_ofs;
 
          // see if bot can't see ...
@@ -970,10 +969,10 @@ void BotFindEnemy( bot_t &pBot )
 
          nearestdistance = distance;
          pNewEnemy = pMonster;
-	 enemy_type = "monster";
          v_newenemy = pMonster->v.origin;
 
 #if DEBUG_ENEMY_SELECT
+	 enemy_type = "monster";
 	 snprintf(info, sizeof(info), "%s[or:o-%.1f:%.1f:%.1f, or:g-%.1f:%.1f:%.1f, td-%.0f(%f), df-%d, h-%.0f, f-%d, s-%d]",
 		  enemy_type,
 		  pMonster->v.origin.x, pMonster->v.origin.y, pMonster->v.origin.z,
@@ -999,22 +998,13 @@ void BotFindEnemy( bot_t &pBot )
          {
             if ((b_observer_mode) && !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
                continue;
-            
-            float distance = GetModifiedEnemyDistance(pBot, UTIL_GetOriginWithExtent(pBot, pPlayer) - pEdict->v.origin).Length();
-            if (distance >= nearestdistance)
-               continue;
 
             // 0,0,0 is considered invalid
             if(pPlayer->v.origin == Vector(0,0,0))
                continue;
-            
+
             // skip this player if not alive (i.e. dead or dying)
             if (!IsAlive(pPlayer))
-               continue;
-              
-            // skip this player if respawned lately
-            float time_since_respawn = UTIL_GetTimeSinceRespawn(pPlayer);
-            if(time_since_respawn != -1.0 && time_since_respawn < skill_settings[pBot.bot_skill].respawn_react_delay)
                continue;
 
             // skip this player if facing wall
@@ -1023,6 +1013,15 @@ void BotFindEnemy( bot_t &pBot )
 
             // don't target teammates
             if(AreTeamMates(pPlayer, pEdict))
+               continue;
+            
+            float distance = GetModifiedEnemyDistance(pBot, UTIL_GetOriginWithExtent(pBot, pPlayer) - pEdict->v.origin).Length();
+            if (distance >= nearestdistance)
+               continue;
+              
+            // skip this player if respawned lately
+            float time_since_respawn = UTIL_GetTimeSinceRespawn(pPlayer);
+            if(time_since_respawn != -1.0 && time_since_respawn < skill_settings[pBot.bot_skill].respawn_react_delay)
                continue;
 
             vecEnd = GetGunPosition(pPlayer);
@@ -1033,8 +1032,11 @@ void BotFindEnemy( bot_t &pBot )
 
             nearestdistance = distance;
             pNewEnemy = pPlayer;
-	    enemy_type = "player";
             v_newenemy = v_player;
+
+#if DEBUG_ENEMY_SELECT
+	    enemy_type = "player";
+#endif
          }
       }
    }
@@ -1046,7 +1048,6 @@ void BotFindEnemy( bot_t &pBot )
    {
       // only run this 5fps
       pNewEnemy = BotFindVisibleSoundEnemy(pBot);
-      enemy_type = "sound-enemy";
       pBot.f_next_find_visible_sound_enemy_time = gpGlobals->time + 0.2f;
       
       if(!FNullEnt(pNewEnemy))
@@ -1056,6 +1057,10 @@ void BotFindEnemy( bot_t &pBot )
          //UTIL_HostSay(pEdict, 0, msg);
          
          is_sound_enemy = TRUE;
+
+#if DEBUG_ENEMY_SELECT
+         enemy_type = "sound-enemy";
+#endif
       }
    }
 
