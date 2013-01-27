@@ -792,10 +792,14 @@ void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking )
 //
 void BotFindEnemy( bot_t &pBot )
 {
+#if DEBUG_ENEMY_SELECT
+   char info[256];
+#endif
    edict_t *pNewEnemy; 
    Vector v_newenemy;
    float nearestdistance;
    qboolean chatprot = FALSE;
+   const char *enemy_type = 0;
    int i;
 
    edict_t *pEdict = pBot.pEdict;
@@ -870,6 +874,7 @@ void BotFindEnemy( bot_t &pBot )
    }
 
    pNewEnemy = NULL;
+   enemy_type = "";
    v_newenemy = Vector(0,0,0);
    nearestdistance = 99999;
 
@@ -911,7 +916,20 @@ void BotFindEnemy( bot_t &pBot )
          
          nearestdistance = distance;
          pNewEnemy = pBreakable->pEdict;
+	 enemy_type = "breakable";
          v_newenemy = v_origin;
+
+#if DEBUG_ENEMY_SELECT
+	 snprintf(info, sizeof(info), "%s[or:e-%.1f:%.1f:%.1f, or:o-%.1f:%.1f:%.1f, td-%.0f, s-%d, df-%d, h-%.0f]",
+		  enemy_type, v_origin.x, v_origin.y, v_origin.z,
+		  UTIL_GetOrigin(pBreakable->pEdict).x, UTIL_GetOrigin(pBreakable->pEdict).y, UTIL_GetOrigin(pBreakable->pEdict).z,
+		  pBreakable->pEdict->v.takedamage,
+		  pBreakable->pEdict->v.solid,
+		  pBreakable->pEdict->v.deadflag,
+		  pBreakable->pEdict->v.health
+ 		);
+	 enemy_type = info;
+#endif
       }
 
       // search the world for monsters...
@@ -937,7 +955,10 @@ void BotFindEnemy( bot_t &pBot )
          
          if (FIsClassname(pMonster, "monster_snark"))
             continue; // skip snarks
-         
+
+         if (pMonster->v.health > 4000)
+	    continue; // skip monsters with large health
+
          vecEnd = pMonster->v.origin + pMonster->v.view_ofs;
 
          // see if bot can't see ...
@@ -946,7 +967,22 @@ void BotFindEnemy( bot_t &pBot )
 
          nearestdistance = distance;
          pNewEnemy = pMonster;
+	 enemy_type = "monster";
          v_newenemy = pMonster->v.origin;
+
+#if DEBUG_ENEMY_SELECT
+	 snprintf(info, sizeof(info), "%s[or:o-%.1f:%.1f:%.1f, or:g-%.1f:%.1f:%.1f, td-%.0f(%f), df-%d, h-%.0f, f-%d, s-%d]",
+		  enemy_type,
+		  pMonster->v.origin.x, pMonster->v.origin.y, pMonster->v.origin.z,
+		  UTIL_GetOrigin(pMonster).x, UTIL_GetOrigin(pMonster).y, UTIL_GetOrigin(pMonster).z,
+		  pMonster->v.takedamage, pMonster->v.takedamage - (long long)pMonster->v.takedamage,
+		  pMonster->v.deadflag,
+		  pMonster->v.health,
+		  pMonster->v.flags,
+		  pMonster->v.solid
+		);
+	 enemy_type = info;
+#endif
       }
 
       // search the world for players...
@@ -994,6 +1030,7 @@ void BotFindEnemy( bot_t &pBot )
 
             nearestdistance = distance;
             pNewEnemy = pPlayer;
+	    enemy_type = "player";
             v_newenemy = v_player;
          }
       }
@@ -1006,9 +1043,10 @@ void BotFindEnemy( bot_t &pBot )
    {
       // only run this 5fps
       pNewEnemy = BotFindVisibleSoundEnemy(pBot);
+      enemy_type = "sound-enemy";
       pBot.f_next_find_visible_sound_enemy_time = gpGlobals->time + 0.2f;
       
-      if(pNewEnemy)
+      if(!FNullEnt(pNewEnemy))
       {
          //char msg[32];
          //safevoid_snprintf(msg, sizeof(msg), "Found sound enemy! %d", RANDOM_LONG2(0,0x7fffffff));
@@ -1019,7 +1057,7 @@ void BotFindEnemy( bot_t &pBot )
    }
 
    // 
-   if (pNewEnemy)
+   if (!FNullEnt(pNewEnemy))
    {
       // face the enemy
       Vector v_enemy = v_newenemy - pEdict->v.origin;
@@ -1034,10 +1072,14 @@ void BotFindEnemy( bot_t &pBot )
       pBot.v_bot_see_enemy_origin = UTIL_GetOrigin(pNewEnemy);
 
       BotResetReactionTime(pBot, is_sound_enemy);
-      
-      //if(pBot.waypoint_goal != -1)
-      //   UTIL_ConsolePrintf("[%s] Found enemy, forget goal: %d -> %d", pBot.name, pBot.waypoint_goal, -1);
-      
+
+#if DEBUG_ENEMY_SELECT
+      if(pBot.waypoint_goal != -1)
+         UTIL_ConsolePrintf("[%s] Found enemy, forget goal: %d -> %d", pBot.name, pBot.waypoint_goal, -1);
+
+      UTIL_ConsolePrintf("[%s] Found enemy, type: %s", pBot.name, enemy_type);
+#endif
+
       // clear goal waypoint
       pBot.waypoint_goal = -1;
       pBot.wpt_goal_type = WPT_GOAL_ENEMY;
