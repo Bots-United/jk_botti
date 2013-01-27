@@ -1,6 +1,7 @@
 jk_botti changes:
 Tweaked compiling to work with jk_botti sources/makefile. Changes to use
 assembler version of match function.
+Changed the Z_PREFIXes z_* to jkbotti_*
 
                 ChangeLog file for zlib
 
