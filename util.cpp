@@ -203,6 +203,10 @@ bot_t *UTIL_GetBotPointer(const edict_t *pEdict)
 
 Vector UTIL_AdjustOriginWithExtent(bot_t &pBot, const Vector & v_target_origin, edict_t *pTarget)
 {
+   // mins/maxs are absolute values for SOLID_BSP
+   if (pTarget->v.solid == SOLID_BSP)
+      return v_target_origin;
+
    // get smallest extent of bots mins/maxs
    float smallest_extent = -pTarget->v.mins[0];
    if(-pTarget->v.mins[1] < smallest_extent)
@@ -219,7 +223,7 @@ Vector UTIL_AdjustOriginWithExtent(bot_t &pBot, const Vector & v_target_origin, 
    
    if(smallest_extent <= 0.0f)
       return(v_target_origin);
-   
+
    // extent origin towards bot
    Vector v_extent_dir = (GetGunPosition(pBot.pEdict) - v_target_origin).Normalize();
    
@@ -800,32 +804,36 @@ qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnem
    // only check center if cannot use extra information
    if(!pEnemy)
       return(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ));
+
+   if (pEnemy->v.solid != SOLID_BSP) {
+      // first check for if head is visible
+      Vector head_offset = Vector(0, 0, pEnemy->v.maxs.z - 6);
+      if(FVisibleEnemyOffset( vecOrigin, head_offset, pEdict, pEnemy ))
+         return(TRUE);
    
-   // first check for if head is visible
-   Vector head_offset = Vector(0, 0, pEnemy->v.maxs.z - 6);
-   if(FVisibleEnemyOffset( vecOrigin, head_offset, pEdict, pEnemy ))
-      return(TRUE);
-   
-   // then check if feet are visible
-   Vector feet_offset = Vector(0, 0, pEnemy->v.mins.z - 6);
-   if(FVisibleEnemyOffset( vecOrigin, feet_offset, pEdict, pEnemy ))
-      return(TRUE);
+      // then check if feet are visible
+      Vector feet_offset = Vector(0, 0, pEnemy->v.mins.z - 6);
+      if(FVisibleEnemyOffset( vecOrigin, feet_offset, pEdict, pEnemy ))
+         return(TRUE);
+   }
    
    // check center
    return(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ));
-   
-   // construct sideways vector
-   Vector v_right = UTIL_AnglesToRight(UTIL_VecToAngles(vecOrigin - GetGunPosition(pEdict)));
 
-   // check if right side of player is visible
-   Vector right_offset = v_right * (pEnemy->v.maxs.x - 4);
-   if(FVisibleEnemyOffset( vecOrigin, right_offset, pEdict, pEnemy ))
-      return(TRUE);
+   if (pEnemy->v.solid != SOLID_BSP) {
+      // construct sideways vector
+      Vector v_right = UTIL_AnglesToRight(UTIL_VecToAngles(vecOrigin - GetGunPosition(pEdict)));
+
+      // check if right side of player is visible
+      Vector right_offset = v_right * (pEnemy->v.maxs.x - 4);
+      if(FVisibleEnemyOffset( vecOrigin, right_offset, pEdict, pEnemy ))
+         return(TRUE);
    
-   // check if left side of player is visible
-   Vector left_offset = v_right * (pEnemy->v.mins.x - 4);
-   if(FVisibleEnemyOffset( vecOrigin, left_offset, pEdict, pEnemy ))
-      return(TRUE);
+      // check if left side of player is visible
+      Vector left_offset = v_right * (pEnemy->v.mins.x - 4);
+      if(FVisibleEnemyOffset( vecOrigin, left_offset, pEdict, pEnemy ))
+         return(TRUE);
+   }
    
    return(FALSE);
 }
