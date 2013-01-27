@@ -893,7 +893,7 @@ void BotFindEnemy( bot_t &pBot )
             continue;
          
          // cannot take damage
-         if(pBreakable->pEdict->v.takedamage == DAMAGE_NO || 
+         if((int)pBreakable->pEdict->v.takedamage == DAMAGE_NO ||
             pBreakable->pEdict->v.solid == SOLID_NOT || 
             pBreakable->pEdict->v.deadflag == DEAD_DEAD ||
             !pBreakable->material_breakable ||
@@ -943,7 +943,7 @@ void BotFindEnemy( bot_t &pBot )
       pMonster = NULL;
       while (!FNullEnt (pMonster = UTIL_FindEntityInSphere (pMonster, pEdict->v.origin, 1000)))
       {
-         if (!(pMonster->v.flags & FL_MONSTER) || pMonster->v.takedamage == DAMAGE_NO)
+         if (!(pMonster->v.flags & FL_MONSTER) || (int)pMonster->v.takedamage == DAMAGE_NO)
             continue; // discard anything that is not a monster
                   
          if (!IsAlive (pMonster))

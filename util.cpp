@@ -1053,6 +1053,6 @@ Vector VecBModelOrigin(edict_t *pEdict)
 qboolean IsAlive(const edict_t *pEdict)
 {
    return (pEdict->v.deadflag == DEAD_NO) && (pEdict->v.health > 0) &&
-	!(pEdict->v.flags & FL_NOTARGET) && (pEdict->v.takedamage != 0) &&
+	!(pEdict->v.flags & FL_NOTARGET) && ((int)pEdict->v.takedamage != 0) &&
 	(pEdict->v.solid != SOLID_NOT);
 }
