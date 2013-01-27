@@ -18,18 +18,18 @@ else
 	ARCHFLAG = -fPIC
 	LINKFLAGS = -fPIC -shared -ldl -lm -s
 	DLLEND = _i386.so
-	ZLIB_OSFLAGS = -DNO_UNDERLINE
+	ZLIB_OSFLAGS = -DNO_UNDERLINE -DZ_PREFIX
 endif
 
 TARGET = jk_botti_mm
 BASEFLAGS = -Wall -Wno-write-strings
-ARCHFLAG += -march=i586 -mtune=generic
+ARCHFLAG += -march=k8 -mtune=generic
 
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
 else
-#	OPTFLAGS = -O2 -ffast-math -fomit-frame-pointer -g
-	OPTFLAGS = -O2 -ffast-math -g
+	OPTFLAGS = -O2 -ffast-math -fomit-frame-pointer -g -flto
+#	OPTFLAGS = -O2 -ffast-math -g
 endif
 
 INCLUDES = -I"./metamod" \
