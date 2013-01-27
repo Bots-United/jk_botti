@@ -73,7 +73,7 @@ public:
         inline Vector& operator+=(const Vector& v) 		{ x+=v.x; y+=v.y; z+=v.z; return *this; }
         inline Vector& operator-=(const Vector& v) 		{ x-=v.x; y-=v.y; z-=v.z; return *this; }
         inline Vector& operator*=(float fl) 			{ x*=fl; y*=fl; z*=fl; return *this;    }
-        inline Vector& operator/=(float _fl) 			{ double fl = 1.0 / _fl; x*=fl; y*=fl; z*=fl; return *this; }
+        inline Vector& operator/=(float _fl) 			{ double fl = 1.0 / _fl; x=x*fl; y=y*fl; z=z*fl; return *this; }
         
         // Methods
         inline void CopyToArray(float* rgfl) const              { rgfl[0] = x; rgfl[1] = y; rgfl[2] = z; }
@@ -98,6 +98,18 @@ public:
                 return Vector2D(x,y);
         }
         inline double Length2D(void) const                       { return sqrt(x*x + y*y); }
+
+        inline bool is_zero_vector(void) const
+        {
+		const double diff = 0.0000001;
+		if (fabs(x) > diff)
+			return false;
+		if (fabs(y) > diff)
+			return false;
+		if (fabs(z) > diff)
+			return false;
+		return true;
+	}
 
         // Members
         vec_t x, y, z;

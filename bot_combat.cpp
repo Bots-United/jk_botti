@@ -905,7 +905,7 @@ void BotFindEnemy( bot_t &pBot )
          Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBreakable->pEdict);
 
          // 0,0,0 is considered invalid
-         if(v_origin == Vector(0,0,0))
+         if(v_origin.is_zero_vector())
             continue;
          
          float distance = GetModifiedEnemyDistance(pBot, v_origin - pEdict->v.origin).Length();
@@ -945,7 +945,7 @@ void BotFindEnemy( bot_t &pBot )
             continue; // discard dead or dying monsters
 
          // 0,0,0 is considered invalid
-         if(pMonster->v.origin == Vector(0,0,0))
+         if(pMonster->v.origin.is_zero_vector())
             continue;
 
          if (FIsClassname(pMonster, "hornet"))
@@ -1000,7 +1000,7 @@ void BotFindEnemy( bot_t &pBot )
                continue;
 
             // 0,0,0 is considered invalid
-            if(pPlayer->v.origin == Vector(0,0,0))
+            if(pPlayer->v.origin.is_zero_vector())
                continue;
 
             // skip this player if not alive (i.e. dead or dying)

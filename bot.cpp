@@ -2786,7 +2786,7 @@ void BotThink( bot_t &pBot )
    }
    // next if lift-end and on moving platform
    else if(pBot.curr_waypoint_index != -1 && waypoints[pBot.curr_waypoint_index].flags & W_FL_LIFT_END &&
-           !FNullEnt(pEdict->v.groundentity) && (pEdict->v.groundentity->v.velocity != Vector(0, 0, 0)))
+           !FNullEnt(pEdict->v.groundentity) && (!pEdict->v.groundentity->v.velocity.is_zero_vector()))
    {
       Vector v_to_wp = waypoints[pBot.curr_waypoint_index].origin - GetGunPosition( pEdict );
       
