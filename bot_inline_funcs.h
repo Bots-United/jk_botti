@@ -100,11 +100,6 @@ inline double deg2rad(double deg)
    return(deg * (M_PI / 180));
 }
 
-inline qboolean IsAlive(const edict_t *pEdict) 
-{
-   return (pEdict->v.deadflag == DEAD_NO) && (pEdict->v.health > 0) && !(pEdict->v.flags & FL_NOTARGET) && (pEdict->v.takedamage != 0) && (pEdict->v.solid != SOLID_NOT);
-}
-
 inline void BotFixIdealPitch(edict_t *pEdict)
 {
    pEdict->v.idealpitch = UTIL_WrapAngle(pEdict->v.idealpitch);

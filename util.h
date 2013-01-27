@@ -58,3 +58,5 @@ void CheckPlayerChatProtection(edict_t * pPlayer);
 qboolean IsPlayerChatProtected(edict_t * pPlayer);
 
 Vector VecBModelOrigin(edict_t *pEdict);
+
+qboolean IsAlive(const edict_t *pEdict);
