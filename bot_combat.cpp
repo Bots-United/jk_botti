@@ -899,6 +899,9 @@ void BotFindEnemy( bot_t &pBot )
             !pBreakable->material_breakable ||
             pBreakable->pEdict->v.health <= 0)
             continue;
+
+         if (pBreakable->pEdict->v.health > 8000)
+	    continue; // skip breakables with large health
          
          Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBreakable->pEdict);
          
@@ -913,7 +916,7 @@ void BotFindEnemy( bot_t &pBot )
          // see if bot can't see ...
          if (!(FInViewCone( v_origin, pEdict ) && FVisible( v_origin, pEdict, pBreakable->pEdict )))
             continue;
-         
+
          nearestdistance = distance;
          pNewEnemy = pBreakable->pEdict;
 	 enemy_type = "breakable";
