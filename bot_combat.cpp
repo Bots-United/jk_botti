@@ -792,8 +792,9 @@ void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking )
 //
 void BotFindEnemy( bot_t &pBot )
 {
+#define DEBUG_ENEMY_SELECT 1
 #if DEBUG_ENEMY_SELECT
-   char info[256];
+   char info[1024];
    const char *enemy_type = "";
 #endif
    edict_t *pNewEnemy; 
@@ -922,9 +923,13 @@ void BotFindEnemy( bot_t &pBot )
 
 #if DEBUG_ENEMY_SELECT
 	 enemy_type = "breakable";
-	 snprintf(info, sizeof(info), "%s[or:e-%.1f:%.1f:%.1f, or:o-%.1f:%.1f:%.1f, td-%.0f, s-%d, df-%d, h-%.0f]",
+	 snprintf(info, sizeof(info), "%s[or:e-%.1f:%.1f:%.1f, or:o-%.1f:%.1f:%.1f, mins-%.1f:%.1f:%.1f, maxs-%.1f:%.1f:%.1f, absmin-%.1f:%.1f:%.1f, size-%.1f:%.1f:%.1f, td-%.0f, s-%d, df-%d, h-%.0f]",
 		  enemy_type, v_origin.x, v_origin.y, v_origin.z,
 		  UTIL_GetOrigin(pBreakable->pEdict).x, UTIL_GetOrigin(pBreakable->pEdict).y, UTIL_GetOrigin(pBreakable->pEdict).z,
+		  pBreakable->pEdict->v.mins.x, pBreakable->pEdict->v.mins.y, pBreakable->pEdict->v.mins.z,
+		  pBreakable->pEdict->v.maxs.x, pBreakable->pEdict->v.maxs.y, pBreakable->pEdict->v.maxs.z,
+	          pBreakable->pEdict->v.absmin.x, pBreakable->pEdict->v.absmin.y, pBreakable->pEdict->v.absmin.z,
+		  pBreakable->pEdict->v.size.x, pBreakable->pEdict->v.size.y, pBreakable->pEdict->v.size.z,
 		  pBreakable->pEdict->v.takedamage,
 		  pBreakable->pEdict->v.solid,
 		  pBreakable->pEdict->v.deadflag,
@@ -1036,6 +1041,21 @@ void BotFindEnemy( bot_t &pBot )
 
 #if DEBUG_ENEMY_SELECT
 	    enemy_type = "player";
+	    snprintf(info, sizeof(info), "%s[or:o-%.1f:%.1f:%.1f, or:g-%.1f:%.1f:%.1f, mins-%.1f:%.1f:%.1f, maxs-%.1f:%.1f:%.1f, absmin-%.1f:%.1f:%.1f, size-%.1f:%.1f:%.1f, td-%.0f(%f), df-%d, h-%.0f, f-%d, s-%d]",
+		  enemy_type,
+		  pPlayer->v.origin.x, pPlayer->v.origin.y, pPlayer->v.origin.z,
+		  UTIL_GetOrigin(pPlayer).x, UTIL_GetOrigin(pPlayer).y, UTIL_GetOrigin(pPlayer).z,
+		  pPlayer->v.mins.x, pPlayer->v.mins.y, pPlayer->v.mins.z,
+		  pPlayer->v.maxs.x, pPlayer->v.maxs.y, pPlayer->v.maxs.z,
+	          pPlayer->v.absmin.x, pPlayer->v.absmin.y, pPlayer->v.absmin.z,
+		  pPlayer->v.size.x, pPlayer->v.size.y, pPlayer->v.size.z,
+		  pPlayer->v.takedamage, pPlayer->v.takedamage - (long long)pPlayer->v.takedamage,
+		  pPlayer->v.deadflag,
+		  pPlayer->v.health,
+		  pPlayer->v.flags,
+		  pPlayer->v.solid
+		);
+	    enemy_type = info;
 #endif
          }
       }
