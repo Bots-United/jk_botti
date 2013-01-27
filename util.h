@@ -60,3 +60,5 @@ qboolean IsPlayerChatProtected(edict_t * pPlayer);
 Vector VecBModelOrigin(edict_t *pEdict);
 
 qboolean IsAlive(const edict_t *pEdict);
+
+qboolean FInViewCone(const Vector & Origin, edict_t *pEdict);

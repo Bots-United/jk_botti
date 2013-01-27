@@ -1056,3 +1056,10 @@ qboolean IsAlive(const edict_t *pEdict)
 	!(pEdict->v.flags & FL_NOTARGET) && ((int)pEdict->v.takedamage != 0) &&
 	(pEdict->v.solid != SOLID_NOT);
 }
+
+qboolean FInViewCone(const Vector & Origin, edict_t *pEdict)
+{
+   const float fov_angle = 80;
+
+   return(DotProduct((Origin - pEdict->v.origin).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle)) > cos(deg2rad(fov_angle)));
+}

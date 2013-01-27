@@ -129,13 +129,6 @@ inline void UTIL_ParticleEffect( const Vector &vecOrigin, const Vector &vecDirec
    PARTICLE_EFFECT( vecOrigin, vecDirection, (float)ulColor, (float)ulCount );
 }
 
-inline qboolean FInViewCone(const Vector & Origin, edict_t *pEdict)
-{
-   const float fov_angle = 80;
-   
-   return(DotProduct((Origin - pEdict->v.origin).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle)) > cos(deg2rad(fov_angle)));
-}
-
 inline qboolean FIsClassname(edict_t * pent, const char * cname)
 {
    return(likely(pent)?strcmp(STRING(pent->v.classname), cname)==0:FALSE);

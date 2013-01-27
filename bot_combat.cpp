@@ -792,7 +792,7 @@ void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking )
 //
 void BotFindEnemy( bot_t &pBot )
 {
-#define DEBUG_ENEMY_SELECT 1
+//#define DEBUG_ENEMY_SELECT 1
 #if DEBUG_ENEMY_SELECT
    char info[1024];
    const char *enemy_type = "";
