@@ -818,7 +818,8 @@ qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnem
    }
    
    // check center
-   return(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ));
+   if(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ))
+      return(TRUE);
 
    if (pEnemy->v.solid != SOLID_BSP) {
       // construct sideways vector
