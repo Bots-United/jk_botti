@@ -25,11 +25,6 @@ inline Vector GetGunPosition(edict_t *pEdict)
    return (pEdict->v.origin + pEdict->v.view_ofs);
 }
 
-inline Vector VecBModelOrigin(edict_t *pEdict)
-{
-   return pEdict->v.absmin + (pEdict->v.size * 0.5);
-}
-
 inline void UTIL_SelectItem(edict_t *pEdict, const char *item_name)
 {
    FakeClientCommand(pEdict, item_name, NULL, NULL);

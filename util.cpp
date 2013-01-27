@@ -1036,3 +1036,16 @@ void GetGameDir (char *game_dir)
    return;
 }
 
+Vector VecBModelOrigin(edict_t *pEdict)
+{
+   Vector v_origin = pEdict->v.absmin + (pEdict->v.size * 0.5);
+
+   if (likely(pEdict->v.solid == SOLID_BSP)) {
+      if (unlikely((v_origin.x > pEdict->v.maxs.x || v_origin.x < pEdict->v.mins.x) ||
+                   (v_origin.y > pEdict->v.maxs.y || v_origin.y < pEdict->v.mins.y) ||
+                   (v_origin.z > pEdict->v.maxs.z || v_origin.z < pEdict->v.mins.z)))
+         v_origin = (pEdict->v.maxs + pEdict->v.mins) / 2;
+   }
+
+   return v_origin;
+}
