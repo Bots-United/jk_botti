@@ -816,11 +816,17 @@ qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnem
       if(FVisibleEnemyOffset( vecOrigin, feet_offset, pEdict, pEnemy ))
          return(TRUE);
    }
-   
+
    // check center
    if(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ))
       return(TRUE);
 
+#if 0
+   /*
+    * For long time this part was unintentionally disabled. Everything worked
+    * just fine. And enabling this appears to increase CPU usage quite abit.
+    * So keep this disabled after all.
+    */
    if (pEnemy->v.solid != SOLID_BSP) {
       // construct sideways vector
       Vector v_right = UTIL_AnglesToRight(UTIL_VecToAngles(vecOrigin - GetGunPosition(pEdict)));
@@ -835,7 +841,8 @@ qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnem
       if(FVisibleEnemyOffset( vecOrigin, left_offset, pEdict, pEnemy ))
          return(TRUE);
    }
-   
+#endif
+
    return(FALSE);
 }
 

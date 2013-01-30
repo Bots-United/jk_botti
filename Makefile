@@ -23,7 +23,7 @@ endif
 
 TARGET = jk_botti_mm
 BASEFLAGS = -Wall -Wno-write-strings
-ARCHFLAG += -march=k8 -mtune=generic
+ARCHFLAG += -march=i686 -mtune=generic
 
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
