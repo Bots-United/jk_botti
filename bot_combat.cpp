@@ -1142,7 +1142,7 @@ static qboolean HaveRoomForThrow(bot_t & pBot)
       
    UTIL_TraceMove(v_start, v_end, ignore_monsters, pEdict, &tr);
      
-   feet_ok = (tr.flFraction >= 1.0f || tr.pHit == pBot.pBotEnemy);
+   feet_ok = (tr.flFraction > 0.999999f || tr.pHit == pBot.pBotEnemy);
       
    //center
    v_start = pEdict->v.origin;
@@ -1150,7 +1150,7 @@ static qboolean HaveRoomForThrow(bot_t & pBot)
       
    UTIL_TraceMove(v_start, v_end, ignore_monsters, pEdict, &tr);
       
-   center_ok = (tr.flFraction >= 1.0f || tr.pHit == pBot.pBotEnemy);
+   center_ok = (tr.flFraction > 0.999999f || tr.pHit == pBot.pBotEnemy);
       
    if(center_ok && !feet_ok)
    {
@@ -1160,7 +1160,7 @@ static qboolean HaveRoomForThrow(bot_t & pBot)
       
       UTIL_TraceMove(v_start, v_end, ignore_monsters, pEdict, &tr);
          
-      head_ok = (tr.flFraction >= 1.0f || tr.pHit == pBot.pBotEnemy);
+      head_ok = (tr.flFraction > 0.999999f || tr.pHit == pBot.pBotEnemy);
    }
    else
       head_ok = FALSE;
@@ -1752,7 +1752,7 @@ void BotShootAtEnemy( bot_t &pBot )
 
       // can the bot see the enemies feet?
 
-      if ((tr.flFraction >= 1.0f) ||
+      if ((tr.flFraction > 0.999999f) ||
           ((tr.flFraction >= 0.95f) &&
            FIsClassname("player", tr.pHit)))
       {

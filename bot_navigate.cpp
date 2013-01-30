@@ -788,7 +788,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
             );
             
             // make sure it's clear
-            if (tr.flFraction >= 1.0f)
+            if (tr.flFraction > 0.999999f)
             {
                // trace another hull straight down so we can get ground level here
                UTIL_TraceHull(tr.vecEndPos, tr.vecEndPos - Vector(0,0,8192), dont_ignore_monsters, head_hull, pEdict, &tr);
@@ -968,7 +968,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
          UTIL_TraceMove( v_src, v_dest, ignore_monsters, 
                          pEdict->v.pContainingEntity, &tr );
 
-         if (tr.flFraction >= 1.0f)
+         if (tr.flFraction > 0.999999f)
          {
             // find out what the contents is of the end of the trace...
             contents = POINT_CONTENTS( tr.vecEndPos );
@@ -1282,7 +1282,7 @@ void BotUnderWater( bot_t &pBot )
                       pEdict->v.pContainingEntity, &tr);
    
       // check if the trace didn't hit anything (i.e. nothing in the way)...
-      if (tr.flFraction >= 1.0f)
+      if (tr.flFraction > 0.999999f)
       {
          // find out what the contents is of the end of the trace...
          contents = POINT_CONTENTS( tr.vecEndPos );
@@ -1485,7 +1485,7 @@ qboolean BotStuckInCorner( bot_t &pBot )
      
      UTIL_TraceMove( v_src, v_dest, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
      
-     if (tr.flFraction >= 1.0f)
+     if (tr.flFraction > 0.999999f)
         return FALSE;
      
      // trace 45 degrees to the left...
@@ -1493,7 +1493,7 @@ qboolean BotStuckInCorner( bot_t &pBot )
      
      UTIL_TraceMove( v_src, v_dest, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
      
-     if (tr.flFraction >= 1.0f)
+     if (tr.flFraction > 0.999999f)
         return FALSE;
    }
 
@@ -1879,7 +1879,7 @@ qboolean BotCanDuckUnder( bot_t &pBot )
                    pEdict->v.pContainingEntity, &tr);
 
    // if trace didn't hit something, return FALSE
-   if (tr.flFraction >= 1.0)
+   if (tr.flFraction > 0.999999f)
       return FALSE;
 
    // now check same height to one side of the bot...
@@ -1892,7 +1892,7 @@ qboolean BotCanDuckUnder( bot_t &pBot )
                    pEdict->v.pContainingEntity, &tr);
 
    // if trace didn't hit something, return FALSE
-   if (tr.flFraction >= 1.0)
+   if (tr.flFraction > 0.999999f)
       return FALSE;
 
    // now check same height on the other side of the bot...
@@ -1905,7 +1905,7 @@ qboolean BotCanDuckUnder( bot_t &pBot )
                    pEdict->v.pContainingEntity, &tr);
 
    // if trace didn't hit something, return FALSE
-   if (tr.flFraction >= 1.0)
+   if (tr.flFraction > 0.999999f)
       return FALSE;
 
    return TRUE;
@@ -2240,7 +2240,7 @@ void BotLookForDrop( bot_t &pBot )
    UTIL_TraceMove( v_src, v_dest, ignore_monsters,  pEdict->v.pContainingEntity, &tr );
 
    // check if area in front of bot was clear...
-   if (tr.flFraction >= 1.0) 
+   if (tr.flFraction > 0.999999f)
    {
       v_src = v_dest;  // start downward trace from endpoint of open trace
       v_dest.z = v_dest.z - max_drop_height;
@@ -2250,7 +2250,7 @@ void BotLookForDrop( bot_t &pBot )
       need_to_turn = FALSE;
 
       // if trace did not hit anything then drop is TOO FAR...
-      if (tr.flFraction >= 1.0) 
+      if (tr.flFraction > 0.999999f) 
       {
          need_to_turn = TRUE;
       }
@@ -2335,7 +2335,7 @@ void BotLookForDrop( bot_t &pBot )
                                pEdict->v.pContainingEntity, &tr );
 
                // check if area in front of bot was clear...
-               if (tr.flFraction >= 1.0) 
+               if (tr.flFraction > 0.999999f)
                {
                   v_src = v_dest;  // start downward trace from endpoint of open trace
                   v_dest.z = v_dest.z - max_drop_height;
@@ -2344,7 +2344,7 @@ void BotLookForDrop( bot_t &pBot )
                                   pEdict->v.pContainingEntity, &tr );
 
                   // if trace hit something then drop is NOT TOO FAR...
-                  if (tr.flFraction >= 1.0) 
+                  if (tr.flFraction > 0.999999f)
                      done = TRUE;
                }
 

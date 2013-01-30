@@ -998,7 +998,7 @@ static qboolean BotEntityIsVisible( bot_t &pBot, const Vector & dest )
                    pBot.pEdict->v.pContainingEntity, &tr );
 
    // check if line of sight to object is not blocked (i.e. visible)
-   if (tr.flFraction >= 1.0f)
+   if (tr.flFraction > 0.999999f)
       return TRUE;
    else
       return FALSE;
@@ -1092,7 +1092,7 @@ static void BotFindItem( bot_t &pBot )
                             pEdict->v.pContainingEntity, &tr);
 
             // check if traced all the way up to the entity (didn't hit wall)
-            if (tr.flFraction >= 1.0f)
+            if (tr.flFraction > 0.999999f)
             {
                // find distance to item for later use...
                float distance = (vecEnd - vecStart).Length( );
@@ -2434,7 +2434,7 @@ static void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_
          UTIL_TraceMove(vecSrc, vecSrc + UTIL_AnglesToForward(target_angle) * max_lj_distance, dont_ignore_monsters, pEdict, &tr);
          
          // make sure it's clear
-         if (tr.flFraction >= 1.0f)
+         if (tr.flFraction > 0.999999f)
          {
             //UTIL_ConsolePrintf("%s - Clear longjump path found\n", STRING(pEdict->v.netname));
             pBot.b_combat_longjump = TRUE;

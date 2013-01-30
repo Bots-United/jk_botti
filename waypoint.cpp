@@ -130,7 +130,7 @@ static qboolean WaypointInBlockRadius(const Vector &origin)
       UTIL_TraceMove( block_list[i], origin, ignore_monsters, NULL, &tr );
       
       // block visible
-      if(tr.fStartSolid || tr.fAllSolid || tr.flFraction >= 1.0f)
+      if(tr.fStartSolid || tr.fAllSolid || tr.flFraction > 0.999999f)
          return(TRUE);
    }
    
@@ -428,7 +428,7 @@ void CollectMapSpawnItems(edict_t *pSpawn)
    UTIL_TraceHull( SpawnOrigin, SpawnOrigin + Vector(0, 0, 1),
       ignore_monsters, human_hull, pSpawn->v.pContainingEntity, &tr2 );
       
-   if(tr2.fStartSolid || tr2.flFraction < 1.0f )
+   if(tr2.fStartSolid || tr2.flFraction < 1.0f)
    {
       // Not enough space, make this duck waypoint
       SpawnOrigin = tr.vecEndPos;
@@ -707,7 +707,7 @@ int WaypointFindNearest(const Vector &v_origin, const Vector &v_offset, edict_t 
          else
             UTIL_TraceMove( v_origin + v_offset, waypoints[index].origin, ignore_monsters, pEntity->v.pContainingEntity, &tr );
 
-         if (tr.flFraction >= 1.0f)
+         if (tr.flFraction > 0.999999f)
          {
             min_index = index;
             min_distance = distance;
@@ -1008,7 +1008,7 @@ static void WaypointSearchItems(edict_t *pEntity, const Vector &v_origin, int wp
                       pEntity ? pEntity->v.pContainingEntity : NULL, &tr );
 
       // make sure entity is visible...
-      if (tr.flFraction >= 1.0f)
+      if (tr.flFraction > 0.999999f)
       {
          safe_strcopy(item_name, sizeof(item_name), STRING(pent->v.classname));
 
@@ -1099,7 +1099,7 @@ edict_t *WaypointFindItem( int wpt_index )
       UTIL_TraceMove( v_origin, pent->v.origin, ignore_monsters, NULL, &tr );
       
       // make sure entity is visible...
-      if ((tr.flFraction >= 1.0f) || (tr.pHit == pent) || !(pent->v.effects & EF_NODRAW) || !(pent->v.frame > 0))
+      if ((tr.flFraction > 0.999999f) || (tr.pHit == pent) || !(pent->v.effects & EF_NODRAW) || !(pent->v.frame > 0))
       {
          safe_strcopy(item_name, sizeof(item_name), STRING(pent->v.classname));
          
@@ -1558,7 +1558,7 @@ static qboolean WaypointFixOldWaypoints(void)
       UTIL_TraceDuck(v_src, v_dest, ignore_monsters, NULL, &tr);
       
       // check if we didn't hit anything, if not then there is room to stand up
-      if (!tr.fAllSolid && !tr.fStartSolid && tr.flFraction >= 1.0f)
+      if (!tr.fAllSolid && !tr.fStartSolid && tr.flFraction > 0.999999f)
       {
          crouch_to_normal_count++;
          
@@ -1596,7 +1596,7 @@ static qboolean WaypointFixOldWaypoints(void)
       }
 
       // check if we didn't hit anything, if not then it's in mid-air
-      if (!tr.fAllSolid && !tr.fStartSolid && tr.flFraction >= 1.0f)
+      if (!tr.fAllSolid && !tr.fStartSolid && tr.flFraction > 0.999999f)
       {
          int index = k;
          
@@ -1967,7 +1967,7 @@ static qboolean WaypointReachable(const Vector &v_src, const Vector &v_dest, con
          UTIL_TraceHull( v_src, v_dest, ignore_monsters, head_hull, NULL, &tr );
 
       // if waypoint is visible from current position (even behind head)...
-      if (!tr.fAllSolid && !tr.fStartSolid && tr.flFraction >= 1.0f)
+      if (!tr.fAllSolid && !tr.fStartSolid && tr.flFraction > 0.999999f)
       {
       	 // special ladder case, if both on same ladder -> ok
       	 if((reachable_flags & W_FL_LADDER) && (v_src.Make2D() - v_dest.Make2D()).Length() <= 32.0f)
@@ -2005,7 +2005,7 @@ static qboolean WaypointReachable(const Vector &v_src, const Vector &v_dest, con
             }
             
             // check if we didn't hit anything, if not then it's in mid-air
-            if (tr.flFraction >= 1.0f)
+            if (tr.flFraction > 0.999999f)
             {
                return FALSE;  // can't reach this one
             }
@@ -2165,7 +2165,7 @@ int WaypointFindReachable(edict_t *pEntity, float range)
          UTIL_TraceMove( pEntity->v.origin + pEntity->v.view_ofs, waypoints[i].origin,
                          ignore_monsters, pEntity->v.pContainingEntity, &tr );
 
-         if (tr.flFraction >= 1.0f)
+         if (tr.flFraction > 0.999999f)
          {
             if (WaypointReachable(pEntity->v.origin, waypoints[i].origin, GetReachableFlags(pEntity, i)))
             {
