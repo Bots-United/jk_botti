@@ -1,4 +1,4 @@
-jk_botti 1.42
+jk_botti 1.43
 -------------
 
 1. Intro
@@ -10,7 +10,7 @@ jk_botti 1.42
 1. Intro
 --------------------
 
-This is 1.42 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@iki.fi>
+This is 1.43 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@iki.fi>
 You are free to use code for any of your needs.
 
 jk_botti is computer gamer for multiplayer mode of Half-Life (HLDM) and has 
@@ -66,6 +66,11 @@ Credits:
 --------------------
 2. What's new
 --------------------
+1.43:
+ * Bots do not attack breakable objects or monsters with huge amount
+   of health
+ * Support modifying new HL server query format
+
 1.42:
  * [bugfix, linux] Fixed jk_botti to be linked with libm.so
  * Tweaked low level bot skills alot
