@@ -28,7 +28,7 @@ ARCHFLAG += -march=i686 -mtune=generic
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
 else
-	OPTFLAGS = -O2 -ffast-math -fomit-frame-pointer -g -flto
+	OPTFLAGS = -O2 -fomit-frame-pointer -g -flto
 #	OPTFLAGS = -O2 -ffast-math -g
 endif
 
