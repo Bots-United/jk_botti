@@ -29,9 +29,9 @@ ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
 else
 	OPTFLAGS = -O2 -fomit-frame-pointer -g
+	OPTFLAGS += -funsafe-math-optimizations
 	LTOFLAGS = -flto -fvisibility=hidden
 	LINKFLAGS += ${OPTFLAGS} ${LTOFLAGS}
-#	OPTFLAGS = -O2 -ffast-math -g
 endif
 
 INCLUDES = -I"./metamod" \
