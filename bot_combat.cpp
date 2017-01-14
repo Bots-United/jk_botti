@@ -1367,6 +1367,9 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
    qboolean avoid_use_primary;
    qboolean avoid_use_secondary;
    select_list_t * tmp_select_list;
+
+   if (FNullEnt(pBot.pBotEnemy))
+     return FALSE;
    
    distance = v_enemy.Length();  // how far away is the enemy?
    height = v_enemy.z; // how high is enemy?
@@ -1850,9 +1853,16 @@ void BotShootAtEnemy( bot_t &pBot )
 qboolean BotShootTripmine( bot_t &pBot )
 {
    edict_t *pEdict = pBot.pEdict;
+   qboolean ret;
 
-   if (pBot.b_shoot_tripmine != TRUE)
-      return FALSE;
+   if (!pBot.b_shoot_tripmine)
+     return FALSE;
+   if (FNullEnt(pBot.tripmine_edict))
+     return FALSE;
+
+   // Shoot tripmine only if bot does not have target
+   if (pBot.pBotEnemy != NULL)
+     return FALSE;
 
    // aim at the tripmine and fire the glock...
    Vector v_enemy = pBot.v_tripmine - GetGunPosition( pEdict );
@@ -1860,10 +1870,13 @@ qboolean BotShootTripmine( bot_t &pBot )
 
    pEdict->v.idealpitch = UTIL_WrapAngle(enemy_angle.x);
    pEdict->v.ideal_yaw = UTIL_WrapAngle(enemy_angle.y);
-   
+
    //TODO: check if glock is available!!!!
    // if not try find another weapon which can do this (type: WEAPON_FIRE or FIRE_ZOOM).
    //TODO: or maybe throw grenade????
-   return (BotFireWeapon( v_enemy, pBot, VALVE_WEAPON_GLOCK ));
+   pBot.pBotEnemy = pBot.tripmine_edict;
+   ret = BotFireWeapon( v_enemy, pBot, VALVE_WEAPON_GLOCK );
+   pBot.pBotEnemy = NULL;
+   return ret;
 }
 

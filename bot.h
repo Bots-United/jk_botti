@@ -274,6 +274,7 @@ typedef struct
    qboolean  b_see_tripmine;
    qboolean  b_shoot_tripmine;
    Vector v_tripmine;
+   edict_t *tripmine_edict;
 
    qboolean  b_use_health_station;
    float f_use_health_time;

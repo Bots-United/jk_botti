@@ -201,6 +201,7 @@ static void BotSpawnInit( bot_t &pBot )
    pBot.b_see_tripmine = FALSE;
    pBot.b_shoot_tripmine = FALSE;
    pBot.v_tripmine = Vector(0,0,0);
+   pBot.tripmine_edict = NULL;
 
    pBot.b_use_health_station = FALSE;
    pBot.f_use_health_time = 0.0;
@@ -1402,6 +1403,7 @@ static void BotFindItem( bot_t &pBot )
                   // see if this tripmine is closer to bot...
                   if (distance < (pBot.v_tripmine - pEdict->v.origin).Length())
                   {
+                     pBot.tripmine_edict = pent;
                      pBot.v_tripmine = pent->v.origin;
                      pBot.b_shoot_tripmine = FALSE;
 
@@ -1415,6 +1417,7 @@ static void BotFindItem( bot_t &pBot )
                else
                {
                   pBot.b_see_tripmine = TRUE;
+                  pBot.tripmine_edict = pent;
                   pBot.v_tripmine = pent->v.origin;
                   pBot.b_shoot_tripmine = FALSE;
 
@@ -1722,7 +1725,7 @@ static void BotJustWanderAround(bot_t &pBot, float moved_distance)
    }
 
    // check if bot sees a tripmine...
-   if (pBot.b_see_tripmine)
+   if (pBot.b_see_tripmine && !FNullEnt(pBot.tripmine_edict))
    {
       // check if bot can shoot the tripmine...
       if ((pBot.b_shoot_tripmine) && BotShootTripmine( pBot ))
