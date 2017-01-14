@@ -1,4 +1,4 @@
-jk_botti 1.43
+jk_botti 1.44β
 -------------
 
 1. Intro
@@ -10,7 +10,7 @@ jk_botti 1.43
 1. Intro
 --------------------
 
-This is 1.43 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@iki.fi>
+This is 1.44β release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@iki.fi>
 You are free to use code for any of your needs.
 
 jk_botti is computer gamer for multiplayer mode of Half-Life (HLDM) and has 
@@ -66,6 +66,9 @@ Credits:
 --------------------
 2. What's new
 --------------------
+1.44β:
+ * Fix rare crash when bot tries to shoot tripmine with MP5
+
 1.43:
  * Bots do not attack breakable objects or monsters with huge amount
    of health
