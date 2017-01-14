@@ -1663,7 +1663,7 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
                (use_secondary && pSelect[select_index].secondary_skill_level < avoid_skill)) &&
                BotCanUseWeapon(pBot, pSelect[select_index]))
             {
-               avoid_skill = max(pSelect[select_index].primary_skill_level, pSelect[select_index].secondary_skill_level);
+               avoid_skill = MAX(pSelect[select_index].primary_skill_level, pSelect[select_index].secondary_skill_level);
                avoid_index = select_index;
                avoid_use_primary = use_primary;
                avoid_use_secondary = use_secondary;
@@ -1672,7 +1672,7 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
          else if((use_primary && pSelect[select_index].primary_skill_level > min_skill) || 
             (use_secondary && pSelect[select_index].secondary_skill_level > min_skill))
          {
-            min_skill = max(pSelect[select_index].primary_skill_level, pSelect[select_index].secondary_skill_level);
+            min_skill = MAX(pSelect[select_index].primary_skill_level, pSelect[select_index].secondary_skill_level);
             min_index = select_index;
             min_use_primary = use_primary;
             min_use_secondary = use_secondary;

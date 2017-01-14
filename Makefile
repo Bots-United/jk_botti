@@ -8,15 +8,15 @@ ifeq ($(OSTYPE),win32)
 	CPP = i686-w64-mingw32-gcc -m32
 	AR = i686-w64-mingw32-ar rc
 	RANLIB = i686-w64-mingw32-ranlib
-	LINKFLAGS = -mdll -fuse-linker-plugin -lm -lwsock32 -lws2_32 -Xlinker --add-stdcall-alias -s
+	LINKFLAGS = -mdll -lm -lwsock32 -lws2_32 -Xlinker --add-stdcall-alias -s
 	DLLEND = .dll
 	ZLIB_OSFLAGS =
 else
-	CPP = gcc-4.8 -m32
+	CPP = gcc -m32
 	AR = ar rc
 	RANLIB = ranlib
 	ARCHFLAG = -fPIC
-	LINKFLAGS = -fuse-linker-plugin -fPIC -shared -ldl -lm -s
+	LINKFLAGS = -fPIC -shared -ldl -lm -s
 	DLLEND = _i386.so
 	ZLIB_OSFLAGS = -DNO_UNDERLINE -DZ_PREFIX
 endif
@@ -28,7 +28,9 @@ ARCHFLAG += -march=i686 -mtune=generic
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
 else
-	OPTFLAGS = -O2 -fomit-frame-pointer -g -flto
+	OPTFLAGS = -O2 -fomit-frame-pointer -g
+	LTOFLAGS = -flto -fvisibility=hidden
+	LINKFLAGS += ${OPTFLAGS} ${LTOFLAGS}
 #	OPTFLAGS = -O2 -ffast-math -g
 endif
 
@@ -87,10 +89,10 @@ distclean:
 #	${CPP} ${CPPFLAGS} -funroll-loops -c $< -o $@
 
 %.o: %.cpp
-	${CPP} ${CPPFLAGS} -c $< -o $@
+	${CPP} ${CPPFLAGS} ${LTOFLAGS} -c $< -o $@
 
 %.o: %.c
-	${CPP} ${CFLAGS} -c $< -o $@
+	${CPP} ${CFLAGS} ${LTOFLAGS} -c $< -o $@
 
 depend: Rules.depend
 
