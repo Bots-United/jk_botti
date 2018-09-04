@@ -399,12 +399,13 @@ void BotClient_Valve_DeathMsg(void *p, int bot_index)
                bots[index].b_spray_logo = TRUE;  // this bot should spray logo now
                bots[index].f_spray_logo_time = gpGlobals->time;
             }
+
+            if (victim_edict != NULL)
+            {
+               BotChatTaunt(bots[index], victim_edict);
+            }
          }
 
-         if (victim_edict != NULL)
-         {
-            BotChatTaunt(bots[index], victim_edict);
-         }
       }
 
       // get the bot index of the victim...
