@@ -753,10 +753,10 @@ void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking )
 {
    edict_t *pEdict = pBot.pEdict;
    
-   JKASSERT(pBot.pBotEnemy == NULL);
+   //JKASSERT(pBot.pBotEnemy == NULL);
    
    // track enemy?
-   if(b_keep_tracking)
+   if(pBot.pBotEnemy != NULL && b_keep_tracking)
    {
       float track_time = RANDOM_FLOAT2(skill_settings[pBot.bot_skill].track_sound_time_min, skill_settings[pBot.bot_skill].track_sound_time_max);
       
