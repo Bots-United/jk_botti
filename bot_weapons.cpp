@@ -98,12 +98,6 @@ bot_weapon_select_t valve_weapon_select[NUM_OF_WEAPON_SELECTS] =
     250.0, 1500.0, 32.0, 300.0, 300.0,
     20, TRUE, 70, 1, 1, TRUE, TRUE, FALSE, FALSE, 0.0, 0.0, TRUE, 30, -1,
     W_IFL_GLOCK, W_IFL_AMMO_9MM, 0, TRUE, FALSE },
-
-   {GEARBOX_WEAPON_GRAPPLE, WEAPON_SUBMOD_OP4, "weapon_grapple", WEAPON_MELEE, 1.0,
-    SKILL4, NOSKILL, FALSE, FALSE,
-    0.0, 200.0, 0, 0, 100.0,
-    20, TRUE, 100, 0, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
-    W_IFL_GRAPPLE, 0, 0, FALSE, FALSE },
    
    {GEARBOX_WEAPON_EAGLE, WEAPON_SUBMOD_OP4, "weapon_eagle", WEAPON_FIRE, 1.0, 
     SKILL5, NOSKILL, FALSE, FALSE,
@@ -152,6 +146,12 @@ bot_weapon_select_t valve_weapon_select[NUM_OF_WEAPON_SELECTS] =
     0.0, 40.0, 0, 0, 1.0,
     20, TRUE, 100, 0, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
     W_IFL_KNIFE, 0, 0, FALSE, FALSE },
+
+   {GEARBOX_WEAPON_GRAPPLE, WEAPON_SUBMOD_OP4, "weapon_grapple", WEAPON_MELEE, 1.0,
+    SKILL4, NOSKILL, TRUE, FALSE,
+    0.0, 200.0, 0, 0, 100.0,
+    5, TRUE, 100, 0, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
+    W_IFL_GRAPPLE, 0, 0, FALSE, FALSE },
 
    /* terminator */   
    {0, 0, "", 0, 0.0,
@@ -233,9 +233,6 @@ bot_fire_delay_t valve_fire_delay[NUM_OF_WEAPON_SELECTS] = {
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
 
-   {GEARBOX_WEAPON_GRAPPLE,
-    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
-    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
    {GEARBOX_WEAPON_EAGLE,
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
@@ -258,6 +255,9 @@ bot_fire_delay_t valve_fire_delay[NUM_OF_WEAPON_SELECTS] = {
     0.05, {0.05, 0.1, 0.2, 0.0, 0.0}, {0.05, 0.1, 0.2, 0.0, 0.0},
     0.1, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
    {GEARBOX_WEAPON_KNIFE,
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
+   {GEARBOX_WEAPON_GRAPPLE,
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
 
