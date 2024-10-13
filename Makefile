@@ -1,18 +1,20 @@
 ##
 ## compiling under ubuntu:
-##  for compiling linux: make 
+##  for compiling linux: make
 ##  for compiling win32: make OSTYPE=win32
 ##
 
 ifeq ($(OSTYPE),win32)
-	CPP = i686-w64-mingw32-gcc -m32
+	CPP = i686-w64-mingw32-g++ -m32
+	CC = i686-w64-mingw32-gcc -m32
 	AR = i686-w64-mingw32-ar rc
 	RANLIB = i686-w64-mingw32-ranlib
 	LINKFLAGS = -mdll -lm -lwsock32 -lws2_32 -Xlinker --add-stdcall-alias -s
 	DLLEND = .dll
 	ZLIB_OSFLAGS =
 else
-	CPP = gcc -m32
+	CPP = g++ -m32
+	CC = gcc -m32
 	AR = ar rc
 	RANLIB = ranlib
 	ARCHFLAG = -fPIC
@@ -23,15 +25,13 @@ endif
 
 TARGET = jk_botti_mm
 BASEFLAGS = -Wall -Wno-write-strings
+BASEFLAGS += -fno-strict-aliasing -fno-strict-overflow
 ARCHFLAG += -march=i686 -mtune=generic -msse -msse2 -msse3
 
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
 else
 	OPTFLAGS = -O2 -fomit-frame-pointer -g
-	OPTFLAGS += -funsafe-math-optimizations
-	LTOFLAGS = -flto -fvisibility=hidden
-	LINKFLAGS += ${OPTFLAGS} ${LTOFLAGS}
 endif
 
 INCLUDES = -I"./metamod" \
@@ -41,7 +41,7 @@ INCLUDES = -I"./metamod" \
 	-I"./pm_shared"
 
 CFLAGS = ${BASEFLAGS} ${OPTFLAGS} ${ARCHFLAG} ${INCLUDES}
-CPPFLAGS = -fno-rtti -fno-exceptions ${CFLAGS} 
+CPPFLAGS = -fno-rtti -fno-exceptions ${CFLAGS}
 
 SRC = 	bot.cpp \
 	bot_chat.cpp \
@@ -66,15 +66,15 @@ SRC = 	bot.cpp \
 
 OBJ = $(SRC:%.cpp=%.o)
 
-${TARGET}${DLLEND}: zlib/libz.a ${OBJ} 
-	${CPP} -o $@ ${OBJ} zlib/libz.a ${LINKFLAGS}
+${TARGET}${DLLEND}: zlib/libz.a ${OBJ}
+	${CC} -o $@ ${OBJ} zlib/libz.a ${LINKFLAGS}
 	cp $@ addons/jk_botti/dlls/
 
 zlib/libz.a:
-	(cd zlib; AR="${AR}" RANLIB="${RANLIB}" CC="${CPP} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -DASMV" ./configure; $(MAKE) OBJA=match.o; cd ..)
+	(cd zlib; AR="${AR}" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -DASMV" ./configure; $(MAKE) OBJA=match.o; cd ..)
 
 clean:
-	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe 
+	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe
 	(cd zlib; $(MAKE) clean; cd ..)
 	rm -f zlib/Makefile
 
@@ -89,10 +89,10 @@ distclean:
 #	${CPP} ${CPPFLAGS} -funroll-loops -c $< -o $@
 
 %.o: %.cpp
-	${CPP} ${CPPFLAGS} ${LTOFLAGS} -c $< -o $@
+	${CPP} ${CPPFLAGS} -c $< -o $@
 
 %.o: %.c
-	${CPP} ${CFLAGS} ${LTOFLAGS} -c $< -o $@
+	${CPP} ${CFLAGS} -c $< -o $@
 
 depend: Rules.depend
 
