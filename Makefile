@@ -1,6 +1,6 @@
 ##
 ## compiling under ubuntu:
-##  for compiling linux: make 
+##  for compiling linux: make
 ##  for compiling win32: make OSTYPE=win32
 ##
 
@@ -41,7 +41,7 @@ INCLUDES = -I"./metamod" \
 	-I"./pm_shared"
 
 CFLAGS = ${BASEFLAGS} ${OPTFLAGS} ${ARCHFLAG} ${INCLUDES}
-CPPFLAGS = -fno-rtti -fno-exceptions ${CFLAGS} 
+CPPFLAGS = -fno-rtti -fno-exceptions ${CFLAGS}
 
 SRC = 	bot.cpp \
 	bot_chat.cpp \
@@ -66,7 +66,7 @@ SRC = 	bot.cpp \
 
 OBJ = $(SRC:%.cpp=%.o)
 
-${TARGET}${DLLEND}: zlib/libz.a ${OBJ} 
+${TARGET}${DLLEND}: zlib/libz.a ${OBJ}
 	${CPP} -o $@ ${OBJ} zlib/libz.a ${LINKFLAGS}
 	cp $@ addons/jk_botti/dlls/
 
@@ -74,7 +74,7 @@ zlib/libz.a:
 	(cd zlib; AR="${AR}" RANLIB="${RANLIB}" CC="${CPP} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -DASMV" ./configure; $(MAKE) OBJA=match.o; cd ..)
 
 clean:
-	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe 
+	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe
 	(cd zlib; $(MAKE) clean; cd ..)
 	rm -f zlib/Makefile
 
