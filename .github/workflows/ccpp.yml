@@ -12,7 +12,7 @@ jobs:
     - name: Update package list for i386
       run: sudo dpkg --add-architecture i386 && sudo apt-get -y update
     - name: Install packages
-      run: sudo apt-get -y install build-essential g++-multilib gcc-mingw-w64
+      run: sudo apt-get -y install build-essential g++-multilib gcc-mingw-w64 g++-mingw-w64
     - name: make
       run: make
     - name: cleanup 1
