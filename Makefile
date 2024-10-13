@@ -23,15 +23,13 @@ endif
 
 TARGET = jk_botti_mm
 BASEFLAGS = -Wall -Wno-write-strings
+BASEFLAGS += -fno-strict-aliasing -fno-strict-overflow
 ARCHFLAG += -march=i686 -mtune=generic -msse -msse2 -msse3
 
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
 else
 	OPTFLAGS = -O2 -fomit-frame-pointer -g
-	OPTFLAGS += -funsafe-math-optimizations
-	LTOFLAGS = -flto -fvisibility=hidden
-	LINKFLAGS += ${OPTFLAGS} ${LTOFLAGS}
 endif
 
 INCLUDES = -I"./metamod" \
@@ -89,10 +87,10 @@ distclean:
 #	${CPP} ${CPPFLAGS} -funroll-loops -c $< -o $@
 
 %.o: %.cpp
-	${CPP} ${CPPFLAGS} ${LTOFLAGS} -c $< -o $@
+	${CPP} ${CPPFLAGS} -c $< -o $@
 
 %.o: %.c
-	${CPP} ${CFLAGS} ${LTOFLAGS} -c $< -o $@
+	${CPP} ${CFLAGS} -c $< -o $@
 
 depend: Rules.depend
 
