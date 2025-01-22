@@ -154,6 +154,7 @@ void BotClient_Valve_CurrentWeapon(void *p, int bot_index)
 }
 
 // This message is sent when a weapon is selected.
+/* Was only needed for OP4 grapple detection (old method)
 void PlayerClient_Valve_CurrentWeapon(void *p, int player_index)
 {
    static int state = 0;   // current state machine state
@@ -186,6 +187,7 @@ void PlayerClient_Valve_CurrentWeapon(void *p, int player_index)
       }
    }
 }
+*/
 
 
 // This message is sent whenever ammo ammounts are adjusted (up or down).

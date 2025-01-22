@@ -2251,7 +2251,7 @@ static void WaypointAutowaypointing(int idx, edict_t *pEntity)
       return;
    
    // moving with grapple (op4)
-   if(pEntity->v.movetype == MOVETYPE_FLY && players[idx].current_weapon_id == GEARBOX_WEAPON_GRAPPLE)
+   if(pEntity->v.movetype == MOVETYPE_FLY && pEntity->v.flags & FL_IMMUNE_LAVA)
       return;
 
    // more waypoints on ladders
