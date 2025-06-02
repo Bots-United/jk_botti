@@ -1,4 +1,4 @@
-jk_botti 1.44β
+jk_botti custom
 -------------
 
 1. Intro
