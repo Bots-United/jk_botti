@@ -29,7 +29,7 @@ typedef struct player_s
 {
    edict_t * pEdict;
    
-   int current_weapon_id;
+   //int current_weapon_id; // Was only needed for OP4 grapple detection (old method)
 
    int last_waypoint;
 

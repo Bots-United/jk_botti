@@ -270,8 +270,9 @@ static void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, ed
                botMsgIndex = index;       // index of bot receiving message
             }
             
-            if (msg_type == FAST_GET_USER_MSG_ID (PLID, CurWeapon, "CurWeapon", NULL))
-               botMsgFunction = PlayerClient_Valve_CurrentWeapon;
+			// Was only needed for OP4 grapple detection (old method)
+            //if (msg_type == FAST_GET_USER_MSG_ID (PLID, CurWeapon, "CurWeapon", NULL))
+               //botMsgFunction = PlayerClient_Valve_CurrentWeapon;
          }
       }
       else if (msg_dest == MSG_ALL)
