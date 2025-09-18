@@ -417,7 +417,7 @@ typedef enum _fieldtypes
 	FIELD_TYPECOUNT,		// MUST BE LAST
 } FIELDTYPE;
 
-#ifndef linux
+#ifndef __linux__
 #ifndef offsetof
 #define offsetof(s,m)	(size_t)&(((s *)0)->m)
 #endif

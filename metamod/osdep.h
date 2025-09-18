@@ -45,7 +45,7 @@
 
 
 // String describing platform/DLL-type, for matching lines in metamod.ini.
-#ifdef linux
+#ifdef __linux__
 	#define PLATFORM	"linux"
 #elif defined(_WIN32)
 	#define PLATFORM	"win32"
@@ -72,7 +72,7 @@
 	#define DLLEXPORT	__declspec(dllexport)
 	// WINAPI should be provided in the windows compiler headers.
 	// It's usually defined to something like "__stdcall".
-#elif defined(linux)
+#elif defined(__linux__)
 	#define DLLEXPORT	__attribute__ ((visibility ("default")))
 	#define WINAPI		/* */
 #endif /* _WIN32 */
@@ -96,7 +96,7 @@
 
 
 // Functions & types for DLL open/close/etc operations.
-#ifdef linux
+#ifdef __linux__
 	#include <dlfcn.h>
 	typedef void* DLHANDLE;
 	typedef void* DLFUNC;
@@ -151,7 +151,7 @@ mBOOL os_safe_call(REG_CMD_FN pfn);
 // Set filename and pathname maximum lengths.  Note some windows compilers
 // provide a <limits.h> which is incomplete and/or causes problems; see
 // doc/windows_notes.txt for more information.
-#ifdef linux
+#ifdef __linux__
 	#include <limits.h>
 #elif defined(_WIN32)
 	#ifndef NAME_MAX
@@ -164,7 +164,7 @@ mBOOL os_safe_call(REG_CMD_FN pfn);
 
 
 // Various other windows routine differences.
-#ifdef linux
+#ifdef __linux__
 	#include <unistd.h>	// sleep
 #elif defined(_WIN32)
 	#define snprintf	_snprintf
@@ -211,7 +211,7 @@ mBOOL os_safe_call(REG_CMD_FN pfn);
 
 
 // Thread handling...
-#ifdef linux
+#ifdef __linux__
 	#include <pthread.h>
 	typedef	pthread_t 	THREAD_T;
 	// returns 0==success, non-zero==failure
@@ -245,7 +245,7 @@ mBOOL os_safe_call(REG_CMD_FN pfn);
 
 
 // Mutex handling...
-#ifdef linux
+#ifdef __linux__
 	typedef pthread_mutex_t		MUTEX_T;
 	inline int MUTEX_INIT(MUTEX_T *mutex) {
 		int ret;
@@ -290,7 +290,7 @@ mBOOL os_safe_call(REG_CMD_FN pfn);
 
 
 // Condition variables...
-#ifdef linux
+#ifdef __linux__
 	typedef pthread_cond_t	COND_T;
 	inline int COND_INIT(COND_T *cond) {
 		int ret;
