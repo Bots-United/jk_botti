@@ -677,25 +677,27 @@ static void StartFrame( void )
    if (bot_check_time < gpGlobals->time && min_bots != -1 && max_bots != -1 && min_bots <= max_bots)
    {
       int client_count = UTIL_GetClientCount();
+      int bot_count = UTIL_GetBotCount();
       
       if(debug_minmax)
       {
          UTIL_ConsolePrintf("client count: %d, bot count: %d, max_bots: %d, min_bots: %d\n", 
-            client_count, UTIL_GetBotCount(), max_bots, min_bots);
+            client_count, bot_count, max_bots, min_bots);
          
          UTIL_ConsolePrintf("client_count < max_bots: %s", client_count < max_bots ? "TRUE":"FALSE");
          UTIL_ConsolePrintf("client_count > max_bots: %s", client_count > max_bots ? "TRUE":"FALSE");
-         UTIL_ConsolePrintf("bot_count > min_bots: %s", UTIL_GetBotCount() > min_bots ? "TRUE":"FALSE");
+         UTIL_ConsolePrintf("bot_count < min_bots: %s", bot_count < min_bots ? "TRUE":"FALSE");
+         UTIL_ConsolePrintf("bot_count > min_bots: %s", bot_count > min_bots ? "TRUE":"FALSE");
          
-         UTIL_ConsolePrintf("Should add bot: %s", client_count < max_bots ? "TRUE":"FALSE");
-         UTIL_ConsolePrintf("Should remove bot: %s", (client_count > max_bots && UTIL_GetBotCount() > min_bots) ? "TRUE":"FALSE");
+         UTIL_ConsolePrintf("Should add bot: %s", (client_count < gpGlobals->maxClients && (client_count < max_bots || bot_count < min_bots)) ? "TRUE":"FALSE");
+         UTIL_ConsolePrintf("Should remove bot: %s", (client_count > max_bots && bot_count > min_bots) ? "TRUE":"FALSE");
          
-         if(client_count > max_bots && UTIL_GetBotCount() > min_bots)
+         if(client_count > max_bots && bot_count > min_bots)
             UTIL_ConsolePrintf("Test UTIL_PickRandomBot(), return value: %d", UTIL_PickRandomBot());
       }
       
       // need more clients
-      if(client_count < max_bots)
+      if(client_count < gpGlobals->maxClients && (client_count < max_bots || bot_count < min_bots))
       {
          const cfg_bot_record_t * record = GetUnusedCfgBotRecord();
          
@@ -707,7 +709,7 @@ static void StartFrame( void )
          bot_check_time = gpGlobals->time + 0.5;
       }
       // more than minimum count of bots and need to lower client count
-      else if(client_count > max_bots && UTIL_GetBotCount() > min_bots)
+      else if(client_count > max_bots && bot_count > min_bots)
       {
          int pick = UTIL_PickRandomBot();
          
