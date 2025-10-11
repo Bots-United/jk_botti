@@ -13,10 +13,10 @@ ifeq ($(OSTYPE),win32)
 	DLLEND = .dll
 	ZLIB_OSFLAGS =
 else
-	CPP = g++ -m32
-	CC = gcc -m32
-	AR = ar rc
-	RANLIB = ranlib
+	CPP ?= g++ -m32
+	CC ?= gcc -m32
+	AR ?= ar rc
+	RANLIB ?= ranlib
 	ARCHFLAG = -fPIC
 	LINKFLAGS = -fPIC -shared -ldl -lm -s
 	DLLEND = _i386.so
@@ -26,12 +26,14 @@ endif
 TARGET = jk_botti_mm
 BASEFLAGS = -Wall -Wno-write-strings
 BASEFLAGS += -fno-strict-aliasing -fno-strict-overflow
+BASEFLAGS += -fvisibility=hidden
 ARCHFLAG += -march=i686 -mtune=generic -msse -msse2 -msse3
 
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
 else
 	OPTFLAGS = -O2 -fomit-frame-pointer -g
+	OPTFLAGS += -fno-semantic-interposition
 endif
 
 INCLUDES = -I"./metamod" \
@@ -41,7 +43,8 @@ INCLUDES = -I"./metamod" \
 	-I"./pm_shared"
 
 CFLAGS = ${BASEFLAGS} ${OPTFLAGS} ${ARCHFLAG} ${INCLUDES}
-CPPFLAGS = -fno-rtti -fno-exceptions ${CFLAGS}
+CPPFLAGS = -fno-rtti -fno-exceptions
+CPPFLAGS += ${CFLAGS}
 
 SRC = 	bot.cpp \
 	bot_chat.cpp \
