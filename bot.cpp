@@ -866,7 +866,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
       // initialize all the variables for this bot...
 
       bot_t &pBot = bots[index];
-      memset(&pBot, 0, sizeof(pBot));
+      pBot = bot_t();
 
       pBot.is_used = TRUE;
       pBot.userid = 0;

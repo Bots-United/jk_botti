@@ -167,10 +167,10 @@ static void GameDLLInit( void )
    submod_id = CheckSubMod();
    submod_weaponflag = SubmodToSubmodWeaponFlag(submod_id);
    
-   memset(players, 0, sizeof(players));
+   zero_initialize_array(players);
 
    // initialize the bots array of structures...
-   memset(bots, 0, sizeof(bots));
+   zero_initialize_array(bots);
 
    //skill init
    ResetSkillsToDefault();
@@ -205,7 +205,7 @@ static int Spawn( edict_t *pent )
          //   memset players need to be before anything else (except posdata free)
          for(int i = 0; i < 32; i++)
             free_posdata_list(i);
-         memset(players, 0, sizeof(players));
+         zero_initialize_array(players);
          
          // do level initialization stuff here...
          WaypointInit();

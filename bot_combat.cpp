@@ -208,8 +208,8 @@ static void BotResetReactionTime(bot_t &pBot, qboolean have_slow_reaction = FALS
 // called in clientdisconnect
 void free_posdata_list(int idx) 
 {
-   memset(players[idx].posdata_mem, 0, sizeof(players[idx].posdata_mem));
-   
+   zero_initialize_array(players[idx].posdata_mem);
+
    players[idx].position_oldest = 0;
    players[idx].position_latest = 0;
 }
@@ -245,7 +245,7 @@ static posdata_t *get_posdata_slot(int idx)
       i = oldest_idx;
    }
    
-   memset(&players[idx].posdata_mem[i], 0, sizeof(players[idx].posdata_mem[i]));
+   players[idx].posdata_mem[i] = posdata_t();
    players[idx].posdata_mem[i].time = gpGlobals->time;
    players[idx].posdata_mem[i].inuse = TRUE;
    
@@ -446,7 +446,7 @@ static Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolea
    
    if(!newer) 
    {
-      memset(&newertmp, 0, sizeof(newertmp));
+      newertmp = posdata_t();
       
       newertmp.origin = pPlayer->v.origin;
       newertmp.velocity = pPlayer->v.basevelocity + pPlayer->v.velocity;   

@@ -4,6 +4,15 @@
 // util.h
 //
 
+template <typename T, size_t N>
+inline void zero_initialize_array(T (&arr)[N])
+{
+   for (size_t i = 0; i < N; ++i)
+   {
+     arr[i] = T();
+   }
+}
+
 void null_terminate_buffer(char *buf, const size_t maxlen);
 
 double UTIL_GetSecs(void);

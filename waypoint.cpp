@@ -208,7 +208,7 @@ void WaypointInit(void)
    from_to = NULL;
    wp_matrix_initialized = FALSE;
 
-   memset(waypoints, 0, sizeof(waypoints));
+   zero_initialize_array(waypoints);
    
    for (i=0; i < MAX_WAYPOINTS; i++)
    {
@@ -226,7 +226,7 @@ void WaypointInit(void)
    memset(&spawnpoints, 0, sizeof(spawnpoints));
    num_spawnpoints = 0;
    
-   memset(block_list, 0, sizeof(block_list));
+   zero_initialize_array(block_list);
    block_list_endlist = 0;
    
    g_lifts_added = 0;
