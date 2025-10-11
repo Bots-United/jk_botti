@@ -74,7 +74,7 @@ ${TARGET}${DLLEND}: zlib/libz.a ${OBJ}
 	cp $@ addons/jk_botti/dlls/
 
 zlib/libz.a:
-	(cd zlib; AR="${AR}" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -DASMV" ./configure; $(MAKE) OBJA=match.o; cd ..)
+	(cd zlib; AR="${AR}" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS}" ./configure; $(MAKE); cd ..)
 
 clean:
 	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe
