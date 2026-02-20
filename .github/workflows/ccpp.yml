@@ -14,7 +14,7 @@ jobs:
     - name: Install packages
       run: sudo apt-get -y install build-essential g++-multilib gcc-mingw-w64 g++-mingw-w64
     - name: make
-      run: make
+      run: CC="gcc -m32" CXX="g++ -m32" AR="ar rc" RANLIB="ranlib" make
     - name: cleanup 1
       run: git clean -xdf
     - name: make win32
