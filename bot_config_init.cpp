@@ -22,6 +22,7 @@
 #include "bot_skill.h"
 
 #include "bot_config_init.h"
+#include "bot_name_sanitize.h"
 
 int number_names = 0;
 char bot_names[MAX_BOT_NAMES][BOT_NAME_LEN+1];
@@ -72,9 +73,8 @@ void BotNameInit( void )
 {
    FILE *bot_name_fp;
    char bot_name_filename[256];
-   int str_index;
    char name_buffer[80];
-   int length, index;
+   int length;
 
    UTIL_BuildFileName_N(bot_name_filename, sizeof(bot_name_filename), "addons/jk_botti/jk_botti_names.txt", NULL);
 
@@ -95,16 +95,7 @@ void BotNameInit( void )
             length--;
          }
 
-         str_index = 0;
-         while (str_index < length)
-         {
-            if ((name_buffer[str_index] < ' ') || (name_buffer[str_index] > '~') ||
-                (name_buffer[str_index] == '"'))
-            for (index=str_index; index < length; index++)
-               name_buffer[index] = name_buffer[index+1];
-
-            str_index++;
-         }
+         bot_name_sanitize(name_buffer);
 
          if (name_buffer[0] != 0)
          {

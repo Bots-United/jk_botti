@@ -21,6 +21,7 @@
 #include "bot_weapons.h"
 #include "bot_skill.h"
 #include "bot_config_init.h"
+#include "bot_name_sanitize.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -625,7 +626,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
    char c_name[BOT_NAME_LEN];
    char balanceskin[MAX_TEAMNAME_LENGTH];
    int index;
-   int i, j, length;
+   int i;
    qboolean found = FALSE;
    qboolean got_skill_arg = FALSE;
    char c_topcolor[4], c_bottomcolor[4];
@@ -759,42 +760,18 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
    safevoid_snprintf(c_topcolor, sizeof(c_topcolor), "%d", top_color);
    safevoid_snprintf(c_bottomcolor, sizeof(c_bottomcolor), "%d", bottom_color);
 
-   length = strlen(c_name);
-
    // remove any illegal characters from name...
-   for (i = 0; i < length; i++)
-   {
-      if ((c_name[i] <= ' ') || (c_name[i] > '~') ||
-          (c_name[i] == '"'))
-      {
-         for (j = i; j < length; j++)  // shuffle chars left (and null)
-            c_name[j] = c_name[j+1];
-         length--;
-      }
-   }
-   
-   //
+   bot_name_sanitize(c_name);
+
    // Bug fix: remove "(1)" tags from name, HLDS adds "(1)" on duplicated names (and "(2), (3), ...")
-   //
-   if(c_name[0] == '(' && (c_name[1] >= '1' && c_name[1] <= '9') && c_name[2] == ')') 
-   {
-      length = strlen(&c_name[3]) + 1; // str+null
-      for(i = 0; i < length; i++)
-         c_name[i] = (&c_name[3])[i];
-   }
-   
-   //
+   bot_name_strip_hlds_tag(c_name);
+
    // Bug fix: remove [lvlX] tags always
-   //
-   if(!strncmp(c_name, "[lvl", 4) && (c_name[4] >= '1' && c_name[4] <= '5') && c_name[5] == ']')
    {
-      // Read skill from config file name
-      if(!got_skill_arg)
-      	 skill = c_name[4] - '0';
-      
-      length = strlen(&c_name[6]) + 1; // str+null
-      for(i = 0; i < length; i++)
-         c_name[i] = (&c_name[6])[i];
+      int tag_skill = 0;
+      bot_name_strip_skill_tag(c_name, got_skill_arg ? NULL : &tag_skill);
+      if(tag_skill)
+         skill = tag_skill;
    }
    
    //

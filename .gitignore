@@ -9,3 +9,4 @@ zlib/Makefile
 *.a
 zlib/example
 zlib/minigzip
+tests/test_*
