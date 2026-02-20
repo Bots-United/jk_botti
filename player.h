@@ -7,23 +7,7 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
-typedef struct posdata_s 
-{
-   qboolean inuse;
-   
-   float time;
-   qboolean was_alive;
-   qboolean ducking;
-   Vector origin;
-   Vector velocity;
-   //Vector accel;
-   posdata_s * older;
-   posdata_s * newer;
-   
-} posdata_t;
-
-// try store max 4sec of position data, server max fps is 100 -> 10ms/frame, 4000ms/10ms = 400
-#define POSDATA_SIZE (4000/10)
+#include "posdata_list.h"
 
 typedef struct player_s 
 {

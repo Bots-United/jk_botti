@@ -206,50 +206,16 @@ static void BotResetReactionTime(bot_t &pBot, qboolean have_slow_reaction = FALS
 
 
 // called in clientdisconnect
-void free_posdata_list(int idx) 
+void free_posdata_list(int idx)
 {
-   memset(players[idx].posdata_mem, 0, sizeof(players[idx].posdata_mem));
-   
-   players[idx].position_oldest = 0;
-   players[idx].position_latest = 0;
+   posdata_free_list(players[idx].posdata_mem, POSDATA_SIZE, &players[idx].position_latest, &players[idx].position_oldest);
 }
 
 
 static posdata_t *get_posdata_slot(int idx)
 {
-   int i, oldest_idx = -1;
-   float oldest_time = gpGlobals->time;
-
-   for(i = 0; i < POSDATA_SIZE; i++)
-   {
-      if(!players[idx].posdata_mem[i].inuse)
-         break;
-
-      /* ugly fix */
-      /* we cannot have future time, there has been some error. */
-      if (players[idx].posdata_mem[i].time > gpGlobals->time)
-          players[idx].posdata_mem[i].time = gpGlobals->time;
-
-      if (players[idx].posdata_mem[i].time <= oldest_time)
-      {
-         oldest_time = players[idx].posdata_mem[i].time;
-         oldest_idx = i;
-      }
-   }
-   
-   if(i >= POSDATA_SIZE)
-   {
-      if(oldest_idx == -1)
-         return(NULL);
-      
-      i = oldest_idx;
-   }
-   
-   memset(&players[idx].posdata_mem[i], 0, sizeof(players[idx].posdata_mem[i]));
-   players[idx].posdata_mem[i].time = gpGlobals->time;
-   players[idx].posdata_mem[i].inuse = TRUE;
-   
-   return(&players[idx].posdata_mem[i]);
+   return posdata_get_slot(players[idx].posdata_mem, POSDATA_SIZE, gpGlobals->time,
+                           &players[idx].position_latest, &players[idx].position_oldest);
 }
 
 
@@ -257,72 +223,34 @@ static posdata_t *get_posdata_slot(int idx)
 static void add_next_posdata(int idx, edict_t *pEdict)
 {
    posdata_t * new_latest = get_posdata_slot(idx);
-   
+
    JKASSERT(new_latest == NULL);
    if(new_latest == NULL)
       return;
-   
-   posdata_t * curr_latest = players[idx].position_latest;
-   players[idx].position_latest = new_latest;
-   
-   if(curr_latest != NULL) 
-   {
-      curr_latest->newer = players[idx].position_latest;
-   }
-   
-   players[idx].position_latest->older = curr_latest;
-   players[idx].position_latest->newer = NULL;
-   
+
+   posdata_link_as_latest(&players[idx].position_latest, &players[idx].position_oldest, new_latest);
+
    players[idx].position_latest->origin = pEdict->v.origin;
-   players[idx].position_latest->velocity = pEdict->v.basevelocity + pEdict->v.velocity;   
-   
+   players[idx].position_latest->velocity = pEdict->v.basevelocity + pEdict->v.velocity;
+
    players[idx].position_latest->was_alive = !!IsAlive(pEdict);
    players[idx].position_latest->ducking = (pEdict->v.flags & FL_DUCKING) == FL_DUCKING;
-   
+
    players[idx].position_latest->time = gpGlobals->time;
-   
-   if(!players[idx].position_oldest)
-      players[idx].position_oldest = players[idx].position_latest;
 }
 
 
 // remove data older than max + 100ms
-static void timetrim_posdata(int idx) 
+static void timetrim_posdata(int idx)
 {
-   posdata_t * list;
-   
-   if(!(list = players[idx].position_oldest))
+   if(!players[idx].position_oldest)
       return;
-   
-   while(list) 
-   {
-      // max + 100ms
-      // max is maximum by skill + max randomness added in GetPredictedPlayerPosition()
-      if(list->time + (skill_settings[4].ping_emu_latency + 0.1) <= gpGlobals->time) 
-      {
-         posdata_t * next = list->newer;
-         
-         //mark slot free
-         list->inuse = FALSE;
-         
-         list = next;
-         list->older = 0;
-         players[idx].position_oldest = list;
-      }
-      else 
-      {
-         // new enough.. so are all the rest
-         break;
-      }
-   }
-   
-   if(!players[idx].position_oldest) 
-   {
-	   JKASSERT(players[idx].position_latest != 0);
-	  
-      players[idx].position_oldest = 0;
-      players[idx].position_latest = 0;
-   }
+
+   // max + 100ms
+   // max is maximum by skill + max randomness added in GetPredictedPlayerPosition()
+   float cutoff_time = gpGlobals->time - (skill_settings[4].ping_emu_latency + 0.1);
+
+   posdata_timetrim(&players[idx].position_latest, &players[idx].position_oldest, cutoff_time);
 }
 
 

@@ -9,7 +9,7 @@ ifeq ($(OSTYPE),win32)
 	CC = i686-w64-mingw32-gcc -m32
 	AR = i686-w64-mingw32-ar rc
 	RANLIB = i686-w64-mingw32-ranlib
-	LINKFLAGS = -mdll -lm -lwsock32 -lws2_32 -Xlinker --add-stdcall-alias -s
+	LINKFLAGS = -mdll -lm -lwsock32 -lws2_32 -Xlinker --add-stdcall-alias -g
 	DLLEND = .dll
 	ZLIB_OSFLAGS =
 else
@@ -18,7 +18,7 @@ else
 	AR ?= ar rc
 	RANLIB ?= ranlib
 	ARCHFLAG = -fPIC
-	LINKFLAGS = -fPIC -shared -ldl -lm -s
+	LINKFLAGS = -fPIC -shared -ldl -lm -g
 	DLLEND = _i386.so
 	ZLIB_OSFLAGS = -DNO_UNDERLINE -DZ_PREFIX
 endif
@@ -27,7 +27,7 @@ TARGET = jk_botti_mm
 BASEFLAGS = -Wall -Wno-write-strings -Wno-class-memaccess
 BASEFLAGS += -fno-strict-aliasing -fno-strict-overflow
 BASEFLAGS += -fvisibility=hidden
-ARCHFLAG += -march=i686 -mtune=generic -msse -msse2 -msse3
+ARCHFLAG += -march=i686 -mtune=generic -msse -msse2 -msse3 -mincoming-stack-boundary=2
 
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
@@ -76,14 +76,18 @@ ${TARGET}${DLLEND}: zlib/libz.a ${OBJ}
 zlib/libz.a:
 	(cd zlib; AR="${AR}" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -Wno-old-style-definition" ./configure; $(MAKE) CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -Wno-old-style-definition"; cd ..)
 
-test: tests/test_name_sanitize
+test: tests/test_name_sanitize tests/test_posdata_list
 	./tests/test_name_sanitize
+	./tests/test_posdata_list
 
 tests/test_name_sanitize: tests/test_name_sanitize.cpp bot_name_sanitize.h
 	${CXX} -Wall -o $@ $<
 
+tests/test_posdata_list: tests/test_posdata_list.cpp posdata_list.h
+	${CXX} -Wall -o $@ $<
+
 clean:
-	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe tests/test_name_sanitize
+	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe tests/test_name_sanitize tests/test_posdata_list
 	(cd zlib; $(MAKE) clean; cd ..)
 	rm -f zlib/Makefile
 
