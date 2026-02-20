@@ -24,7 +24,7 @@ else
 endif
 
 TARGET = jk_botti_mm
-BASEFLAGS = -Wall -Wno-write-strings
+BASEFLAGS = -Wall -Wno-write-strings -Wno-class-memaccess
 BASEFLAGS += -fno-strict-aliasing -fno-strict-overflow
 ARCHFLAG += -march=i686 -mtune=generic -msse -msse2 -msse3
 
@@ -71,7 +71,7 @@ ${TARGET}${DLLEND}: zlib/libz.a ${OBJ}
 	cp $@ addons/jk_botti/dlls/
 
 zlib/libz.a:
-	(cd zlib; AR="${AR}" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS}" ./configure; $(MAKE) CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS}"; cd ..)
+	(cd zlib; AR="${AR}" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -Wno-old-style-definition" ./configure; $(MAKE) CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -Wno-old-style-definition"; cd ..)
 
 clean:
 	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe
