@@ -27,7 +27,7 @@ TARGET = jk_botti_mm
 BASEFLAGS = -Wall -Wno-write-strings -Wno-class-memaccess
 BASEFLAGS += -fno-strict-aliasing -fno-strict-overflow
 BASEFLAGS += -fvisibility=hidden
-ARCHFLAG += -march=i686 -mtune=generic -msse -msse2 -msse3
+ARCHFLAG += -march=i686 -mtune=generic -msse -msse2 -msse3 -mincoming-stack-boundary=2
 
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
