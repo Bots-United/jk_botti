@@ -10,3 +10,4 @@ zlib/Makefile
 zlib/example
 zlib/minigzip
 tests/test_*
+!tests/test_*.cpp
