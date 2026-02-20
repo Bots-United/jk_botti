@@ -26,12 +26,14 @@ endif
 TARGET = jk_botti_mm
 BASEFLAGS = -Wall -Wno-write-strings -Wno-class-memaccess
 BASEFLAGS += -fno-strict-aliasing -fno-strict-overflow
+BASEFLAGS += -fvisibility=hidden
 ARCHFLAG += -march=i686 -mtune=generic -msse -msse2 -msse3
 
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
 else
 	OPTFLAGS = -O2 -fomit-frame-pointer -g
+	OPTFLAGS += -fno-semantic-interposition
 endif
 
 INCLUDES = -I"./metamod" \
@@ -41,7 +43,8 @@ INCLUDES = -I"./metamod" \
 	-I"./pm_shared"
 
 CFLAGS = ${BASEFLAGS} ${OPTFLAGS} ${ARCHFLAG} ${INCLUDES}
-CXXFLAGS = -fno-rtti -fno-exceptions ${CFLAGS}
+CXXFLAGS = -fno-rtti -fno-exceptions
+CXXFLAGS += ${CFLAGS}
 
 SRC = 	bot.cpp \
 	bot_chat.cpp \
