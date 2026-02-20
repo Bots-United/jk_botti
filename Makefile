@@ -5,7 +5,7 @@
 ##
 
 ifeq ($(OSTYPE),win32)
-	CPP = i686-w64-mingw32-g++ -m32
+	CXX = i686-w64-mingw32-g++ -m32
 	CC = i686-w64-mingw32-gcc -m32
 	AR = i686-w64-mingw32-ar rc
 	RANLIB = i686-w64-mingw32-ranlib
@@ -13,7 +13,7 @@ ifeq ($(OSTYPE),win32)
 	DLLEND = .dll
 	ZLIB_OSFLAGS =
 else
-	CPP = g++ -m32
+	CXX = g++ -m32
 	CC = gcc -m32
 	AR = ar rc
 	RANLIB = ranlib
@@ -41,7 +41,7 @@ INCLUDES = -I"./metamod" \
 	-I"./pm_shared"
 
 CFLAGS = ${BASEFLAGS} ${OPTFLAGS} ${ARCHFLAG} ${INCLUDES}
-CPPFLAGS = -fno-rtti -fno-exceptions ${CFLAGS}
+CXXFLAGS = -fno-rtti -fno-exceptions ${CFLAGS}
 
 SRC = 	bot.cpp \
 	bot_chat.cpp \
@@ -83,20 +83,20 @@ distclean:
 	(cd zlib; $(MAKE) distclean; cd ..)
 
 #waypoint.o: waypoint.cpp
-#	${CPP} ${CPPFLAGS} -funroll-loops -c $< -o $@
+#	${CXX} ${CXXFLAGS} -funroll-loops -c $< -o $@
 
 #safe_snprintf.o: safe_snprintf.cpp
-#	${CPP} ${CPPFLAGS} -funroll-loops -c $< -o $@
+#	${CXX} ${CXXFLAGS} -funroll-loops -c $< -o $@
 
 %.o: %.cpp
-	${CPP} ${CPPFLAGS} -c $< -o $@
+	${CXX} ${CXXFLAGS} -c $< -o $@
 
 %.o: %.c
-	${CPP} ${CFLAGS} -c $< -o $@
+	${CXX} ${CFLAGS} -c $< -o $@
 
 depend: Rules.depend
 
 Rules.depend: Makefile $(SRC)
-	$(CPP) -MM ${INCLUDES} $(SRC) > $@
+	$(CXX) -MM ${INCLUDES} $(SRC) > $@
 
 include Rules.depend
