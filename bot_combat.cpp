@@ -1208,9 +1208,17 @@ static qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &s
                pBot.f_shoot_time = gpGlobals->time + base_delay + RANDOM_FLOAT2(min_delay, max_delay);
          }
       }
+
+      // after throwing satchel, set up detonation tracking and switch to better weapon
+      if (select.iId == VALVE_WEAPON_SATCHEL)
+      {
+         pBot.f_satchel_detonate_time = gpGlobals->time + 30.0;  // 30s force-detonate deadline
+         pBot.f_satchel_check_time = gpGlobals->time + 2.0;      // first check after throw settles
+         pBot.current_weapon_index = -1;  // force re-eval -> switch to better weapon
+      }
    }
    else // MUST be use_secondary...
-   {      
+   {
       pEdict->v.button |= IN_ATTACK2;  // use secondary attack
 
       if (select.secondary_fire_charge)
@@ -1775,6 +1783,78 @@ void BotShootAtEnemy( bot_t &pBot )
          BotResetReactionTime(pBot);
       }
    }
+}
+
+
+// Check if any enemy is near bot's deployed satchels and bot is at safe distance
+static qboolean BotShouldDetonateSatchel(bot_t &pBot)
+{
+   edict_t *pEdict = pBot.pEdict;
+   qboolean found_satchel = FALSE;
+
+   edict_t *pSatchel = NULL;
+   while ((pSatchel = UTIL_FindEntityByClassname(pSatchel, "monster_satchel")) != NULL)
+   {
+      if (pSatchel->v.owner != pEdict)
+         continue;
+
+      found_satchel = TRUE;
+      Vector satchel_origin = pSatchel->v.origin;
+
+      // Self-damage check: don't detonate if bot is within blast radius + margin
+      if ((satchel_origin - pEdict->v.origin).Length() < 200.0)
+         continue;
+
+      // Check for enemy players near the satchel
+      if (BotFindEnemyNearestToPoint(pBot, satchel_origin, 300.0, NULL) != NULL)
+         return TRUE;
+   }
+
+   // No satchels found - they were detonated or removed
+   if (!found_satchel)
+      pBot.f_satchel_detonate_time = 0;
+
+   return FALSE;
+}
+
+
+// Called from BotThink - handles full detonation flow
+qboolean BotDetonateSatchel(bot_t &pBot)
+{
+   if (pBot.f_satchel_detonate_time <= 0)
+      return FALSE;
+
+   edict_t *pEdict = pBot.pEdict;
+   qboolean should_detonate = FALSE;
+
+   // Force detonate after 30s timeout
+   if (pBot.f_satchel_detonate_time <= gpGlobals->time)
+      should_detonate = TRUE;
+   // Throttled proximity check (every 0.5s)
+   else if (pBot.f_satchel_check_time <= gpGlobals->time)
+   {
+      pBot.f_satchel_check_time = gpGlobals->time + 0.5;
+      should_detonate = BotShouldDetonateSatchel(pBot);
+   }
+
+   if (!should_detonate)
+      return FALSE;
+
+   // Two-phase: frame 1 selects weapon, frame 2 detonates
+   if (pBot.current_weapon.iId == VALVE_WEAPON_SATCHEL)
+   {
+      pEdict->v.button |= IN_ATTACK;     // detonate (primary when m_chargeReady==1)
+      pBot.f_satchel_detonate_time = 0;
+      pBot.f_shoot_time = gpGlobals->time + 0.5;
+      pBot.current_weapon_index = -1;
+   }
+   else
+   {
+      UTIL_SelectItem(pEdict, "weapon_satchel");
+      pBot.f_shoot_time = gpGlobals->time + 0.3;
+   }
+
+   return TRUE;
 }
 
 

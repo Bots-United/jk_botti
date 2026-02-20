@@ -260,6 +260,8 @@ typedef struct
    float f_shoot_time;
    float f_primary_charging;
    float f_secondary_charging;
+   float f_satchel_detonate_time;  // >0 = satchels deployed, value = force-detonate deadline
+   float f_satchel_check_time;     // throttle for proximity checks
    int   charging_weapon_id;
    float f_grenade_search_time;
    float f_grenade_found_time;

@@ -39,6 +39,12 @@ bot_weapon_select_t valve_weapon_select[NUM_OF_WEAPON_SELECTS] =
     20, TRUE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, -1, -1,
     W_IFL_HANDGRENADE, 0, 0, TRUE, FALSE },
 
+   {VALVE_WEAPON_SATCHEL, WEAPON_SUBMOD_ALL, "weapon_satchel", WEAPON_THROW, 1.0,
+    SKILL3, NOSKILL, TRUE, FALSE,
+    300.0, 800.0, 0.0, 0.0, 400.0,
+    20, TRUE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, -1, -1,
+    0, 0, 0, TRUE, FALSE },
+
    {VALVE_WEAPON_SNARK, WEAPON_SUBMOD_ALL, "weapon_snark", WEAPON_THROW, 1.0,
     SKILL3, NOSKILL, FALSE, FALSE,
     128.0, 800.0, 0, 0, 300.0,
@@ -200,6 +206,9 @@ bot_fire_delay_t valve_fire_delay[NUM_OF_WEAPON_SELECTS] = {
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
    {VALVE_WEAPON_HANDGRENADE,
+    0.5, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
+   {VALVE_WEAPON_SATCHEL,
     0.5, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
    {VALVE_WEAPON_SNARK,
@@ -432,7 +441,11 @@ qboolean IsValidToFireAtTheMoment(bot_t &pBot, const bot_weapon_select_t &select
    // underwater and cannot use underwater
    if (pBot.b_in_water && !select.can_use_underwater)
       return(FALSE);
-   
+
+   // don't select satchel while charges are deployed (prevents accidental detonate or re-throw)
+   if (select.iId == VALVE_WEAPON_SATCHEL && pBot.f_satchel_detonate_time > 0)
+      return(FALSE);
+
    return(TRUE);
 }
 

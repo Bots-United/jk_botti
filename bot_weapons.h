@@ -129,7 +129,7 @@ typedef struct
    char ammoName[64];
 } bot_ammo_names_t;
 
-#define NUM_OF_WEAPON_SELECTS 22
+#define NUM_OF_WEAPON_SELECTS 23
 
 extern bot_weapon_select_t weapon_select[NUM_OF_WEAPON_SELECTS];
 extern bot_fire_delay_t fire_delay[NUM_OF_WEAPON_SELECTS];
