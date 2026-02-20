@@ -5,7 +5,7 @@
 ##
 
 ifeq ($(OSTYPE),win32)
-	CPP = i686-w64-mingw32-g++ -m32
+	CXX = i686-w64-mingw32-g++ -m32
 	CC = i686-w64-mingw32-gcc -m32
 	AR = i686-w64-mingw32-ar rc
 	RANLIB = i686-w64-mingw32-ranlib
@@ -13,10 +13,10 @@ ifeq ($(OSTYPE),win32)
 	DLLEND = .dll
 	ZLIB_OSFLAGS =
 else
-	CPP = g++ -m32
-	CC = gcc -m32
-	AR = ar rc
-	RANLIB = ranlib
+	CXX ?= g++ -m32
+	CC ?= gcc -m32
+	AR ?= ar rc
+	RANLIB ?= ranlib
 	ARCHFLAG = -fPIC
 	LINKFLAGS = -fPIC -shared -ldl -lm -s
 	DLLEND = _i386.so
@@ -24,14 +24,16 @@ else
 endif
 
 TARGET = jk_botti_mm
-BASEFLAGS = -Wall -Wno-write-strings
+BASEFLAGS = -Wall -Wno-write-strings -Wno-class-memaccess
 BASEFLAGS += -fno-strict-aliasing -fno-strict-overflow
+BASEFLAGS += -fvisibility=hidden
 ARCHFLAG += -march=i686 -mtune=generic -msse -msse2 -msse3
 
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
 else
 	OPTFLAGS = -O2 -fomit-frame-pointer -g
+	OPTFLAGS += -fno-semantic-interposition
 endif
 
 INCLUDES = -I"./metamod" \
@@ -41,7 +43,8 @@ INCLUDES = -I"./metamod" \
 	-I"./pm_shared"
 
 CFLAGS = ${BASEFLAGS} ${OPTFLAGS} ${ARCHFLAG} ${INCLUDES}
-CPPFLAGS = -fno-rtti -fno-exceptions ${CFLAGS}
+CXXFLAGS = -fno-rtti -fno-exceptions
+CXXFLAGS += ${CFLAGS}
 
 SRC = 	bot.cpp \
 	bot_chat.cpp \
@@ -71,7 +74,7 @@ ${TARGET}${DLLEND}: zlib/libz.a ${OBJ}
 	cp $@ addons/jk_botti/dlls/
 
 zlib/libz.a:
-	(cd zlib; AR="${AR}" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -DASMV" ./configure; $(MAKE) OBJA=match.o; cd ..)
+	(cd zlib; AR="${AR}" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -Wno-old-style-definition" ./configure; $(MAKE) CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -Wno-old-style-definition"; cd ..)
 
 clean:
 	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe
@@ -83,20 +86,20 @@ distclean:
 	(cd zlib; $(MAKE) distclean; cd ..)
 
 #waypoint.o: waypoint.cpp
-#	${CPP} ${CPPFLAGS} -funroll-loops -c $< -o $@
+#	${CXX} ${CXXFLAGS} -funroll-loops -c $< -o $@
 
 #safe_snprintf.o: safe_snprintf.cpp
-#	${CPP} ${CPPFLAGS} -funroll-loops -c $< -o $@
+#	${CXX} ${CXXFLAGS} -funroll-loops -c $< -o $@
 
 %.o: %.cpp
-	${CPP} ${CPPFLAGS} -c $< -o $@
+	${CXX} ${CXXFLAGS} -c $< -o $@
 
 %.o: %.c
-	${CPP} ${CFLAGS} -c $< -o $@
+	${CXX} ${CFLAGS} -c $< -o $@
 
 depend: Rules.depend
 
 Rules.depend: Makefile $(SRC)
-	$(CPP) -MM ${INCLUDES} $(SRC) > $@
+	$(CXX) -MM ${INCLUDES} $(SRC) > $@
 
 include Rules.depend
