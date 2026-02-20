@@ -41,7 +41,8 @@ static inline void posdata_free_list(posdata_t *pool, int pool_size, posdata_t *
 }
 
 
-static inline posdata_t *posdata_get_slot(posdata_t *pool, int pool_size, float current_time)
+static inline posdata_t *posdata_get_slot(posdata_t *pool, int pool_size, float current_time,
+                                          posdata_t **p_latest, posdata_t **p_oldest)
 {
    int i, oldest_idx = -1;
    float oldest_time = current_time;
@@ -69,6 +70,17 @@ static inline posdata_t *posdata_get_slot(posdata_t *pool, int pool_size, float 
          return(NULL);
 
       i = oldest_idx;
+
+      // Unlink the stolen node from the doubly-linked list before reuse
+      posdata_t *stolen = &pool[i];
+      if (stolen->older)
+         stolen->older->newer = stolen->newer;
+      else if (*p_oldest == stolen)
+         *p_oldest = stolen->newer;
+      if (stolen->newer)
+         stolen->newer->older = stolen->older;
+      else if (*p_latest == stolen)
+         *p_latest = stolen->older;
    }
 
    memset(&pool[i], 0, sizeof(pool[i]));
@@ -115,8 +127,9 @@ static inline void posdata_timetrim(posdata_t **p_latest, posdata_t **p_oldest, 
          list->inuse = FALSE;
 
          list = next;
-         list->older = 0;
          *p_oldest = list;
+         if (!list) break;
+         list->older = 0;
       }
       else
       {

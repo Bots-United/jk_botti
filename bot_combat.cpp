@@ -214,7 +214,8 @@ void free_posdata_list(int idx)
 
 static posdata_t *get_posdata_slot(int idx)
 {
-   return posdata_get_slot(players[idx].posdata_mem, POSDATA_SIZE, gpGlobals->time);
+   return posdata_get_slot(players[idx].posdata_mem, POSDATA_SIZE, gpGlobals->time,
+                           &players[idx].position_latest, &players[idx].position_oldest);
 }
 
 

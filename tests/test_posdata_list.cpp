@@ -75,7 +75,7 @@ static int test_add_single_node(void)
    printf("posdata basic operations:\n");
 
    TEST("add single node: latest and oldest point to it");
-   posdata_t *node = posdata_get_slot(pool, TEST_POOL_SIZE, 1.0f);
+   posdata_t *node = posdata_get_slot(pool, TEST_POOL_SIZE, 1.0f, &latest, &oldest);
    ASSERT_TRUE(node != NULL);
    posdata_link_as_latest(&latest, &oldest, node);
    ASSERT_PTR_EQ(latest, node);
@@ -95,13 +95,13 @@ static int test_add_multiple_nodes(void)
 
    printf("posdata list ordering:\n");
 
-   posdata_t *n0 = posdata_get_slot(pool, TEST_POOL_SIZE, 1.0f);
+   posdata_t *n0 = posdata_get_slot(pool, TEST_POOL_SIZE, 1.0f, &latest, &oldest);
    posdata_link_as_latest(&latest, &oldest, n0);
 
-   posdata_t *n1 = posdata_get_slot(pool, TEST_POOL_SIZE, 2.0f);
+   posdata_t *n1 = posdata_get_slot(pool, TEST_POOL_SIZE, 2.0f, &latest, &oldest);
    posdata_link_as_latest(&latest, &oldest, n1);
 
-   posdata_t *n2 = posdata_get_slot(pool, TEST_POOL_SIZE, 3.0f);
+   posdata_t *n2 = posdata_get_slot(pool, TEST_POOL_SIZE, 3.0f, &latest, &oldest);
    posdata_link_as_latest(&latest, &oldest, n2);
 
    TEST("oldest is first node added");
@@ -136,13 +136,13 @@ static int test_timetrim_basic(void)
    printf("posdata timetrim:\n");
 
    // Add 3 nodes at times 1.0, 2.0, 3.0
-   posdata_t *n0 = posdata_get_slot(pool, TEST_POOL_SIZE, 1.0f);
+   posdata_t *n0 = posdata_get_slot(pool, TEST_POOL_SIZE, 1.0f, &latest, &oldest);
    posdata_link_as_latest(&latest, &oldest, n0);
 
-   posdata_t *n1 = posdata_get_slot(pool, TEST_POOL_SIZE, 2.0f);
+   posdata_t *n1 = posdata_get_slot(pool, TEST_POOL_SIZE, 2.0f, &latest, &oldest);
    posdata_link_as_latest(&latest, &oldest, n1);
 
-   posdata_t *n2 = posdata_get_slot(pool, TEST_POOL_SIZE, 3.0f);
+   posdata_t *n2 = posdata_get_slot(pool, TEST_POOL_SIZE, 3.0f, &latest, &oldest);
    posdata_link_as_latest(&latest, &oldest, n2);
 
    // Trim entries with time <= 1.5 (should remove n0 only)
@@ -180,9 +180,9 @@ static int test_free_list(void)
 
    printf("posdata free_list:\n");
 
-   posdata_t *n0 = posdata_get_slot(pool, TEST_POOL_SIZE, 1.0f);
+   posdata_t *n0 = posdata_get_slot(pool, TEST_POOL_SIZE, 1.0f, &latest, &oldest);
    posdata_link_as_latest(&latest, &oldest, n0);
-   posdata_t *n1 = posdata_get_slot(pool, TEST_POOL_SIZE, 2.0f);
+   posdata_t *n1 = posdata_get_slot(pool, TEST_POOL_SIZE, 2.0f, &latest, &oldest);
    posdata_link_as_latest(&latest, &oldest, n1);
 
    posdata_free_list(pool, TEST_POOL_SIZE, &latest, &oldest);
@@ -217,12 +217,12 @@ static int test_steal_slot_no_cycle(void)
 
    // Fill all slots
    for (int i = 0; i < TEST_POOL_SIZE; i++) {
-      posdata_t *node = posdata_get_slot(pool, TEST_POOL_SIZE, 1.0f + i);
+      posdata_t *node = posdata_get_slot(pool, TEST_POOL_SIZE, 1.0f + i, &latest, &oldest);
       posdata_link_as_latest(&latest, &oldest, node);
    }
 
    // All slots are full. Get another slot — this steals the oldest.
-   posdata_t *stolen = posdata_get_slot(pool, TEST_POOL_SIZE, 5.0f);
+   posdata_t *stolen = posdata_get_slot(pool, TEST_POOL_SIZE, 5.0f, &latest, &oldest);
    posdata_link_as_latest(&latest, &oldest, stolen);
 
    // Traverse from latest via ->older. If count exceeds pool size, there is a cycle.
@@ -275,7 +275,7 @@ static int test_timetrim_remove_last_no_crash(void)
       memset(pool, 0, sizeof(pool));
 
       // Add one node at time 1.0
-      posdata_t *node = posdata_get_slot(pool, TEST_POOL_SIZE, 1.0f);
+      posdata_t *node = posdata_get_slot(pool, TEST_POOL_SIZE, 1.0f, &latest, &oldest);
       posdata_link_as_latest(&latest, &oldest, node);
 
       // Trim with cutoff >= node's time (removes the only node)
