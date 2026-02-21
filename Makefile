@@ -11,7 +11,7 @@ ifeq ($(OSTYPE),win32)
 	RANLIB = i686-w64-mingw32-ranlib
 	LINKFLAGS = -mdll -lm -lwsock32 -lws2_32 -Xlinker --add-stdcall-alias -g
 	DLLEND = .dll
-	ZLIB_OSFLAGS =
+	ZLIB_OSFLAGS = -DZ_PREFIX
 else
 	CXX ?= g++ -m32
 	CC ?= gcc -m32
@@ -20,7 +20,7 @@ else
 	ARCHFLAG = -fPIC
 	LINKFLAGS = -fPIC -shared -ldl -lm -g
 	DLLEND = _i386.so
-	ZLIB_OSFLAGS = -DNO_UNDERLINE -DZ_PREFIX
+	ZLIB_OSFLAGS = -DZ_PREFIX
 endif
 
 TARGET = jk_botti_mm
@@ -74,7 +74,7 @@ ${TARGET}${DLLEND}: zlib/libz.a ${OBJ}
 	cp $@ addons/jk_botti/dlls/
 
 zlib/libz.a:
-	(cd zlib; AR="${AR}" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -Wno-old-style-definition" ./configure; $(MAKE) CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -Wno-old-style-definition"; cd ..)
+	(cd zlib; AR="${AR}" ARFLAGS="" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS}" ./configure --static; $(MAKE) libz.a CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS}" AR="${AR}" ARFLAGS="" RANLIB="${RANLIB}"; cd ..)
 
 test: tests/test_name_sanitize tests/test_posdata_list
 	./tests/test_name_sanitize
