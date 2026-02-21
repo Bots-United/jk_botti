@@ -48,6 +48,7 @@ int UTIL_GetBotCount(void);
 int UTIL_PickRandomBot(void);
 
 breakable_list_t * UTIL_FindBreakable(breakable_list_t * pbreakable);
+breakable_list_t * UTIL_LookupBreakable(edict_t *pEdict);
 void UTIL_FreeFuncBreakables(void);
 void UTIL_UpdateFuncBreakable(edict_t *pEdict, const char * setting, const char * value);
 
