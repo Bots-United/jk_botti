@@ -6,7 +6,28 @@ on:
       - 'v*'
 
 jobs:
+  validate-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      ver_major: ${{ steps.parse.outputs.VER_MAJOR }}
+      ver_minor: ${{ steps.parse.outputs.VER_MINOR }}
+      ver_note: ${{ steps.parse.outputs.VER_NOTE }}
+    steps:
+      - name: Parse version from tag
+        id: parse
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          if [[ "$TAG" =~ ^v([0-9]+)\.([0-9]+)(.*)$ ]]; then
+            echo "VER_MAJOR=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            echo "VER_MINOR=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
+            echo "VER_NOTE=${BASH_REMATCH[3]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Invalid tag format '$TAG', expected v<int>.<int><string>"
+            exit 1
+          fi
+
   build-linux:
+    needs: validate-tag
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,7 +36,7 @@ jobs:
       - name: Install packages
         run: sudo apt-get -y install build-essential g++-multilib
       - name: Build
-        run: CC="gcc -m32" CXX="g++ -m32" AR="ar rc" RANLIB="ranlib" make -j4
+        run: CC="gcc -m32" CXX="g++ -m32" AR="ar rc" RANLIB="ranlib" make -j4 VER_MAJOR=${{ needs.validate-tag.outputs.ver_major }} VER_MINOR=${{ needs.validate-tag.outputs.ver_minor }} VER_NOTE=${{ needs.validate-tag.outputs.ver_note }}
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -23,13 +44,14 @@ jobs:
           path: jk_botti_mm_i386.so
 
   build-windows:
+    needs: validate-tag
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install packages
         run: sudo apt-get -y update && sudo apt-get -y install gcc-mingw-w64 g++-mingw-w64
       - name: Build
-        run: make -j4 OSTYPE=win32
+        run: make -j4 OSTYPE=win32 VER_MAJOR=${{ needs.validate-tag.outputs.ver_major }} VER_MINOR=${{ needs.validate-tag.outputs.ver_minor }} VER_NOTE=${{ needs.validate-tag.outputs.ver_note }}
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -37,7 +59,7 @@ jobs:
           path: jk_botti_mm.dll
 
   release:
-    needs: [build-linux, build-windows]
+    needs: [validate-tag, build-linux, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
