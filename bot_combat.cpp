@@ -1812,7 +1812,10 @@ static qboolean BotShouldDetonateSatchel(bot_t &pBot)
 
    // No satchels found - they were detonated or removed
    if (!found_satchel)
+   {
       pBot.f_satchel_detonate_time = 0;
+      pBot.b_satchel_detonating = FALSE;
+   }
 
    return FALSE;
 }
@@ -1825,6 +1828,26 @@ qboolean BotDetonateSatchel(bot_t &pBot)
       return FALSE;
 
    edict_t *pEdict = pBot.pEdict;
+
+   // Phase 2: already committed to detonation, just waiting for weapon switch
+   if (pBot.b_satchel_detonating)
+   {
+      if (pBot.current_weapon.iId == VALVE_WEAPON_SATCHEL)
+      {
+         pEdict->v.button |= IN_ATTACK;     // detonate (primary when m_chargeReady==1)
+         pBot.f_satchel_detonate_time = 0;
+         pBot.b_satchel_detonating = FALSE;
+         pBot.f_shoot_time = gpGlobals->time + 0.5;
+         pBot.current_weapon_index = -1;
+      }
+      else
+      {
+         UTIL_SelectItem(pEdict, "weapon_satchel");  // retry select
+      }
+      return TRUE;
+   }
+
+   // Phase 1: decide whether to detonate
    qboolean should_detonate = FALSE;
 
    // Force detonate after 30s timeout
@@ -1840,16 +1863,19 @@ qboolean BotDetonateSatchel(bot_t &pBot)
    if (!should_detonate)
       return FALSE;
 
-   // Two-phase: frame 1 selects weapon, frame 2 detonates
+   // Commit to detonation
    if (pBot.current_weapon.iId == VALVE_WEAPON_SATCHEL)
    {
-      pEdict->v.button |= IN_ATTACK;     // detonate (primary when m_chargeReady==1)
+      // Already holding satchel - detonate immediately
+      pEdict->v.button |= IN_ATTACK;
       pBot.f_satchel_detonate_time = 0;
       pBot.f_shoot_time = gpGlobals->time + 0.5;
       pBot.current_weapon_index = -1;
    }
    else
    {
+      // Need to switch to satchel first, then detonate next frame
+      pBot.b_satchel_detonating = TRUE;
       UTIL_SelectItem(pEdict, "weapon_satchel");
       pBot.f_shoot_time = gpGlobals->time + 0.3;
    }

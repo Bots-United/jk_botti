@@ -40,8 +40,8 @@ bot_weapon_select_t valve_weapon_select[NUM_OF_WEAPON_SELECTS] =
     W_IFL_HANDGRENADE, 0, 0, TRUE, FALSE },
 
    {VALVE_WEAPON_SATCHEL, WEAPON_SUBMOD_ALL, "weapon_satchel", WEAPON_THROW, 1.0,
-    SKILL3, NOSKILL, TRUE, FALSE,
-    300.0, 800.0, 0.0, 0.0, 400.0,
+    SKILL4, NOSKILL, FALSE, FALSE,
+    0.0, 800.0, 0.0, 0.0, 400.0,
     20, TRUE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, -1, -1,
     0, 0, 0, TRUE, FALSE },
 
