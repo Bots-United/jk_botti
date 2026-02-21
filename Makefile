@@ -85,6 +85,9 @@ zlib/libz.a:
 test:
 	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" run
 
+valgrind:
+	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" valgrind
+
 clean:
 	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe
 	$(MAKE) -C tests clean

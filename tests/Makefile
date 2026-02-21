@@ -32,5 +32,12 @@ run: $(ALL_TESTS)
 	./test_posdata_list
 	./test_bot_combat
 
+VALGRIND = valgrind --leak-check=full --error-exitcode=1
+
+valgrind: $(ALL_TESTS)
+	$(VALGRIND) ./test_name_sanitize
+	$(VALGRIND) ./test_posdata_list
+	$(VALGRIND) ./test_bot_combat
+
 clean:
 	rm -f $(ALL_TESTS) *.o

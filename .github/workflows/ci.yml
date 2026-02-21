@@ -14,8 +14,12 @@ jobs:
         run: sudo dpkg --add-architecture i386 && sudo apt-get -y update
       - name: Install packages
         run: sudo apt-get -y install build-essential g++-multilib
+      - name: Install valgrind
+        run: sudo apt-get -y install valgrind libc6-dbg:i386
       - name: Run tests
         run: CXX="g++ -m32" make test
+      - name: Run valgrind
+        run: CXX="g++ -m32" make valgrind
 
   build-linux:
     runs-on: ubuntu-latest
