@@ -102,10 +102,14 @@ CNeuralNet::CNeuralNet(int num_inputs, int num_outputs, int num_hidden, int num_
 
 	// create network wide weight array
 	m_weights = (double *)calloc(1, sizeof(double) * m_num_weights);
+	if (!m_weights)
+		return;
 	reset_weights_random();
 
 	// create network wide neuron array
 	m_neurons = (CNeuron *)calloc(1, sizeof(CNeuron) * (m_num_outputs + m_num_neurons_per_hidden * m_num_hidden));
+	if (!m_neurons)
+		return;
 
 	// create neuron layers
 	m_layers = new CNeuronLayer[m_num_layers];
