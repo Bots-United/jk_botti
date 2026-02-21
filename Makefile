@@ -76,18 +76,12 @@ ${TARGET}${DLLEND}: zlib/libz.a ${OBJ}
 zlib/libz.a:
 	(cd zlib; AR="${AR}" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -Wno-old-style-definition" ./configure; $(MAKE) CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS} -Wno-old-style-definition"; cd ..)
 
-test: tests/test_name_sanitize tests/test_posdata_list
-	./tests/test_name_sanitize
-	./tests/test_posdata_list
-
-tests/test_name_sanitize: tests/test_name_sanitize.cpp bot_name_sanitize.h
-	${CXX} -Wall -o $@ $<
-
-tests/test_posdata_list: tests/test_posdata_list.cpp posdata_list.h
-	${CXX} -Wall -o $@ $<
+test:
+	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" run
 
 clean:
-	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe tests/test_name_sanitize tests/test_posdata_list
+	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe
+	$(MAKE) -C tests clean
 	(cd zlib; $(MAKE) clean; cd ..)
 	rm -f zlib/Makefile
 
