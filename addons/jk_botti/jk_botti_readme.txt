@@ -271,8 +271,7 @@ Credits:
 --------------------
 jk_botti is Metamod plugin, so I except you have already installed Metamod
 successfully. If not read: 
-   http://wiki.bots-united.com/index.php/How_to_install_metamod
-   http://wiki.bots-united.com/index.php/How_to_install_a_metamod_bot_%28or_any_metamod_plugin%29
+   https://github.com/Bots-United/jk_botti
 
 Binary release file comes with correct directory structure:
 addons/jk_botti/dlls/* - binaries
