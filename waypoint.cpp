@@ -758,15 +758,15 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags,
       if (exclude != NULL)
       {
          int exclude_index = 0;
-         while (exclude[exclude_index])
+         while (exclude[exclude_index] != -1)
          {
             if (index == exclude[exclude_index])
                break;  // found a match, break out of while loop
 
             exclude_index++;
          }
-         
-         if (index == exclude[exclude_index])
+
+         if (exclude[exclude_index] != -1 && index == exclude[exclude_index])
             continue;  // skip any index that matches exclude list
       }
 
@@ -823,21 +823,21 @@ int WaypointFindRandomGoal(int *out_indexes, int max_indexes, edict_t *pEntity, 
       if (exclude != NULL)
       {
          int exclude_index = 0;
-         while (exclude[exclude_index])
+         while (exclude[exclude_index] != -1)
          {
             if (index == exclude[exclude_index])
                break;  // found a match, break out of while loop
 
             exclude_index++;
          }
-         
-         if (index == exclude[exclude_index])
+
+         if (exclude[exclude_index] != -1 && index == exclude[exclude_index])
             continue;  // skip any index that matches exclude list
       }
-      
+
       if (waypoints[index].flags & (W_FL_LONGJUMP | W_FL_HEALTH | W_FL_ARMOR | W_FL_AMMO | W_FL_WEAPON))
       {
-         edict_t *wpt_item = WaypointFindItem(index);   
+         edict_t *wpt_item = WaypointFindItem(index);
          if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0))
             continue;
       }
@@ -896,7 +896,7 @@ int WaypointFindRunawayPath(int runner, int enemy)
          continue;  // skip any deleted&aiming waypoints
 
       runner_distance = WaypointDistanceFromTo(runner, index);
-      enemy_distance = WaypointDistanceFromTo(runner, index);
+      enemy_distance = WaypointDistanceFromTo(enemy, index);
       
       if(runner_distance == WAYPOINT_MAX_DISTANCE)
          continue;
@@ -1714,7 +1714,15 @@ qboolean WaypointLoad(edict_t *pEntity)
 #endif
          {
             WaypointInit();  // remove any existing waypoints
-            
+
+            if (header.number_of_waypoints > MAX_WAYPOINTS)
+            {
+               UTIL_ConsolePrintf("Waypoint file has too many waypoints (%d > %d)!\n",
+                  header.number_of_waypoints, MAX_WAYPOINTS);
+               gzclose(bfp);
+               return FALSE;
+            }
+
             int count_wp = 0, count_paths = 0;
 
             for (i=0; i < header.number_of_waypoints; i++)
@@ -1737,7 +1745,8 @@ qboolean WaypointLoad(edict_t *pEntity)
                {
                   gzread(bfp, &path_index, sizeof(path_index));
 
-                  WaypointAddPath(index, path_index);
+                  if (path_index >= 0 && path_index < MAX_WAYPOINTS)
+                     WaypointAddPath(index, path_index);
                }
             }
 
@@ -1912,6 +1921,11 @@ void WaypointSave(void)
    UTIL_ConsolePrintf("Saving waypoint file: %s\n", filename);
 
    gzFile bfp = gzopen(filename, "wb6");
+   if (!bfp)
+   {
+      UTIL_ConsolePrintf("Error: could not open waypoint file for writing: %s\n", filename);
+      return;
+   }
 
    // write the waypoint header to the file...
    gzwrite(bfp, &header, sizeof(header));
@@ -2144,7 +2158,7 @@ static qboolean WaypointReachable(const Vector &v_src, const Vector &v_dest, con
 // find the nearest reachable waypoint
 int WaypointFindReachable(edict_t *pEntity, float range)
 {
-   int i, min_index=0;
+   int i, min_index=-1;
    float distance;
    float min_distance;
    TraceResult tr;
@@ -2310,6 +2324,7 @@ static void WaypointAutowaypointing(int idx, edict_t *pEntity)
 
             // distance between isn't too much
             if ((waypoints[i].origin - waypoints[onepath_wpt].origin).Length() >= 350.0f)
+               continue;
 
             // need to be reachable to current player location
             if (!WaypointReachable(pEntity->v.origin, waypoints[i].origin, GetReachableFlags(pEntity, i)))
@@ -2661,9 +2676,10 @@ static int WaypointSlowFloyds(unsigned short *shortest_path, unsigned short *fro
                   slow_floyds.escaped = 1;
                   return 1;
                }
+               z = 0;  // reset z for normal iteration
 escape_return:
 
-               for (z=0; z < route_num_waypoints; z++)
+               for (; z < route_num_waypoints; z++)
                {
                   if ((shortest_path[y * route_num_waypoints + x] == WAYPOINT_UNREACHABLE) ||
                       (shortest_path[x * route_num_waypoints + z] == WAYPOINT_UNREACHABLE))
@@ -2772,6 +2788,14 @@ static void WaypointRouteInit(qboolean ForceRebuild)
       file1 = open(filename, O_RDONLY);
       file2 = open(filename2, O_RDONLY);
 
+      if (file1 < 0 || file2 < 0)
+      {
+         if (file1 >= 0) close(file1);
+         if (file2 >= 0) close(file2);
+         // fall through to recalculate
+      }
+      else
+      {
       fstat(file1, &stat1);
       fstat(file2, &stat2);
 
@@ -2859,6 +2883,7 @@ static void WaypointRouteInit(qboolean ForceRebuild)
       {
       	 UTIL_ConsolePrintf("[matrix load] - Waypoint file is newer than matrix file, recalculating...\n");
       }
+      } // else (file1/file2 open succeeded)
    }
 
    if (shortest_path == NULL)
