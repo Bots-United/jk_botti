@@ -351,13 +351,16 @@ static Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolea
    older = 0;
    while(newer) 
    {
-      if(newer->time > time) 
+      if(newer->time > time)
       {
+         if(newer->older == newer)
+            break;
+
          //this is too new for us.. proceed
          newer = newer->older;
          continue;
       }
-      if(newer->time == time) 
+      if(newer->time == time)
       {
          return(TracePredictedMovement(pBot, pPlayer, newer->origin, newer->velocity, fabs(gpGlobals->time - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity)); 
       }
@@ -444,13 +447,16 @@ static qboolean GetPredictedIsAlive(edict_t * pPlayer, float time)
    newer = players[idx].position_latest;
    while(newer) 
    {
-      if(newer->time > time) 
+      if(newer->time > time)
       {
+         if(newer->older == newer)
+            break;
+
          //this is too new for us.. proceed
          newer = newer->older;
          continue;
       }
-      if(newer->time == time) 
+      if(newer->time == time)
       {
          return(newer->was_alive);
       }
@@ -1654,7 +1660,8 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
       if(!(weapon_choice == pSelect[select_index].iId || weapon_choice == 0))
          continue;
 
-      if(!IsValidWeaponChoose(pBot, pSelect[select_index]))
+      if(!IsValidWeaponChoose(pBot, pSelect[select_index]) ||
+         !BotIsCarryingWeapon(pBot, pSelect[select_index].iId))
          continue;
       
       // Underwater: only use avoidable weapon if can be used underwater

@@ -36,7 +36,7 @@ qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnem
 void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2);
 void GetGameDir (char *game_dir);
 
-void UTIL_ConsolePrintf( char *fmt, ... );
+void UTIL_ConsolePrintf( const char *fmt, ... );
 void UTIL_AssertConsolePrintf(const char *file, const char *str, int line);
 char* UTIL_VarArgs2( char * string, size_t strlen, char *format, ... );
 

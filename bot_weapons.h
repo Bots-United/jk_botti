@@ -203,6 +203,7 @@ int GetWeaponItemFlag(const char * classname);
 
 qboolean BotSkilledEnoughForPrimaryAttack(bot_t &pBot, const bot_weapon_select_t &select);
 qboolean BotSkilledEnoughForSecondaryAttack(bot_t &pBot, const bot_weapon_select_t &select);
+qboolean BotIsCarryingWeapon(bot_t &pBot, int weapon_id);
 qboolean BotCanUseWeapon(bot_t &pBot, const bot_weapon_select_t &select);
 
 ammo_low_t BotPrimaryAmmoLow(bot_t &pBot, const bot_weapon_select_t &select);
