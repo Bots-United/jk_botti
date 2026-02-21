@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update package list for i386
+        run: sudo dpkg --add-architecture i386 && sudo apt-get -y update
+      - name: Install packages
+        run: sudo apt-get -y install build-essential g++-multilib
+      - name: Run tests
+        run: CXX="g++ -m32" make test
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update package list for i386
+        run: sudo dpkg --add-architecture i386 && sudo apt-get -y update
+      - name: Install packages
+        run: sudo apt-get -y install build-essential g++-multilib
+      - name: Build
+        run: CC="gcc -m32" CXX="g++ -m32" AR="ar rc" RANLIB="ranlib" make -j4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-binary
+          path: jk_botti_mm_i386.so
+
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packages
+        run: sudo apt-get -y update && sudo apt-get -y install gcc-mingw-w64 g++-mingw-w64
+      - name: Build
+        run: make -j4 OSTYPE=win32
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-binary
+          path: jk_botti_mm.dll
+
+  release-artifact:
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-binary
+          path: addons/jk_botti/dlls
+      - name: Download Windows binary
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-binary
+          path: addons/jk_botti/dlls
+      - name: Create release archive
+        run: tar c addons | xz > jk_botti-snapshot-release.tar.xz
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jk_botti-snapshot-release
+          path: jk_botti-snapshot-release.tar.xz
