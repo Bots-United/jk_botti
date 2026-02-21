@@ -988,7 +988,7 @@ static void UTIL_ServerPrintf( char *fmt, ... )
 }
 #endif
 
-void UTIL_ConsolePrintf( char *fmt, ... )
+void UTIL_ConsolePrintf( const char *fmt, ... )
 {
    va_list argptr;
    char string[512];
