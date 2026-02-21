@@ -43,7 +43,7 @@ bot_weapon_select_t valve_weapon_select[NUM_OF_WEAPON_SELECTS] =
     SKILL4, NOSKILL, FALSE, FALSE,
     0.0, 800.0, 0.0, 0.0, 400.0,
     20, TRUE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, TRUE, -1, -1,
-    0, 0, 0, TRUE, FALSE },
+    W_IFL_HANDGRENADE, 0, 0, TRUE, FALSE },
 
    {VALVE_WEAPON_SNARK, WEAPON_SUBMOD_ALL, "weapon_snark", WEAPON_THROW, 1.0,
     SKILL3, NOSKILL, FALSE, FALSE,

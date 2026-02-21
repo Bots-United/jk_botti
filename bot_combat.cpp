@@ -1843,6 +1843,8 @@ qboolean BotDetonateSatchel(bot_t &pBot)
       else
       {
          UTIL_SelectItem(pEdict, "weapon_satchel");  // retry select
+         // Keep normal firing suppressed until the satchel switch completes
+         pBot.f_shoot_time = gpGlobals->time + 0.3;
       }
       return TRUE;
    }
@@ -1850,14 +1852,16 @@ qboolean BotDetonateSatchel(bot_t &pBot)
    // Phase 1: decide whether to detonate
    qboolean should_detonate = FALSE;
 
-   // Force detonate after 30s timeout
-   if (pBot.f_satchel_detonate_time <= gpGlobals->time)
-      should_detonate = TRUE;
-   // Throttled proximity check (every 0.5s)
-   else if (pBot.f_satchel_check_time <= gpGlobals->time)
+   // Throttled proximity check (every 0.5s), also used when timeout elapses
+   qboolean timeout_reached = (pBot.f_satchel_detonate_time <= gpGlobals->time);
+   if (timeout_reached || pBot.f_satchel_check_time <= gpGlobals->time)
    {
       pBot.f_satchel_check_time = gpGlobals->time + 0.5;
       should_detonate = BotShouldDetonateSatchel(pBot);
+
+      // If timeout but still unsafe (too close), extend deadline
+      if (timeout_reached && !should_detonate)
+         pBot.f_satchel_detonate_time = gpGlobals->time + 1.0;
    }
 
    if (!should_detonate)
