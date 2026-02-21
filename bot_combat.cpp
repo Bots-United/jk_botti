@@ -32,6 +32,8 @@ extern qboolean checked_teamplay;
 extern int num_logos;
 extern int submod_id;
 extern qboolean b_botdontshoot;
+extern int bot_shoot_breakables;
+extern WAYPOINT waypoints[MAX_WAYPOINTS];
 
 char g_team_list[TEAMPLAY_TEAMLISTLENGTH];
 char g_team_names[MAX_TEAMS][MAX_TEAMNAME_LENGTH];
@@ -812,59 +814,63 @@ void BotFindEnemy( bot_t &pBot )
       edict_t *pMonster;
       Vector vecEnd;
 
-      // search func_breakables that we collected at map start (We need to collect in order to get the material value)
-      pBreakable = NULL;
-      while((pBreakable = UTIL_FindBreakable(pBreakable)) != NULL) 
+      // mode 1: search all func_breakables (original behavior)
+      if (bot_shoot_breakables == 1)
       {
-         // removed? null?
-         if(FNullEnt (pBreakable->pEdict))
-            continue;
-         
-         // cannot take damage
-         if((int)pBreakable->pEdict->v.takedamage == DAMAGE_NO ||
-            pBreakable->pEdict->v.solid == SOLID_NOT || 
-            pBreakable->pEdict->v.deadflag == DEAD_DEAD ||
-            !pBreakable->material_breakable ||
-            pBreakable->pEdict->v.health <= 0)
-            continue;
+         // search func_breakables that we collected at map start (We need to collect in order to get the material value)
+         pBreakable = NULL;
+         while((pBreakable = UTIL_FindBreakable(pBreakable)) != NULL)
+         {
+            // removed? null?
+            if(FNullEnt (pBreakable->pEdict))
+               continue;
 
-         if (pBreakable->pEdict->v.health > 8000)
-	    continue; // skip breakables with large health
-         
-         Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBreakable->pEdict);
+            // cannot take damage
+            if((int)pBreakable->pEdict->v.takedamage == DAMAGE_NO ||
+               pBreakable->pEdict->v.solid == SOLID_NOT ||
+               pBreakable->pEdict->v.deadflag == DEAD_DEAD ||
+               !pBreakable->material_breakable ||
+               pBreakable->pEdict->v.health <= 0)
+               continue;
 
-         // 0,0,0 is considered invalid
-         if(v_origin.is_zero_vector())
-            continue;
-         
-         float distance = GetModifiedEnemyDistance(pBot, v_origin - pEdict->v.origin).Length();
-         if (distance >= nearestdistance)
-            continue;
-         
-         // see if bot can't see ...
-         if (!(FInViewCone( v_origin, pEdict ) && FVisible( v_origin, pEdict, pBreakable->pEdict )))
-            continue;
+            if (pBreakable->pEdict->v.health > 8000)
+	       continue; // skip breakables with large health
 
-         nearestdistance = distance;
-         pNewEnemy = pBreakable->pEdict;
-         v_newenemy = v_origin;
+            Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBreakable->pEdict);
+
+            // 0,0,0 is considered invalid
+            if(v_origin.is_zero_vector())
+               continue;
+
+            float distance = GetModifiedEnemyDistance(pBot, v_origin - pEdict->v.origin).Length();
+            if (distance >= nearestdistance)
+               continue;
+
+            // see if bot can't see ...
+            if (!(FInViewCone( v_origin, pEdict ) && FVisible( v_origin, pEdict, pBreakable->pEdict )))
+               continue;
+
+            nearestdistance = distance;
+            pNewEnemy = pBreakable->pEdict;
+            v_newenemy = v_origin;
 
 #if DEBUG_ENEMY_SELECT
-	 enemy_type = "breakable";
-	 snprintf(info, sizeof(info), "%s[or:e-%.1f:%.1f:%.1f, or:o-%.1f:%.1f:%.1f, mins-%.1f:%.1f:%.1f, maxs-%.1f:%.1f:%.1f, absmin-%.1f:%.1f:%.1f, size-%.1f:%.1f:%.1f, td-%.0f, s-%d, df-%d, h-%.0f]",
-		  enemy_type, v_origin.x, v_origin.y, v_origin.z,
-		  UTIL_GetOrigin(pBreakable->pEdict).x, UTIL_GetOrigin(pBreakable->pEdict).y, UTIL_GetOrigin(pBreakable->pEdict).z,
-		  pBreakable->pEdict->v.mins.x, pBreakable->pEdict->v.mins.y, pBreakable->pEdict->v.mins.z,
-		  pBreakable->pEdict->v.maxs.x, pBreakable->pEdict->v.maxs.y, pBreakable->pEdict->v.maxs.z,
-	          pBreakable->pEdict->v.absmin.x, pBreakable->pEdict->v.absmin.y, pBreakable->pEdict->v.absmin.z,
-		  pBreakable->pEdict->v.size.x, pBreakable->pEdict->v.size.y, pBreakable->pEdict->v.size.z,
-		  pBreakable->pEdict->v.takedamage,
-		  pBreakable->pEdict->v.solid,
-		  pBreakable->pEdict->v.deadflag,
-		  pBreakable->pEdict->v.health
- 		);
-	 enemy_type = info;
+	    enemy_type = "breakable";
+	    snprintf(info, sizeof(info), "%s[or:e-%.1f:%.1f:%.1f, or:o-%.1f:%.1f:%.1f, mins-%.1f:%.1f:%.1f, maxs-%.1f:%.1f:%.1f, absmin-%.1f:%.1f:%.1f, size-%.1f:%.1f:%.1f, td-%.0f, s-%d, df-%d, h-%.0f]",
+		     enemy_type, v_origin.x, v_origin.y, v_origin.z,
+		     UTIL_GetOrigin(pBreakable->pEdict).x, UTIL_GetOrigin(pBreakable->pEdict).y, UTIL_GetOrigin(pBreakable->pEdict).z,
+		     pBreakable->pEdict->v.mins.x, pBreakable->pEdict->v.mins.y, pBreakable->pEdict->v.mins.z,
+		     pBreakable->pEdict->v.maxs.x, pBreakable->pEdict->v.maxs.y, pBreakable->pEdict->v.maxs.z,
+	             pBreakable->pEdict->v.absmin.x, pBreakable->pEdict->v.absmin.y, pBreakable->pEdict->v.absmin.z,
+		     pBreakable->pEdict->v.size.x, pBreakable->pEdict->v.size.y, pBreakable->pEdict->v.size.z,
+		     pBreakable->pEdict->v.takedamage,
+		     pBreakable->pEdict->v.solid,
+		     pBreakable->pEdict->v.deadflag,
+		     pBreakable->pEdict->v.health
+ 		   );
+	    enemy_type = info;
 #endif
+         }
       }
 
       // search the world for monsters...
@@ -985,6 +991,54 @@ void BotFindEnemy( bot_t &pBot )
 		);
 	    enemy_type = info;
 #endif
+         }
+      }
+
+      // mode 2: only shoot breakables blocking the bot's path
+      if (bot_shoot_breakables == 2 && pNewEnemy == NULL)
+      {
+         TraceResult tr;
+         Vector v_src = pEdict->v.origin;
+         Vector v_dest;
+
+         if (pBot.curr_waypoint_index != -1)
+         {
+            // trace toward current waypoint
+            v_dest = waypoints[pBot.curr_waypoint_index].origin;
+         }
+         else
+         {
+            // no waypoint, trace forward in facing direction
+            v_dest = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * 100;
+         }
+
+         UTIL_TraceHull(v_src, v_dest, dont_ignore_monsters, head_hull, pEdict, &tr);
+
+         if (tr.pHit && !FNullEnt(tr.pHit))
+         {
+            pBreakable = UTIL_LookupBreakable(tr.pHit);
+
+            if (pBreakable != NULL &&
+                (int)pBreakable->pEdict->v.takedamage != DAMAGE_NO &&
+                pBreakable->pEdict->v.solid != SOLID_NOT &&
+                pBreakable->pEdict->v.deadflag != DEAD_DEAD &&
+                pBreakable->pEdict->v.health > 0 &&
+                pBreakable->pEdict->v.health <= 8000)
+            {
+               Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBreakable->pEdict);
+
+               if (!v_origin.is_zero_vector() &&
+                   FInViewCone( v_origin, pEdict ) &&
+                   FVisible( v_origin, pEdict, pBreakable->pEdict ))
+               {
+                  pNewEnemy = pBreakable->pEdict;
+                  v_newenemy = v_origin;
+
+#if DEBUG_ENEMY_SELECT
+                  enemy_type = "breakable-path";
+#endif
+               }
+            }
          }
       }
    }

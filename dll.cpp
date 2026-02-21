@@ -91,6 +91,7 @@ int bot_stop = 0;
 int frame_count = 0;
 int randomize_bots_on_mapchange = 0;
 int debug_minmax = 0;
+int bot_shoot_breakables = 1; // 0=never, 1=always (default), 2=only path-blocking
 
 qboolean is_team_play = FALSE;
 qboolean checked_teamplay = FALSE;
