@@ -122,25 +122,25 @@ static void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short
    // get event info
    event_info_t *pei;
    
-   for(pei = g_event_info; pei->eventname; pei++)
+   for(pei = g_event_info; pei->eventname && pei->eventname[0]; pei++)
    {
       if(eventindex == pei->eventindex)
          break;
    }
-   
-   if(!pei->eventname)
+
+   if(!pei->eventname || !pei->eventname[0])
       RETURN_META (MRES_IGNORED);
-   
+
    // event creates sound?
-   if(pei->volume > 0.0f)
+   if(pei->volume > 0.0f && !FNullEnt(pInvoker))
    {
       int ivolume = (int)(1000*pei->volume);
-      
+
       SaveSound((edict_t*)pInvoker, pInvoker->v.origin, ivolume, CHAN_WEAPON, 5.0f);
    }
    
    // event causes client recoil?
-   if(pei->recoil[0] != 0.0f && pei->recoil[1] != 0.0f)
+   if(pei->recoil[0] != 0.0f && pei->recoil[1] != 0.0f && !FNullEnt(pInvoker))
    {
       // gauss uses bug fix that sends two events at same time,
       // ignore the duplicated one...
@@ -160,7 +160,7 @@ static void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short
 
 static void pfnEmitSound(edict_t *entity, int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch)
 {
-   if (gpGlobals->deathmatch)
+   if (gpGlobals->deathmatch && !FNullEnt(entity))
    {
       int ivolume = (int)(1000*volume);
       const char *classname = (const char *)STRING(entity->v.classname);
@@ -199,9 +199,9 @@ static void pfnChangeLevel(char* s1, char* s2)
 
 static void pfnClientCommand(edict_t* pEdict, char* szFmt, ...)
 {
-   if ((FBitSet(pEdict->v.flags, FL_FAKECLIENT) || FBitSet(pEdict->v.flags, FL_THIRDPARTYBOT)))
+   if (!FNullEnt(pEdict) && (FBitSet(pEdict->v.flags, FL_FAKECLIENT) || FBitSet(pEdict->v.flags, FL_THIRDPARTYBOT)))
       RETURN_META (MRES_SUPERCEDE);
-      
+
    RETURN_META (MRES_IGNORED);
 }
 
@@ -425,9 +425,9 @@ static void pfnWriteEntity(int iValue)
 
 static void pfnClientPrintf( edict_t* pEdict, PRINT_TYPE ptype, const char *szMsg )
 {
-   if ((FBitSet(pEdict->v.flags, FL_FAKECLIENT) || FBitSet(pEdict->v.flags, FL_THIRDPARTYBOT)))
+   if (!FNullEnt(pEdict) && (FBitSet(pEdict->v.flags, FL_FAKECLIENT) || FBitSet(pEdict->v.flags, FL_THIRDPARTYBOT)))
       RETURN_META (MRES_SUPERCEDE);
-      
+
    RETURN_META (MRES_IGNORED);
 }
 
