@@ -127,7 +127,7 @@ static void BotSpawnInit( bot_t &pBot )
    pBot.pTrackSoundEdict = NULL;
    pBot.f_track_sound_time = 0.0;
    
-   memset(pBot.exclude_points, 0, sizeof(pBot.exclude_points));
+   memset(pBot.exclude_points, -1, sizeof(pBot.exclude_points));
 
    pBot.b_on_ground = 0;
    pBot.b_on_ladder = 0;
@@ -334,6 +334,12 @@ static void BotPickName( char *name_buffer, int sizeof_name_buffer )
    edict_t *pPlayer;
    int attempts = 0;
 
+   if (number_names == 0)
+   {
+      safe_strcopy(name_buffer, sizeof_name_buffer, "Bot");
+      return;
+   }
+
    name_index = RANDOM_LONG2(1, number_names) - 1;  // zero based
 
    // check make sure this name isn't used
@@ -389,8 +395,11 @@ static qboolean TeamInTeamBlockList(const char * teamname)
       
    // make a copy because strtok is destructive
    int slen = strlen(team_blockedlist);
+   if (slen > 4096)
+      slen = 4096;
    char * blocklist = (char*)alloca(slen+1);
-   memcpy(blocklist, team_blockedlist, slen+1);
+   memcpy(blocklist, team_blockedlist, slen);
+   blocklist[slen] = '\0';
    
    char *pName = strtok( blocklist, ";" );
    while ( pName != NULL && *pName)
@@ -807,7 +816,7 @@ void BotCreate( const char *skin, const char *name, int skill, int top_color, in
       UTIL_ConsolePrintf("Creating bot...\n");
 
       index = 0;
-      while ((bots[index].is_used) && (index < 32))
+      while ((index < 32) && (bots[index].is_used))
          index++;
 
       if (index == 32)

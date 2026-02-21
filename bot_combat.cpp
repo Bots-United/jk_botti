@@ -647,10 +647,10 @@ static edict_t *BotFindVisibleSoundEnemy( bot_t &pBot )
    for(iSound = CSoundEnt::ActiveList(); iSound != SOUNDLIST_EMPTY; iSound = pCurrentSound->m_iNext)
    {
       pCurrentSound = CSoundEnt::SoundPointerForIndex( iSound );
-      
+
       if(!pCurrentSound)
-         continue;
-      
+         break;
+
       // ignore sounds created by bot itself
       if(pCurrentSound->m_iBotOwner == (&pBot - &bots[0]))
          continue;
@@ -1396,8 +1396,8 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
    if(pBot.b_in_water)
    {
       select_index = pBot.current_weapon_index;
-      
-      if(!pSelect[select_index].can_use_underwater)
+
+      if(select_index < 0 || !pSelect[select_index].can_use_underwater)
       {
          pBot.current_weapon_index = -1;
          pBot.f_primary_charging = -1;

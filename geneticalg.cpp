@@ -3,6 +3,7 @@
 #include <time.h>
 #include <memory.h>
 #include <math.h>
+#include <limits.h>
 
 #include "geneticalg.h"
 
@@ -48,8 +49,15 @@ CPopulation::CPopulation(int population_size, int genome_length):
 {
 	int i;
 
+	// check for integer overflow in pool_size calculation
+	if (population_size > 0 && genome_length > 0 &&
+	    population_size > INT_MAX / genome_length)
+		return;
+
 	m_individuals = new CGenome[m_pop_size];
 	m_genepool = (double *)calloc(1, sizeof(double) * m_pool_size);
+	if (!m_genepool)
+		return;
 
 	for (i = 0; i < m_pop_size; i++)
 		m_individuals[i] = CGenome(&m_genepool[i * m_genome_length], m_genome_length, 0.0);
@@ -368,6 +376,8 @@ CPopulation *CGeneticAlgorithm::epoch(CPopulation &old_pop, CPopulation &new_pop
 			// use temporary
 			if (!tmp_child_mem)
 				tmp_child_mem = (double *)malloc(sizeof(double) * parent1->length());
+			if (!tmp_child_mem)
+				break;
 
 			tmp_child = CGenome(tmp_child_mem, parent1->length(), 0.0);
 			child2 = &tmp_child;

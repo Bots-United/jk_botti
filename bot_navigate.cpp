@@ -319,10 +319,10 @@ static int BotGetSoundWaypoint( bot_t &pBot, edict_t *pTrackSoundEdict, edict_t 
    for(iSound = CSoundEnt::ActiveList(); iSound != SOUNDLIST_EMPTY; iSound = pCurrentSound->m_iNext)
    {
       pCurrentSound = CSoundEnt::SoundPointerForIndex( iSound );
-      
+
       if(!pCurrentSound)
-         continue;
-      
+         break;
+
       // ignore sounds created by bot itself
       if(pCurrentSound->m_iBotOwner == (&pBot - &bots[0]))
          continue;

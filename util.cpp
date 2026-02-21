@@ -687,6 +687,8 @@ void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
       safevoid_snprintf( text, sizeof(text), "%c%s: ", 2, STRING( pEntity->v.netname ) );
 
    j = sizeof(text) - 2 - strlen(text);  // -2 for /n and null terminator
+   if ( j < 0 )
+      j = 0;
    if ( (int)strlen(message) > j )
       message[j] = 0;
 
