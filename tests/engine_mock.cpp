@@ -93,12 +93,11 @@ qboolean checked_teamplay = FALSE;
 qboolean b_botdontshoot = FALSE;
 int num_logos = 0;
 int submod_id = SUBMOD_HLDM;
+int submod_weaponflag = WEAPON_SUBMOD_HLDM;
 int bot_shoot_breakables = 0;
 int m_spriteTexture = 0;
 WAYPOINT waypoints[MAX_WAYPOINTS];
 bot_skill_settings_t skill_settings[5];
-bot_weapon_select_t weapon_select[NUM_OF_WEAPON_SELECTS];
-bot_fire_delay_t fire_delay[NUM_OF_WEAPON_SELECTS];
 CSoundEnt *pSoundEnt = NULL;
 
 // ============================================================
@@ -303,38 +302,6 @@ static int mock_mutil_GetUserMsgID(plid_t plid, const char *msgname, int *size)
 // Stub functions from other .cpp files
 // ============================================================
 
-// bot_weapons.cpp
-bot_weapon_select_t *GetWeaponSelect(int id) { (void)id; return NULL; }
-void BotSelectAttack(bot_t &pBot, const bot_weapon_select_t &select,
-                     qboolean &use_primary, qboolean &use_secondary)
-{ (void)pBot; (void)select; (void)use_primary; (void)use_secondary; }
-qboolean IsValidWeaponChoose(bot_t &pBot, const bot_weapon_select_t &select)
-{ (void)pBot; (void)select; return FALSE; }
-qboolean BotCanUseWeapon(bot_t &pBot, const bot_weapon_select_t &select)
-{ (void)pBot; (void)select; return FALSE; }
-qboolean IsValidToFireAtTheMoment(bot_t &pBot, const bot_weapon_select_t &select)
-{ (void)pBot; (void)select; return FALSE; }
-qboolean IsValidPrimaryAttack(bot_t &pBot, const bot_weapon_select_t &select,
-                              const float distance, const float height,
-                              const qboolean always_in_range)
-{ (void)pBot; (void)select; (void)distance; (void)height; (void)always_in_range; return FALSE; }
-qboolean IsValidSecondaryAttack(bot_t &pBot, const bot_weapon_select_t &select,
-                                const float distance, const float height,
-                                const qboolean always_in_range)
-{ (void)pBot; (void)select; (void)distance; (void)height; (void)always_in_range; return FALSE; }
-qboolean BotSkilledEnoughForPrimaryAttack(bot_t &pBot, const bot_weapon_select_t &select)
-{ (void)pBot; (void)select; return FALSE; }
-qboolean BotSkilledEnoughForSecondaryAttack(bot_t &pBot, const bot_weapon_select_t &select)
-{ (void)pBot; (void)select; return FALSE; }
-int BotGetBetterWeaponChoice(bot_t &pBot, const bot_weapon_select_t &current,
-                             const bot_weapon_select_t *pSelect,
-                             const float distance, const float height,
-                             qboolean *use_primary, qboolean *use_secondary)
-{ (void)pBot; (void)current; (void)pSelect; (void)distance; (void)height;
-  (void)use_primary; (void)use_secondary; return -1; }
-float ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(float distance, float height)
-{ (void)distance; (void)height; return 0; }
-
 // waypoint.cpp
 int WaypointFindNearest(const Vector &v_origin, const Vector &v_offset,
                         edict_t *pEntity, float range, qboolean b_traceline)
@@ -441,8 +408,6 @@ void mock_reset(void)
    memset(players, 0, sizeof(players));
    memset(waypoints, 0, sizeof(waypoints));
    memset(skill_settings, 0, sizeof(skill_settings));
-   memset(weapon_select, 0, sizeof(weapon_select));
-   memset(fire_delay, 0, sizeof(fire_delay));
    b_observer_mode = FALSE;
    is_team_play = FALSE;
    b_botdontshoot = FALSE;

@@ -1,5 +1,5 @@
 //
-// JK_Botti - unit tests for BotFindEnemy() breakable targeting modes
+// JK_Botti - unit tests for bot_combat.cpp
 //
 // test_bot_combat.cpp
 //
@@ -318,6 +318,51 @@ static int test_mode1_high_health_breakable_skipped(void)
    return 0;
 }
 
+static int test_predicted_position_self_cycle(void)
+{
+   printf("GetPredictedPlayerPosition self-cycle guard:\n");
+   mock_reset();
+
+   // Create bot
+   edict_t *pBotEdict = mock_alloc_edict(); // index 1
+   bot_t testbot;
+   setup_bot_for_test(testbot, pBotEdict);
+
+   // Create enemy player at edict index 2
+   edict_t *pEnemy = mock_alloc_edict(); // index 2
+   pEnemy->v.origin = Vector(200, 0, 0);
+   pEnemy->v.health = 100;
+   pEnemy->v.deadflag = DEAD_NO;
+   pEnemy->v.takedamage = DAMAGE_YES;
+   pEnemy->v.flags = FL_CLIENT;
+
+   testbot.pBotEnemy = pEnemy;
+
+   // Set up posdata with self-cycle: node.older points to itself
+   // Enemy is edict index 2, so player index = 2 - 1 = 1
+   int pidx = 1;
+   posdata_t &node = players[pidx].posdata_mem[0];
+   memset(&node, 0, sizeof(node));
+   node.inuse = TRUE;
+   node.time = gpGlobals->time + 100; // far in the future, so loop tries ->older
+   node.origin = Vector(200, 0, 0);
+   node.older = &node; // SELF-CYCLE: would cause infinite loop without guard
+   node.newer = NULL;
+
+   players[pidx].position_latest = &node;
+   players[pidx].position_oldest = &node;
+
+   mock_trace_line_fn = trace_nohit;
+
+   TEST("self-cycle in posdata does not hang");
+   // If the guard works, this returns promptly.
+   // Without the guard, this would infinite loop.
+   FPredictedVisible(testbot);
+   PASS();
+
+   return 0;
+}
+
 // ============================================================
 // Main
 // ============================================================
@@ -343,6 +388,8 @@ int main(void)
    rc |= test_mode2_breakable_blocking_path();
    printf("\n");
    rc |= test_mode2_dead_breakable_blocking();
+   printf("\n");
+   rc |= test_predicted_position_self_cycle();
 
    printf("\n%d/%d tests passed.\n", tests_passed, tests_run);
 

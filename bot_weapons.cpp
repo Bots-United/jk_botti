@@ -425,7 +425,7 @@ void BotSelectAttack(bot_t &pBot, const bot_weapon_select_t &select, qboolean &u
 }
 
 //
-static qboolean BotIsCarryingWeapon(bot_t &pBot, int weapon_id)
+qboolean BotIsCarryingWeapon(bot_t &pBot, int weapon_id)
 {
    // is the bot carrying this weapon?
    return((pBot.pEdict->v.weapons & (1 << weapon_id)) == (1 << weapon_id));

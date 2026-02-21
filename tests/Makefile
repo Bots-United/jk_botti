@@ -12,7 +12,7 @@ test_posdata_list: test_posdata_list.cpp ../posdata_list.h
 
 # Engine-mock based tests
 BOT_COMBAT_OBJS = engine_mock.o test_bot_combat.o \
-	bot_combat.o util.o safe_snprintf.o
+	bot_combat.o bot_weapons.o util.o safe_snprintf.o
 
 test_bot_combat: $(BOT_COMBAT_OBJS)
 	${CXX} -o $@ $(BOT_COMBAT_OBJS) -lm
