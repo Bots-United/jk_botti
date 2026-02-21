@@ -190,6 +190,9 @@ static void BotSpawnInit( bot_t &pBot )
    pBot.f_shoot_time = gpGlobals->time;
    pBot.f_primary_charging = -1.0;
    pBot.f_secondary_charging = -1.0;
+   pBot.f_satchel_detonate_time = 0;
+   pBot.f_satchel_check_time = 0;
+   pBot.b_satchel_detonating = FALSE;
    pBot.charging_weapon_id = 0;
    pBot.f_grenade_search_time = 0.0;
    pBot.f_grenade_found_time = 0.0;
@@ -2686,6 +2689,8 @@ void BotThink( bot_t &pBot )
          }
       }
    }
+
+   BotDetonateSatchel(pBot);
 
    qboolean DidShootAtEnemy = FALSE;
 

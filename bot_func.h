@@ -35,6 +35,7 @@ void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking);
 void BotFindEnemy( bot_t &pBot );
 void BotShootAtEnemy( bot_t &pBot );
 qboolean BotShootTripmine( bot_t &pBot );
+qboolean BotDetonateSatchel( bot_t &pBot );
 
 // bot_models.cpp:
 void LoadBotModels(void);
