@@ -24,7 +24,6 @@
 #include "bot_skill.h"
 #include "bot_weapons.h"
 #include "bot_sound.h"
-#include "version.h"
 #include "player.h"
 #include "bot_config_init.h"
 

@@ -23,8 +23,14 @@ else
 	ZLIB_OSFLAGS = -DZ_PREFIX
 endif
 
+VER_MAJOR ?= 0
+VER_MINOR ?= 0
+VER_NOTE ?= git$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+
+VERFLAGS = -DVER_MAJOR=$(VER_MAJOR) -DVER_MINOR=$(VER_MINOR) -DVER_NOTE=\"$(VER_NOTE)\"
+
 TARGET = jk_botti_mm
-BASEFLAGS = -Wall -Wno-write-strings -Wno-class-memaccess
+BASEFLAGS = -Wall -Wno-write-strings -Wno-class-memaccess ${VERFLAGS}
 BASEFLAGS += -fno-strict-aliasing -fno-strict-overflow
 BASEFLAGS += -fvisibility=hidden
 ARCHFLAG += -march=i686 -mtune=generic -msse -msse2 -msse3 -mincoming-stack-boundary=2
