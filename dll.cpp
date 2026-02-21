@@ -825,7 +825,7 @@ plugin_info_t Plugin_info = {
    "", // plugin version
    __DATE__, // date of creation
    "Jussi Kivilinna", // plugin author
-   "http://forums.bots-united.com/forumdisplay.php?f=83", // plugin URL
+   "https://github.com/Bots-United/jk_botti", // plugin URL
    "JK_BOTTI", // plugin logtag
    PT_STARTUP, // when loadable
    PT_ANYTIME, // when unloadable
