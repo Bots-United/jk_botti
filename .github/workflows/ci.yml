@@ -10,8 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Update package list for i386
+        run: sudo dpkg --add-architecture i386 && sudo apt-get -y update
+      - name: Install packages
+        run: sudo apt-get -y install build-essential g++-multilib
       - name: Run tests
-        run: CXX="g++" make test
+        run: CXX="g++ -m32" make test
 
   build-linux:
     runs-on: ubuntu-latest
