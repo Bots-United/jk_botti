@@ -1490,7 +1490,7 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
    }
    
    // check if we can reuse currently active weapon
-   if(pBot.current_weapon_index >= 0)
+   if(pBot.current_weapon_index >= 0 && !pSelect[pBot.current_weapon_index].avoid_this_gun)
    {
       select_index = pBot.current_weapon_index;
       
@@ -1538,7 +1538,13 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
 
    // don't change weapon too fast
    if(pBot.f_weaponchange_time >= gpGlobals->time && pBot.current_weapon_index >= 0 && weapon_choice == 0)
+   {
+      // keep tracking the enemy even if we cannot hit right now
+      if(weapon_select[pBot.current_weapon_index].type & WEAPON_MELEE)
+         return TRUE;
+
       return FALSE;
+   }
 
    pBot.current_weapon_index = -1; // forget current weapon
 
@@ -1672,8 +1678,8 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
       }
 
       // Check if this weapon is ok for current contitions
-      use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
-      use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
+      use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, TRUE);
+      use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, TRUE);
       if(use_primary || use_secondary)
       {
          if(pSelect[select_index].avoid_this_gun)
