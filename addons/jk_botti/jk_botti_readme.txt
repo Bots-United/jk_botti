@@ -1,4 +1,4 @@
-jk_botti 1.44β
+jk_botti 1.45
 -------------
 
 1. Intro
@@ -10,7 +10,7 @@ jk_botti 1.44β
 1. Intro
 --------------------
 
-This is 1.44β release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@iki.fi>
+This is 1.45 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@iki.fi>
 You are free to use code for any of your needs.
 
 jk_botti is computer gamer for multiplayer mode of Half-Life (HLDM) and has 
@@ -66,6 +66,47 @@ Credits:
 --------------------
 2. What's new
 --------------------
+1.45:
+ New features:
+ * Bots can now use satchel charges (issue #15)
+ * New bot_shoot_breakables cvar to control breakable targeting (issue #19)
+   * 0 = disabled, 1 = shoot all breakables, 2 = shoot only path-blocking
+     breakables (default)
+
+ Bug fixes:
+ * Fix assertion fail when botdontshoot is enabled (issue #4)
+ * Fix posdata linked list cycle causing NULL dereference (issue #10)
+ * Fix SSE stack alignment crash on i686
+ * Fix infinite loop and weapon selection bugs (jonatan1024, GoldSrc-one fork)
+ * Fix OP4 grapple detection (anzz1)
+ * Fix min_bots logic (anzz1)
+ * Avoid calling BotChatTaunt when the bot kills self (josemam)
+ * Fix WaypointFindRunawayPath always returning -1 (copy-paste bug)
+
+ Improvements:
+ * Improve weapon selection: allow Glock, fix avoided weapon reuse
+   (jonatan1024, GoldSrc-one fork)
+ * Improve melee weapon movement behavior (jonatan1024, GoldSrc-one fork)
+ * Make grapple the least favorite weapon in OP4 (anzz1)
+ * Add null safety checks to engine callback functions
+
+ Security and stability:
+ * Fix stack buffer overflow in config file parsing
+ * Fix unchecked memory allocations across multiple subsystems
+ * Add bounds validation for waypoint file loading
+ * Fix null dereference in sound list traversal
+ * Fix out-of-bounds reads in bot creation and combat code
+ * Cap network-supplied alloca sizes in query hook handlers
+ * Fix waypoint exclude list unable to exclude waypoint index 0
+
+ Internal:
+ * Update bundled zlib from 1.2.3 to 1.3.2
+ * Derive version from git tags instead of hardcoded version.h
+ * Keep debug symbols in release builds
+ * Add unit test suite
+ * Add GitHub Actions CI (artkirienko)
+ * Update project URLs to GitHub
+
 1.44β:
  * Fix rare crash when bot tries to shoot tripmine with MP5
 
