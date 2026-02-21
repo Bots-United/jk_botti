@@ -12,9 +12,11 @@ jobs:
     - name: Update package list for i386
       run: sudo dpkg --add-architecture i386 && sudo apt-get -y update
     - name: Install packages
-      run: sudo apt-get -y install build-essential g++-multilib gcc-mingw-w64 g++-mingw-w64
+      run: sudo apt-get -y install build-essential g++-multilib gcc-mingw-w64 g++-mingw-w64 valgrind libc6-dbg:i386
     - name: test
-      run: CXX="g++" make test
+      run: CXX="g++ -m32" make test
+    - name: valgrind
+      run: CXX="g++ -m32" make valgrind
     - name: cleanup 0
       run: git clean -xdf
     - name: make
