@@ -92,18 +92,20 @@ const cfg_bot_record_t * GetUnusedCfgBotRecord(void)
 {
    if(cfg_bot_record_size <= 0)
       return (const cfg_bot_record_t *)NULL;
-   
+
    //
-   int record_indexes[cfg_bot_record_size];
+   int *record_indexes = (int *)malloc(cfg_bot_record_size * sizeof(int));
+   if(!record_indexes)
+      return (const cfg_bot_record_t *)NULL;
    int num_records = 0;
-   
+
    record_indexes[0] = 0;
-   
+
    // collect unused records
    for(int cfgindex = 0; cfgindex < cfg_bot_record_size; cfgindex++)
    {
       int used = 0;
-      
+
       for(int index = 0; index < 32; index++)
       {
          if(bots[index].is_used)
@@ -115,21 +117,26 @@ const cfg_bot_record_t * GetUnusedCfgBotRecord(void)
             }
          }
       }
-      
+
       if(used)
          continue;
-      
+
       record_indexes[num_records++] = cfgindex;
    }
-   
+
    if(num_records <= 0)
+   {
+      free(record_indexes);
       return (const cfg_bot_record_t *)NULL;
-   
+   }
+
    // random pick one of unused records
    int pick = RANDOM_LONG2(0, num_records-1);
-   
+
    //
-   return(&cfg_bot_record[record_indexes[pick]]);
+   const cfg_bot_record_t *result = &cfg_bot_record[record_indexes[pick]];
+   free(record_indexes);
+   return(result);
 }
 
 //
@@ -155,9 +162,13 @@ void FreeCfgBotRecord(void)
 //
 int AddToCfgBotRecord(const char *skin, const char *name, int skill, int top_color, int bottom_color)
 {
-   int index = cfg_bot_record_size++;
+   int index = cfg_bot_record_size;
 
-   cfg_bot_record = (cfg_bot_record_t*)realloc(cfg_bot_record, sizeof(cfg_bot_record_t) * cfg_bot_record_size);
+   cfg_bot_record_t *tmp = (cfg_bot_record_t*)realloc(cfg_bot_record, sizeof(cfg_bot_record_t) * (cfg_bot_record_size + 1));
+   if (!tmp)
+      return -1;
+   cfg_bot_record = tmp;
+   cfg_bot_record_size++;
 
    cfg_bot_record[index].index = index;
    cfg_bot_record[index].skin = (skin) ? strdup(skin) : NULL;
@@ -333,7 +344,7 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
       if(!team_blockedlist)
          team_blockedlist = strdup("");
 
-      safevoid_snprintf(msg, sizeof(msg), "team_blockedlist: %s\n", team_blockedlist);
+      safevoid_snprintf(msg, sizeof(msg), "team_blockedlist: %s\n", team_blockedlist ? team_blockedlist : "");
       printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;
@@ -1265,10 +1276,14 @@ void ProcessBotCfgFile(void)
 
       // skip multiple spaces in input file
       while ((cmd_line[cmd_index] == ' ') &&
-             (ch == ' '))      
+             (ch == ' '))
          ch = fgetc(bot_cfg_fp);
 
       cmd_index++;
+
+      // prevent buffer overflow on long lines
+      if (cmd_index >= (int)sizeof(cmd_line) - 1)
+         break;
    }
 
    if (ch == '\r')  // is it a carriage return?
