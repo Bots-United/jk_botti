@@ -291,6 +291,21 @@ addons/jk_botti/* - config files, readme files
 For commands 'bot_skill_setup' and 'botweapon' see below.
 For other commands see jk_botti.cfg
 
+Command - bot_shoot_breakables
+
+Usage:
+ - bot_shoot_breakables <value>
+
+Controls whether bots shoot func_breakable and func_pushable entities.
+
+Values:
+ 0 - Never shoot breakables.
+ 1 - Always shoot visible breakables.
+ 2 - Only shoot breakables that block the bot's movement path. (default)
+     Bot traces forward in its facing direction and only targets
+     breakables in the way. Decorative breakables (ceiling lights,
+     side windows) are ignored.
+
 Command - bot_skill_setup
 
 Usage:

@@ -498,6 +498,28 @@ breakable_list_t * UTIL_FindBreakable(breakable_list_t * pbreakable)
 
 
 //
+breakable_list_t * UTIL_LookupBreakable(edict_t *pEdict)
+{
+   breakable_list_t *plist = g_breakable_list;
+
+   while(plist)
+   {
+      if(plist->pEdict == pEdict &&
+         plist->material_breakable &&
+         !FNullEnt(plist->pEdict) &&
+         plist->pEdict->v.health > 0 &&
+         (FIsClassname(plist->pEdict, "func_breakable") || FIsClassname(plist->pEdict, "func_pushable")))
+      {
+         return(plist);
+      }
+
+      plist = plist->next;
+   }
+
+   return(NULL);
+}
+
+//
 void SaveAliveStatus(edict_t * pPlayer)
 {
    int idx;

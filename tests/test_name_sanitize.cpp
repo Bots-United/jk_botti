@@ -2,41 +2,9 @@
 // JK_Botti - unit tests for bot_name_sanitize.h
 //
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
+#include "test_common.h"
 
 #include "../bot_name_sanitize.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-   tests_run++; \
-   printf("  %-50s ", name); \
-} while(0)
-
-#define PASS() do { \
-   tests_passed++; \
-   printf("OK\n"); \
-} while(0)
-
-#define ASSERT_STR(actual, expected) do { \
-   if (strcmp((actual), (expected)) != 0) { \
-      printf("FAIL\n    expected: \"%s\"\n    got:      \"%s\"\n", \
-             (expected), (actual)); \
-      return 1; \
-   } \
-} while(0)
-
-#define ASSERT_INT(actual, expected) do { \
-   if ((actual) != (expected)) { \
-      printf("FAIL\n    expected: %d\n    got:      %d\n", \
-             (expected), (actual)); \
-      return 1; \
-   } \
-} while(0)
 
 // Helper: copy string into mutable buffer and sanitize
 static int test_sanitize(void)

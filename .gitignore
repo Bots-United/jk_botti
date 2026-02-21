@@ -11,6 +11,7 @@ zlib/example
 zlib/minigzip
 tests/test_*
 !tests/test_*.cpp
+!tests/test_*.h
 zlib/configure.log
 zlib/zlib.pc
 tmp/

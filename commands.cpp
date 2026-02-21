@@ -68,6 +68,7 @@ extern int bot_chat_drop_percent;
 extern int bot_chat_swap_percent;
 extern int bot_chat_lower_percent;
 extern qboolean b_random_color;
+extern int bot_shoot_breakables;
 
 qboolean isFakeClientCommand = FALSE;
 int fake_arg_count;
@@ -574,6 +575,23 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
       }
 
       safevoid_snprintf(msg, sizeof(msg), "bot_logo_percent is %d\n", bot_logo_percent);
+      printfunc(PRINTFUNC_INFO, arg, msg);
+
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_shoot_breakables"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < 0) || (temp > 2))
+            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_shoot_breakables value! (0=never, 1=always, 2=path-blocking only)\n");
+         else
+            bot_shoot_breakables = temp;
+      }
+
+      safevoid_snprintf(msg, sizeof(msg), "bot_shoot_breakables is %d\n", bot_shoot_breakables);
       printfunc(PRINTFUNC_INFO, arg, msg);
 
       return TRUE;

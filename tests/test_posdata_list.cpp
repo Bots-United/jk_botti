@@ -2,12 +2,11 @@
 // JK_Botti - unit tests for posdata_list.h
 //
 
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <assert.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#include "test_common.h"
 
 // Minimal stubs for HL SDK types (no engine deps)
 typedef int qboolean;
@@ -19,50 +18,6 @@ struct Vector {
 };
 
 #include "../posdata_list.h"
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { \
-   tests_run++; \
-   printf("  %-50s ", name); \
-} while(0)
-
-#define PASS() do { \
-   tests_passed++; \
-   printf("OK\n"); \
-} while(0)
-
-#define ASSERT_PTR_EQ(actual, expected) do { \
-   if ((actual) != (expected)) { \
-      printf("FAIL\n    expected: %p\n    got:      %p\n", \
-             (void*)(expected), (void*)(actual)); \
-      return 1; \
-   } \
-} while(0)
-
-#define ASSERT_PTR_NULL(actual) do { \
-   if ((actual) != NULL) { \
-      printf("FAIL\n    expected: NULL\n    got:      %p\n", \
-             (void*)(actual)); \
-      return 1; \
-   } \
-} while(0)
-
-#define ASSERT_INT(actual, expected) do { \
-   if ((actual) != (expected)) { \
-      printf("FAIL\n    expected: %d\n    got:      %d\n", \
-             (expected), (actual)); \
-      return 1; \
-   } \
-} while(0)
-
-#define ASSERT_TRUE(cond) do { \
-   if (!(cond)) { \
-      printf("FAIL\n    condition false: %s\n", #cond); \
-      return 1; \
-   } \
-} while(0)
 
 #define TEST_POOL_SIZE 4
 
