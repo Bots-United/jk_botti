@@ -33,6 +33,7 @@
 #include "bot_weapons.h"
 #include "player.h"
 
+#define Z_PREFIX
 #include "zlib/zlib.h"
 
 
