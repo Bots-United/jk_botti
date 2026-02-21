@@ -34,11 +34,13 @@ static bool msg_get_string(const unsigned char * &msg, size_t &len, char * name,
 	
 	if(i < nlen)
 		name[i]=0;
-	
+	else if(nlen > 0)
+		name[nlen-1]=0;
+
 	msg++;
 	if(--len == 0)
 		return(false);
-	
+
 	return(true);
 }
 
@@ -59,6 +61,8 @@ ssize_t PASCAL handle_player_reply(int socket, const void *message, size_t lengt
 (int32) Player Score
 (float32) Player Time
 */
+	if (length > 4096)
+		return(call_original_sendto(socket, message, length, flags, dest_addr, dest_len));
 	unsigned char * newmsg = (unsigned char *)alloca(length);
 	memcpy(newmsg, message, length);
 	
@@ -154,8 +158,10 @@ Mod 		byte 	Indicates whether the game is a mod:
 VAC 		byte 	Specifies whether the server uses VAC:
     0 for unsecured
     1 for secured
-Bots	 	byte 	Number of bots on the server. 
+Bots	 	byte 	Number of bots on the server.
  */
+	if (length > 4096)
+		return(call_original_sendto(socket, message, length, flags, dest_addr, dest_len));
 	unsigned char * newmsg = (unsigned char *)alloca(length);
 	memcpy(newmsg, message, length);
 
@@ -405,6 +411,8 @@ VAC 		byte 	Specifies whether the server uses VAC:
 
 ....Continues....
  */
+	if (length > 4096)
+		return(call_original_sendto(socket, message, length, flags, dest_addr, dest_len));
 	unsigned char * newmsg = (unsigned char *)alloca(length);
 	memcpy(newmsg, message, length);
 
@@ -515,19 +523,19 @@ ssize_t PASCAL sendto_hook(int socket, const void *message, size_t length, int f
 
 	if(length > 5 && orig_buf[0] == 0xff && orig_buf[1] == 0xff && orig_buf[2] == 0xff && orig_buf[3] == 0xff)
 	{
-		// check if this is server info reply packet (ÿÿÿÿm)
+		// check if this is server info reply packet (ï¿½ï¿½ï¿½ï¿½m)
 		// old GoldSrc format
 		if (orig_buf[4] == 'm') {
 			return handle_goldsrc_server_info_reply(socket, message, length, flags, dest_addr, dest_len);
 		}
 
-		// check if this is server info reply packet (ÿÿÿÿI)
+		// check if this is server info reply packet (ï¿½ï¿½ï¿½ï¿½I)
 		// new Source format (GoldSrc engine has switched to use this)
 		if (orig_buf[4] == 'I') {
 			return handle_source_server_info_reply(socket, message, length, flags, dest_addr, dest_len);
 		}
 
-		// check if this is player reply packet (ÿÿÿÿD)
+		// check if this is player reply packet (ï¿½ï¿½ï¿½ï¿½D)
 		if(orig_buf[4] == 'D') {
 			return(handle_player_reply(socket, message, length, flags, dest_addr, dest_len));
 		}
