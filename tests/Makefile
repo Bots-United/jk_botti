@@ -23,6 +23,12 @@ test_bot_combat: $(BOT_COMBAT_OBJS)
 %.o: ../%.cpp
 	${CXX} ${TEST_CXXFLAGS} -c $< -o $@
 
+# safe_snprintf test
+SAFE_SNPRINTF_OBJS = test_safe_snprintf.o safe_snprintf.o
+
+test_safe_snprintf: $(SAFE_SNPRINTF_OBJS)
+	${CXX} -o $@ $(SAFE_SNPRINTF_OBJS)
+
 # Random number generator test
 RANDOM_NUM_OBJS = test_random_num.o random_num.o
 
@@ -35,7 +41,7 @@ NEURALNET_OBJS = test_neuralnet.o neuralnet.o geneticalg.o random_num.o
 test_neuralnet: $(NEURALNET_OBJS)
 	${CXX} -o $@ $(NEURALNET_OBJS) -lm
 
-ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_random_num test_neuralnet
+ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_safe_snprintf test_random_num test_neuralnet
 
 all: $(ALL_TESTS)
 
@@ -43,6 +49,7 @@ run: $(ALL_TESTS)
 	./test_name_sanitize
 	./test_posdata_list
 	./test_bot_combat
+	./test_safe_snprintf
 	./test_random_num
 	./test_neuralnet
 
@@ -52,6 +59,7 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_name_sanitize
 	$(VALGRIND) ./test_posdata_list
 	$(VALGRIND) ./test_bot_combat
+	$(VALGRIND) ./test_safe_snprintf
 	$(VALGRIND) ./test_random_num
 	$(VALGRIND) ./test_neuralnet
 

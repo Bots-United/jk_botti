@@ -1,11 +1,4 @@
-// Manual branch optimization for GCC 3.0.0 and newer
-#if !defined(__GNUC__) || __GNUC__ < 3
-   #define likely(x) (x)
-   #define unlikely(x) (x)
-#else
-   #define likely(x) __builtin_expect((long int)!!(x), true)
-   #define unlikely(x) __builtin_expect((long int)!!(x), false)
-#endif
+#include "compiler.h"
 
 static unsigned int rnd_idnum[2] = {1, 1};
 
