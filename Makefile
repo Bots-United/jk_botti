@@ -12,6 +12,7 @@ ifeq ($(OSTYPE),win32)
 	LINKFLAGS = -mdll -lm -lwsock32 -lws2_32 -Xlinker --add-stdcall-alias -g
 	DLLEND = .dll
 	ZLIB_OSFLAGS = -DZ_PREFIX
+	OBJDIR = obj/win32
 else
 	CXX ?= g++ -m32
 	CC ?= gcc -m32
@@ -21,6 +22,7 @@ else
 	LINKFLAGS = -fPIC -shared -ldl -lm -g
 	DLLEND = _i386.so
 	ZLIB_OSFLAGS = -DZ_PREFIX
+	OBJDIR = obj/linux
 endif
 
 # Override make's built-in defaults (origin 'default') which ?= won't catch
@@ -82,45 +84,44 @@ SRC = 	bot.cpp \
 	util.cpp \
 	waypoint.cpp
 
-OBJ = $(SRC:%.cpp=%.o)
+OBJ = $(SRC:%.cpp=$(OBJDIR)/%.o)
+ZLIB_LIB = $(OBJDIR)/zlib/libz.a
 
-${TARGET}${DLLEND}: zlib/libz.a ${OBJ}
-	${CC} -o $@ ${OBJ} zlib/libz.a ${LINKFLAGS}
+${TARGET}${DLLEND}: $(ZLIB_LIB) ${OBJ}
+	${CC} -o $@ ${OBJ} $(ZLIB_LIB) ${LINKFLAGS}
 	cp $@ addons/jk_botti/dlls/
 
-zlib/libz.a:
-	(cd zlib; AR="${AR}" ARFLAGS="" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS}" ./configure --static; $(MAKE) libz.a CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS}" AR="${AR}" ARFLAGS="" RANLIB="${RANLIB}"; cd ..)
+$(ZLIB_LIB): | $(OBJDIR)/zlib
+	(cd $(OBJDIR)/zlib; AR="${AR}" ARFLAGS="" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS}" $(CURDIR)/zlib/configure --static; $(MAKE) libz.a CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS}" AR="${AR}" ARFLAGS="" RANLIB="${RANLIB}")
 
-test: zlib/libz.a
-	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" run
+test: $(ZLIB_LIB)
+	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" ZLIB_LIB="../$(ZLIB_LIB)" run
 
-valgrind: zlib/libz.a
-	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" valgrind
+valgrind: $(ZLIB_LIB)
+	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" ZLIB_LIB="../$(ZLIB_LIB)" valgrind
 
 clean:
-	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe
+	rm -rf obj ${TARGET}${DLLEND} Rules.depend
 	$(MAKE) -C tests clean
-	rm -f zlib/*.o zlib/libz.a zlib/Makefile zlib/configure.log zlib/zlib.pc
 
 distclean:
-	rm -f Rules.depend ${TARGET}.dll ${TARGET}_i386.so addons/jk_botti/dlls/* zlib/*.exe
-	rm -f zlib/*.o zlib/libz.a zlib/Makefile zlib/configure.log zlib/zlib.pc
+	rm -rf obj Rules.depend ${TARGET}.dll ${TARGET}_i386.so addons/jk_botti/dlls/*
 
-#waypoint.o: waypoint.cpp
-#	${CXX} ${CXXFLAGS} -funroll-loops -c $< -o $@
-
-#safe_snprintf.o: safe_snprintf.cpp
-#	${CXX} ${CXXFLAGS} -funroll-loops -c $< -o $@
-
-%.o: %.cpp
+$(OBJDIR)/%.o: %.cpp | $(OBJDIR)
 	${CXX} ${CXXFLAGS} -c $< -o $@
 
-%.o: %.c
+$(OBJDIR)/%.o: %.c | $(OBJDIR)
 	${CXX} ${CFLAGS} -c $< -o $@
+
+$(OBJDIR):
+	mkdir -p $@
+
+$(OBJDIR)/zlib:
+	mkdir -p $@
 
 depend: Rules.depend
 
 Rules.depend: Makefile $(SRC)
-	$(CXX) -MM ${INCLUDES} $(SRC) > $@
+	$(CXX) -MM ${INCLUDES} $(SRC) | sed 's|^\([^ ]\)|$(OBJDIR)/\1|' > $@
 
-include Rules.depend
+-include Rules.depend

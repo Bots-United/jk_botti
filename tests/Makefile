@@ -1,5 +1,7 @@
 # tests/Makefile
 
+ZLIB_LIB ?= ../zlib/libz.a
+
 PARENT_INCLUDES = -I"../metamod" -I"../common" -I"../dlls" -I"../engine" -I"../pm_shared"
 TEST_CXXFLAGS = ${CXXFLAGS} ${PARENT_INCLUDES} -I".."
 
@@ -56,8 +58,8 @@ test_neuralnet: $(NEURALNET_OBJS)
 # Waypoint tests (waypoint.cpp is #included in test file, not linked separately)
 WAYPOINT_OBJS = engine_mock.o test_waypoint.o bot_weapons.o util.o safe_snprintf.o random_num.o
 
-test_waypoint: $(WAYPOINT_OBJS) ../zlib/libz.a
-	${CXX} -o $@ $(WAYPOINT_OBJS) ../zlib/libz.a -lm
+test_waypoint: $(WAYPOINT_OBJS) $(ZLIB_LIB)
+	${CXX} -o $@ $(WAYPOINT_OBJS) $(ZLIB_LIB) -lm
 
 ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_waypoint
 
