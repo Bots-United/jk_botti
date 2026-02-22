@@ -15,7 +15,7 @@
 
 //
 #define JKASSERT(_x_) \
-    do { if (unlikely(!!(_x_))) UTIL_AssertConsolePrintf(#_x_, __FILE__, __LINE__); } while(0)
+    do { if (unlikely(!!(_x_))) UTIL_AssertConsolePrintf(__FILE__, #_x_, __LINE__); } while(0)
 
 
 // stuff for Win32 vs. Linux builds

@@ -12,7 +12,7 @@ test_posdata_list: test_posdata_list.cpp ../posdata_list.h
 
 # Engine-mock based tests
 BOT_COMBAT_OBJS = engine_mock.o test_bot_combat.o \
-	bot_combat.o bot_weapons.o util.o safe_snprintf.o
+	bot_combat.o bot_weapons.o util.o safe_snprintf.o random_num.o
 
 test_bot_combat: $(BOT_COMBAT_OBJS)
 	${CXX} -o $@ $(BOT_COMBAT_OBJS) -lm
@@ -35,13 +35,19 @@ RANDOM_NUM_OBJS = test_random_num.o random_num.o
 test_random_num: $(RANDOM_NUM_OBJS)
 	${CXX} -o $@ $(RANDOM_NUM_OBJS) -lm
 
+# Util bug fix tests
+UTIL_TEST_OBJS = engine_mock.o test_util.o util.o safe_snprintf.o random_num.o
+
+test_util: $(UTIL_TEST_OBJS)
+	${CXX} -o $@ $(UTIL_TEST_OBJS) -lm
+
 # Neural net training test
 NEURALNET_OBJS = test_neuralnet.o neuralnet.o geneticalg.o random_num.o
 
 test_neuralnet: $(NEURALNET_OBJS)
 	${CXX} -o $@ $(NEURALNET_OBJS) -lm
 
-ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_safe_snprintf test_random_num test_neuralnet
+ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_util test_safe_snprintf test_random_num test_neuralnet
 
 all: $(ALL_TESTS)
 
@@ -49,6 +55,7 @@ run: $(ALL_TESTS)
 	./test_name_sanitize
 	./test_posdata_list
 	./test_bot_combat
+	./test_util
 	./test_safe_snprintf
 	./test_random_num
 	./test_neuralnet
@@ -59,6 +66,7 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_name_sanitize
 	$(VALGRIND) ./test_posdata_list
 	$(VALGRIND) ./test_bot_combat
+	$(VALGRIND) ./test_util
 	$(VALGRIND) ./test_safe_snprintf
 	$(VALGRIND) ./test_random_num
 	$(VALGRIND) ./test_neuralnet

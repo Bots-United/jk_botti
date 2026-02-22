@@ -69,6 +69,7 @@ SRC = 	bot.cpp \
 	dll.cpp \
 	engine.cpp \
 	h_export.cpp \
+	random_num.cpp \
 	safe_snprintf.cpp \
 	util.cpp \
 	waypoint.cpp
