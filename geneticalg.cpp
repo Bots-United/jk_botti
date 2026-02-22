@@ -16,13 +16,13 @@ static int get_random_int(int x,int y)
    return RANDOM_LONG2(x, y);
 }
 
-// return random value in range 0 < n < 1
+// return random value in range 0 <= n <= 1
 static double get_random(void)
 {
    return RANDOM_FLOAT2(0.0, 1.0);
 }
 
-// return random value in range -1 < n < 1
+// return random value in range -1 <= n <= 1
 static double get_random_weight(void)
 {
    return get_random() - get_random();
