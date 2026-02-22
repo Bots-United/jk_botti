@@ -39,12 +39,12 @@ inline void UTIL_TraceHull( const Vector &vecStart, const Vector &vecEnd, IGNORE
    TRACE_HULL( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE), hullNumber, pentIgnore, ptr );
 }
 
-inline void UTIL_TraceMove( const Vector &vecStart, const Vector &vecEnd, IGNORE_MONSTERS igmon, edict_t *pentIgnore, TraceResult *ptr ) 
+inline void UTIL_TraceMove( const Vector &vecStart, const Vector &vecEnd, IGNORE_MONSTERS igmon, edict_t *pentIgnore, TraceResult *ptr )
 {
    TRACE_HULL( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE), point_hull, pentIgnore, ptr );
 }
 
-inline void UTIL_TraceDuck( const Vector &vecStart, const Vector &vecEnd, IGNORE_MONSTERS igmon, edict_t *pentIgnore, TraceResult *ptr ) 
+inline void UTIL_TraceDuck( const Vector &vecStart, const Vector &vecEnd, IGNORE_MONSTERS igmon, edict_t *pentIgnore, TraceResult *ptr )
 {
    TRACE_HULL( vecStart, vecEnd, (igmon == ignore_monsters ? TRUE : FALSE), head_hull, pentIgnore, ptr );
 }
@@ -69,7 +69,7 @@ inline edict_t *UTIL_FindEntityByString( edict_t *pentStart, const char *szKeywo
 
    if (likely(!FNullEnt(pentEntity)))
       return pentEntity;
-   
+
    return NULL;
 }
 
@@ -88,7 +88,7 @@ inline edict_t *UTIL_FindEntityByTargetname( edict_t *pentStart, const char *szN
    return UTIL_FindEntityByString( pentStart, "targetname", szName );
 }
 
-inline double deg2rad(double deg) 
+inline double deg2rad(double deg)
 {
    return(deg * (M_PI / 180));
 }
@@ -109,7 +109,7 @@ inline Vector UTIL_GetOrigin(edict_t *pEdict)
    if(unlikely(pEdict->v.solid == SOLID_BSP))
       return VecBModelOrigin(pEdict);
 
-   return pEdict->v.origin; 
+   return pEdict->v.origin;
 }
 
 inline Vector UTIL_GetOriginWithExtent(bot_t &pBot, edict_t *pTarget)

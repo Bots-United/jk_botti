@@ -4,9 +4,7 @@
 // dll.cpp
 //
 
-#ifndef _WIN32
 #include <string.h>
-#endif
 
 #include <malloc.h>
 
@@ -112,10 +110,10 @@ cvar_t jk_botti_version = { "jk_botti_version", "", FCVAR_EXTDLL|FCVAR_SERVER, 0
 static int CheckSubMod(void)
 {
    int submod = 0;
-   
+
    // Check if Severians, XDM or Bubblemod
    const char * desc = MDLL_GetGameDescription();
-   
+
    if(!strnicmp(desc, "Opposing", 8) || !strnicmp(desc, "OpFor", 5))
       submod = SUBMOD_OP4;
    else if(!strnicmp(desc, "Sev", 3))
@@ -123,7 +121,7 @@ static int CheckSubMod(void)
    else if(!strnicmp(desc, "XDM", 3))
       submod = SUBMOD_XDM;
    else if(CVAR_GET_POINTER("bm_ver") != NULL)
-      submod = SUBMOD_BUBBLEMOD; 
+      submod = SUBMOD_BUBBLEMOD;
    else if(!strnicmp(desc, "HL Teamplay", 11))
    {
       // this is a bit of hack, sevs uses "HL Teamplay" string for teamplay so we need alternative way of detecting
@@ -135,7 +133,7 @@ static int CheckSubMod(void)
    }
    else
       submod = SUBMOD_HLDM;
-   
+
    switch(submod)
    {
    case SUBMOD_OP4:
@@ -156,7 +154,7 @@ static int CheckSubMod(void)
       UTIL_ConsolePrintf("Standard HL1DM assumed.");
       break;
    }
-   
+
    return(submod);
 }
 
@@ -166,7 +164,7 @@ static void GameDLLInit( void )
    //before anything else detect submod
    submod_id = CheckSubMod();
    submod_weaponflag = SubmodToSubmodWeaponFlag(submod_id);
-   
+
    memset(players, 0, sizeof(players));
 
    // initialize the bots array of structures...
@@ -174,7 +172,7 @@ static void GameDLLInit( void )
 
    //skill init
    ResetSkillsToDefault();
-   
+
    //weapon init
    InitWeaponSelect(submod_id);
 
@@ -199,22 +197,22 @@ static int Spawn( edict_t *pent )
    {
       if (FIsClassname(pent, "worldspawn"))
       {
-         // clear players array 
+         // clear players array
          //  note: posdata clean up first to prevent mem-leaks.
-         //  note2: WaypointInit (and maybe others) set different than zero init value for array object, 
+         //  note2: WaypointInit (and maybe others) set different than zero init value for array object,
          //   memset players need to be before anything else (except posdata free)
          for(int i = 0; i < 32; i++)
             free_posdata_list(i);
          memset(players, 0, sizeof(players));
-         
+
          // do level initialization stuff here...
          WaypointInit();
          WaypointLoad(NULL);
-         
+
          // init sound system
          *pSoundEnt = CSoundEnt();
          pSoundEnt->Spawn();
-         
+
          PRECACHE_SOUND("weapons/xbow_hit1.wav");      // waypoint add
          PRECACHE_SOUND("weapons/mine_activate.wav");  // waypoint delete
          PRECACHE_SOUND("common/wpn_hudoff.wav");      // path add/delete start
@@ -245,7 +243,7 @@ static int Spawn( edict_t *pent )
 
          for(int i = 0; i < 32; i++)
             bots[i].is_used = FALSE;
-         
+
          num_bots = 0;
          need_to_open_cfg = TRUE;
          FreeCfgBotRecord();//reset on mapchange
@@ -266,7 +264,7 @@ static int Spawn_Post( edict_t *pent )
 {
    if(!gpGlobals->deathmatch)
       RETURN_META_VALUE (MRES_IGNORED, 0);
-   
+
    if (FIsClassname(pent, "worldspawn"))
    {
       // check for team play... gamedll check it in 'worldspawn' spawn and doesn't recheck
@@ -276,11 +274,11 @@ static int Spawn_Post( edict_t *pent )
    {
       if(m_height == 0)
          m_height = pent->v.size.z + 8;
-      
+
       Vector v_position1 = m_origin;
       Vector v_position2 = m_origin;
       v_position2.z -= m_height;
-      
+
       Vector start, end;
       if(!FStringNull(pent->v.targetname))
       {
@@ -292,13 +290,13 @@ static int Spawn_Post( edict_t *pent )
          start = v_position2;
          end = v_position1;
       }
-      
+
       WaypointAddLift(pent, start, end);
    }
    else if(FIsClassname(pent, "func_door"))
    {
       const int SF_DOOR_START_OPEN = 1;
-      
+
       Vector v_position1 = m_origin;
       // Subtract 2 from size because the engine expands bboxes by 1 in all directions making the size too big
       Vector v_position2 = m_origin + (pent->v.movedir * (fabs( pent->v.movedir.x * (pent->v.size.x-2) ) + fabs( pent->v.movedir.y * (pent->v.size.y-2) ) + fabs( pent->v.movedir.z * (pent->v.size.z-2) ) - m_lip));
@@ -309,18 +307,18 @@ static int Spawn_Post( edict_t *pent )
          v_position1 = v_position2;
          v_position2 = swap;
       }
-      
+
       Vector start = v_position1;
       Vector end = v_position2;
-      
+
       WaypointAddLift(pent, start, end);
    }
    else
       CollectMapSpawnItems(pent);
-   
+
    m_height = 0;
    m_lip = 0;
-   
+
    RETURN_META_VALUE (MRES_IGNORED, 0);
 }
 
@@ -329,15 +327,15 @@ static void DispatchKeyValue_Post( edict_t *pentKeyvalue, KeyValueData *pkvd )
 {
    if(!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
-   
+
    if(pkvd && pkvd->szKeyName && pkvd->szValue)
    {
       if(FIsClassname(pentKeyvalue, "func_breakable") && !(pentKeyvalue->v.spawnflags & SF_BREAK_TRIGGER_ONLY))
-      	 UTIL_UpdateFuncBreakable(pentKeyvalue, pkvd->szKeyName, pkvd->szValue);
-      
+          UTIL_UpdateFuncBreakable(pentKeyvalue, pkvd->szKeyName, pkvd->szValue);
+
       else if(FIsClassname(pentKeyvalue, "func_pushable") && pentKeyvalue->v.spawnflags & SF_PUSH_BREAKABLE && !(pentKeyvalue->v.spawnflags & SF_BREAK_TRIGGER_ONLY))
          UTIL_UpdateFuncBreakable(pentKeyvalue, pkvd->szKeyName, pkvd->szValue);
-      
+
       else if(FIsClassname(pentKeyvalue, "func_plat"))
       {
          // save height?
@@ -351,13 +349,13 @@ static void DispatchKeyValue_Post( edict_t *pentKeyvalue, KeyValueData *pkvd )
             m_lip = atof(pkvd->szValue);
       }
    }
-   
+
    RETURN_META (MRES_HANDLED);
 }
 
 
 BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ] )
-{ 
+{
    if (!gpGlobals->deathmatch)
       RETURN_META_VALUE (MRES_IGNORED, 0);
 
@@ -377,7 +375,7 @@ BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *p
       // don't try to add bots for 1 second, give client time to get added
       bot_check_time = gpGlobals->time + 1.0;
    }
-   
+
    RETURN_META_VALUE (MRES_IGNORED, 0);
 }
 
@@ -386,7 +384,7 @@ void jkbotti_ClientPutInServer( edict_t *pEntity )
 {
    if (!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
-   
+
    int idx = ENTINDEX(pEntity) - 1;
 
    if (idx < gpGlobals->maxClients && idx >= 0)
@@ -396,7 +394,7 @@ void jkbotti_ClientPutInServer( edict_t *pEntity )
       UTIL_ConsolePrintf("Error! ClientPutInServer pEntity invalid!");
       RETURN_META (MRES_IGNORED);
    }
-   
+
    RETURN_META (MRES_IGNORED);
 }
 
@@ -405,37 +403,37 @@ static void CmdStart( const edict_t *player, const struct usercmd_s *cmd, unsign
 {
    // check if is our bot
    int bot_index = UTIL_GetBotIndex(player);
-   
+
    if(bot_index != -1)
    {
       if(bots[bot_index].name[0] == 0)  // name filled in yet?
          safe_strcopy(bots[bot_index].name, sizeof(bots[bot_index].name), STRING(bots[bot_index].pEdict->v.netname));
-      
+
       if(bots[bot_index].userid <= 0)  // user id filled in yet?
          bots[bot_index].userid = GETPLAYERUSERID(bots[bot_index].pEdict);
-      
+
       JKASSERT(bots[bot_index].name[0] == 0);
       JKASSERT(bots[bot_index].userid <= 0);
-      
+
       RETURN_META (MRES_IGNORED);
    }
-	
+
    // This is to detect other third party bots
-   
+
    // check if connected
    for(int i = 0; i < gpGlobals->maxClients; i++)
    {
       if(player == players[i].pEdict)
          RETURN_META (MRES_IGNORED);
    }
-   
+
    char szRejectReason[ 128 ];
-   
+
    memset(szRejectReason, 0, sizeof(szRejectReason));
-   
+
    jkbotti_ClientConnect((edict_t*)player, STRING(player->v.netname), "::::local:other_bot", szRejectReason);
    jkbotti_ClientPutInServer( (edict_t*)player );
-   
+
    RETURN_META (MRES_IGNORED);
 }
 
@@ -473,7 +471,7 @@ static void ServerDeactivate(void)
 {
    if(!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
-   
+
    // automatic saving in autowaypoint mode, only if there are changes!
    if(g_auto_waypoint && g_waypoint_updated)
       WaypointSave();
@@ -482,44 +480,44 @@ static void ServerDeactivate(void)
       WaypointSaveFloydsMatrix();
       wp_matrix_save_on_mapend = FALSE;
    }
-   
+
    UTIL_FreeFuncBreakables();
-      
+
    RETURN_META (MRES_HANDLED);
 }
 
 
 static void PlayerPostThink_Post( edict_t *pEdict )
 {
-   if (!gpGlobals->deathmatch) 
+   if (!gpGlobals->deathmatch)
       RETURN_META(MRES_IGNORED);
-   
+
    //check if player is facing wall
    CheckPlayerChatProtection(pEdict);
-      
+
    //Gather player positions for ping prediction
    GatherPlayerData(pEdict);
-   
+
    //Store check IsAlive
    SaveAliveStatus(pEdict);
-   
+
    RETURN_META (MRES_HANDLED);
 }
 
 
-static void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch) 
+static void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch)
 {
    if (gpGlobals->deathmatch)
    {
       edict_t * pPlayer;
       int idx;
-   
+
       idx = ENGINE_CURRENT_PLAYER();
-   
+
       if(idx >= 0 && idx < gpGlobals->maxClients)
       {
          pPlayer = INDEXENT(idx+1);
-   
+
          if(!FNullEnt(pPlayer))
          {
             int ivolume = (int)(1000*((volume+1)/2));
@@ -527,27 +525,27 @@ static void new_PM_PlaySound(int channel, const char *sample, float volume, floa
          }
       }
    }
-   
+
    (*old_PM_PlaySound)(channel, sample, volume, attenuation, fFlags, pitch);
 }
 
-static void PM_Move(struct playermove_s *ppmove, qboolean server) 
+static void PM_Move(struct playermove_s *ppmove, qboolean server)
 {
-   if (!gpGlobals->deathmatch) 
+   if (!gpGlobals->deathmatch)
       RETURN_META(MRES_IGNORED);
-      
+
    //
-   if(ppmove) 
+   if(ppmove)
    {
       //hook footstep sound function
-      if(ppmove->PM_PlaySound != &new_PM_PlaySound) 
+      if(ppmove->PM_PlaySound != &new_PM_PlaySound)
       {
          old_PM_PlaySound = ppmove->PM_PlaySound;
          ppmove->PM_PlaySound = &new_PM_PlaySound;
          old_ppmove = ppmove;
       }
    }
-   
+
    RETURN_META (MRES_HANDLED);
 }
 
@@ -557,29 +555,29 @@ static void StartFrame( void )
    int bot_index;
    int count;
    double begin_time;
-   
+
    if (!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
-   
+
    begin_time = UTIL_GetSecs();
-   
+
    // sound system
    if (pSoundEnt->m_nextthink <= gpGlobals->time)
       pSoundEnt->Think();
-   
+
    // bot system
    if (bot_stop == 0)
-   {            
+   {
       count = 0;
-         
+
       for (bot_index = 0; bot_index < gpGlobals->maxClients; bot_index++)
       {
-         if (bots[bot_index].is_used)   // is this slot used 
+         if (bots[bot_index].is_used)   // is this slot used
          {
             if (gpGlobals->time >= bots[bot_index].bot_think_time)
             {
                BotThink(bots[bot_index]);
-                  
+
                // randomness prevents all bots to run on same frame -> less laggy server
                bots[bot_index].bot_think_time = gpGlobals->time + bot_think_spf * RANDOM_FLOAT2(0.95, 1.05);
             }
@@ -587,22 +585,22 @@ static void StartFrame( void )
             count++;
          }
       }
-         
+
       if (count > num_bots)
          num_bots = count;
    }
-   
+
    // Autowaypointing engine
    if (gpGlobals->time >= waypoint_time)
    {
       int waypoint_player_count = 0;
       int waypoint_player_index = 1;
-      
+
       WaypointAddSpawnObjects();
-      
+
       // 10 times / sec, note: this is extremely slow, do checking only for max 4 players on one frame
       waypoint_time = gpGlobals->time + (1.0/10.0);
-      
+
       while(waypoint_player_index <= gpGlobals->maxClients)
       {
          pPlayer = INDEXENT(waypoint_player_index++);
@@ -612,19 +610,19 @@ static void StartFrame( void )
             // Is player alive?
             if(!IsAlive(pPlayer))
                continue;
-            
-            if (FBitSet(pPlayer->v.flags, FL_CLIENT) && !FBitSet(pPlayer->v.flags, FL_PROXY) && 
+
+            if (FBitSet(pPlayer->v.flags, FL_CLIENT) && !FBitSet(pPlayer->v.flags, FL_PROXY) &&
                !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
             {
                WaypointThink(pPlayer);
-               
+
                if(++waypoint_player_count >= 2)
                   break;
             }
          }
       }
    }
-   
+
    if (need_to_open_cfg)  // have we open jk_botti.cfg file yet?
    {
       char filename[256];
@@ -637,7 +635,7 @@ static void StartFrame( void )
          safe_strcopy(mapname, sizeof(mapname), "_jk_botti_logo.cfg");
       else
          safevoid_snprintf(mapname, sizeof(mapname), "jk_botti_%s.cfg", STRING(gpGlobals->mapname));
-      
+
       UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti", mapname);
 
       if ((bot_cfg_fp = fopen(filename, "r")) != NULL)
@@ -669,7 +667,7 @@ static void StartFrame( void )
    {
       // process jk_botti.cfg file options...
       ProcessBotCfgFile();
-      
+
       bot_check_time = gpGlobals->time + 1.0;
    }
 
@@ -678,41 +676,41 @@ static void StartFrame( void )
    {
       int client_count = UTIL_GetClientCount();
       int bot_count = UTIL_GetBotCount();
-      
+
       if(debug_minmax)
       {
-         UTIL_ConsolePrintf("client count: %d, bot count: %d, max_bots: %d, min_bots: %d\n", 
+         UTIL_ConsolePrintf("client count: %d, bot count: %d, max_bots: %d, min_bots: %d\n",
             client_count, bot_count, max_bots, min_bots);
-         
+
          UTIL_ConsolePrintf("client_count < max_bots: %s", client_count < max_bots ? "TRUE":"FALSE");
          UTIL_ConsolePrintf("client_count > max_bots: %s", client_count > max_bots ? "TRUE":"FALSE");
          UTIL_ConsolePrintf("bot_count < min_bots: %s", bot_count < min_bots ? "TRUE":"FALSE");
          UTIL_ConsolePrintf("bot_count > min_bots: %s", bot_count > min_bots ? "TRUE":"FALSE");
-         
+
          UTIL_ConsolePrintf("Should add bot: %s", (client_count < gpGlobals->maxClients && (client_count < max_bots || bot_count < min_bots)) ? "TRUE":"FALSE");
          UTIL_ConsolePrintf("Should remove bot: %s", (client_count > max_bots && bot_count > min_bots) ? "TRUE":"FALSE");
-         
+
          if(client_count > max_bots && bot_count > min_bots)
             UTIL_ConsolePrintf("Test UTIL_PickRandomBot(), return value: %d", UTIL_PickRandomBot());
       }
-      
+
       // need more clients
       if(client_count < gpGlobals->maxClients && (client_count < max_bots || bot_count < min_bots))
       {
          const cfg_bot_record_t * record = GetUnusedCfgBotRecord();
-         
+
          if(record)
             BotCreate( record->skin, record->name, record->skill, record->top_color, record->bottom_color, record->index );
          else
             BotCreate( NULL, NULL, -1, -1, -1, -1 );
-         
+
          bot_check_time = gpGlobals->time + 0.5;
       }
       // more than minimum count of bots and need to lower client count
       else if(client_count > max_bots && bot_count > min_bots)
       {
          int pick = UTIL_PickRandomBot();
-         
+
          if(is_team_play && team_balancetype >= 1 && g_team_limit)
          {
             char balanceskin[MAX_TEAMNAME_LENGTH];
@@ -725,32 +723,32 @@ static void StartFrame( void )
                for(int i = 0; i < 32; i++)
                {
                   char teamstr[MAX_TEAMNAME_LENGTH];
-                  
+
                   if(bots[i].is_used)
                   {
                      if(!stricmp(UTIL_GetTeam(bots[i].pEdict, teamstr, sizeof(teamstr)), balanceskin))
                      {
                         pick = i;
-                        
+
                         if(debug_minmax)
                            UTIL_ConsolePrintf("Teambalance override, kicking from team: %s", balanceskin);
-                        
+
                         break;
                      }
                   }
                }
             }
          }
-            
+
          if(pick != -1)
             BotKick(bots[pick]);
-         
+
          bot_check_time = gpGlobals->time + 0.5;
       }
       else
          bot_check_time = gpGlobals->time + ((!!debug_minmax) ? 5.0 : 0.5);
    }
-   
+
    // -- Run Floyds for creating waypoint path matrix
    //
    //    keep going for 10ms (hlds sleeps 10ms after every frame on win32, thus 10ms+10ms = 20ms -> 50fps
@@ -764,7 +762,7 @@ static void StartFrame( void )
             break;
       }
    }
-   
+
    RETURN_META (MRES_HANDLED);
 }
 
@@ -772,7 +770,7 @@ static void StartFrame( void )
 C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion)
 {
    memset(pFunctionTable, 0, sizeof (DLL_FUNCTIONS));
-   
+
    pFunctionTable->pfnGameInit = GameDLLInit;
    pFunctionTable->pfnSpawn = Spawn;
    pFunctionTable->pfnClientConnect = jkbotti_ClientConnect;
@@ -790,7 +788,7 @@ C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVers
 C_DLLEXPORT int GetEntityAPI2_POST (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion)
 {
    memset(pFunctionTable, 0, sizeof (DLL_FUNCTIONS));
-   
+
    pFunctionTable->pfnSpawn = Spawn_Post;
    pFunctionTable->pfnPlayerPostThink = PlayerPostThink_Post;
    pFunctionTable->pfnKeyValue = DispatchKeyValue_Post;
@@ -902,13 +900,13 @@ C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, 
 
    // ask the engine to register the server commands this plugin uses
    REG_SVR_COMMAND ("jk_botti", jk_botti_ServerCommand);
-   
+
    // init random
    fast_random_seed(time(0) ^ (unsigned long)&bots[0] ^ sizeof(bots));
-  
+
    CVAR_REGISTER(&jk_botti_version);
    CVAR_SET_STRING("jk_botti_version", Plugin_info.version);
-      
+
    return (TRUE); // returning TRUE enables metamod to attach this plugin
 }
 
@@ -930,21 +928,21 @@ C_DLLEXPORT int Meta_Detach (PLUG_LOADTIME now, PL_UNLOAD_REASON reason)
    for (int index = 0; index < 32; index++)
       if (bots[index].is_used)  // is this slot used?
          BotKick(bots[index]);
-   
+
    // free memory
    WaypointInit();
    for(int i = 0; i < 32; i++)
       free_posdata_list(i);
    UTIL_FreeFuncBreakables();
    FreeCfgBotRecord();
-   
+
    // remove pm_move hook
    if(old_ppmove)
       old_ppmove->PM_PlaySound = old_PM_PlaySound;
-   
+
    // try remove hook
    if(!unhook_sendto_function())
       return(FALSE);
-   
+
    return (TRUE); // returning TRUE enables metamod to unload this plugin
 }

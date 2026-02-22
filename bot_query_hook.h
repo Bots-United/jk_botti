@@ -1,16 +1,16 @@
 #ifdef _WIN32
-	#define WIN32_LEAN_AND_MEAN
-	#include <windows.h>
-	#include <winsock2.h>
-	
-	#include <sys/types.h>
-	
-	typedef int socklen_t;
+   #define WIN32_LEAN_AND_MEAN
+   #include <windows.h>
+   #include <winsock2.h>
+
+   #include <sys/types.h>
+
+   typedef int socklen_t;
 #else
-	#include <sys/types.h>
-	#include <sys/socket.h>
-	
-	#define PASCAL
+   #include <sys/types.h>
+   #include <sys/socket.h>
+
+   #define PASCAL
 #endif
 
 ssize_t PASCAL sendto_hook(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len);

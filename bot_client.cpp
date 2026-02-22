@@ -4,9 +4,7 @@
 // bot_client.cpp
 //
 
-#ifndef _WIN32
 #include <string.h>
-#endif
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -125,7 +123,7 @@ void BotClient_Valve_CurrentWeapon(void *p, int bot_index)
          {
             bot_weapon_select_t *pSelect = NULL;
             int found = 0;
-            
+
             bots[bot_index].current_weapon.iId = iId;
             bots[bot_index].current_weapon.iClip = iClip;
 
@@ -134,18 +132,18 @@ void BotClient_Valve_CurrentWeapon(void *p, int bot_index)
             bots[bot_index].current_weapon.iAmmo2 = bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo2];
 
             pSelect = &weapon_select[0];
-            
-            for(int i = 0; pSelect && pSelect[i].iId; i++) 
+
+            for(int i = 0; pSelect && pSelect[i].iId; i++)
             {
-               if(iId == pSelect[i].iId) 
-               	{
+               if(iId == pSelect[i].iId)
+                  {
                   bots[bot_index].current_opt_distance = pSelect[i].opt_distance;
                   bots[bot_index].current_weapon_index = i;
                   found = 1;
-               	  break;
+                    break;
                }
             }
-            
+
             if(!found)
                bots[bot_index].current_opt_distance = 99999.0;
          }
@@ -268,7 +266,7 @@ void BotClient_Valve_WeaponPickup(void *p, int bot_index)
 void BotClient_Valve_ItemPickup(void *p, int bot_index)
 {
    char itemname[64];
-   
+
    safe_strcopy(itemname, sizeof(itemname), (char *)p);
 
    if (strcmp(itemname, "item_longjump") == 0)
@@ -351,7 +349,7 @@ void BotClient_Valve_Damage(void *p, int bot_index)
             bots[bot_index].pEdict->v.ideal_yaw = bot_angles.y;
 
             BotFixIdealYaw(bots[bot_index].pEdict);
-         
+
             // stop using health or HEV stations...
             bots[bot_index].b_use_health_station = FALSE;
             bots[bot_index].b_use_HEV_station = FALSE;
@@ -466,4 +464,3 @@ void BotClient_Valve_ScreenFade(void *p, int bot_index)
       state++;
    }
 }
-

@@ -4,9 +4,7 @@
 // engine.cpp
 //
 
-#ifndef _WIN32
 #include <string.h>
-#endif
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -50,36 +48,36 @@ typedef struct event_info_s {
 
 event_info_t g_event_info[] = {
 //from valve
-   {-1, "events/glock1.sc",		0.96,  {-2.0, -2.0}},
-   {-1, "events/glock2.sc",		0.96,  {-2.0, -2.0}},
-   {-1, "events/shotgun1.sc",		0.975, {-5.0, -5.0}},
-   {-1, "events/shotgun2.sc",		0.99,  {-10.0, -10.0}},
-   {-1, "events/mp5.sc",		1.0,   {-2.0, 2.0}},
-   {-1, "events/mp52.sc",		1.0,   {-10.0, -10.0}},
-   {-1, "events/python.sc",		0.85,  {-10.0, -10.0}},
-   {-1, "events/gauss.sc",		1.0,   {-2.0, -2.0}},
-   {-1, "events/gaussspin.sc",		1.0,   {0, 0}},
-   {-1, "events/train.sc",		0.6,   {0, 0}},
-   {-1, "events/crowbar.sc",		1.0,   {0, 0}},
-   {-1, "events/crossbow1.sc",		1.0,   {-2.0, -2.0}},
-   {-1, "events/crossbow2.sc",		1.0,   {0, 0}},
-   {-1, "events/rpg.sc",		0.9,   {-5.0, -5.0}},
-   {-1, "events/egon_fire.sc",		0.94,  {0, 0}},
-   {-1, "events/egon_stop.sc",		0.98,  {0, 0}},
-   {-1, "events/firehornet.sc",		1.0,   {0.0, 2.0}},
-   {-1, "events/tripfire.sc",		0.0,   {0, 0}},
-   {-1, "events/snarkfire.sc",		0.0,   {0, 0}},
+   {-1, "events/glock1.sc",      0.96,  {-2.0, -2.0}},
+   {-1, "events/glock2.sc",      0.96,  {-2.0, -2.0}},
+   {-1, "events/shotgun1.sc",    0.975, {-5.0, -5.0}},
+   {-1, "events/shotgun2.sc",    0.99,  {-10.0, -10.0}},
+   {-1, "events/mp5.sc",      1.0,   {-2.0, 2.0}},
+   {-1, "events/mp52.sc",     1.0,   {-10.0, -10.0}},
+   {-1, "events/python.sc",      0.85,  {-10.0, -10.0}},
+   {-1, "events/gauss.sc",    1.0,   {-2.0, -2.0}},
+   {-1, "events/gaussspin.sc",      1.0,   {0, 0}},
+   {-1, "events/train.sc",    0.6,   {0, 0}},
+   {-1, "events/crowbar.sc",     1.0,   {0, 0}},
+   {-1, "events/crossbow1.sc",      1.0,   {-2.0, -2.0}},
+   {-1, "events/crossbow2.sc",      1.0,   {0, 0}},
+   {-1, "events/rpg.sc",      0.9,   {-5.0, -5.0}},
+   {-1, "events/egon_fire.sc",      0.94,  {0, 0}},
+   {-1, "events/egon_stop.sc",      0.98,  {0, 0}},
+   {-1, "events/firehornet.sc",     1.0,   {0.0, 2.0}},
+   {-1, "events/tripfire.sc",    0.0,   {0, 0}},
+   {-1, "events/snarkfire.sc",      0.0,   {0, 0}},
 //from gearbox
-   {-1, "events/egon_effect.sc",	0.0,   {0, 0}},
-   {-1, "events/eagle.sc",		0.90,  {-20.0, -20.0}},
-   {-1, "events/pipewrench.sc",		0.8,   {0, 0}},
-   {-1, "events/m249.sc",		0.96,  {-7.0, 7.0}},
-   {-1, "events/shock.sc",		0.96,  {0.0, 2.0}},
-   {-1, "events/sniper.sc",		1.00,  {-10.0, -10.0}},
-   {-1, "events/knife.sc",		0.6,   {0, 0}},
-   {-1, "events/penguinfire.sc",	0.85,  {0, 0}},
-   {-1, "events/spore.sc",		0.96,  {-10.0, -10.0}},
-   
+   {-1, "events/egon_effect.sc", 0.0,   {0, 0}},
+   {-1, "events/eagle.sc",    0.90,  {-20.0, -20.0}},
+   {-1, "events/pipewrench.sc",     0.8,   {0, 0}},
+   {-1, "events/m249.sc",     0.96,  {-7.0, 7.0}},
+   {-1, "events/shock.sc",    0.96,  {0.0, 2.0}},
+   {-1, "events/sniper.sc",      1.00,  {-10.0, -10.0}},
+   {-1, "events/knife.sc",    0.6,   {0, 0}},
+   {-1, "events/penguinfire.sc", 0.85,  {0, 0}},
+   {-1, "events/spore.sc",    0.96,  {-10.0, -10.0}},
+
    {-1, "", 0, {0, 0}} //NULL
 };
 
@@ -89,7 +87,7 @@ static unsigned short pfnPrecacheEvent_Post(int type, const char* psz)
 {
    if (!gpGlobals->deathmatch)
       RETURN_META_VALUE (MRES_IGNORED, 0);
-   
+
    unsigned short eventindex = (META_RESULT_STATUS == MRES_OVERRIDE || META_RESULT_STATUS == MRES_SUPERCEDE) ? META_RESULT_OVERRIDE_RET(unsigned short) : META_RESULT_ORIG_RET(unsigned short);
 
    event_info_t *pei;
@@ -102,26 +100,26 @@ static unsigned short pfnPrecacheEvent_Post(int type, const char* psz)
          break;
       }
    }
-   
+
    if(!pei->eventname || !pei->eventname[0])
    {
       // unknown event
       //UTIL_ConsolePrintf("PrecacheEvent, new event type: \"%s\" : %d", psz, eventindex);
    }
-   
+
    RETURN_META_VALUE (MRES_IGNORED, 0);
 }
 
 
 //
-static void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 ) 
+static void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 )
 {
    if (!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
 
    // get event info
    event_info_t *pei;
-   
+
    for(pei = g_event_info; pei->eventname && pei->eventname[0]; pei++)
    {
       if(eventindex == pei->eventindex)
@@ -138,7 +136,7 @@ static void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short
 
       SaveSound((edict_t*)pInvoker, pInvoker->v.origin, ivolume, CHAN_WEAPON, 5.0f);
    }
-   
+
    // event causes client recoil?
    if(pei->recoil[0] != 0.0f && pei->recoil[1] != 0.0f && !FNullEnt(pInvoker))
    {
@@ -146,15 +144,15 @@ static void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short
       // ignore the duplicated one...
       if(strcmp("events/gauss.sc", pei->eventname) == 0 && delay > 0.0f && (flags & FEV_RELIABLE))
          RETURN_META (MRES_IGNORED);
-      
+
       int index = UTIL_GetBotIndex(pInvoker);
-      
+
       if(index != -1)
       {
          bots[index].f_recoil += RANDOM_FLOAT2(pei->recoil[0], pei->recoil[1]);
       }
    }
-   
+
    RETURN_META (MRES_IGNORED);
 }
 
@@ -165,7 +163,7 @@ static void pfnEmitSound(edict_t *entity, int channel, const char *sample, float
       int ivolume = (int)(1000*volume);
       const char *classname = (const char *)STRING(entity->v.classname);
       float duration = 5.0f;
-      
+
       if (strncmp("item_health", classname, 11) == 0)
          duration = 8.0f;
       else if (strncmp("item_battery", classname, 12) == 0)
@@ -176,7 +174,7 @@ static void pfnEmitSound(edict_t *entity, int channel, const char *sample, float
          duration = 8.0f;
       else if (strcmp("item_longjump", classname) == 0)
          duration = 8.0f;
-      
+
       SaveSound(entity, entity->v.origin, ivolume, channel, duration);
    }
 
@@ -187,7 +185,7 @@ static void pfnChangeLevel(char* s1, char* s2)
 {
    if (!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
-   
+
    // kick any bot off of the server after time/frag limit...
    for (int index = 0; index < 32; index++)
       if (bots[index].is_used)  // is this slot used?
@@ -205,17 +203,17 @@ static void pfnClientCommand(edict_t* pEdict, char* szFmt, ...)
    RETURN_META (MRES_IGNORED);
 }
 
-static int FAST_GET_USER_MSG_ID(plid_t plindex, int & value, const char * name, int * size) 
+static int FAST_GET_USER_MSG_ID(plid_t plindex, int & value, const char * name, int * size)
 {
    return(value ? value : (value = GET_USER_MSG_ID(plindex, name, size)));
 }
 
 static void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, edict_t *ed)
-{   
+{
    if (gpGlobals->deathmatch)
    {
       int index = -1;
-      
+
       static int WeaponList = 0;
       static int CurWeapon = 0;
       static int AmmoX = 0;
@@ -227,7 +225,7 @@ static void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, ed
       static int Damage = 0;
       static int ScreenFade = 0;
       static int DeathMsg = 0;
-      
+
       if (ed)
       {
          index = UTIL_GetBotIndex(ed);
@@ -260,7 +258,7 @@ static void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, ed
                botMsgFunction = BotClient_Valve_ScreenFade;
          }
          // is this message for a player?
-         else 
+         else
          {
             index = ENTINDEX(ed) - 1;
             if(index > -1 && index < gpGlobals->maxClients)
@@ -269,7 +267,7 @@ static void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, ed
                botMsgEndFunction = NULL;  // no msg end function until known otherwise
                botMsgIndex = index;       // index of bot receiving message
             }
-            
+
             // Was only needed for OP4 grapple detection (old method)
             //if (msg_type == FAST_GET_USER_MSG_ID (PLID, CurWeapon, "CurWeapon", NULL))
                //botMsgFunction = PlayerClient_Valve_CurrentWeapon;
@@ -472,7 +470,7 @@ static void pfnSetClientMaxspeed(const edict_t *pEdict, float fNewMaxspeed)
 {
    if (!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
-   
+
    int index;
 
    index = UTIL_GetBotIndex((edict_t *)pEdict);
@@ -504,7 +502,7 @@ static int pfnGetPlayerUserId(edict_t *e )
 C_DLLEXPORT int GetEngineFunctions (enginefuncs_t *pengfuncsFromEngine, int *interfaceVersion)
 {
    memset(pengfuncsFromEngine, 0, sizeof(enginefuncs_t));
-   
+
    pengfuncsFromEngine->pfnPlaybackEvent = pfnPlaybackEvent;
    pengfuncsFromEngine->pfnChangeLevel = pfnChangeLevel;
    pengfuncsFromEngine->pfnEmitSound = pfnEmitSound;
@@ -533,8 +531,8 @@ C_DLLEXPORT int GetEngineFunctions (enginefuncs_t *pengfuncsFromEngine, int *int
 C_DLLEXPORT int GetEngineFunctions_POST (enginefuncs_t *pengfuncsFromEngine, int *interfaceVersion)
 {
    memset(pengfuncsFromEngine, 0, sizeof(enginefuncs_t));
-   
+
    pengfuncsFromEngine->pfnPrecacheEvent = pfnPrecacheEvent_Post;
-   
+
    return TRUE;
 }

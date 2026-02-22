@@ -196,8 +196,8 @@ inline int WaypointFindRandomGoal(edict_t *pEntity, int flags)
 }
 
 //
-inline int WaypointFindRandomGoal(edict_t *pEntity, int flags, int exclude[]) 
-{ 
+inline int WaypointFindRandomGoal(edict_t *pEntity, int flags, int exclude[])
+{
    int index = 0;
    JKASSERT(pEntity == NULL);
    return WaypointFindRandomGoal(&index, 1, pEntity, flags, 0, exclude) > 0 ? index : -1;

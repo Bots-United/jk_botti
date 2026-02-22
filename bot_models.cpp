@@ -4,9 +4,7 @@
 // bot_models.cpp
 //
 
-#ifndef _WIN32
 #include <string.h>
-#endif
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -36,8 +34,8 @@ int number_skins;
 char *default_bot_models[VALVE_MAX_SKINS + GEARBOX_MAX_SKINS] = {
    "barney", "gina", "gman", "gordon", "helmet",
    "hgrunt", "recon", "robo", "scientist", "zombie",
-   
-   "beret", "cl_suit", "drill", "fassn", "grunt", 
+
+   "beret", "cl_suit", "drill", "fassn", "grunt",
    "massn", "otis", "recruit", "shephard", "tower"
 };
 
@@ -45,7 +43,7 @@ char *default_bot_models[VALVE_MAX_SKINS + GEARBOX_MAX_SKINS] = {
 char *default_bot_names[VALVE_MAX_SKINS + GEARBOX_MAX_SKINS] = {
    "Barney", "Gina", "G-Man", "Gordon", "Helmet",
    "H-Grunt", "Recon", "Robo", "Scientist", "Zombie",
-   
+
    "Beret", "Cleansuit", "Drill", "Female Assassin", "Grunt",
    "Male Assassin", "Otis", "Recruit", "Shephard", "Tower"
 };
@@ -65,7 +63,7 @@ static HANDLE FindDirectory(HANDLE hFile, char *dirname, int sizeof_dirname, cha
       if (hFile == INVALID_HANDLE_VALUE)
       {
          hFile = NULL;
-	 return hFile; // bugfix
+    return hFile; // bugfix
       }
 
       while (pFindFileData.dwFileAttributes != FILE_ATTRIBUTE_DIRECTORY)
@@ -135,7 +133,7 @@ static DIR *FindDirectory(DIR *directory, char *dirname, int sizeof_dirname, cha
          }
       }
    }
-   
+
    /* at end of directory? */
    closedir(directory);
    return NULL;
@@ -225,4 +223,3 @@ void LoadBotModels(void)
          break;  // break out if max models reached
    }
 }
-
