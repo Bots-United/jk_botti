@@ -4,9 +4,7 @@
 // util.cpp
 //
 
-#ifndef _WIN32
 #include <string.h>
-#endif
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -26,11 +24,11 @@ extern qboolean is_team_play;
 static breakable_list_t *g_breakable_list = NULL;
 static breakable_list_t breakable_list_memarray[BREAKABLE_LIST_MAX];
 
-static unsigned int rnd_idnum[2] = {1, 1};
-
 #ifdef __GNUC__
-inline void fsincos(double x, double &s, double &c) 
+inline void fsincos(double x, double &s, double &c)
 {
+   // Benchmarked (see tests/bench_fsincos.cpp): ~2.4x faster than glibc
+   // sin()+cos() on Linux, ~1.2x faster on Win32/mingw. Identical accuracy.
    __asm__ ("fsincos;" : "=t" (c), "=u" (s) : "0" (x) : "st(7)");
 }
 #else
@@ -44,14 +42,11 @@ inline void fsincos(double x, double &s, double &c)
 
 void null_terminate_buffer(char *buf, const size_t maxlen)
 {
-   for(size_t i = 0; i < maxlen; i++)
-      if(buf[i] == 0)
-         return;
-   buf[maxlen-1] = 0;
+   buf[maxlen-1] = '\0';
 }
 
 
-double UTIL_GetSecs(void) 
+double UTIL_GetSecs(void)
 {
 #ifdef _WIN32
    LARGE_INTEGER count, freq;
@@ -65,9 +60,9 @@ double UTIL_GetSecs(void)
    return (double)count.QuadPart / (double)freq.QuadPart;
 #else
    struct timeval tv;
-   
+
    gettimeofday (&tv, NULL);
-   
+
    return (double) tv.tv_sec + ((double) tv.tv_usec) / 1000000.0;
 #endif
 }
@@ -83,15 +78,15 @@ double UTIL_GetSecs(void)
 
 float UTIL_WrapAngle(float angle)
 {
-   // this function returns an angle normalized to the range [-180 < angle <= 180]
-   
+   // this function returns an angle normalized to the range (-180, 180]
+
    angle += 180.0;
    const unsigned int bits = 0x80000000;
    angle = -180.0 + ((360.0 / bits) * ((int64_t)(angle * (bits / 360.0)) & (bits-1)));
-   
-   if(angle == -180.0f)
+
+   if (angle == -180.0f)
       angle = 180.0;
-   
+
    return(angle);
 }
 
@@ -160,7 +155,7 @@ Vector UTIL_VecToAngles(const Vector &forward)
 {
    // from pm_shared/pm_math.h
    float tmp, yaw, pitch;
-   
+
    if (unlikely(forward.y == 0) && unlikely(forward.x == 0))
    {
       yaw = 0;
@@ -173,7 +168,7 @@ Vector UTIL_VecToAngles(const Vector &forward)
       tmp = sqrt(forward.x * forward.x + forward.y * forward.y);
       pitch = (atan2(forward.z, tmp) * 180 / M_PI);
    }
-   
+
    return(Vector(pitch, yaw, 0));
 }
 
@@ -193,10 +188,10 @@ int UTIL_GetBotIndex(const edict_t *pEdict)
 bot_t *UTIL_GetBotPointer(const edict_t *pEdict)
 {
    int index = UTIL_GetBotIndex(pEdict);
-   
-   if(index == -1)
+
+   if (index == -1)
       return NULL; // return NULL if edict is not a bot
-   
+
    return(&bots[index]);
 }
 
@@ -209,83 +204,25 @@ Vector UTIL_AdjustOriginWithExtent(bot_t &pBot, const Vector & v_target_origin, 
 
    // get smallest extent of bots mins/maxs
    float smallest_extent = -pTarget->v.mins[0];
-   if(-pTarget->v.mins[1] < smallest_extent)
+   if (-pTarget->v.mins[1] < smallest_extent)
       smallest_extent = -pTarget->v.mins[1];
-   if(-pTarget->v.mins[2] < smallest_extent)
+   if (-pTarget->v.mins[2] < smallest_extent)
       smallest_extent = -pTarget->v.mins[2];
-   
-   if(pTarget->v.maxs[0] < smallest_extent)
+
+   if (pTarget->v.maxs[0] < smallest_extent)
       smallest_extent = pTarget->v.maxs[0];
-   if(pTarget->v.maxs[1] < smallest_extent)
+   if (pTarget->v.maxs[1] < smallest_extent)
       smallest_extent = pTarget->v.maxs[1];
-   if(pTarget->v.maxs[2] < smallest_extent)
+   if (pTarget->v.maxs[2] < smallest_extent)
       smallest_extent = pTarget->v.maxs[2];
-   
-   if(smallest_extent <= 0.0f)
+
+   if (smallest_extent <= 0.0f)
       return(v_target_origin);
 
    // extent origin towards bot
    Vector v_extent_dir = (GetGunPosition(pBot.pEdict) - v_target_origin).Normalize();
-   
+
    return(v_target_origin + v_extent_dir * smallest_extent);
-}
-
-
-/* generates a random 32bit integer */
-static unsigned int fast_generate_random(void)
-{
-   rnd_idnum[0] ^= rnd_idnum[1] << 5;
-   
-   rnd_idnum[0] *= 1664525L;
-   rnd_idnum[0] += 1013904223L;
-   
-   rnd_idnum[1] *= 1664525L;
-   rnd_idnum[1] += 1013904223L;
-   
-   rnd_idnum[1] ^= rnd_idnum[0] << 3;
-   
-   return rnd_idnum[0];
-}
-
-
-void fast_random_seed(unsigned int seed)
-{
-   rnd_idnum[0] = seed;
-   rnd_idnum[1] = ~(seed + 6);
-   rnd_idnum[1] = fast_generate_random();
-}
-
-
-/* supports range INT_MIN, INT_MAX */
-int RANDOM_LONG2(int lLow, int lHigh) 
-{
-   const double c_divider = ((unsigned long long)1) << 32; // div by (1<<32)
-   double rnd;
-   
-   if(unlikely(lLow >= lHigh))
-      return(lLow);
-   
-   rnd = fast_generate_random();
-   rnd *= (double)lHigh - (double)lLow + 1.0;
-   rnd /= c_divider; // div by (1<<32)
-   
-   return (int)(rnd + (double)lLow);
-}
-
-
-float RANDOM_FLOAT2(float flLow, float flHigh) 
-{
-   const double c_divider = (((unsigned long long)1) << 32) - 1; // div by (1<<32)-1
-   double rnd;
-   
-   if(unlikely(flLow >= flHigh))
-      return(flLow);
-   
-   rnd = fast_generate_random();
-   rnd *= (double)flHigh - (double)flLow;
-   rnd /= c_divider; // div by (1<<32)-1
-   
-   return (float)(rnd + (double)flLow);
 }
 
 
@@ -293,30 +230,29 @@ float RANDOM_FLOAT2(float flLow, float flHigh)
 int UTIL_GetClientCount(void)
 {
    int count = 0;
-   
-   for(int i = 1; i <= gpGlobals->maxClients; i++)
+
+   for (int i = 1; i <= gpGlobals->maxClients; i++)
    {
       edict_t * pClient = INDEXENT(i);
-      
-      if(!pClient || pClient->free || FNullEnt(pClient) || GETPLAYERUSERID(pClient) <= 0 || STRING(pClient->v.netname)[0] == 0)
+
+      if (!pClient || pClient->free || FNullEnt(pClient) || GETPLAYERUSERID(pClient) <= 0 || STRING(pClient->v.netname)[0] == 0)
          continue;
-      
+
       count++;
    }
-   
+
    return(count);
 }
 
 
-// 
+//
 int UTIL_GetBotCount(void)
 {
    int count = 0;
-   
-   for(int i = 0; i < 32; i++)
-      if(bots[i].is_used)
-         count++;
-   
+
+   for (int i = 0; i < 32; i++)
+      count += bots[i].is_used;
+
    return(count);
 }
 
@@ -326,23 +262,23 @@ int UTIL_PickRandomBot(void)
 {
    int bot_index_list[32];
    int num_bots = 0;
-   
-   for(int i = 0; i < 32; i++)
-      if(bots[i].is_used)  // is this slot used?
+
+   for (int i = 0; i < 32; i++)
+      if (bots[i].is_used)  // is this slot used?
          bot_index_list[num_bots++] = i;
-   
-   if(num_bots > 0)
+
+   if (num_bots > 0)
    {
-      if(num_bots == 1)
+      if (num_bots == 1)
          return(bot_index_list[0]);
-      
+
       int pick = RANDOM_LONG2(0, num_bots-1);
-      
+
       JKASSERT(pick < 0 || pick > num_bots-1);
-      
+
       return(bot_index_list[pick]);
    }
-   
+
    return(-1);
 }
 
@@ -351,14 +287,14 @@ int UTIL_PickRandomBot(void)
 void UTIL_DrawBeam(edict_t *pEnemy, const Vector &start, const Vector &end, int width,
     int noise, int red, int green, int blue, int brightness, int speed)
 {
-   if(pEnemy && (ENTINDEX(pEnemy)-1 < 0 || ENTINDEX(pEnemy)-1 >= gpGlobals->maxClients))
+   if (pEnemy && (ENTINDEX(pEnemy)-1 < 0 || ENTINDEX(pEnemy)-1 >= gpGlobals->maxClients))
       return;
-   
-   if(pEnemy == NULL)
+
+   if (pEnemy == NULL)
       MESSAGE_BEGIN(MSG_ALL, SVC_TEMPENTITY);
    else
       MESSAGE_BEGIN(MSG_ONE, SVC_TEMPENTITY, NULL, pEnemy);
-   
+
    WRITE_BYTE( TE_BEAMPOINTS);
    WRITE_COORD(start.x);
    WRITE_COORD(start.y);
@@ -379,47 +315,47 @@ void UTIL_DrawBeam(edict_t *pEnemy, const Vector &start, const Vector &end, int 
 
    WRITE_BYTE( brightness );   // brightness
    WRITE_BYTE( speed );    // speed
-   
+
    MESSAGE_END();
 }
 
 
-// 
+//
 static breakable_list_t * UTIL_AddFuncBreakable(edict_t *pEdict)
 {
    int i;
-   
+
    // get end of list
    breakable_list_t *prev = NULL;
    breakable_list_t *next = g_breakable_list;
-   while(next)
+   while (next)
    {
       prev = next;
       next = next->next;
    }
-   
+
    // get unused slot
-   for(i = 0; i < BREAKABLE_LIST_MAX; i++)
-      if(!breakable_list_memarray[i].inuse)
+   for (i = 0; i < BREAKABLE_LIST_MAX; i++)
+      if (!breakable_list_memarray[i].inuse)
          break;
-   if(i >= BREAKABLE_LIST_MAX)
+   if (i >= BREAKABLE_LIST_MAX)
       return(NULL);
-   
+
    next = &breakable_list_memarray[i];
    memset(next, 0, sizeof(breakable_list_t));
    next->inuse = TRUE;
-   
+
    // fill in data
    next->next = NULL;
    next->material_breakable = FALSE;
    next->pEdict = pEdict;
-   
+
    //link end of list next
-   if(prev)
+   if (prev)
       prev->next = next;
    else
       g_breakable_list = next;
-   
+
    return(next);
 }
 
@@ -430,27 +366,27 @@ void UTIL_UpdateFuncBreakable(edict_t *pEdict, const char * setting, const char 
 {
    // find breakable
    breakable_list_t *plist = g_breakable_list;
-   
-   while(plist)
+
+   while (plist)
    {
-      if(plist->pEdict == pEdict)
+      if (plist->pEdict == pEdict)
          break;
       plist = plist->next;
    }
-   
+
    // not found?
-   if(!plist)
+   if (!plist)
    {
       // add new
       plist = UTIL_AddFuncBreakable(pEdict);
-      
+
       JKASSERT(plist == NULL);
-      if(!plist)
+      if (!plist)
          return;
    }
-   
+
    // check if interesting setting
-   if(FStrEq(setting, "material"))
+   if (FStrEq(setting, "material"))
    {
       // update data value
       plist->material_breakable = (atoi(value) != matUnbreakableGlass);
@@ -467,7 +403,7 @@ void UTIL_FreeFuncBreakables(void)
 //
 static breakable_list_t * UTIL_FindBreakable_Internal(breakable_list_t * pbreakable)
 {
-   if(unlikely(!pbreakable))
+   if (unlikely(!pbreakable))
       return(g_breakable_list);
    else
       return(pbreakable->next);
@@ -478,21 +414,21 @@ breakable_list_t * UTIL_FindBreakable(breakable_list_t * pbreakable)
 {
    do {
       pbreakable = UTIL_FindBreakable_Internal(pbreakable);
-      
-      if(unlikely(!pbreakable))
+
+      if (unlikely(!pbreakable))
          return(NULL);
-      
+
       // skip unbreakable glass
-      if(!pbreakable->material_breakable)
+      if (!pbreakable->material_breakable)
          continue;
-      
+
       // skip deleted entities
-      if(FNullEnt(pbreakable->pEdict) || pbreakable->pEdict->v.health <= 0)
+      if (FNullEnt(pbreakable->pEdict) || pbreakable->pEdict->v.health <= 0)
          continue;
-   
+
    // skip reused/wrong name entities
-   } while(!FIsClassname(pbreakable->pEdict, "func_breakable") && !FIsClassname(pbreakable->pEdict, "func_pushable"));
-   
+   } while (!FIsClassname(pbreakable->pEdict, "func_breakable") && !FIsClassname(pbreakable->pEdict, "func_pushable"));
+
    return(pbreakable);
 }
 
@@ -502,9 +438,9 @@ breakable_list_t * UTIL_LookupBreakable(edict_t *pEdict)
 {
    breakable_list_t *plist = g_breakable_list;
 
-   while(plist)
+   while (plist)
    {
-      if(plist->pEdict == pEdict &&
+      if (plist->pEdict == pEdict &&
          plist->material_breakable &&
          !FNullEnt(plist->pEdict) &&
          plist->pEdict->v.health > 0 &&
@@ -523,12 +459,12 @@ breakable_list_t * UTIL_LookupBreakable(edict_t *pEdict)
 void SaveAliveStatus(edict_t * pPlayer)
 {
    int idx;
-   
+
    idx = ENTINDEX(pPlayer) - 1;
-   if(idx < 0 || idx >= gpGlobals->maxClients)
+   if (idx < 0 || idx >= gpGlobals->maxClients)
       return;
-   
-   if(!IsAlive(pPlayer))
+
+   if (!IsAlive(pPlayer))
       players[idx].last_time_dead = gpGlobals->time;
 }
 
@@ -536,14 +472,14 @@ void SaveAliveStatus(edict_t * pPlayer)
 float UTIL_GetTimeSinceRespawn(edict_t * pPlayer)
 {
    int idx;
-   
+
    idx = ENTINDEX(pPlayer) - 1;
-   if(idx < 0 || idx >= gpGlobals->maxClients)
+   if (idx < 0 || idx >= gpGlobals->maxClients)
       return(-1.0);
-   
-   if(!IsAlive(pPlayer))
+
+   if (!IsAlive(pPlayer))
    {
-      //we are dead, so time since respawn is... 
+      //we are dead, so time since respawn is...
       return(-1.0);
    }
    else
@@ -558,16 +494,16 @@ static qboolean IsPlayerFacingWall(edict_t * pPlayer)
 {
    TraceResult tr;
    Vector v_forward, EyePosition;
-	
+
    EyePosition = pPlayer->v.origin + pPlayer->v.view_ofs;
    v_forward = UTIL_AnglesToForward(pPlayer->v.v_angle);
-   
-   UTIL_TraceLine(EyePosition, EyePosition + gpGlobals->v_forward * 48, ignore_monsters, ignore_glass, pPlayer, &tr);
-   
+
+   UTIL_TraceLine(EyePosition, EyePosition + v_forward * 48, ignore_monsters, ignore_glass, pPlayer, &tr);
+
    if (tr.flFraction > 0.999999f)
       return(FALSE);
 
-   if (DotProduct(gpGlobals->v_forward, tr.vecPlaneNormal) > -0.5f) //60deg
+   if (DotProduct(v_forward, tr.vecPlaneNormal) > -0.5f) //60deg
       return(FALSE);
 
    return(TRUE);
@@ -577,36 +513,36 @@ static qboolean IsPlayerFacingWall(edict_t * pPlayer)
 void CheckPlayerChatProtection(edict_t * pPlayer)
 {
    int idx;
-   
+
    idx = ENTINDEX(pPlayer) - 1;
-   if(idx < 0 || idx >= gpGlobals->maxClients)
+   if (idx < 0 || idx >= gpGlobals->maxClients)
       return;
-   
+
    // skip bots
    if (FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT))
    {
       players[idx].last_time_not_facing_wall = gpGlobals->time;
       return;
    }
-   
+
    // use of any buttons will reset protection
-   if((pPlayer->v.button & ~(IN_SCORE | IN_DUCK)) != 0)
+   if ((pPlayer->v.button & ~(IN_SCORE | IN_DUCK)) != 0)
    {
       players[idx].last_time_not_facing_wall = gpGlobals->time;
       return;
    }
-   
+
    // is not facing wall?
-   if(!IsPlayerFacingWall(pPlayer))
+   if (!IsPlayerFacingWall(pPlayer))
    {
       players[idx].last_time_not_facing_wall = gpGlobals->time;
       return;
    }
-   
+
    // This cannot be checked, because if someone accidentally shoots chatter, chatter will move abit -> resets protection
    /*
    // is moving
-   if(pPlayer->v.velocity.Length() > 1.0)
+   if (pPlayer->v.velocity.Length() > 1.0)
    {
       players[idx].last_time_not_facing_wall = gpGlobals->time;
       return;
@@ -617,22 +553,22 @@ void CheckPlayerChatProtection(edict_t * pPlayer)
 qboolean IsPlayerChatProtected(edict_t * pPlayer)
 {
    int idx;
-   
+
    idx = ENTINDEX(pPlayer) - 1;
-   if(idx < 0 || idx >= gpGlobals->maxClients)
+   if (idx < 0 || idx >= gpGlobals->maxClients)
       return(FALSE);
-   
-   if(players[idx].last_time_not_facing_wall + 2.0 < gpGlobals->time)
+
+   if (players[idx].last_time_not_facing_wall + 2.0 < gpGlobals->time)
    {
       return TRUE;
    }
-   
+
    return FALSE;
 }
 
 
 void ClientPrint( edict_t *pEntity, int msg_dest, const char *msg_name)
-{       
+{
    if (GET_USER_MSG_ID (PLID, "TextMsg", NULL) <= 0)
       REG_USER_MSG ("TextMsg", -1);
 
@@ -686,14 +622,15 @@ void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
    else
       safevoid_snprintf( text, sizeof(text), "%c%s: ", 2, STRING( pEntity->v.netname ) );
 
-   j = sizeof(text) - 2 - strlen(text);  // -2 for /n and null terminator
+   j = sizeof(text) - 2 - strlen(text);  // -2 for \n and null terminator
    if ( j < 0 )
       j = 0;
    if ( (int)strlen(message) > j )
       message[j] = 0;
 
    strcat( text, message );
-   strcat( text, "\n" );
+   if ( strlen(text) < sizeof(text) - 2 )
+      strcat( text, "\n" );
 
    // loop through all players
    // Start with the first player.
@@ -706,7 +643,7 @@ void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
    UTIL_GetTeam(pEntity, sender_teamstr, sizeof(sender_teamstr));
 
    client = NULL;
-   while((client = UTIL_FindEntityByClassname( client, "player" )) != NULL && !FNullEnt(client))
+   while ((client = UTIL_FindEntityByClassname( client, "player" )) != NULL && !FNullEnt(client))
    {
       if ( client == pEntity )  // skip sender of message
          continue;
@@ -735,8 +672,8 @@ void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
    // team match?
    if ( is_team_play )
    {
-      UTIL_LogPrintf( "\"%s<%i><%s><%s>\" %s \"%s\"\n", 
-         STRING( pEntity->v.netname ), 
+      UTIL_LogPrintf( "\"%s<%i><%s><%s>\" %s \"%s\"\n",
+         STRING( pEntity->v.netname ),
          GETPLAYERUSERID( pEntity ),
          (*g_engfuncs.pfnGetPlayerAuthId)( pEntity ),
          sender_teamstr,
@@ -745,8 +682,8 @@ void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message )
    }
    else
    {
-      UTIL_LogPrintf( "\"%s<%i><%s><%i>\" %s \"%s\"\n", 
-         STRING( pEntity->v.netname ), 
+      UTIL_LogPrintf( "\"%s<%i><%s><%i>\" %s \"%s\"\n",
+         STRING( pEntity->v.netname ),
          GETPLAYERUSERID( pEntity ),
          (*g_engfuncs.pfnGetPlayerAuthId)( pEntity ),
          GETPLAYERUSERID( pEntity ),
@@ -760,7 +697,7 @@ edict_t *DBG_EntOfVars( const entvars_t *pev )
 {
    if (pev->pContainingEntity != NULL)
       return pev->pContainingEntity;
-   
+
    UTIL_ConsolePrintf("%s", "entvars_t pContainingEntity is NULL, calling into engine");
    edict_t* pent = (*g_engfuncs.pfnFindEntityByVars)((entvars_t*)pev);
    if (pent == NULL)
@@ -774,7 +711,7 @@ edict_t *DBG_EntOfVars( const entvars_t *pev )
 char * UTIL_GetTeam(edict_t *pEntity, char *teamstr, size_t slen)
 {
    safe_strcopy(teamstr, slen, INFOKEY_VALUE(GET_INFOKEYBUFFER(pEntity), "model"));
-   
+
    return(teamstr);
 }
 
@@ -782,23 +719,23 @@ qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit )
 {
    TraceResult tr;
    Vector      vecLookerOrigin;
-   
-   if(pHit)
+
+   if (pHit)
       *pHit = NULL;
-   
+
    // look through caller's eyes
    vecLookerOrigin = GetGunPosition(pEdict);
 
    int bInWater = (POINT_CONTENTS (vecOrigin) == CONTENTS_WATER);
    int bLookerInWater = (POINT_CONTENTS (vecLookerOrigin) == CONTENTS_WATER);
-   
+
    // don't look through water
    if (bInWater != bLookerInWater)
       return FALSE;
 
    UTIL_TraceLine(vecLookerOrigin, vecOrigin, ignore_monsters, ignore_glass, pEdict, &tr);
 
-   if(pHit)
+   if (pHit)
       *pHit = tr.pHit;
 
    return(tr.flFraction > 0.999999f);
@@ -807,42 +744,42 @@ qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit )
 static qboolean FVisibleEnemyOffset( const Vector &vecOrigin, const Vector &vecOffset, edict_t *pEdict, edict_t *pEnemy )
 {
    edict_t * pHit = NULL;
-   
-   if(FVisible(vecOrigin + vecOffset, pEdict, &pHit) || (pEnemy != NULL && pHit == pEnemy))
+
+   if (FVisible(vecOrigin + vecOffset, pEdict, &pHit) || (pEnemy != NULL && pHit == pEnemy))
       return(TRUE);
-   
-   if(FNullEnt(pHit))
+
+   if (FNullEnt(pHit))
       return(FALSE);
-   
-   if(!(pHit->v.flags & FL_MONSTER) && !FIsClassname(pHit, "player"))
+
+   if (!(pHit->v.flags & FL_MONSTER) && !FIsClassname(pHit, "player"))
       return(FALSE);
-   
-   if(!IsAlive (pHit))
+
+   if (!IsAlive (pHit))
       return(FALSE);
-   
+
    return(TRUE);
 }
 
 qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnemy )
 {
    // only check center if cannot use extra information
-   if(!pEnemy)
+   if (!pEnemy)
       return(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ));
 
    if (pEnemy->v.solid != SOLID_BSP) {
       // first check for if head is visible
       Vector head_offset = Vector(0, 0, pEnemy->v.maxs.z - 6);
-      if(FVisibleEnemyOffset( vecOrigin, head_offset, pEdict, pEnemy ))
+      if (FVisibleEnemyOffset( vecOrigin, head_offset, pEdict, pEnemy ))
          return(TRUE);
-   
+
       // then check if feet are visible
       Vector feet_offset = Vector(0, 0, pEnemy->v.mins.z - 6);
-      if(FVisibleEnemyOffset( vecOrigin, feet_offset, pEdict, pEnemy ))
+      if (FVisibleEnemyOffset( vecOrigin, feet_offset, pEdict, pEnemy ))
          return(TRUE);
    }
 
    // check center
-   if(FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ))
+   if (FVisibleEnemyOffset( vecOrigin, Vector(0, 0, 0), pEdict, pEnemy ))
       return(TRUE);
 
 #if 0
@@ -857,12 +794,12 @@ qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnem
 
       // check if right side of player is visible
       Vector right_offset = v_right * (pEnemy->v.maxs.x - 4);
-      if(FVisibleEnemyOffset( vecOrigin, right_offset, pEdict, pEnemy ))
+      if (FVisibleEnemyOffset( vecOrigin, right_offset, pEdict, pEnemy ))
          return(TRUE);
-   
+
       // check if left side of player is visible
       Vector left_offset = v_right * (pEnemy->v.mins.x - 4);
-      if(FVisibleEnemyOffset( vecOrigin, left_offset, pEdict, pEnemy ))
+      if (FVisibleEnemyOffset( vecOrigin, left_offset, pEdict, pEnemy ))
          return(TRUE);
    }
 #endif
@@ -873,9 +810,9 @@ qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnem
 qboolean FInShootCone(const Vector & Origin, edict_t *pEdict, float distance, float diameter, float min_angle)
 {
    /*
-   
+
       <----- distance ---->
-      
+
                   ___....->T^           ^
        ...----''''          | <- radius |
      O ------------------->Qv           |
@@ -883,29 +820,29 @@ qboolean FInShootCone(const Vector & Origin, edict_t *pEdict, float distance, fl
      |               ''''->             v
      |
      Bot(pEdict)
-   
+
     T: Target (Origin)
-    
+
     if angle Q-O-T is less than min_angle, always return true.
-   
+
    */
-   
-   if(distance < 0.01)
+
+   if (distance < 0.01)
       return TRUE;
-   
+
    // angle between forward-view-vector and vector to player (as cos(angle))
    float flDot = DotProduct( (Origin - (pEdict->v.origin + pEdict->v.view_ofs)).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle) );
-   if(flDot > cos(deg2rad(min_angle))) // smaller angle, bigger cosine
+   if (flDot > cos(deg2rad(min_angle))) // smaller angle, bigger cosine
       return TRUE;
-   
+
    Vector2D triangle;
    triangle.x = distance;
    triangle.y = diameter / 2.0;
-   
-   // full angle of shootcode at this distance (as cos(angle))   
-   if(flDot > (distance / triangle.Length())) // smaller angle, bigger cosine
+
+   // full angle of shootcode at this distance (as cos(angle))
+   if (flDot > (distance / triangle.Length())) // smaller angle, bigger cosine
       return TRUE;
-      
+
    return FALSE;
 }
 
@@ -934,7 +871,7 @@ void UTIL_SelectWeapon(edict_t *pEdict, int weapon_index)
 void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2)
 {
    const char * mod_dir = (submod_id == SUBMOD_OP4) ? "gearbox" : "valve";
-   
+
    if ((arg1 != NULL) && (arg2 != NULL))
    {
       if (*arg1 && *arg2)
@@ -952,7 +889,7 @@ void UTIL_BuildFileName_N(char *filename, int size, char *arg1, char *arg2)
          return;
       }
    }
-   
+
    safevoid_snprintf(filename, size, "%s/", mod_dir);
    return;
 }
@@ -980,7 +917,7 @@ static void UTIL_ServerPrintf( char *fmt, ... )
 {
    va_list argptr;
    char string[512];
-   
+
    va_start( argptr, fmt );
    safevoid_vsnprintf( string, sizeof(string), fmt, argptr );
    va_end( argptr );
@@ -995,19 +932,19 @@ void UTIL_ConsolePrintf( const char *fmt, ... )
    va_list argptr;
    char string[512];
    size_t len;
-   
+
    strcpy(string, "[jk_botti] ");
    len = strlen(string);
-   
+
    va_start( argptr, fmt );
    safevoid_vsnprintf( string+len, sizeof(string)-len, fmt, argptr );
    va_end( argptr );
 
    // end msg with newline if not already
    len = strlen(string);
-   if(string[len-1] != '\n')
+   if (string[len-1] != '\n')
    {
-      if(len < sizeof(string)-2)// -1 null, -1 for newline
+      if (len < sizeof(string)-2)// -1 null, -1 for newline
          strcat(string, "\n");
       else
          string[len-1] = '\n';
@@ -1026,12 +963,12 @@ void UTIL_AssertConsolePrintf(const char *file, const char *str, int line)
 char* UTIL_VarArgs2( char * string, size_t strlen, char *format, ... )
 {
    va_list argptr;
-   
+
    va_start (argptr, format);
    safevoid_vsnprintf (string, strlen, format, argptr);
    va_end (argptr);
 
-   return string;   
+   return string;
 }
 
 void GetGameDir (char *game_dir)
@@ -1040,12 +977,14 @@ void GetGameDir (char *game_dir)
    // macro, which returns either an absolute directory path, or a relative one, depending on
    // whether the game server is run standalone or not. This one always return a RELATIVE path.
 
-   unsigned char length, fieldstart, fieldstop;
+   int length, fieldstart, fieldstop;
 
    GET_GAME_DIR (game_dir); // call the engine macro and let it mallocate for the char pointer
 
    length = strlen (game_dir); // get the length of the returned string
-   length--; // ignore the trailing string terminator
+   if (length == 0)
+      return;
+   length--; // point to last character
 
    // format the returned string to get the last directory name
    fieldstop = length;
@@ -1084,8 +1023,8 @@ Vector VecBModelOrigin(edict_t *pEdict)
 qboolean IsAlive(const edict_t *pEdict)
 {
    return (pEdict->v.deadflag == DEAD_NO) && (pEdict->v.health > 0) &&
-	!(pEdict->v.flags & FL_NOTARGET) && ((int)pEdict->v.takedamage != 0) &&
-	(pEdict->v.solid != SOLID_NOT);
+      !(pEdict->v.flags & FL_NOTARGET) && ((int)pEdict->v.takedamage != 0) &&
+      (pEdict->v.solid != SOLID_NOT);
 }
 
 qboolean FInViewCone(const Vector & Origin, edict_t *pEdict)

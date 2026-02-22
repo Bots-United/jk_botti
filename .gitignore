@@ -12,6 +12,9 @@ zlib/minigzip
 tests/test_*
 !tests/test_*.cpp
 !tests/test_*.h
+tests/bench_*
+!tests/bench_*.cpp
+!tests/bench_*.h
 zlib/configure.log
 zlib/zlib.pc
 tmp/
