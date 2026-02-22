@@ -18,13 +18,7 @@
 #endif
 
 extern void fast_random_seed(unsigned int seed);
-extern int RANDOM_LONG2(int lLow, int lHigh);
 extern float RANDOM_FLOAT2(float flLow, float flHigh);
-
-static int get_random_int(int x,int y)
-{
-   return RANDOM_LONG2(x, y);
-}
 
 // return random value in range 0 < n < 1
 static double get_random(void)
@@ -278,13 +272,12 @@ double *CNeuralNet::run(const double inputs[], double outputs[], const double sc
 // ptr1 and ptr2 are temporary buffers
 double *CNeuralNet::run_internal(const double orig_inputs[], double *ptr1, double *ptr2) const
 {
-   int i, j, k, in_size, out_size = 0;
+   int i, j, k;
    double *outputs = NULL;
    const double *inputs;
    bool ptr1_used = false, ptr2_used = false;
 
    inputs = orig_inputs;
-   in_size = m_num_inputs;
 
    // walk through all layers
    for (i = 0; i < m_num_layers; i++) {
@@ -296,10 +289,7 @@ double *CNeuralNet::run_internal(const double orig_inputs[], double *ptr1, doubl
          ptr2_used = !(inputs == ptr2) & ptr2_used;
 
          inputs = outputs;
-         in_size = out_size;
       }
-
-      out_size = cur_layer.get_num_neurons();
 
       // get memory slot for output array
       if (!ptr1_used) {
