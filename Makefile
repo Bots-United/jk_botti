@@ -100,12 +100,11 @@ valgrind: zlib/libz.a
 clean:
 	rm -f *.o ${TARGET}${DLLEND} Rules.depend zlib/*.exe
 	$(MAKE) -C tests clean
-	(cd zlib; $(MAKE) clean; cd ..)
-	rm -f zlib/Makefile
+	rm -f zlib/*.o zlib/libz.a zlib/Makefile zlib/configure.log zlib/zlib.pc
 
 distclean:
 	rm -f Rules.depend ${TARGET}.dll ${TARGET}_i386.so addons/jk_botti/dlls/* zlib/*.exe
-	(cd zlib; $(MAKE) distclean; cd ..)
+	rm -f zlib/*.o zlib/libz.a zlib/Makefile zlib/configure.log zlib/zlib.pc
 
 #waypoint.o: waypoint.cpp
 #	${CXX} ${CXXFLAGS} -funroll-loops -c $< -o $@
