@@ -354,12 +354,12 @@ void BotThink(bot_t &pBot) { (void)pBot; }
 void BotCheckTeamplay(void) {}
 void BotKick(bot_t &pBot) { (void)pBot; }
 
-// bot_chat.cpp
-void LoadBotChat(void) {}
-void BotChatTaunt(bot_t &pBot, edict_t *victim_edict) { (void)pBot; (void)victim_edict; }
-void BotChatWhine(bot_t &pBot) { (void)pBot; }
-void BotChatTalk(bot_t &pBot) { (void)pBot; }
-void BotChatEndGame(bot_t &pBot) { (void)pBot; }
+// bot_chat.cpp (weak: overridden by test_bot_chat.cpp which #includes bot_chat.cpp)
+__attribute__((weak)) void LoadBotChat(void) {}
+__attribute__((weak)) void BotChatTaunt(bot_t &pBot, edict_t *victim_edict) { (void)pBot; (void)victim_edict; }
+__attribute__((weak)) void BotChatWhine(bot_t &pBot) { (void)pBot; }
+__attribute__((weak)) void BotChatTalk(bot_t &pBot) { (void)pBot; }
+__attribute__((weak)) void BotChatEndGame(bot_t &pBot) { (void)pBot; }
 
 // bot_skill.cpp
 void ResetSkillsToDefault(void) {}
