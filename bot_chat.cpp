@@ -16,9 +16,9 @@
 
 
 #define NUM_TAGS 24
-char *tag1[NUM_TAGS]={
+const char *tag1[NUM_TAGS]={
 "[", "*[", "-=","-[","-]","-}","-{","<[","<]","[-","]-","{-","}-","[[","[","{","]","}","<",">","-","|","=","+"};
-char *tag2[NUM_TAGS]={
+const char *tag2[NUM_TAGS]={
 "]*", "]*", "=-","]-","[-","{-","}-","]>","[>","-]","-[","-}","-{","]]","]","}","[","{",">","<","-","|","=","+"};
 
 
@@ -491,26 +491,29 @@ static void BotChatFillInName(char *bot_say_msg, int sizeof_msg, const char *cha
                {
                   BotChatGetPlayers();
 
-                  // pick a name at random from the list of players...
-                  int index = RANDOM_LONG2(0, player_count-1);
-                  int count = 0;
-
-                  bool is_bad = (strcmp(player_names[index], chat_name) == 0) ||
-                                (strcmp(player_names[index], bot_name) == 0);
-
-                  while ((is_bad) && (count < 20))
+                  if (player_count > 0)
                   {
-                     index = RANDOM_LONG2(0, player_count-1);
+                     // pick a name at random from the list of players...
+                     int index = RANDOM_LONG2(0, player_count-1);
+                     int count = 0;
 
-                     is_bad = (strcmp(player_names[index], chat_name) == 0) ||
-                              (strcmp(player_names[index], bot_name) == 0);
+                     bool is_bad = (strcmp(player_names[index], chat_name) == 0) ||
+                                   (strcmp(player_names[index], bot_name) == 0);
 
-                     count++;
+                     while ((is_bad) && (count < 20))
+                     {
+                        index = RANDOM_LONG2(0, player_count-1);
+
+                        is_bad = (strcmp(player_names[index], chat_name) == 0) ||
+                                 (strcmp(player_names[index], bot_name) == 0);
+
+                        count++;
+                     }
+
+                     BotChatName(player_names[index], random_name, sizeof(random_name));
+
+                     to_output = random_name;
                   }
-
-                  BotChatName(player_names[index], random_name, sizeof(random_name));
-
-                  to_output = random_name;
                }
 
                // copy chat name to output
@@ -593,7 +596,7 @@ void BotChatTaunt(bot_t &pBot, edict_t *victim_edict)
          BotChatName(temp_name, chat_name, sizeof(chat_name));
       }
       else
-         strcpy(chat_name, "NULL");
+         safe_strcopy(chat_name, sizeof(chat_name), "NULL");
 
       bot_name = STRING(pBot.pEdict->v.netname);
 
@@ -666,7 +669,7 @@ void BotChatWhine(bot_t &pBot)
             BotChatName(temp_name, chat_name, sizeof(chat_name));
          }
          else
-            strcpy(chat_name, "NULL");
+            safe_strcopy(chat_name, sizeof(chat_name), "NULL");
 
          bot_name = STRING(pEdict->v.netname);
 
