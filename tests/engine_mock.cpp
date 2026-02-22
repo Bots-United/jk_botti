@@ -96,7 +96,7 @@ int submod_id = SUBMOD_HLDM;
 int submod_weaponflag = WEAPON_SUBMOD_HLDM;
 int bot_shoot_breakables = 0;
 int m_spriteTexture = 0;
-WAYPOINT waypoints[MAX_WAYPOINTS];
+__attribute__((weak)) WAYPOINT waypoints[MAX_WAYPOINTS];
 bot_skill_settings_t skill_settings[5];
 CSoundEnt *pSoundEnt = NULL;
 
@@ -302,25 +302,25 @@ static int mock_mutil_GetUserMsgID(plid_t plid, const char *msgname, int *size)
 // Stub functions from other .cpp files
 // ============================================================
 
-// waypoint.cpp
-int WaypointFindNearest(const Vector &v_origin, const Vector &v_offset,
+// waypoint.cpp (weak: overridden by test_waypoint.cpp which #includes waypoint.cpp)
+__attribute__((weak)) int WaypointFindNearest(const Vector &v_origin, const Vector &v_offset,
                         edict_t *pEntity, float range, qboolean b_traceline)
 { (void)v_origin; (void)v_offset; (void)pEntity; (void)range; (void)b_traceline; return -1; }
-int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags,
+__attribute__((weak)) int WaypointFindNearestGoal(edict_t *pEntity, int src, int flags, int itemflags,
                             int exclude[], float range, const Vector *pv_src)
 { (void)pEntity; (void)src; (void)flags; (void)itemflags; (void)exclude;
   (void)range; (void)pv_src; return -1; }
-int WaypointFindRandomGoal(int *out_indexes, int max_indexes, edict_t *pEntity,
+__attribute__((weak)) int WaypointFindRandomGoal(int *out_indexes, int max_indexes, edict_t *pEntity,
                            int flags, int itemflags, int exclude[])
 { (void)out_indexes; (void)max_indexes; (void)pEntity; (void)flags;
   (void)itemflags; (void)exclude; return 0; }
-int WaypointFindReachable(edict_t *pEntity, float range)
+__attribute__((weak)) int WaypointFindReachable(edict_t *pEntity, float range)
 { (void)pEntity; (void)range; return -1; }
-edict_t *WaypointFindItem(int wpt_index)
+__attribute__((weak)) edict_t *WaypointFindItem(int wpt_index)
 { (void)wpt_index; return NULL; }
-int WaypointRouteFromTo(int src, int dest)
+__attribute__((weak)) int WaypointRouteFromTo(int src, int dest)
 { (void)src; (void)dest; return -1; }
-float WaypointDistanceFromTo(int src, int dest)
+__attribute__((weak)) float WaypointDistanceFromTo(int src, int dest)
 { (void)src; (void)dest; return 99999.0f; }
 
 // bot_navigate.cpp

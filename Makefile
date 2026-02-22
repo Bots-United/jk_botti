@@ -23,6 +23,14 @@ else
 	ZLIB_OSFLAGS = -DZ_PREFIX
 endif
 
+# Override make's built-in defaults (origin 'default') which ?= won't catch
+ifeq ($(origin CC),default)
+CC = gcc -m32
+endif
+ifeq ($(origin AR),default)
+AR = ar rc
+endif
+
 VER_MAJOR ?= 0
 VER_MINOR ?= 0
 VER_NOTE ?= git$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -83,10 +91,10 @@ ${TARGET}${DLLEND}: zlib/libz.a ${OBJ}
 zlib/libz.a:
 	(cd zlib; AR="${AR}" ARFLAGS="" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS}" ./configure --static; $(MAKE) libz.a CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS}" AR="${AR}" ARFLAGS="" RANLIB="${RANLIB}"; cd ..)
 
-test:
+test: zlib/libz.a
 	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" run
 
-valgrind:
+valgrind: zlib/libz.a
 	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" valgrind
 
 clean:
