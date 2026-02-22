@@ -44,15 +44,17 @@ CPopulation::CPopulation(int population_size, int genome_length):
 		m_pop_size(population_size),
 		m_individuals(NULL),
 		m_genome_length(genome_length),
-		m_pool_size(population_size * genome_length),
+		m_pool_size(0),
 		m_genepool(NULL)
 {
 	int i;
 
 	// check for integer overflow in pool_size calculation
-	if (population_size > 0 && genome_length > 0 &&
+	if (population_size <= 0 || genome_length <= 0 ||
 	    population_size > INT_MAX / genome_length)
 		return;
+
+	m_pool_size = population_size * genome_length;
 
 	m_individuals = new CGenome[m_pop_size];
 	m_genepool = (double *)calloc(1, sizeof(double) * m_pool_size);

@@ -3,6 +3,7 @@
 #include <time.h>
 #include <memory.h>
 #include <math.h>
+#include <limits.h>
 
 #include "neuralnet.h"
 #include "geneticalg.h"
@@ -44,9 +45,12 @@ CNeuron::CNeuron(int num_inputs, double in_weights[]):
 {
 }
 
-// one extra slot needed for bias + one extra slot needed for scale
+// one extra slot needed for bias
+// returns -1 on overflow
 int CNeuron::calc_needed_weights(int num_inputs)
 {
+	if (num_inputs < 0 || num_inputs >= INT_MAX)
+		return -1;
 	return num_inputs + 1;
 }
 
@@ -60,13 +64,17 @@ CNeuronLayer::CNeuronLayer(int num_neurons, int num_inputs_per_neuron, CNeuron i
 	weight_pos = 0;
 	for (i = 0; i < m_num_neurons; i++) {
 		m_neurons[i] = CNeuron(num_inputs_per_neuron, &in_weights[weight_pos]);
-		weight_pos += num_inputs_per_neuron;
+		weight_pos += CNeuron::calc_needed_weights(num_inputs_per_neuron);
 	}
 }
 
+// returns -1 on overflow
 int CNeuronLayer::calc_needed_weights(int num_neurons, int num_inputs_per_neuron)
 {
-	return CNeuron::calc_needed_weights(num_inputs_per_neuron) * num_neurons;
+	int per_neuron = CNeuron::calc_needed_weights(num_inputs_per_neuron);
+	if (per_neuron < 0 || num_neurons <= 0 || per_neuron > INT_MAX / num_neurons)
+		return -1;
+	return per_neuron * num_neurons;
 }
 
 /**************************************************************** CNeuralNet */
@@ -86,19 +94,32 @@ CNeuralNet::CNeuralNet(int num_inputs, int num_outputs, int num_hidden, int num_
 	m_num_neurons(0),
 	m_neurons(NULL)
 {
-	int i, j, weight_pos, neuron_pos; 
+	int i, j, weight_pos, neuron_pos, total_neurons;
 
 	if (m_num_layers == 0)
 		return;
 
 	// calculated number of needed weights in neural network
-	if (m_num_layers == 1)
-		m_num_weights = CNeuronLayer::calc_needed_weights(m_num_outputs, m_num_inputs); // output layer
-	else {
-		m_num_weights = CNeuronLayer::calc_needed_weights(m_num_neurons_per_hidden, m_num_inputs) // first hidden layer
-				+ CNeuronLayer::calc_needed_weights(m_num_neurons_per_hidden, m_num_neurons_per_hidden) * (m_num_layers - 2)// inner hidden layers
-				+ CNeuronLayer::calc_needed_weights(m_num_outputs, m_num_neurons_per_hidden); // output layer
+	if (m_num_layers == 1) {
+		m_num_weights = CNeuronLayer::calc_needed_weights(m_num_outputs, m_num_inputs);
+	} else {
+		int w1 = CNeuronLayer::calc_needed_weights(m_num_neurons_per_hidden, m_num_inputs);
+		int w2 = CNeuronLayer::calc_needed_weights(m_num_neurons_per_hidden, m_num_neurons_per_hidden);
+		int w3 = CNeuronLayer::calc_needed_weights(m_num_outputs, m_num_neurons_per_hidden);
+		int inner_layers = m_num_layers - 2;
+		int w2_total;
+
+		if (w1 < 0 || w2 < 0 || w3 < 0)
+			return;
+		if (inner_layers > 0 && w2 > INT_MAX / inner_layers)
+			return;
+		w2_total = w2 * inner_layers;
+		if (w1 > INT_MAX - w2_total || w1 + w2_total > INT_MAX - w3)
+			return;
+		m_num_weights = w1 + w2_total + w3;
 	}
+	if (m_num_weights < 0)
+		return;
 
 	// create network wide weight array
 	m_weights = (double *)calloc(1, sizeof(double) * m_num_weights);
@@ -106,8 +127,14 @@ CNeuralNet::CNeuralNet(int num_inputs, int num_outputs, int num_hidden, int num_
 		return;
 	reset_weights_random();
 
-	// create network wide neuron array
-	m_neurons = (CNeuron *)calloc(1, sizeof(CNeuron) * (m_num_outputs + m_num_neurons_per_hidden * m_num_hidden));
+	// create network wide neuron array (check for overflow)
+	if (m_num_hidden > 0 && m_num_neurons_per_hidden > INT_MAX / m_num_hidden)
+		return;
+	total_neurons = m_num_neurons_per_hidden * m_num_hidden;
+	if (m_num_outputs > INT_MAX - total_neurons)
+		return;
+	total_neurons += m_num_outputs;
+	m_neurons = (CNeuron *)calloc(1, sizeof(CNeuron) * total_neurons);
 	if (!m_neurons)
 		return;
 
