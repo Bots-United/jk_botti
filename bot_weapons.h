@@ -10,7 +10,7 @@
 #define NOSKILL 0 // better than best required == N/A
 
 #define SKILL1 1 // best
-#define SKILL2 2 
+#define SKILL2 2
 #define SKILL3 3
 #define SKILL4 4
 #define SKILL5 5 // worst
@@ -75,20 +75,20 @@ typedef struct
    int supported_submods; // supported submods
    char  weapon_name[64];  // name of the weapon when selecting it
    int type;
-   
+
    float aim_speed; // aim speed, 0.0 worst, 1.0 best.
-   
+
    int   primary_skill_level;   // bot skill must be less than or equal to this value
    int   secondary_skill_level; // bot skill must be less than or equal to this value
    qboolean  avoid_this_gun; // bot avoids using this weapon if possible
    qboolean  prefer_higher_skill_attack; // bot uses better of primary and secondary attacks if both avaible
-      
+
    float primary_min_distance;   // 0 = no minimum
    float primary_max_distance;   // 9999 = no maximum
-   float secondary_min_distance; // 0 = no minimum    
+   float secondary_min_distance; // 0 = no minimum
    float secondary_max_distance; // 9999 = no maximum
    float opt_distance; // optimal distance from target
-   
+
    int   use_percent;   // times out of 100 to use this weapon when available
    qboolean  can_use_underwater;     // can use this weapon underwater
    int   primary_fire_percent;   // times out of 100 to use primary fire
@@ -103,11 +103,11 @@ typedef struct
    qboolean  secondary_use_primary_ammo; //does secondary fire use primary ammo?
    int   low_ammo_primary;
    int   low_ammo_secondary;
-   
+
    int  waypoint_flag;
    int  ammo1_waypoint_flag;
    int  ammo2_waypoint_flag;
-   
+
    qboolean  ammo1_on_repickup; // getting same weapon gives ammo instead
    qboolean  ammo2_on_repickup;
 } bot_weapon_select_t;
@@ -171,7 +171,7 @@ enum ammo_low_t {
 #define GEARBOX_WEAPON_KNIFE         25
 
 // in normal gravity, how far the longjump hurls us
-#define LONGJUMP_DISTANCE	540
+#define LONGJUMP_DISTANCE  540
 
 #define VALVE_MAX_NORMAL_HEALTH    100
 #define VALVE_MAX_NORMAL_BATTERY   100
@@ -223,4 +223,3 @@ qboolean IsValidToFireAtTheMoment(bot_t &pBot, const bot_weapon_select_t &select
 qboolean BotWeaponCanAttack(bot_t &pBot, const qboolean GoodWeaponsOnly);
 qboolean BotGetGoodWeaponCount(bot_t &pBot, const int stop_count);
 #endif // BOT_WEAPONS_H
-

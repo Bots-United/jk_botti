@@ -10,31 +10,31 @@
 
 class class_new_baseclass {
 public:
-	// Construction
-	class_new_baseclass(void) { };
-	
-	// Operators
-	inline void * operator new(size_t size) {
-		if(size==0)
-			return(calloc(1, 1));
-		return(calloc(1, size));
-	}
-	
-	inline void * operator new[](size_t size) {
-		if(size==0)
-			return(calloc(1, 1));
-		return(calloc(1, size));
-	}
-	
-	inline void operator delete(void *ptr) {
-		if(ptr)
-			free(ptr); 
-	}
-	
-	inline void operator delete[](void *ptr) {
-		if(ptr)
-			free(ptr); 
-	}
+   // Construction
+   class_new_baseclass(void) { };
+
+   // Operators
+   inline void * operator new(size_t size) {
+      if(size==0)
+         return(calloc(1, 1));
+      return(calloc(1, size));
+   }
+
+   inline void * operator new[](size_t size) {
+      if(size==0)
+         return(calloc(1, 1));
+      return(calloc(1, size));
+   }
+
+   inline void operator delete(void *ptr) {
+      if(ptr)
+         free(ptr);
+   }
+
+   inline void operator delete[](void *ptr) {
+      if(ptr)
+         free(ptr);
+   }
 };
 
 #endif /*NEW_BASECLASS_H*/

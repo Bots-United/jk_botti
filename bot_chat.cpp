@@ -805,4 +805,3 @@ void BotChatEndGame(bot_t &pBot)
       pBot.f_bot_say = gpGlobals->time + RANDOM_FLOAT2(0.3, 2.0) + strlen(pBot.bot_say_msg) * RANDOM_FLOAT2(0.2, 0.3);
    }
 }
-

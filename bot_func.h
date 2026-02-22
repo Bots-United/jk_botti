@@ -77,4 +77,3 @@ void jkbotti_ClientPutInServer( edict_t *pEntity );
 BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ] );
 
 #endif // BOT_FUNC_H
-

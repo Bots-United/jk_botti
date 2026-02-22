@@ -4,9 +4,7 @@
 // commands.cpp
 //
 
-#ifndef _WIN32
 #include <string.h>
-#endif
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -87,7 +85,7 @@ cfg_bot_record_t * cfg_bot_record;
 typedef void (*printfunc_t)(int printtype, void *arg, char *msg);
 
 
-// 
+//
 const cfg_bot_record_t * GetUnusedCfgBotRecord(void)
 {
    if(cfg_bot_record_size <= 0)
@@ -151,10 +149,10 @@ void FreeCfgBotRecord(void)
          if(cfg_bot_record[i].skin)
             free(cfg_bot_record[i].skin);
       }
-      
+
       free(cfg_bot_record);
    }
-   
+
    cfg_bot_record = NULL;
    cfg_bot_record_size = 0;
 }
@@ -181,12 +179,12 @@ int AddToCfgBotRecord(const char *skin, const char *name, int skill, int top_col
 }
 
 //
-static void UTIL_PrintBotInfo(const printfunc_t printfunc, void * arg) 
+static void UTIL_PrintBotInfo(const printfunc_t printfunc, void * arg)
 {
    //print out bot info
    char msg[80];
    int bot_index, count = 0;
-   
+
    for (bot_index = 0; bot_index < gpGlobals->maxClients; bot_index++)
    {
       if (bots[bot_index].is_used) {
@@ -199,22 +197,22 @@ static void UTIL_PrintBotInfo(const printfunc_t printfunc, void * arg)
          printfunc(PRINTFUNC_INFO, arg, msg);
          safevoid_snprintf(msg, sizeof(msg), " skill: %d\n", bots[bot_index].bot_skill + 1);
          printfunc(PRINTFUNC_INFO, arg, msg);
-         safevoid_snprintf(msg, sizeof(msg), " got enemy: %s\n", (bots[bot_index].pBotEnemy != 0) ? "true" : "false"); 
+         safevoid_snprintf(msg, sizeof(msg), " got enemy: %s\n", (bots[bot_index].pBotEnemy != 0) ? "true" : "false");
          printfunc(PRINTFUNC_INFO, arg, msg);
-         safevoid_snprintf(msg, sizeof(msg), "---\n"); 
+         safevoid_snprintf(msg, sizeof(msg), "---\n");
          printfunc(PRINTFUNC_INFO, arg, msg);
       }
    }
-   
+
    safevoid_snprintf(msg, sizeof(msg), "Total Bots: %d\n", count);
    printfunc(PRINTFUNC_INFO, arg, msg);
 }
 
 //
-static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * arg, const char * pcmd, const char * arg1, const char * arg2, const char * arg3, const char * arg4, const char * arg5) 
+static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * arg, const char * pcmd, const char * arg1, const char * arg2, const char * arg3, const char * arg4, const char * arg5)
 {
    char msg[128];
-   
+
    switch(cmdtype) {
       default:
          return FALSE;
@@ -223,11 +221,11 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
       case CLICMD_TYPE:
          break;
    }
-   
+
    if (FStrEq(pcmd, "info"))
    {
       UTIL_PrintBotInfo(printfunc, arg);
-      
+
       return TRUE;
    }
    else if (FStrEq(pcmd, "addbot"))
@@ -242,18 +240,18 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
       // save bots from config to special buffer
       if(cmdtype == CFGCMD_TYPE)
          cfg_bot_index = AddToCfgBotRecord(skin, name, skill, top_color, bottom_color);
-      
+
       // only add bots if max_bots not reached
       if(max_bots == -1 || UTIL_GetClientCount() < max_bots)
       {
          BotCreate(skin, name, skill, top_color, bottom_color, cfg_bot_index);
-         
+
          if(cmdtype == CFGCMD_TYPE)
             bot_cfg_pause_time = gpGlobals->time + 0.5;
       }
-      
+
       bot_check_time = gpGlobals->time + 1.0;
-      
+
       return TRUE;
    }
    else if (FStrEq(pcmd, "show_waypoints"))
@@ -266,7 +264,7 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
          else
             g_waypoint_on = g_path_waypoint = FALSE;
       }
-      
+
       g_path_waypoint = g_waypoint_on;
 
       if (g_waypoint_on && g_path_waypoint)
@@ -321,7 +319,7 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
             temp = 0;
          if (temp > 1)
             temp = 1;
-         
+
          team_balancetype = temp;
       }
 
@@ -330,17 +328,17 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
 
       return TRUE;
    }
-   
+
    else if (FStrEq(pcmd, "team_blockedlist"))
    {
       if ((arg1 != NULL) && (*arg1 != 0))
       {
          if(team_blockedlist)
             free(team_blockedlist);
-         
+
          team_blockedlist = strdup(arg1);
       }
-      
+
       if(!team_blockedlist)
          team_blockedlist = strdup("");
 
@@ -382,13 +380,13 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
       if(!IS_DEDICATED_SERVER() && bot_conntimes != 0)
       {
          bot_conntimes = 0;
-         
+
          printfunc(PRINTFUNC_INFO, arg, "bot_conntimes is not supported on listenserver!");
       }
 
       safevoid_snprintf(msg, sizeof(msg), "bot_conntimes is %d (%s)\n", bot_conntimes, (bot_conntimes==0?"disabled":"enabled"));
       printfunc(PRINTFUNC_INFO, arg, msg);
-      
+
       if(bot_conntimes == 0)
          unhook_sendto_function();
       else
@@ -661,7 +659,7 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
          if ((min_bots < 0) || (min_bots > 31))
             min_bots = -1;
       }
-      
+
       safevoid_snprintf(msg, sizeof(msg), "min_bots is set to %d\n", min_bots);
       printfunc(PRINTFUNC_INFO, arg, msg);
 
@@ -676,7 +674,7 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
          if ((max_bots < 0) || (max_bots > 31))
             max_bots = -1;
       }
-      
+
       safevoid_snprintf(msg, sizeof(msg), "max_bots is set to %d\n", max_bots);
       printfunc(PRINTFUNC_INFO, arg, msg);
 
@@ -687,7 +685,7 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
       if ((arg1 != NULL) && (*arg1 != 0))
       {
          bot_cfg_pause_time = gpGlobals->time + atoi( arg1 );
-         
+
          if(bot_cfg_pause_time <= 0.0f)
             bot_cfg_pause_time = 0.1f;
       }
@@ -720,7 +718,7 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
          else
             printfunc(PRINTFUNC_INFO, arg, "autowaypoint is OFF\n");
       }
-      
+
       return TRUE;
    }
    else if (FStrEq(pcmd, "botweapon"))
@@ -729,15 +727,15 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
       {
          int select_index = -1;
          bot_weapon_select_t *pSelect = &weapon_select[0];
-         
+
          while (pSelect[++select_index].iId)
             if (FStrEq(pSelect[select_index].weapon_name, arg1))
                break;
-         
+
          if(pSelect[select_index].iId)
          {
             qboolean got_match = FALSE;
-            
+
 #define CHECK_AND_SET_BOTWEAPON_INT(setting) \
    if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
       got_match = TRUE; \
@@ -784,7 +782,7 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
             CHECK_AND_SET_BOTWEAPON_QBOOLEAN(prefer_higher_skill_attack) // bot uses better of primary and secondary attacks if both avaible
             CHECK_AND_SET_BOTWEAPON_FLOAT(primary_min_distance)   // 0 = no minimum
             CHECK_AND_SET_BOTWEAPON_FLOAT(primary_max_distance)   // 9999 = no maximum
-            CHECK_AND_SET_BOTWEAPON_FLOAT(secondary_min_distance) // 0 = no minimum    
+            CHECK_AND_SET_BOTWEAPON_FLOAT(secondary_min_distance) // 0 = no minimum
             CHECK_AND_SET_BOTWEAPON_FLOAT(secondary_max_distance) // 9999 = no maximum
             CHECK_AND_SET_BOTWEAPON_FLOAT(opt_distance) // optimal distance from target
             CHECK_AND_SET_BOTWEAPON_INT(use_percent)   // times out of 100 to use this weapon when available
@@ -792,7 +790,7 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
             CHECK_AND_SET_BOTWEAPON_INT(primary_fire_percent)   // times out of 100 to use primary fire
             CHECK_AND_SET_BOTWEAPON_INT(low_ammo_primary)        // low ammo level
             CHECK_AND_SET_BOTWEAPON_INT(low_ammo_secondary)      // low ammo level
-            if(!got_match) 
+            if(!got_match)
             {
                snprintf(msg, sizeof(msg), "unknown weapon setting %s.\n", arg2);
                printfunc(PRINTFUNC_ERROR, arg, msg);
@@ -805,14 +803,14 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
                }
             }
          }
-         else if(FStrEq("weapons", arg1)) 
+         else if(FStrEq("weapons", arg1))
          {
             printfunc(PRINTFUNC_INFO, arg, "List of available weapons:\n");
-            
+
             select_index = -1;
             pSelect = &weapon_select[0];
 
-            while (pSelect[++select_index].iId) 
+            while (pSelect[++select_index].iId)
             {
                safevoid_snprintf(msg, sizeof(msg), "  %s\n", pSelect[select_index].weapon_name);
                printfunc(PRINTFUNC_INFO, arg, msg);
@@ -825,7 +823,7 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
             printfunc(PRINTFUNC_INFO, arg, "Bot weapon settings reset default.\n");
          }
          else
-         { 
+         {
             snprintf(msg, sizeof(msg), "Could not complete request! (unknown arg1: '%s')\n", arg1);
             printfunc(PRINTFUNC_ERROR, arg, msg);
             if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
@@ -840,27 +838,27 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
       }
       else
       {
-      	 printfunc(PRINTFUNC_ERROR, arg, "Could not complete request! (arg1 not given)\n");
+          printfunc(PRINTFUNC_ERROR, arg, "Could not complete request! (arg1 not given)\n");
          if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
          {
-      	    printfunc(PRINTFUNC_INFO, arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
+             printfunc(PRINTFUNC_INFO, arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
             printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
             printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> - shows all setting values\n");
             printfunc(PRINTFUNC_INFO, arg, "       botweapon weapons - shows weapon-names\n");
             printfunc(PRINTFUNC_INFO, arg, "       botweapon reset - reset values back to defaults for all skills\n");
          }
       }
-      
+
       return TRUE;
    }
    else if (FStrEq(pcmd, "bot_skill_setup"))
-   {  // this command allows editing of botskill settings, 
+   {  // this command allows editing of botskill settings,
       // bot_skill_setup <skill>, bot_skill_setup <skill> <setting>, bot_skill_setup <skill> <setting> <value>
       if ((arg1 != NULL) && (*arg1 != 0) && atoi(arg1) >= 1 && atoi(arg1) <= 5)
       {
          int skill_idx = atoi(arg1)-1;
          qboolean got_match = FALSE;
-         
+
 #define CHECK_AND_SET_BOTSKILL_INT(setting) \
    if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
       got_match = TRUE; \
@@ -912,33 +910,33 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
       printfunc(PRINTFUNC_INFO, arg, msg); \
    }
          CHECK_AND_SET_BOTSKILL_INT(pause_frequency) // how often (out of 1000 times) the bot will pause, based on bot skill
-         
+
          CHECK_AND_SET_BOTSKILL_FLOAT(pause_time_min) // how long bot pauses (min, max)
          CHECK_AND_SET_BOTSKILL_FLOAT(pause_time_max) //
-         
+
          CHECK_AND_SET_BOTSKILL_FLOAT100(normal_strafe) // how much bot strafes when walking around
          CHECK_AND_SET_BOTSKILL_FLOAT100(battle_strafe) // how much bot strafes when attacking enemy
-         
+
          CHECK_AND_SET_BOTSKILL_INT(keep_optimal_dist) // how often bot (out of 100 times) the bot try to keep at optimum distance of weapon when attacking
-         CHECK_AND_SET_BOTSKILL_FLOAT(shootcone_diameter) // bot tries to fire when aim line is less than [diameter / 2] apart from target 
+         CHECK_AND_SET_BOTSKILL_FLOAT(shootcone_diameter) // bot tries to fire when aim line is less than [diameter / 2] apart from target
          CHECK_AND_SET_BOTSKILL_FLOAT(shootcone_minangle) // OR angle between bot aim line and line to target is less than angle set here
-         
+
          CHECK_AND_SET_BOTSKILL_FLOAT(turn_skill) // BotAim turn_skill, how good bot is at aiming on enemy origin.
          CHECK_AND_SET_BOTSKILL_FLOAT(turn_slowness) // Is bot's aim in slow motion?
          CHECK_AND_SET_BOTSKILL_FLOAT(updown_turn_ration) // how much slower bots aims up and down than side ways?
-   
+
          CHECK_AND_SET_BOTSKILL_FLOAT(ping_emu_latency) // how much ping latency bot brain has.
          CHECK_AND_SET_BOTSKILL_FLOAT(ping_emu_speed_varitation) // how well bot can predict target speed.
          CHECK_AND_SET_BOTSKILL_FLOAT(ping_emu_position_varitation) // how well bot can predict target position.
-   
+
          CHECK_AND_SET_BOTSKILL_FLOAT(hearing_sensitivity) // how well bot hears sounds
          CHECK_AND_SET_BOTSKILL_FLOAT(track_sound_time_min) // how long bot tracks one sound
          CHECK_AND_SET_BOTSKILL_FLOAT(track_sound_time_max)
-         
+
          CHECK_AND_SET_BOTSKILL_FLOAT(respawn_react_delay) // delay on players after respawn
-         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_min) // 
+         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_min) //
          CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_max) //
-         
+
          CHECK_AND_SET_BOTSKILL_FLOAT(weaponchange_rate_min) // how fast changing weapons (min, max)
          CHECK_AND_SET_BOTSKILL_FLOAT(weaponchange_rate_max) //
 
@@ -956,18 +954,18 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
          CHECK_AND_SET_BOTSKILL_FLOAT(flee_taujump_distance) // max distance to flee enemy from
          CHECK_AND_SET_BOTSKILL_FLOAT(flee_taujump_health) // how much bot has health left when tries to escape
          CHECK_AND_SET_BOTSKILL_FLOAT(flee_taujump_escape_distance) // how long way bot tries to move away
-         
+
          CHECK_AND_SET_BOTSKILL_QBOOLEAN(can_shoot_through_walls) // can shoot through walls by sound
          CHECK_AND_SET_BOTSKILL_INT(wallshoot_frequency) // how often (out of 100 times) the bot will try attack enemy behind wall
 #endif
 
-         if(!got_match) 
+         if(!got_match)
          {
             snprintf(msg, sizeof(msg), "unknown skill setting %s.\n", arg2);
             printfunc(PRINTFUNC_ERROR, arg, msg);
             if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
             {
-      	       printfunc(PRINTFUNC_INFO, arg, "Usage: bot_skill_setup <skill> <setting> <value> - set value\n");
+                printfunc(PRINTFUNC_INFO, arg, "Usage: bot_skill_setup <skill> <setting> <value> - set value\n");
                printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> <setting> - shows setting value\n");
                printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> - shows all setting values\n");
                printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup reset - reset values back to defaults for all skills\n");
@@ -982,22 +980,22 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
       else
       {
          if((arg1 == NULL) || (*arg1 == 0))
-      	    printfunc(PRINTFUNC_ERROR, arg, "Could not complete request! (arg1 not given)\n");
-      	 else
-      	 {
-      	    snprintf(msg, sizeof(msg), "Could not complete request! (invalid skill %d, use 1-5)\n", atoi(arg1));
-      	    printfunc(PRINTFUNC_ERROR, arg, msg);
-      	 }
-         
+             printfunc(PRINTFUNC_ERROR, arg, "Could not complete request! (arg1 not given)\n");
+          else
+          {
+             snprintf(msg, sizeof(msg), "Could not complete request! (invalid skill %d, use 1-5)\n", atoi(arg1));
+             printfunc(PRINTFUNC_ERROR, arg, msg);
+          }
+
          if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
          {
-      	    printfunc(PRINTFUNC_INFO, arg, "Usage: bot_skill_setup <skill> <setting> <value> - set value\n");
+             printfunc(PRINTFUNC_INFO, arg, "Usage: bot_skill_setup <skill> <setting> <value> - set value\n");
             printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> <setting> - shows setting value\n");
             printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> - shows all setting values\n");
             printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup reset - reset values back to defaults for all skills\n");
          }
       }
-      
+
       return TRUE;
    }
 
@@ -1005,7 +1003,7 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
 }
 
 #if _DEBUG
-static void print_to_client(int, void *arg, char *msg) 
+static void print_to_client(int, void *arg, char *msg)
 {
    ClientPrint((edict_t *)arg, HUD_PRINTNOTIFY, msg);
 }
@@ -1025,7 +1023,7 @@ void ClientCommand( edict_t *pEntity )
       const char *arg3 = CMD_ARGV (3);
       const char *arg4 = CMD_ARGV (4);
       const char *arg5 = CMD_ARGV (5);
-      
+
       if(ProcessCommand(CLICMD_TYPE, print_to_client, pEntity, pcmd, arg1, arg2, arg3, arg4, arg5))
       {
          RETURN_META (MRES_SUPERCEDE);
@@ -1195,39 +1193,39 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
    {
       safe_strcopy(g_argv, sizeof(g_argv), arg1);
       null_terminate_buffer(g_argv, sizeof(g_argv));
-      
+
       fake_arg_count = 1;
    }
    else if (!arg3 || !*arg3)
    {
       safevoid_snprintf(g_argv, sizeof(g_argv), "%s %s", arg1, arg2);
       null_terminate_buffer(g_argv, sizeof(g_argv));
-      
+
       fake_arg_count = 2;
    }
    else
    {
       safevoid_snprintf(g_argv, sizeof(g_argv), "%s %s %s", arg1, arg2, arg3);
       null_terminate_buffer(g_argv, sizeof(g_argv));
-      
+
       fake_arg_count = 3;
    }
-   
+
    safe_strcopy(g_arg1, sizeof(g_arg1), arg1);
    null_terminate_buffer(g_arg1, sizeof(g_arg1));
-   
+
    if (arg2 && *arg2)
    {
       safe_strcopy(g_arg2, sizeof(g_arg2), arg2);
       null_terminate_buffer(g_arg2, sizeof(g_arg2));
    }
-   
+
    if (arg3 && *arg3)
    {
       safe_strcopy(g_arg3, sizeof(g_arg3), arg3);
       null_terminate_buffer(g_arg3, sizeof(g_arg3));
    }
-   
+
    // allow the MOD DLL to execute the ClientCommand...
    isFakeClientCommand = TRUE;
    MDLL_ClientCommand(pBot);
@@ -1235,7 +1233,7 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
 }
 
 
-static void print_to_console_config(int printtype, void *, char * msg) 
+static void print_to_console_config(int printtype, void *, char * msg)
 {
    if(printtype == PRINTFUNC_ERROR)
       UTIL_ConsolePrintf("line[%d] config error: %s", bot_cfg_linenumber, msg);
@@ -1387,7 +1385,7 @@ void ProcessBotCfgFile(void)
       arg4++;
    if(arg5 && *arg5=='\"')
       arg5++;
-   
+
    if(arg1 && arg1[strlen(arg1)-1]=='\"')
       arg1[strlen(arg1)-1]='\0';
    if(arg2 && arg2[strlen(arg2)-1]=='\"')
@@ -1398,10 +1396,10 @@ void ProcessBotCfgFile(void)
       arg4[strlen(arg4)-1]='\0';
    if(arg5 && arg5[strlen(arg5)-1]=='\"')
       arg5[strlen(arg5)-1]='\0';
-   
+
    if(ProcessCommand(CFGCMD_TYPE, print_to_console_config, NULL, cmd, arg1, arg2, arg3, arg4, arg5))
       return;
-   
+
    UTIL_ConsolePrintf("line[%d] unknown command: '%s' (trying to execute as server command)\n", bot_cfg_linenumber, server_cmd_print);
 
    SERVER_COMMAND(server_cmd);
@@ -1409,7 +1407,7 @@ void ProcessBotCfgFile(void)
 }
 
 
-static void print_to_server_output(int, void *, char * msg) 
+static void print_to_server_output(int, void *, char * msg)
 {
    UTIL_ConsolePrintf("%s", msg);
 }
@@ -1420,7 +1418,7 @@ void jk_botti_ServerCommand (void)
    if(FStrEq(CMD_ARGV(1), "kickall"))
    {
       int count = 0;
-      
+
       // kick all bots.
       for (int index = 0; index < 32; index++)
       {
@@ -1430,21 +1428,20 @@ void jk_botti_ServerCommand (void)
             count++;
          }
       }
-      
+
       if(count>0)
          UTIL_ConsolePrintf("Kicked %d bots.", count);
       else
          UTIL_ConsolePrintf("No bots on server to be kicked.");
-      
+
       if(max_bots != -1 && min_bots != -1)
       {
          max_bots = min_bots = -1;
          UTIL_ConsolePrintf("Disabled min_bots/max_bots.");
       }
    }
-   else if(!ProcessCommand(SRVCMD_TYPE, print_to_server_output, NULL, CMD_ARGV (1), CMD_ARGV (2), CMD_ARGV (3), CMD_ARGV (4), CMD_ARGV (5), CMD_ARGV (6))) 
+   else if(!ProcessCommand(SRVCMD_TYPE, print_to_server_output, NULL, CMD_ARGV (1), CMD_ARGV (2), CMD_ARGV (3), CMD_ARGV (4), CMD_ARGV (5), CMD_ARGV (6)))
    {
       UTIL_ConsolePrintf("%s: Unknown command \'%s\'\n", CMD_ARGV(0), CMD_ARGS());
    }
 }
-

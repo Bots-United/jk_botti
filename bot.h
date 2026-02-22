@@ -23,7 +23,7 @@
 #ifdef __linux__
 #define Sleep sleep
 #define stricmp strcasecmp
-#define strcmpi strcasecmp 
+#define strcmpi strcasecmp
 #define strnicmp strncasecmp
 typedef int BOOL;
 #endif
@@ -63,32 +63,32 @@ typedef int BOOL;
 #define RESPAWN_IS_RESPAWNING    3
 
 // waypoint goal types
-#define WPT_GOAL_NONE		0
-#define WPT_GOAL_HEALTH		1
-#define WPT_GOAL_ARMOR		2
-#define WPT_GOAL_WEAPON		3
-#define WPT_GOAL_AMMO		4
-#define WPT_GOAL_ITEM		5
-#define WPT_GOAL_LOCATION	8
-#define WPT_GOAL_TRACK_SOUND	9
-#define WPT_GOAL_ENEMY		10
+#define WPT_GOAL_NONE      0
+#define WPT_GOAL_HEALTH    1
+#define WPT_GOAL_ARMOR     2
+#define WPT_GOAL_WEAPON    3
+#define WPT_GOAL_AMMO      4
+#define WPT_GOAL_ITEM      5
+#define WPT_GOAL_LOCATION  8
+#define WPT_GOAL_TRACK_SOUND  9
+#define WPT_GOAL_ENEMY     10
 
 // instant damage (from cbase.h)
-#define DMG_CRUSH			(1 << 0)	// crushed by falling or moving object
-#define DMG_BURN			(1 << 3)	// heat burned
-#define DMG_FREEZE			(1 << 4)	// frozen
-#define DMG_FALL			(1 << 5)	// fell too far
-#define DMG_SHOCK			(1 << 8)	// electric shock
-#define DMG_DROWN			(1 << 14)	// Drowning
-#define DMG_NERVEGAS		(1 << 16)	// nerve toxins, very bad
-#define DMG_RADIATION		(1 << 18)	// radiation exposure
-#define DMG_DROWNRECOVER	(1 << 19)	// drowning recovery
-#define DMG_ACID			(1 << 20)	// toxic chemicals or acid burns
-#define DMG_SLOWBURN		(1 << 21)	// in an oven
-#define DMG_SLOWFREEZE		(1 << 22)	// in a subzero freezer
+#define DMG_CRUSH       (1 << 0) // crushed by falling or moving object
+#define DMG_BURN        (1 << 3) // heat burned
+#define DMG_FREEZE         (1 << 4) // frozen
+#define DMG_FALL        (1 << 5) // fell too far
+#define DMG_SHOCK       (1 << 8) // electric shock
+#define DMG_DROWN       (1 << 14)   // Drowning
+#define DMG_NERVEGAS    (1 << 16)   // nerve toxins, very bad
+#define DMG_RADIATION      (1 << 18)   // radiation exposure
+#define DMG_DROWNRECOVER   (1 << 19)   // drowning recovery
+#define DMG_ACID        (1 << 20)   // toxic chemicals or acid burns
+#define DMG_SLOWBURN    (1 << 21)   // in an oven
+#define DMG_SLOWFREEZE     (1 << 22)   // in a subzero freezer
 
 
-#define BOT_SKIN_LEN MAX_TEAMNAME_LENGTH 
+#define BOT_SKIN_LEN MAX_TEAMNAME_LENGTH
 #define BOT_NAME_LEN 32
 
 #define MAX_BOT_CHAT 100
@@ -104,10 +104,10 @@ typedef struct
    int    bottom_color;
 } cfg_bot_record_t;
 
-typedef struct breakable_list_s 
+typedef struct breakable_list_s
 {
    qboolean inuse;
-   
+
    struct breakable_list_s * next;
    qboolean material_breakable;
    edict_t *pEdict;
@@ -125,24 +125,24 @@ typedef struct
 {
    qboolean is_used;
    int userid;
-   
+
    int cfg_bot_index;
-   
+
    edict_t *pEdict;
    qboolean need_to_initialize;
-   
+
    char name[BOT_NAME_LEN];
    char skin[BOT_SKIN_LEN];
    int bot_skill;
    int weapon_skill;
-   
+
    float f_recoil;
-   
+
    float f_kick_time;
    float f_create_time;
    float f_frame_time;
    float f_bot_spawn_time;
-   
+
    int chat_percent;
    int taunt_percent;
    int whine_percent;
@@ -154,14 +154,14 @@ typedef struct
 
    double connect_time;
    double stay_time;
-   
+
    qboolean b_on_ground;
    qboolean b_on_ladder;
    qboolean b_in_water;
    qboolean b_ducking;
    qboolean b_has_enough_ammo_for_good_weapon;
    qboolean b_low_health;
-   
+
    int eagle_secondary_state;
 
    // things from pev in CBasePlayer...
@@ -171,7 +171,7 @@ typedef struct
 
    float bot_think_time;
    float f_last_think_time;
-   
+
    float msecdel;
    float msecval;
 
@@ -224,7 +224,7 @@ typedef struct
    float f_bot_see_enemy_time;
    Vector v_bot_see_enemy_origin;
    float f_next_find_visible_sound_enemy_time;
- 
+
    float f_last_time_attacked;
 
    edict_t *killer_edict;
@@ -235,21 +235,21 @@ typedef struct
    qboolean b_bot_endgame;
 
    float f_duck_time;
-   
+
    float f_random_jump_time;
    float f_random_jump_duck_time;
    float f_random_jump_duck_end;
    float f_random_duck_time;
    int prev_random_type;
-   
+
    qboolean b_longjump;
    float f_combat_longjump;
    qboolean b_combat_longjump;
    float f_longjump_time;
    qboolean b_longjump_do_jump;
-   
+
    float f_sniper_aim_time;
-   
+
    float f_shoot_time;
    float f_primary_charging;
    float f_secondary_charging;
@@ -261,7 +261,7 @@ typedef struct
    float f_grenade_found_time;
    int current_weapon_index;
    float current_opt_distance;
-   
+
    float f_move_speed;
    float f_pause_time;
    float f_pause_look_time;
@@ -280,7 +280,7 @@ typedef struct
    qboolean  b_use_button;
    float f_use_button_time;
    qboolean  b_lift_moving;
-   
+
    Vector v_use_target;
 
    int   logo_percent;
@@ -291,11 +291,11 @@ typedef struct
    int   bottom_color;
 
    float f_reaction_target_time;  // time when enemy targeting starts
-   
+
    float f_weaponchange_time;
 
    float f_current_hearing_sensitivity;
-   
+
    qboolean b_set_special_shoot_angle;
    float f_special_shoot_angle;
 
@@ -346,7 +346,7 @@ typedef struct
 
 typedef struct
 {
-   char identification[4];		// should be WAD2 (or 2DAW) or WAD3 (or 3DAW)
+   char identification[4];    // should be WAD2 (or 2DAW) or WAD3 (or 3DAW)
    int  numlumps;
    int  infotableofs;
 } wadinfo_t;
@@ -355,11 +355,11 @@ typedef struct
 {
    int  filepos;
    int  disksize;
-   int  size;					// uncompressed
+   int  size;              // uncompressed
    char type;
    char compression;
    char pad1, pad2;
-   char name[16];				// must be null terminated
+   char name[16];          // must be null terminated
 } lumpinfo_t;
 
 extern bot_t bots[32];

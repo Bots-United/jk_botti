@@ -4,9 +4,7 @@
 // bot.cpp
 //
 
-#ifndef _WIN32
 #include <string.h>
-#endif
 
 #include <malloc.h>
 
@@ -44,7 +42,7 @@ void BotLogoInit(void)
    if (bot_logo_fp != NULL)
    {
       UTIL_ConsolePrintf("Loading %s...\n", bot_logo_filename);
-      
+
       while ((num_logos < MAX_BOT_LOGOS) &&
              (fgets(logo_buffer, 80, bot_logo_fp) != NULL))
       {
@@ -83,7 +81,7 @@ void BotNameInit( void )
    if (bot_name_fp != NULL)
    {
       UTIL_ConsolePrintf("Loading %s...\n", bot_name_filename);
-      
+
       while ((number_names < MAX_BOT_NAMES) &&
              (fgets(name_buffer, 80, bot_name_fp) != NULL))
       {
@@ -108,4 +106,3 @@ void BotNameInit( void )
       fclose(bot_name_fp);
    }
 }
-
