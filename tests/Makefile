@@ -23,13 +23,19 @@ test_bot_combat: $(BOT_COMBAT_OBJS)
 %.o: ../%.cpp
 	${CXX} ${TEST_CXXFLAGS} -c $< -o $@
 
+# Random number generator test
+RANDOM_NUM_OBJS = test_random_num.o random_num.o
+
+test_random_num: $(RANDOM_NUM_OBJS)
+	${CXX} -o $@ $(RANDOM_NUM_OBJS) -lm
+
 # Neural net training test
 NEURALNET_OBJS = test_neuralnet.o neuralnet.o geneticalg.o random_num.o
 
 test_neuralnet: $(NEURALNET_OBJS)
 	${CXX} -o $@ $(NEURALNET_OBJS) -lm
 
-ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_neuralnet
+ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_random_num test_neuralnet
 
 all: $(ALL_TESTS)
 
@@ -37,6 +43,7 @@ run: $(ALL_TESTS)
 	./test_name_sanitize
 	./test_posdata_list
 	./test_bot_combat
+	./test_random_num
 	./test_neuralnet
 
 VALGRIND = valgrind --leak-check=full --error-exitcode=1
@@ -45,6 +52,7 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_name_sanitize
 	$(VALGRIND) ./test_posdata_list
 	$(VALGRIND) ./test_bot_combat
+	$(VALGRIND) ./test_random_num
 	$(VALGRIND) ./test_neuralnet
 
 clean:
