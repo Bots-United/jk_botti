@@ -259,7 +259,7 @@ double *CNeuralNet::run(const double inputs[], double outputs[], const double sc
 		for (i = 0; i < m_num_outputs; i++)
 			outputs[i] = out[i];
 
-	return out;
+	return outputs;
 }
 
 // run neural network, inputs must have array size of m_num_inputs

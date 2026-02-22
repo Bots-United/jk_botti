@@ -120,7 +120,7 @@ void CGeneticAlgorithm::crossover(CGenome &parent1, CGenome &parent2, CGenome &c
 	int num_genes = parent1.length();
 	int i, j;
 
-	if (&parent1 == &parent2 || get_random() < m_crossover_rate) {
+	if (&parent1 == &parent2 || get_random() > m_crossover_rate) {
 		child1.copy_from(parent1);
 		child2.copy_from(parent2);
 		return;
@@ -197,21 +197,26 @@ CGenome *CGeneticAlgorithm::get_individual_random_weighted(void)
 {
 	int i;
 	double fitness_pos = 0.0;
-	double slice = get_random() * m_total_fitness;
+
+	// offset fitness so worst individual has effective fitness 0
+	// (roulette wheel selection requires non-negative values)
+	double offset = m_worst_fitness < 0 ? -m_worst_fitness : 0;
+	double total = m_total_fitness + offset * m_population->get_size();
+
+	// if all individuals have equal fitness, fall back to uniform random
+	if (total <= 0.0)
+		return get_individual_random();
+
+	double slice = get_random() * total;
 
 	for (i = 0; i < m_population->get_size(); i++) {
-		fitness_pos += m_population->get_fitness_of(i);
+		fitness_pos += m_population->get_fitness_of(i) + offset;
 
-		// if the fitness so far > random number return the genome at this point
-		if (fitness_pos >= slice) {
-			if (i == 0)
-				return m_population->get_individual(i); // slice == 0.0
-			else
-				return m_population->get_individual(i - 1);
-		}
+		if (fitness_pos >= slice)
+			return m_population->get_individual(i);
 	}
 
-	return m_population->get_individual(i - 1);
+	return m_population->get_individual(m_population->get_size() - 1);
 }
 
 CGenome *CGeneticAlgorithm::get_individual_random(void)
