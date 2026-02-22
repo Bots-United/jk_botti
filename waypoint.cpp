@@ -246,11 +246,6 @@ static void WaypointAddPath(short int add_index, short int path_index)
          p.index[i] = path_index;
          return;
       }
-
-#ifdef _DEBUG
-      count++;
-      if (count > 100) WaypointDebug();
-#endif
    }
 
    if(i >= MAX_PATH_INDEX)
@@ -269,11 +264,6 @@ static void WaypointDeletePath(short int path_index, short int del_index)
    {
       if(p.index[i] == del_index)
          p.index[i] = -1;
-
-#ifdef _DEBUG
-      count++;
-      if (count > 100) WaypointDebug();
-#endif
    }
 }
 
@@ -856,10 +846,8 @@ int WaypointFindRandomGoal(int *out_indexes, int max_indexes, edict_t *pEntity, 
    }
 
    // we have extra.. take randomly
-   int out_count = 0;
-
    for(int i = 0; i < max_indexes; i++)
-      out_indexes[out_count] = indexes[RANDOM_LONG2(0, count - 1)];
+      out_indexes[i] = indexes[RANDOM_LONG2(0, count - 1)];
 
    return max_indexes;
 }
@@ -1093,7 +1081,7 @@ edict_t *WaypointFindItem( int wpt_index )
       UTIL_TraceMove( v_origin, pent->v.origin, ignore_monsters, NULL, &tr );
 
       // make sure entity is visible...
-      if ((tr.flFraction > 0.999999f) || (tr.pHit == pent) || !(pent->v.effects & EF_NODRAW) || !(pent->v.frame > 0))
+      if (((tr.flFraction > 0.999999f) || (tr.pHit == pent)) && !(pent->v.effects & EF_NODRAW) && !(pent->v.frame > 0))
       {
          safe_strcopy(item_name, sizeof(item_name), STRING(pent->v.classname));
 

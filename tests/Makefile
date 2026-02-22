@@ -53,7 +53,13 @@ NEURALNET_OBJS = test_neuralnet.o neuralnet.o geneticalg.o random_num.o
 test_neuralnet: $(NEURALNET_OBJS)
 	${CXX} -o $@ $(NEURALNET_OBJS) -lm
 
-ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet
+# Waypoint tests (waypoint.cpp is #included in test file, not linked separately)
+WAYPOINT_OBJS = engine_mock.o test_waypoint.o bot_weapons.o util.o safe_snprintf.o random_num.o
+
+test_waypoint: $(WAYPOINT_OBJS) ../zlib/libz.a
+	${CXX} -o $@ $(WAYPOINT_OBJS) ../zlib/libz.a -lm
+
+ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_waypoint
 
 all: $(ALL_TESTS)
 
@@ -66,6 +72,7 @@ run: $(ALL_TESTS)
 	./test_safe_snprintf
 	./test_random_num
 	./test_neuralnet
+	./test_waypoint
 
 VALGRIND = valgrind --leak-check=full --error-exitcode=1
 
@@ -78,6 +85,7 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_safe_snprintf
 	$(VALGRIND) ./test_random_num
 	$(VALGRIND) ./test_neuralnet
+	$(VALGRIND) ./test_waypoint
 
 clean:
 	rm -f $(ALL_TESTS) *.o
