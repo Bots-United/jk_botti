@@ -36,7 +36,7 @@
 #define W_FL_LIFT_END    (1<<15) /* handled otherwise as normal waypoint except only one incoming path from lift-start,
                                     other incoming paths are ignored (at creating time of other waypoints). */
 
-#define W_FL_DELETED     (1<<31) /* used by waypoint allocation code */
+#define W_FL_DELETED     (1u<<31) /* used by waypoint allocation code */
 
 
 #define WAYPOINT_VERSION 5

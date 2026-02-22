@@ -1277,7 +1277,7 @@ static void BotFindItem( bot_t &pBot )
                if(found)
                {
                   //does player have this weapon
-                  if(pEdict->v.weapons & (1<<pSelect[select_index].iId))
+                  if(pEdict->v.weapons & (1u<<pSelect[select_index].iId))
                   {
                      // is ammo low?
                      if(BotPrimaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
