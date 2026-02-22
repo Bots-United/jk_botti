@@ -52,7 +52,7 @@ jobs:
           path: jk_botti_mm.dll
 
   release-artifact:
-    needs: [build-linux, build-windows]
+    needs: [test, build-linux, build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
