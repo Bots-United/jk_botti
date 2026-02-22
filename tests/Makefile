@@ -41,13 +41,19 @@ UTIL_TEST_OBJS = engine_mock.o test_util.o util.o safe_snprintf.o random_num.o
 test_util: $(UTIL_TEST_OBJS)
 	${CXX} -o $@ $(UTIL_TEST_OBJS) -lm
 
+# Bot chat tests (bot_chat.cpp is #included in test file, not linked separately)
+BOT_CHAT_OBJS = engine_mock.o test_bot_chat.o util.o safe_snprintf.o random_num.o
+
+test_bot_chat: $(BOT_CHAT_OBJS)
+	${CXX} -o $@ $(BOT_CHAT_OBJS) -lm
+
 # Neural net training test
 NEURALNET_OBJS = test_neuralnet.o neuralnet.o geneticalg.o random_num.o
 
 test_neuralnet: $(NEURALNET_OBJS)
 	${CXX} -o $@ $(NEURALNET_OBJS) -lm
 
-ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_util test_safe_snprintf test_random_num test_neuralnet
+ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet
 
 all: $(ALL_TESTS)
 
@@ -56,6 +62,7 @@ run: $(ALL_TESTS)
 	./test_posdata_list
 	./test_bot_combat
 	./test_util
+	./test_bot_chat
 	./test_safe_snprintf
 	./test_random_num
 	./test_neuralnet
@@ -67,6 +74,7 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_posdata_list
 	$(VALGRIND) ./test_bot_combat
 	$(VALGRIND) ./test_util
+	$(VALGRIND) ./test_bot_chat
 	$(VALGRIND) ./test_safe_snprintf
 	$(VALGRIND) ./test_random_num
 	$(VALGRIND) ./test_neuralnet

@@ -1,12 +1,10 @@
 //
 // JK_Botti - be more human!
 //
-// bot_combat.cpp
+// bot_chat.cpp
 //
 
-#ifndef _WIN32
 #include <string.h>
-#endif
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -18,9 +16,9 @@
 
 
 #define NUM_TAGS 24
-char *tag1[NUM_TAGS]={
+const char *tag1[NUM_TAGS]={
 "[", "*[", "-=","-[","-]","-}","-{","<[","<]","[-","]-","{-","}-","[[","[","{","]","}","<",">","-","|","=","+"};
-char *tag2[NUM_TAGS]={
+const char *tag2[NUM_TAGS]={
 "]*", "]*", "=-","]-","[-","{-","}-","]>","[>","-]","-[","-}","-{","]]","]","}","[","{",">","<","-","|","=","+"};
 
 
@@ -74,8 +72,8 @@ void LoadBotChat(void)
    UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/jk_botti_chat.txt", NULL);
 
    bfp = fopen(filename, "r");
-   
-   if(bfp != NULL)
+
+   if (bfp != NULL)
       UTIL_ConsolePrintf("Loading %s...\n", filename);
 
    while (bfp != NULL)
@@ -116,7 +114,7 @@ void LoadBotChat(void)
          section = 2;
          continue;
       }
-      
+
       if (strcmp(buffer, "[bot_endgame]") == 0)
       {
          section = 3;
@@ -257,7 +255,7 @@ static int BotChatTrimTag(const char *original_name, char *out_name, int sizeof_
    if (strlen(in_name) == 0)  // is name just a tag?
    {
       safe_strcopy(in_name, sizeof(in_name), original_name);
-      
+
       /*
       // strip just the tag part...
       for (i=0; i < NUM_TAGS; i++)
@@ -302,13 +300,13 @@ static void BotDropCharacter(const char *in_string, char *out_string, int sizeof
    safe_strcopy(out_string, sizeof_out_string, in_string);
 
    len = strlen(out_string);
-   if(len < 2)
+   if (len < 2)
       return;
-   
+
    pos = RANDOM_LONG2(1, len-1);  // don't drop position zero
 
    is_bad = !isalpha(out_string[pos]) || (out_string[pos-1] == '%');
-   for(count = 0; is_bad && count < len && count < 20; count++)
+   for (count = 0; is_bad && count < len && count < 20; count++)
    {
       pos = RANDOM_LONG2(1, len-1);
       is_bad = !isalpha(out_string[pos]) || (out_string[pos-1] == '%');
@@ -335,13 +333,13 @@ static void BotSwapCharacter(const char *in_string, char *out_string, int sizeof
    safe_strcopy(out_string, sizeof_out_string, in_string);
 
    len = strlen(out_string);
-   if(len < 3) // must be 3, 1+1 for swap + zero must now swap = 3
+   if (len < 3) // must be 3, 1+1 for swap + zero must now swap = 3
       return;
-   
+
    pos = RANDOM_LONG2(1, len-2);  // don't swap position zero
 
    is_bad = !isalpha(out_string[pos]) || !isalpha(out_string[pos+1]) || (out_string[pos-1] == '%');
-   for(count = 0; is_bad && count < len && count < 20; count++)
+   for (count = 0; is_bad && count < len && count < 20; count++)
    {
       pos = RANDOM_LONG2(1, len-2);
       is_bad = !isalpha(out_string[pos]) || !isalpha(out_string[pos+1]) || (out_string[pos-1] == '%');
@@ -360,9 +358,9 @@ static void BotChatName(const char *original_name, char *out_name, int sizeof_ou
 {
    int pos;
    char temp_lvlXless_name[80];
-   
+
    //always remove [lvlX] tag
-   if(strncmp(original_name, "[lvl", 4) == 0 && original_name[4] >= '0' && original_name[4] <= '5' && original_name[5] == ']')
+   if (strncmp(original_name, "[lvl", 4) == 0 && original_name[4] >= '0' && original_name[4] <= '5' && original_name[5] == ']')
    {
       safe_strcopy(temp_lvlXless_name, sizeof(temp_lvlXless_name), &original_name[6]);
       original_name = temp_lvlXless_name;
@@ -479,60 +477,63 @@ static void BotChatFillInName(char *bot_say_msg, int sizeof_msg, const char *cha
    int i = 0;
    int o = 0;
 
-   while(i < clen && o < sizeof_msg)
+   while (i < clen && o < sizeof_msg)
    {
-      if(chat_text[i] == '%')
+      if (chat_text[i] == '%')
       {
-         if(i + 1 < clen)
+         if (i + 1 < clen)
          {
-            if(chat_text[i + 1] == 'n' || chat_text[i + 1] == 'r')
+            if (chat_text[i + 1] == 'n' || chat_text[i + 1] == 'r')
             {
                const char * to_output = chat_name;
-               
-               if(chat_text[i + 1] == 'r')
+
+               if (chat_text[i + 1] == 'r')
                {
                   BotChatGetPlayers();
-         
-                  // pick a name at random from the list of players...
-                  int index = RANDOM_LONG2(0, player_count-1);
-                  int count = 0;
-                  
-                  bool is_bad = (strcmp(player_names[index], chat_name) == 0) ||
-                                (strcmp(player_names[index], bot_name) == 0);
 
-                  while ((is_bad) && (count < 20))
+                  if (player_count > 0)
                   {
-                     index = RANDOM_LONG2(0, player_count-1);
+                     // pick a name at random from the list of players...
+                     int index = RANDOM_LONG2(0, player_count-1);
+                     int count = 0;
 
-                     is_bad = (strcmp(player_names[index], chat_name) == 0) ||
-                              (strcmp(player_names[index], bot_name) == 0);
-                     
-                     count++;
+                     bool is_bad = (strcmp(player_names[index], chat_name) == 0) ||
+                                   (strcmp(player_names[index], bot_name) == 0);
+
+                     while ((is_bad) && (count < 20))
+                     {
+                        index = RANDOM_LONG2(0, player_count-1);
+
+                        is_bad = (strcmp(player_names[index], chat_name) == 0) ||
+                                 (strcmp(player_names[index], bot_name) == 0);
+
+                        count++;
+                     }
+
+                     BotChatName(player_names[index], random_name, sizeof(random_name));
+
+                     to_output = random_name;
                   }
-
-                  BotChatName(player_names[index], random_name, sizeof(random_name));
-                  
-                  to_output = random_name;
                }
-               
+
                // copy chat name to output
                int nlen = strlen(to_output);
                int n = 0;
-               
-               while(n < nlen && o < sizeof_msg)
+
+               while (n < nlen && o < sizeof_msg)
                   bot_say_msg[o++] = to_output[n++];
-               
+
                // skip %X
                i+=2;
                continue;
             }
          }
       }
-      
+
       bot_say_msg[o++] = chat_text[i++];
    }
-   
-   if(o < sizeof_msg)
+
+   if (o < sizeof_msg)
       bot_say_msg[o] = 0;
    else
       bot_say_msg[sizeof_msg - 1] = 0;
@@ -546,10 +547,10 @@ void BotChatTaunt(bot_t &pBot, edict_t *victim_edict)
    char chat_name[64];
    char temp_name[64];
    const char *bot_name;
-   
-   if(pBot.b_bot_say && pBot.f_bot_say >= gpGlobals->time)
+
+   if (pBot.b_bot_say && pBot.f_bot_say >= gpGlobals->time)
       return;
-   
+
    // are there any taunt messages and should the bot taunt?
    if ((bot_taunt_count > 0) &&
        (RANDOM_LONG2(1,100) <= pBot.taunt_percent))
@@ -595,7 +596,7 @@ void BotChatTaunt(bot_t &pBot, edict_t *victim_edict)
          BotChatName(temp_name, chat_name, sizeof(chat_name));
       }
       else
-         strcpy(chat_name, "NULL");
+         safe_strcopy(chat_name, sizeof(chat_name), "NULL");
 
       bot_name = STRING(pBot.pEdict->v.netname);
 
@@ -615,12 +616,12 @@ void BotChatWhine(bot_t &pBot)
    char chat_name[64];
    char temp_name[64];
    const char *bot_name;
-   
-   if(pBot.b_bot_say && pBot.f_bot_say >= gpGlobals->time)
+
+   if (pBot.b_bot_say && pBot.f_bot_say >= gpGlobals->time)
       return;
-   
+
    edict_t *pEdict = pBot.pEdict;
-   
+
    // has the bot been alive for at least 15 seconds AND
    if ((pBot.killer_edict != NULL) && (bot_whine_count > 0) &&
        ((pBot.f_bot_spawn_time + 15.0) <= gpGlobals->time))
@@ -668,7 +669,7 @@ void BotChatWhine(bot_t &pBot)
             BotChatName(temp_name, chat_name, sizeof(chat_name));
          }
          else
-            strcpy(chat_name, "NULL");
+            safe_strcopy(chat_name, sizeof(chat_name), "NULL");
 
          bot_name = STRING(pEdict->v.netname);
 
@@ -688,12 +689,12 @@ void BotChatTalk(bot_t &pBot)
    char chat_text[81];
    char chat_name[64];
    const char *bot_name;
-   
-   if(pBot.b_bot_say && pBot.f_bot_say >= gpGlobals->time)
+
+   if (pBot.b_bot_say && pBot.f_bot_say >= gpGlobals->time)
       return;
-   
+
    edict_t *pEdict = pBot.pEdict;
-   
+
    if ((bot_chat_count > 0) && (pBot.f_bot_chat_time < gpGlobals->time))
    {
       pBot.f_bot_chat_time = gpGlobals->time + 30.0;
@@ -754,15 +755,15 @@ void BotChatEndGame(bot_t &pBot)
    char chat_text[81];
    char chat_name[64];
    const char *bot_name;
-   
+
    edict_t *pEdict = pBot.pEdict;
-   
+
    if ((bot_endgame_count > 0) && RANDOM_LONG2(1,100) <= pBot.endgame_percent)
    {
       int endgame_index;
       qboolean used;
       int i, recent_count;
-      
+
       recent_count = 0;
 
       while (recent_count < 5)
