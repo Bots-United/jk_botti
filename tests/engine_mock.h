@@ -38,4 +38,8 @@ typedef void (*mock_trace_fn)(const float *v1, const float *v2,
 extern mock_trace_fn mock_trace_hull_fn;
 extern mock_trace_fn mock_trace_line_fn;
 
+// Control what POINT_CONTENTS returns
+typedef int (*mock_point_contents_fn_t)(const float *origin);
+extern mock_point_contents_fn_t mock_point_contents_fn;
+
 #endif // ENGINE_MOCK_H

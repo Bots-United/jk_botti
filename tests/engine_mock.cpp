@@ -10,6 +10,7 @@
 #ifndef _WIN32
 #include <string.h>
 #endif
+#include <math.h>
 
 #include <extdll.h>
 #include <dllapi.h>
@@ -63,6 +64,7 @@ void mock_set_classname(edict_t *e, const char *name)
 
 mock_trace_fn mock_trace_hull_fn = NULL;
 mock_trace_fn mock_trace_line_fn = NULL;
+mock_point_contents_fn_t mock_point_contents_fn = NULL;
 
 // ============================================================
 // Engine globals
@@ -178,8 +180,29 @@ static edict_t *mock_pfnFindEntityInSphere(edict_t *pentStart,
                                            const float *origin,
                                            float radius)
 {
-   // Return NULL to signal end of search (no monsters/players found)
-   (void)pentStart; (void)origin; (void)radius;
+   // Start scanning from pentStart+1 (or edict 1 if pentStart is NULL/worldspawn)
+   int start = 1;
+   if (pentStart)
+   {
+      for (int i = 0; i < MOCK_MAX_EDICTS; i++)
+         if (&mock_edicts[i] == pentStart)
+         { start = i + 1; break; }
+   }
+
+   for (int i = start; i < mock_next_edict; i++)
+   {
+      edict_t *e = &mock_edicts[i];
+      if (e->v.classname == 0) continue;
+
+      float dx = e->v.origin[0] - origin[0];
+      float dy = e->v.origin[1] - origin[1];
+      float dz = e->v.origin[2] - origin[2];
+      float dist = sqrtf(dx*dx + dy*dy + dz*dz);
+
+      if (dist <= radius)
+         return e;
+   }
+
    return NULL;
 }
 
@@ -213,8 +236,26 @@ static edict_t *mock_pfnFindEntityByString(edict_t *pentStart,
 
 static int mock_pfnPointContents(const float *origin)
 {
-   (void)origin;
+   if (mock_point_contents_fn)
+      return mock_point_contents_fn(origin);
    return CONTENTS_EMPTY;
+}
+
+static void mock_pfnSetOrigin(edict_t *e, const float *rgflOrigin)
+{
+   if (e)
+   {
+      e->v.origin[0] = rgflOrigin[0];
+      e->v.origin[1] = rgflOrigin[1];
+      e->v.origin[2] = rgflOrigin[2];
+   }
+}
+
+static void mock_pfnEmitSound(edict_t *entity, int channel, const char *sample,
+                               float volume, float attenuation, int flags, int pitch)
+{
+   (void)entity; (void)channel; (void)sample; (void)volume;
+   (void)attenuation; (void)flags; (void)pitch;
 }
 
 static void mock_pfnAlertMessage(ALERT_TYPE atype, char *szFmt, ...)
@@ -270,6 +311,11 @@ static void mock_pfnMakeVectors(const float *angles)
 static void mock_pfnServerPrint(const char *msg)
 {
    (void)msg;
+}
+
+static void mock_pfnClientPrintf(edict_t *pEdict, PRINT_TYPE ptype, const char *szMsg)
+{
+   (void)pEdict; (void)ptype; (void)szMsg;
 }
 
 static int mock_pfnRegUserMsg(const char *name, int size)
@@ -432,6 +478,7 @@ void mock_reset(void)
    // Clear trace hooks
    mock_trace_hull_fn = NULL;
    mock_trace_line_fn = NULL;
+   mock_point_contents_fn = NULL;
 
    // Clear mock cvar values
    mock_cvar_bm_gluon_mod_val = 0.0f;
@@ -468,6 +515,8 @@ void mock_reset(void)
    g_engfuncs.pfnFindEntityInSphere = mock_pfnFindEntityInSphere;
    g_engfuncs.pfnFindEntityByString = mock_pfnFindEntityByString;
    g_engfuncs.pfnPointContents = mock_pfnPointContents;
+   g_engfuncs.pfnSetOrigin = mock_pfnSetOrigin;
+   g_engfuncs.pfnEmitSound = mock_pfnEmitSound;
    g_engfuncs.pfnAlertMessage = mock_pfnAlertMessage;
    g_engfuncs.pfnMessageBegin = mock_pfnMessageBegin;
    g_engfuncs.pfnMessageEnd = mock_pfnMessageEnd;
@@ -484,6 +533,7 @@ void mock_reset(void)
    g_engfuncs.pfnGetPlayerUserId = mock_pfnGetPlayerUserId;
    g_engfuncs.pfnMakeVectors = mock_pfnMakeVectors;
    g_engfuncs.pfnServerPrint = mock_pfnServerPrint;
+   g_engfuncs.pfnClientPrintf = mock_pfnClientPrintf;
    g_engfuncs.pfnRegUserMsg = mock_pfnRegUserMsg;
    g_engfuncs.pfnGetPlayerAuthId = mock_pfnGetPlayerAuthId;
    g_engfuncs.pfnRandomLong = mock_pfnRandomLong;
