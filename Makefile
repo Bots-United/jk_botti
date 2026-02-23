@@ -103,6 +103,9 @@ test: $(ZLIB_LIB)
 valgrind: $(ZLIB_LIB)
 	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" ZLIB_LIB="../$(ZLIB_LIB)" valgrind
 
+coverage: $(ZLIB_LIB)
+	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" ZLIB_LIB="../$(ZLIB_LIB)" coverage
+
 clean:
 	rm -rf obj ${TARGET}${DLLEND} Rules.depend
 	$(MAKE) -C tests clean
