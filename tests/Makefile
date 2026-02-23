@@ -62,13 +62,20 @@ BOT_WEAPONS_OBJS = engine_mock.o test_bot_weapons.o \
 test_bot_weapons: $(BOT_WEAPONS_OBJS)
 	${CXX} -o $@ $(BOT_WEAPONS_OBJS) -lm
 
+# Bot navigate tests
+BOT_NAVIGATE_OBJS = engine_mock.o test_bot_navigate.o \
+	bot_navigate.o bot_weapons.o util.o safe_snprintf.o random_num.o
+
+test_bot_navigate: $(BOT_NAVIGATE_OBJS)
+	${CXX} -o $@ $(BOT_NAVIGATE_OBJS) -lm
+
 # Waypoint tests (waypoint.cpp is #included in test file, not linked separately)
 WAYPOINT_OBJS = engine_mock.o test_waypoint.o bot_weapons.o util.o safe_snprintf.o random_num.o
 
 test_waypoint: $(WAYPOINT_OBJS) $(ZLIB_LIB)
 	${CXX} -o $@ $(WAYPOINT_OBJS) $(ZLIB_LIB) -lm
 
-ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_waypoint
+ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_waypoint test_bot_navigate
 
 all: $(ALL_TESTS)
 
@@ -83,6 +90,7 @@ run: $(ALL_TESTS)
 	./test_random_num
 	./test_neuralnet
 	./test_waypoint
+	./test_bot_navigate
 
 VALGRIND = valgrind --leak-check=full --error-exitcode=1
 
@@ -97,6 +105,7 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_random_num
 	$(VALGRIND) ./test_neuralnet
 	$(VALGRIND) ./test_waypoint
+	$(VALGRIND) ./test_bot_navigate
 
 clean:
 	rm -f $(ALL_TESTS) *.o

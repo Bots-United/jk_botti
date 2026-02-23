@@ -1713,8 +1713,8 @@ qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump)
       if (tr.flFraction < 1.0f)
          return FALSE;
 
-      // now check same height on the other side of the bot...
-      v_source = pEdict->v.origin + v_right * -16 + Vector(0, 0, -36 + 64);
+      // now check same height on the right side of the bot...
+      v_source = pEdict->v.origin + v_right * 16 + Vector(0, 0, -36 + 64);
       v_dest = v_source + v_forward * 24;
 
       // trace a line forward at maximum jump height...
@@ -2167,22 +2167,19 @@ qboolean BotCheckWallOnRight( bot_t &pBot )
 qboolean BotCheckWallOnForward( bot_t &pBot )
 {
    edict_t *pEdict = pBot.pEdict;
-   Vector v_src, v_right;
+   Vector v_src, v_forward;
    TraceResult tr;
 
-   // do a trace to the right...
+   // do a trace forward...
 
    v_src = pEdict->v.origin;
-   v_right = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * 40;  // 40 units to the forawrd
+   v_forward = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * 40;  // 40 units to the forward
 
-   UTIL_TraceMove( v_src, v_right, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
+   UTIL_TraceMove( v_src, v_forward, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
 
    // check if the trace hit something...
    if (tr.flFraction < 1.0f)
    {
-      if (pBot.f_wall_on_right < 1.0)
-         pBot.f_wall_on_right = gpGlobals->time;
-
       return TRUE;
    }
 
@@ -2193,22 +2190,19 @@ qboolean BotCheckWallOnForward( bot_t &pBot )
 qboolean BotCheckWallOnBack( bot_t &pBot )
 {
    edict_t *pEdict = pBot.pEdict;
-   Vector v_src, v_right;
+   Vector v_src, v_back;
    TraceResult tr;
 
-   // do a trace to the right...
+   // do a trace to the back...
 
    v_src = pEdict->v.origin;
-   v_right = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * -40;  // 40 units to the back
+   v_back = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * -40;  // 40 units to the back
 
-   UTIL_TraceMove( v_src, v_right, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
+   UTIL_TraceMove( v_src, v_back, dont_ignore_monsters,  pEdict->v.pContainingEntity, &tr);
 
    // check if the trace hit something...
    if (tr.flFraction < 1.0f)
    {
-      if (pBot.f_wall_on_right < 1.0)
-         pBot.f_wall_on_right = gpGlobals->time;
-
       return TRUE;
    }
 
@@ -2342,7 +2336,7 @@ void BotLookForDrop( bot_t &pBot )
                                   pEdict->v.pContainingEntity, &tr );
 
                   // if trace hit something then drop is NOT TOO FAR...
-                  if (tr.flFraction > 0.999999f)
+                  if (tr.flFraction < 0.999999f)
                      done = TRUE;
                }
 

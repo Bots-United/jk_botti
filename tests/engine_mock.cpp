@@ -102,6 +102,7 @@ int submod_id = SUBMOD_HLDM;
 int submod_weaponflag = WEAPON_SUBMOD_HLDM;
 int bot_shoot_breakables = 0;
 int m_spriteTexture = 0;
+__attribute__((weak)) int num_waypoints = 0;
 __attribute__((weak)) WAYPOINT waypoints[MAX_WAYPOINTS];
 bot_skill_settings_t skill_settings[5];
 CSoundEnt *pSoundEnt = NULL;
@@ -335,12 +336,28 @@ __attribute__((weak)) int WaypointRouteFromTo(int src, int dest)
 { (void)src; (void)dest; return -1; }
 __attribute__((weak)) float WaypointDistanceFromTo(int src, int dest)
 { (void)src; (void)dest; return 99999.0f; }
+__attribute__((weak)) int WaypointFindPath(int &path_index, int waypoint_index)
+{ (void)path_index; (void)waypoint_index; return -1; }
 
-// bot_navigate.cpp
-qboolean BotUpdateTrackSoundGoal(bot_t &pBot) { (void)pBot; return FALSE; }
-float BotChangeYaw(bot_t &pBot, float speed) { (void)pBot; (void)speed; return 0; }
-float BotChangePitch(bot_t &pBot, float speed) { (void)pBot; (void)speed; return 0; }
-qboolean BotHeadTowardWaypoint(bot_t &pBot) { (void)pBot; return FALSE; }
+// bot_navigate.cpp (weak: overridden by test_bot_navigate.cpp which links bot_navigate.o)
+__attribute__((weak)) qboolean BotUpdateTrackSoundGoal(bot_t &pBot) { (void)pBot; return FALSE; }
+__attribute__((weak)) float BotChangeYaw(bot_t &pBot, float speed) { (void)pBot; (void)speed; return 0; }
+__attribute__((weak)) float BotChangePitch(bot_t &pBot, float speed) { (void)pBot; (void)speed; return 0; }
+__attribute__((weak)) qboolean BotHeadTowardWaypoint(bot_t &pBot) { (void)pBot; return FALSE; }
+__attribute__((weak)) qboolean BotStuckInCorner(bot_t &pBot) { (void)pBot; return FALSE; }
+__attribute__((weak)) qboolean BotCantMoveForward(bot_t &pBot, TraceResult *tr) { (void)pBot; (void)tr; return FALSE; }
+__attribute__((weak)) qboolean BotCanJumpUp(bot_t &pBot, qboolean *bDuckJump) { (void)pBot; (void)bDuckJump; return FALSE; }
+__attribute__((weak)) qboolean BotCanDuckUnder(bot_t &pBot) { (void)pBot; return FALSE; }
+__attribute__((weak)) qboolean BotEdgeForward(bot_t &pBot, const Vector &v) { (void)pBot; (void)v; return FALSE; }
+__attribute__((weak)) qboolean BotEdgeRight(bot_t &pBot, const Vector &v) { (void)pBot; (void)v; return FALSE; }
+__attribute__((weak)) qboolean BotEdgeLeft(bot_t &pBot, const Vector &v) { (void)pBot; (void)v; return FALSE; }
+__attribute__((weak)) qboolean BotCheckWallOnLeft(bot_t &pBot) { (void)pBot; return FALSE; }
+__attribute__((weak)) qboolean BotCheckWallOnRight(bot_t &pBot) { (void)pBot; return FALSE; }
+__attribute__((weak)) qboolean BotCheckWallOnForward(bot_t &pBot) { (void)pBot; return FALSE; }
+__attribute__((weak)) qboolean BotCheckWallOnBack(bot_t &pBot) { (void)pBot; return FALSE; }
+__attribute__((weak)) void BotLookForDrop(bot_t &pBot) { (void)pBot; }
+__attribute__((weak)) void BotRemoveEnemy(bot_t &pBot, qboolean b_keep_tracking)
+{ (void)pBot; (void)b_keep_tracking; }
 
 // bot_sound.cpp
 int CSoundEnt::ActiveList(void) { return SOUNDLIST_EMPTY; }
@@ -422,6 +439,7 @@ void mock_reset(void)
    // Clear extern globals
    memset(bots, 0, sizeof(bots));
    memset(players, 0, sizeof(players));
+   num_waypoints = 0;
    memset(waypoints, 0, sizeof(waypoints));
    memset(skill_settings, 0, sizeof(skill_settings));
    b_observer_mode = FALSE;
