@@ -73,13 +73,20 @@ test_bot_navigate: $(BOT_NAVIGATE_OBJS)
 test_bot_skill: test_bot_skill.o
 	${CXX} -o $@ test_bot_skill.o
 
+# Bot sound tests
+BOT_SOUND_OBJS = engine_mock.o test_bot_sound.o \
+	bot_sound.o util.o safe_snprintf.o random_num.o
+
+test_bot_sound: $(BOT_SOUND_OBJS)
+	${CXX} -o $@ $(BOT_SOUND_OBJS) -lm
+
 # Waypoint tests (waypoint.cpp is #included in test file, not linked separately)
 WAYPOINT_OBJS = engine_mock.o test_waypoint.o bot_weapons.o util.o safe_snprintf.o random_num.o
 
 test_waypoint: $(WAYPOINT_OBJS) $(ZLIB_LIB)
 	${CXX} -o $@ $(WAYPOINT_OBJS) $(ZLIB_LIB) -lm
 
-ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_waypoint test_bot_navigate test_bot_skill
+ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_waypoint test_bot_navigate test_bot_skill test_bot_sound
 
 all: $(ALL_TESTS)
 
@@ -96,6 +103,7 @@ run: $(ALL_TESTS)
 	./test_waypoint
 	./test_bot_navigate
 	./test_bot_skill
+	./test_bot_sound
 
 VALGRIND = valgrind --leak-check=full --error-exitcode=1
 
@@ -112,6 +120,7 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_waypoint
 	$(VALGRIND) ./test_bot_navigate
 	$(VALGRIND) ./test_bot_skill
+	$(VALGRIND) ./test_bot_sound
 
 clean:
 	rm -f $(ALL_TESTS) *.o
