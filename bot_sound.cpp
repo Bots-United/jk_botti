@@ -48,6 +48,7 @@ void SaveSound(edict_t * pEdict, const Vector & origin, int volume, int channel,
          if(pEdict->v.owner == bots[i].pEdict)
          {
             bot_index = i;
+            min_distance = 0.0f;
             break;
          }
 

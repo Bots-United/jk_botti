@@ -107,7 +107,7 @@ int m_spriteTexture = 0;
 __attribute__((weak)) int num_waypoints = 0;
 __attribute__((weak)) WAYPOINT waypoints[MAX_WAYPOINTS];
 bot_skill_settings_t skill_settings[5];
-CSoundEnt *pSoundEnt = NULL;
+__attribute__((weak)) CSoundEnt *pSoundEnt = NULL;
 
 // ============================================================
 // Engine function stubs
@@ -115,13 +115,16 @@ CSoundEnt *pSoundEnt = NULL;
 
 static int mock_pfnEntOffsetOfPEntity(const edict_t *pEdict)
 {
-   // Return 0 for NULL (drives FNullEnt), non-zero for valid
-   return (int)(long)pEdict;
+   // Return byte offset from mock_edicts[0], so worldspawn (edict 0) returns 0.
+   // This makes FNullEnt(NULL) and FNullEnt(&mock_edicts[0]) both return TRUE,
+   // matching real engine behavior.
+   if (!pEdict) return 0;
+   return (int)((const char *)pEdict - (const char *)&mock_edicts[0]);
 }
 
 static edict_t *mock_pfnPEntityOfEntOffset(int offset)
 {
-   return (edict_t *)(long)offset;
+   return (edict_t *)((char *)&mock_edicts[0] + offset);
 }
 
 static int mock_pfnIndexOfEdict(const edict_t *pEdict)
@@ -343,6 +346,11 @@ static float mock_pfnRandomFloat(float low, float high)
    return low;
 }
 
+static void mock_pfnParticleEffect(const float *org, const float *dir, float color, float count)
+{
+   (void)org; (void)dir; (void)color; (void)count;
+}
+
 static float mock_pfnCVarGetFloat(const char *szVarName)
 {
    if (strcmp(szVarName, "bm_gluon_mod") == 0)
@@ -405,10 +413,21 @@ __attribute__((weak)) void BotLookForDrop(bot_t &pBot) { (void)pBot; }
 __attribute__((weak)) void BotRemoveEnemy(bot_t &pBot, qboolean b_keep_tracking)
 { (void)pBot; (void)b_keep_tracking; }
 
-// bot_sound.cpp
-int CSoundEnt::ActiveList(void) { return SOUNDLIST_EMPTY; }
-CSound *CSoundEnt::SoundPointerForIndex(int iIndex) { (void)iIndex; return NULL; }
-void SaveSound(edict_t *pEdict, const Vector &origin, int volume, int channel, float flDuration)
+// bot_sound.cpp (weak: overridden by test_bot_sound.cpp which links bot_sound.o)
+__attribute__((weak)) void CSound::Clear(void) {}
+__attribute__((weak)) void CSound::Reset(void) {}
+__attribute__((weak)) void CSoundEnt::Initialize(void) {}
+__attribute__((weak)) int CSoundEnt::ActiveList(void) { return SOUNDLIST_EMPTY; }
+__attribute__((weak)) int CSoundEnt::FreeList(void) { return SOUNDLIST_EMPTY; }
+__attribute__((weak)) CSound *CSoundEnt::SoundPointerForIndex(int iIndex) { (void)iIndex; return NULL; }
+__attribute__((weak)) void CSoundEnt::InsertSound(edict_t *pEdict, int channel, const Vector &vecOrigin,
+   int iVolume, float flDuration, int iBotOwner)
+{ (void)pEdict; (void)channel; (void)vecOrigin; (void)iVolume; (void)flDuration; (void)iBotOwner; }
+__attribute__((weak)) void CSoundEnt::FreeSound(int iSound, int iPrevious) { (void)iSound; (void)iPrevious; }
+__attribute__((weak)) CSound *CSoundEnt::GetEdictChannelSound(edict_t *pEdict, int iChannel)
+{ (void)pEdict; (void)iChannel; return NULL; }
+__attribute__((weak)) int CSoundEnt::ClientSoundIndex(edict_t *pClient) { (void)pClient; return -1; }
+__attribute__((weak)) void SaveSound(edict_t *pEdict, const Vector &origin, int volume, int channel, float flDuration)
 { (void)pEdict; (void)origin; (void)volume; (void)channel; (void)flDuration; }
 
 // commands.cpp
@@ -539,6 +558,11 @@ void mock_reset(void)
    g_engfuncs.pfnRandomLong = mock_pfnRandomLong;
    g_engfuncs.pfnRandomFloat = mock_pfnRandomFloat;
    g_engfuncs.pfnCVarGetFloat = mock_pfnCVarGetFloat;
+   g_engfuncs.pfnParticleEffect = mock_pfnParticleEffect;
+
+   // Re-initialize sound entity if present
+   if (pSoundEnt)
+      pSoundEnt->Initialize();
 
    // Initialize metamod util function pointers
    memset(&mock_mutil_funcs, 0, sizeof(mock_mutil_funcs));
