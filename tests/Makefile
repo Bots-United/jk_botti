@@ -55,13 +55,20 @@ NEURALNET_OBJS = test_neuralnet.o neuralnet.o geneticalg.o random_num.o
 test_neuralnet: $(NEURALNET_OBJS)
 	${CXX} -o $@ $(NEURALNET_OBJS) -lm
 
+# Bot weapons tests
+BOT_WEAPONS_OBJS = engine_mock.o test_bot_weapons.o \
+	bot_weapons.o util.o safe_snprintf.o random_num.o
+
+test_bot_weapons: $(BOT_WEAPONS_OBJS)
+	${CXX} -o $@ $(BOT_WEAPONS_OBJS) -lm
+
 # Waypoint tests (waypoint.cpp is #included in test file, not linked separately)
 WAYPOINT_OBJS = engine_mock.o test_waypoint.o bot_weapons.o util.o safe_snprintf.o random_num.o
 
 test_waypoint: $(WAYPOINT_OBJS) $(ZLIB_LIB)
 	${CXX} -o $@ $(WAYPOINT_OBJS) $(ZLIB_LIB) -lm
 
-ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_waypoint
+ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_waypoint
 
 all: $(ALL_TESTS)
 
@@ -69,6 +76,7 @@ run: $(ALL_TESTS)
 	./test_name_sanitize
 	./test_posdata_list
 	./test_bot_combat
+	./test_bot_weapons
 	./test_util
 	./test_bot_chat
 	./test_safe_snprintf
@@ -82,6 +90,7 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_name_sanitize
 	$(VALGRIND) ./test_posdata_list
 	$(VALGRIND) ./test_bot_combat
+	$(VALGRIND) ./test_bot_weapons
 	$(VALGRIND) ./test_util
 	$(VALGRIND) ./test_bot_chat
 	$(VALGRIND) ./test_safe_snprintf

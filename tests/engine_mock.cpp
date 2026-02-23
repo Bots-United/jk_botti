@@ -27,6 +27,12 @@
 #include "engine_mock.h"
 
 // ============================================================
+// Mock cvar values
+// ============================================================
+
+float mock_cvar_bm_gluon_mod_val = 0.0f;
+
+// ============================================================
 // Mock edict pool
 // ============================================================
 
@@ -290,6 +296,13 @@ static float mock_pfnRandomFloat(float low, float high)
    return low;
 }
 
+static float mock_pfnCVarGetFloat(const char *szVarName)
+{
+   if (strcmp(szVarName, "bm_gluon_mod") == 0)
+      return mock_cvar_bm_gluon_mod_val;
+   return 0.0f;
+}
+
 // Metamod util stubs
 static int mock_mutil_GetUserMsgID(plid_t plid, const char *msgname, int *size)
 {
@@ -403,6 +416,9 @@ void mock_reset(void)
    mock_trace_hull_fn = NULL;
    mock_trace_line_fn = NULL;
 
+   // Clear mock cvar values
+   mock_cvar_bm_gluon_mod_val = 0.0f;
+
    // Clear extern globals
    memset(bots, 0, sizeof(bots));
    memset(players, 0, sizeof(players));
@@ -454,6 +470,7 @@ void mock_reset(void)
    g_engfuncs.pfnGetPlayerAuthId = mock_pfnGetPlayerAuthId;
    g_engfuncs.pfnRandomLong = mock_pfnRandomLong;
    g_engfuncs.pfnRandomFloat = mock_pfnRandomFloat;
+   g_engfuncs.pfnCVarGetFloat = mock_pfnCVarGetFloat;
 
    // Initialize metamod util function pointers
    memset(&mock_mutil_funcs, 0, sizeof(mock_mutil_funcs));
