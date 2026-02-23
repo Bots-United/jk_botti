@@ -434,6 +434,7 @@ static int test_can_jump_up_blocked_normal_clear_duck(void)
    qboolean result = BotCanJumpUp(bot, &bDuckJump);
 
    ASSERT_INT(result, TRUE);
+   ASSERT_INT(bDuckJump, TRUE);
    PASS();
    return 0;
 }

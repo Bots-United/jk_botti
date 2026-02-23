@@ -1799,6 +1799,9 @@ qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump)
    if (tr.flFraction < 1.0f)
       return FALSE;
 
+   if (check_duck)
+      *bDuckJump = TRUE;
+
    return TRUE;
 }
 
