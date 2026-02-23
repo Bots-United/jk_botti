@@ -1576,7 +1576,7 @@ static int test_WaypointFixOldWaypoints(void)
    setup_waypoint(0, Vector(100, 100, 50), W_FL_CROUCH, 0);
    {
       float old_z = waypoints[0].origin.z;
-      qboolean changed = WaypointFixOldWaypoints();
+      WaypointFixOldWaypoints();
       // Crouch flag should remain because trace up was blocked
       // But midair check may also trigger, so check if crouch still present or deleted
       // The midair check traces down from the crouch waypoint's position
@@ -1668,7 +1668,7 @@ static int test_WaypointFixOldWaypoints(void)
    mock_point_contents_fn = [](const float *) -> int { return CONTENTS_WATER; };
    setup_waypoint(0, Vector(100, 100, 50), 0, 0);
    {
-      qboolean changed = WaypointFixOldWaypoints();
+      WaypointFixOldWaypoints();
       // Water waypoint, should NOT be deleted
       ASSERT_TRUE(!(waypoints[0].flags & W_FL_DELETED));
    }
@@ -1717,7 +1717,7 @@ static int test_WaypointFixOldWaypoints(void)
    setup_waypoint(1, Vector(100, 0, 0), W_FL_DELETED, 0);
    setup_waypoint(2, Vector(200, 0, 0), 0, 0);
    {
-      qboolean changed = WaypointFixOldWaypoints();
+      WaypointFixOldWaypoints();
       // Aiming and deleted should not be touched by path check
       ASSERT_INT(waypoints[0].flags, W_FL_AIMING);
       ASSERT_TRUE(waypoints[1].flags & W_FL_DELETED);
@@ -2079,8 +2079,6 @@ static int test_WaypointAddLift(void)
 
       Vector start(0, 0, 0);
       Vector end(0, 0, 200);
-      Vector orig_origin = pent->v.origin;
-
       WaypointAddLift(pent, start, end);
 
       // SET_ORIGIN is called with end then start, so origin should be restored

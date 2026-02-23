@@ -55,6 +55,12 @@ NEURALNET_OBJS = test_neuralnet.o neuralnet.o geneticalg.o random_num.o
 test_neuralnet: $(NEURALNET_OBJS)
 	${CXX} -o $@ $(NEURALNET_OBJS) -lm
 
+# Genetic algorithm unit tests (geneticalg.cpp is #included in test file)
+GENETICALG_OBJS = test_geneticalg.o random_num.o
+
+test_geneticalg: $(GENETICALG_OBJS)
+	${CXX} -o $@ $(GENETICALG_OBJS) -lm
+
 # Bot weapons tests
 BOT_WEAPONS_OBJS = engine_mock.o test_bot_weapons.o \
 	bot_weapons.o util.o safe_snprintf.o random_num.o
@@ -86,7 +92,7 @@ WAYPOINT_OBJS = engine_mock.o test_waypoint.o bot_weapons.o util.o safe_snprintf
 test_waypoint: $(WAYPOINT_OBJS) $(ZLIB_LIB)
 	${CXX} -o $@ $(WAYPOINT_OBJS) $(ZLIB_LIB) -lm
 
-ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_waypoint test_bot_navigate test_bot_skill test_bot_sound
+ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_geneticalg test_waypoint test_bot_navigate test_bot_skill test_bot_sound
 
 all: $(ALL_TESTS)
 
@@ -100,6 +106,7 @@ run: $(ALL_TESTS)
 	./test_safe_snprintf
 	./test_random_num
 	./test_neuralnet
+	./test_geneticalg
 	./test_waypoint
 	./test_bot_navigate
 	./test_bot_skill
@@ -117,6 +124,7 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_safe_snprintf
 	$(VALGRIND) ./test_random_num
 	$(VALGRIND) ./test_neuralnet
+	$(VALGRIND) ./test_geneticalg
 	$(VALGRIND) ./test_waypoint
 	$(VALGRIND) ./test_bot_navigate
 	$(VALGRIND) ./test_bot_skill
