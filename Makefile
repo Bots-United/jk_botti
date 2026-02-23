@@ -90,6 +90,9 @@ ZLIB_LIB = $(OBJDIR)/zlib/libz.a
 ${TARGET}${DLLEND}: $(ZLIB_LIB) ${OBJ}
 	${CC} -o $@ ${OBJ} $(ZLIB_LIB) ${LINKFLAGS}
 	cp $@ addons/jk_botti/dlls/
+ifneq ($(OSTYPE),win32)
+	ln -sf ${TARGET}${DLLEND} addons/jk_botti/dlls/${TARGET}.so
+endif
 
 $(ZLIB_LIB): | $(OBJDIR)/zlib
 	(cd $(OBJDIR)/zlib; AR="${AR}" ARFLAGS="" RANLIB="${RANLIB}" CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS}" $(CURDIR)/zlib/configure --static; $(MAKE) libz.a CC="${CC} ${OPTFLAGS} ${ARCHFLAG} ${ZLIB_OSFLAGS}" AR="${AR}" ARFLAGS="" RANLIB="${RANLIB}")

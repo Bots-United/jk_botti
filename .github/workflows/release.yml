@@ -78,6 +78,10 @@ jobs:
         with:
           name: windows-binary
           path: addons/jk_botti/dlls
+      - name: Prepare release directory
+        run: |
+          rm -f addons/jk_botti/dlls/.empty_dir
+          ln -sf jk_botti_mm_i386.so addons/jk_botti/dlls/jk_botti_mm.so
       - name: Create release archive
         run: tar c addons | xz > jk_botti-${{ steps.get_version.outputs.VERSION }}-release.tar.xz
       - name: Create GitHub release
