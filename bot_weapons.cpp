@@ -552,20 +552,20 @@ ammo_low_t BotSecondaryAmmoLow(bot_t &pBot, const bot_weapon_select_t &select)
 
    if(select.secondary_use_primary_ammo)
    {
-      // this weapon doesn't use ammo
-      if(weapon_defs[weapon_index].iAmmo2 == -1)
-         return(AMMO_NO);
-
-      if(pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo2] <= select.low_ammo_secondary)
-         return(AMMO_LOW);
-   }
-   else
-   {
-      // this weapon doesn't use ammo
+      // secondary fire uses primary ammo, check iAmmo1
       if(weapon_defs[weapon_index].iAmmo1 == -1)
          return(AMMO_NO);
 
       if(pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] <= select.low_ammo_secondary)
+         return(AMMO_LOW);
+   }
+   else
+   {
+      // secondary fire uses its own ammo, check iAmmo2
+      if(weapon_defs[weapon_index].iAmmo2 == -1)
+         return(AMMO_NO);
+
+      if(pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo2] <= select.low_ammo_secondary)
          return(AMMO_LOW);
    }
 
