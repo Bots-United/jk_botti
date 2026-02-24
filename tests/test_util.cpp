@@ -1072,6 +1072,93 @@ static int test_null_terminate_buffer(void)
 }
 
 // ============================================================
+// bot_inline_funcs.h tests
+// ============================================================
+
+static int test_bot_inline_funcs(void)
+{
+   printf("bot_inline_funcs.h:\n");
+   mock_reset();
+
+   // --- UTIL_SelectItem ---
+   TEST("UTIL_SelectItem: no crash");
+   edict_t *e = mock_alloc_edict();
+   UTIL_SelectItem(e, "weapon_shotgun");
+   PASS();
+
+   // --- BotFixIdealPitch ---
+   TEST("BotFixIdealPitch: wraps 400 into [-180,180]");
+   e->v.idealpitch = 400.0f;
+   BotFixIdealPitch(e);
+   ASSERT_FLOAT(e->v.idealpitch, 40.0f);
+   PASS();
+
+   TEST("BotFixIdealPitch: wraps -540 to 180");
+   e->v.idealpitch = -540.0f;
+   BotFixIdealPitch(e);
+   ASSERT_FLOAT(e->v.idealpitch, 180.0f);
+   PASS();
+
+   // --- UTIL_ParticleEffect ---
+   TEST("UTIL_ParticleEffect: no crash");
+   UTIL_ParticleEffect(Vector(10, 20, 30), Vector(0, 0, 1), 5, 10);
+   PASS();
+
+   // --- UTIL_GetOrigin: non-BSP path (line 112) ---
+   TEST("UTIL_GetOrigin: non-BSP returns v.origin");
+   e->v.solid = SOLID_SLIDEBOX;
+   e->v.origin = Vector(11, 22, 33);
+   ASSERT_VEC(UTIL_GetOrigin(e), 11, 22, 33);
+   PASS();
+
+   // --- FIsClassname(const char*, edict_t*) reverse-arg overload ---
+   mock_reset();
+   edict_t *e2 = mock_alloc_edict();
+   mock_set_classname(e2, "func_breakable");
+
+   TEST("FIsClassname(name, edict): match");
+   ASSERT_TRUE(FIsClassname("func_breakable", e2) == TRUE);
+   PASS();
+
+   TEST("FIsClassname(name, edict): mismatch");
+   ASSERT_TRUE(FIsClassname("func_door", e2) == FALSE);
+   PASS();
+
+   // --- UTIL_FindEntityByClassname / UTIL_FindEntityByString ---
+   mock_reset();
+   edict_t *ent_a = mock_alloc_edict();
+   mock_set_classname(ent_a, "info_player_start");
+   ent_a->v.origin = Vector(100, 200, 300);
+
+   TEST("UTIL_FindEntityByClassname: found");
+   edict_t *found = UTIL_FindEntityByClassname(NULL, "info_player_start");
+   ASSERT_PTR_EQ(found, ent_a);
+   PASS();
+
+   TEST("UTIL_FindEntityByClassname: not found");
+   found = UTIL_FindEntityByClassname(NULL, "nonexistent_class");
+   ASSERT_PTR_NULL(found);
+   PASS();
+
+   // Also exercise UTIL_FindEntityByString directly with found + not-found paths
+   mock_reset();
+   edict_t *ent_b = mock_alloc_edict();
+   mock_set_classname(ent_b, "weapon_9mmAR");
+
+   TEST("UTIL_FindEntityByString: found path");
+   found = UTIL_FindEntityByString(NULL, "classname", "weapon_9mmAR");
+   ASSERT_PTR_EQ(found, ent_b);
+   PASS();
+
+   TEST("UTIL_FindEntityByString: not-found returns NULL");
+   found = UTIL_FindEntityByString(NULL, "classname", "weapon_nope");
+   ASSERT_PTR_NULL(found);
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
 // main
 // ============================================================
 
@@ -1112,6 +1199,9 @@ int main(void)
    fail |= test_get_time_since_respawn();
    fail |= test_build_filename_n();
    fail |= test_null_terminate_buffer();
+
+   // bot_inline_funcs.h coverage
+   fail |= test_bot_inline_funcs();
 
    printf("\n%d/%d tests passed.\n", tests_passed, tests_run);
    if (tests_passed == tests_run)
