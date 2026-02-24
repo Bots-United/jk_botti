@@ -321,6 +321,14 @@ static int test_BotDropCharacter(void)
    ASSERT_INT((int)strlen(out), 1);
    PASS();
 
+   TEST("retry loop with %%-heavy string (no valid drop)");
+   // All positions 1-20 are either '%' or preceded by '%', forcing
+   // the retry loop to exhaust (20 iterations), no drop performed
+   fast_random_seed(123);
+   BotDropCharacter("a%b%c%d%e%f%g%h%i%j%k", out, sizeof(out));
+   ASSERT_INT((int)strlen(out), 21);  // no drop: retry exhausted
+   PASS();
+
    return 0;
 }
 
@@ -362,6 +370,13 @@ static int test_BotSwapCharacter(void)
    TEST("1-char string -> no change");
    BotSwapCharacter("x", out, sizeof(out));
    ASSERT_STR(out, "x");
+   PASS();
+
+   TEST("retry loop with non-alpha middle chars");
+   // All middle chars are digits (non-alpha), forcing retry loop
+   fast_random_seed(42);
+   BotSwapCharacter("a123456789b", out, sizeof(out));
+   ASSERT_INT((int)strlen(out), 11);
    PASS();
 
    return 0;
@@ -626,6 +641,22 @@ static int test_BotChatFillInName(void)
    ASSERT_INT((int)strlen(small), 9);
    PASS();
 
+   TEST("%%r retry when only player matches chat_name");
+   reset_chat_state();
+   setup_mock_player(1, "Victim");
+   // Only one player "Victim" which matches chat_name; retry loop exhausts, uses anyway
+   BotChatFillInName(out, sizeof(out), "ask %r", "Victim", "Bot");
+   ASSERT_TRUE(strstr(out, "Victim") != NULL);
+   PASS();
+
+   TEST("%%r retry when only player matches bot_name");
+   reset_chat_state();
+   setup_mock_player(1, "TestBot");
+   // Only one player "TestBot" which matches bot_name; retry loop exhausts
+   BotChatFillInName(out, sizeof(out), "ask %r", "Other", "TestBot");
+   ASSERT_TRUE(strstr(out, "TestBot") != NULL);
+   PASS();
+
    return 0;
 }
 
@@ -773,6 +804,38 @@ static int test_LoadBotChat(void)
    remove_chat_file();
    PASS();
 
+   TEST("! prefix in taunt/whine/endgame sections");
+   reset_chat_state();
+   create_chat_file(
+      "[bot_taunt]\n"
+      "!no modify taunt\n"
+      "modify taunt\n"
+      "[bot_whine]\n"
+      "!no modify whine\n"
+      "modify whine\n"
+      "[bot_endgame]\n"
+      "!no modify endgame\n"
+      "modify endgame\n"
+   );
+   LoadBotChat();
+   ASSERT_INT(bot_taunt_count, 2);
+   ASSERT_STR(bot_taunt[0].text, "no modify taunt");
+   ASSERT_INT(bot_taunt[0].can_modify, FALSE);
+   ASSERT_STR(bot_taunt[1].text, "modify taunt");
+   ASSERT_INT(bot_taunt[1].can_modify, TRUE);
+   ASSERT_INT(bot_whine_count, 2);
+   ASSERT_STR(bot_whine[0].text, "no modify whine");
+   ASSERT_INT(bot_whine[0].can_modify, FALSE);
+   ASSERT_STR(bot_whine[1].text, "modify whine");
+   ASSERT_INT(bot_whine[1].can_modify, TRUE);
+   ASSERT_INT(bot_endgame_count, 2);
+   ASSERT_STR(bot_endgame[0].text, "no modify endgame");
+   ASSERT_INT(bot_endgame[0].can_modify, FALSE);
+   ASSERT_STR(bot_endgame[1].text, "modify endgame");
+   ASSERT_INT(bot_endgame[1].can_modify, TRUE);
+   remove_chat_file();
+   PASS();
+
    return 0;
 }
 
@@ -883,6 +946,30 @@ static int test_BotChatTaunt(void)
    bot_taunt[0].can_modify = TRUE;
    BotChatTaunt(bot, victim);
    ASSERT_STR(bot.bot_say_msg, "got you");
+   PASS();
+
+   TEST("recent message deduplication loop");
+   reset_chat_state();
+   bot_edict = &mock_edicts[1];
+   victim = &mock_edicts[2];
+   mock_set_netname(victim, "Victim");
+   // Load 6 taunt messages, all can_modify=FALSE
+   bot_taunt_count = 6;
+   for (int i = 0; i < 6; i++)
+   {
+      char msg[16];
+      snprintf(msg, sizeof(msg), "taunt%d", i);
+      safe_strcopy(bot_taunt[i].text, sizeof(bot_taunt[i].text), msg);
+      bot_taunt[i].can_modify = FALSE;
+   }
+   // Call BotChatTaunt 7 times to fill recent array (5 slots) and trigger dedup
+   for (int i = 0; i < 7; i++)
+   {
+      fast_random_seed(i * 31 + 7);
+      setup_bot_for_chat_test(bot, bot_edict);
+      BotChatTaunt(bot, victim);
+      ASSERT_INT(bot.b_bot_say, TRUE);
+   }
    PASS();
 
    return 0;
@@ -1010,6 +1097,50 @@ static int test_BotChatWhine(void)
    ASSERT_STR(bot.bot_say_msg, "curse NULL");
    PASS();
 
+   TEST("can_modify=TRUE with lowercase");
+   reset_chat_state();
+   gpGlobals->time = 100.0;
+   bot_chat_lower_percent = 100;
+   bot_edict = &mock_edicts[1];
+   setup_bot_for_chat_test(bot, bot_edict);
+   killer = &mock_edicts[3];
+   mock_set_netname(killer, "Killer");
+   bot.killer_edict = killer;
+   bot.f_bot_spawn_time = 0;
+   bot_whine_count = 1;
+   safe_strcopy(bot_whine[0].text, sizeof(bot_whine[0].text), "WHY ME");
+   bot_whine[0].can_modify = TRUE;
+   BotChatWhine(bot);
+   ASSERT_INT(bot.b_bot_say, TRUE);
+   ASSERT_STR(bot.bot_say_msg, "why me");
+   PASS();
+
+   TEST("recent message deduplication loop");
+   reset_chat_state();
+   gpGlobals->time = 100.0;
+   bot_edict = &mock_edicts[1];
+   killer = &mock_edicts[3];
+   mock_set_netname(killer, "Killer");
+   // Load 6 whine messages
+   bot_whine_count = 6;
+   for (int i = 0; i < 6; i++)
+   {
+      char msg[16];
+      snprintf(msg, sizeof(msg), "whine%d", i);
+      safe_strcopy(bot_whine[i].text, sizeof(bot_whine[i].text), msg);
+      bot_whine[i].can_modify = FALSE;
+   }
+   for (int i = 0; i < 7; i++)
+   {
+      fast_random_seed(i * 37 + 11);
+      setup_bot_for_chat_test(bot, bot_edict);
+      bot.killer_edict = killer;
+      bot.f_bot_spawn_time = 0;
+      BotChatWhine(bot);
+      ASSERT_INT(bot.b_bot_say, TRUE);
+   }
+   PASS();
+
    return 0;
 }
 
@@ -1084,6 +1215,42 @@ static int test_BotChatTalk(void)
    ASSERT_TRUE(bot.f_bot_chat_time > gpGlobals->time);
    PASS();
 
+   TEST("can_modify=TRUE with lowercase");
+   reset_chat_state();
+   bot_chat_lower_percent = 100;
+   bot_edict = &mock_edicts[1];
+   setup_bot_for_chat_test(bot, bot_edict);
+   bot_chat_count = 1;
+   safe_strcopy(bot_chat[0].text, sizeof(bot_chat[0].text), "HELLO WORLD");
+   bot_chat[0].can_modify = TRUE;
+   BotChatTalk(bot);
+   ASSERT_INT(bot.b_bot_say, TRUE);
+   ASSERT_STR(bot.bot_say_msg, "hello world");
+   PASS();
+
+   TEST("recent message deduplication loop");
+   reset_chat_state();
+   bot_edict = &mock_edicts[1];
+   // Load 6 chat messages
+   bot_chat_count = 6;
+   for (int i = 0; i < 6; i++)
+   {
+      char msg[16];
+      snprintf(msg, sizeof(msg), "chat%d", i);
+      safe_strcopy(bot_chat[i].text, sizeof(bot_chat[i].text), msg);
+      bot_chat[i].can_modify = FALSE;
+   }
+   for (int i = 0; i < 7; i++)
+   {
+      fast_random_seed(i * 41 + 13);
+      setup_bot_for_chat_test(bot, bot_edict);
+      // Advance time past 30s cooldown for each call
+      gpGlobals->time += 31.0;
+      BotChatTalk(bot);
+      ASSERT_INT(bot.b_bot_say, TRUE);
+   }
+   PASS();
+
    return 0;
 }
 
@@ -1144,6 +1311,40 @@ static int test_BotChatEndGame(void)
    // BotChatEndGame does NOT check b_bot_say, so it overwrites
    ASSERT_INT(bot.b_bot_say, TRUE);
    ASSERT_STR(bot.bot_say_msg, "gg");
+   PASS();
+
+   TEST("can_modify=TRUE with lowercase");
+   reset_chat_state();
+   bot_chat_lower_percent = 100;
+   bot_edict = &mock_edicts[1];
+   setup_bot_for_chat_test(bot, bot_edict);
+   bot_endgame_count = 1;
+   safe_strcopy(bot_endgame[0].text, sizeof(bot_endgame[0].text), "GOOD GAME");
+   bot_endgame[0].can_modify = TRUE;
+   BotChatEndGame(bot);
+   ASSERT_INT(bot.b_bot_say, TRUE);
+   ASSERT_STR(bot.bot_say_msg, "good game");
+   PASS();
+
+   TEST("recent message deduplication loop");
+   reset_chat_state();
+   bot_edict = &mock_edicts[1];
+   // Load 6 endgame messages
+   bot_endgame_count = 6;
+   for (int i = 0; i < 6; i++)
+   {
+      char msg[16];
+      snprintf(msg, sizeof(msg), "endgame%d", i);
+      safe_strcopy(bot_endgame[i].text, sizeof(bot_endgame[i].text), msg);
+      bot_endgame[i].can_modify = FALSE;
+   }
+   for (int i = 0; i < 7; i++)
+   {
+      fast_random_seed(i * 43 + 17);
+      setup_bot_for_chat_test(bot, bot_edict);
+      BotChatEndGame(bot);
+      ASSERT_INT(bot.b_bot_say, TRUE);
+   }
    PASS();
 
    return 0;
