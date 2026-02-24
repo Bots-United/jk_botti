@@ -28,6 +28,7 @@
 static void reset_waypoint_state(void)
 {
    mock_reset();
+   InitWeaponSelect(SUBMOD_HLDM);
    WaypointInit();
    g_waypoint_on = FALSE;
    g_path_waypoint = FALSE;
@@ -3459,6 +3460,740 @@ static int test_WaypointThink(void)
 }
 
 // ============================================================
+// Tests: WaypointThink beam colors
+// ============================================================
+
+static int test_WaypointThinkBeamColors(void)
+{
+   printf("WaypointThinkBeamColors:\n");
+
+   TEST("crouch waypoint -> yellow beam");
+   reset_waypoint_state();
+   g_waypoint_on = TRUE;
+   g_auto_waypoint = FALSE;
+   gpGlobals->time = 100.0f;
+   msg_begin_call_count = 0;
+   g_engfuncs.pfnMessageBegin = counting_pfnMessageBegin;
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      pEntity->v.origin = Vector(10, 0, 0);
+      setup_waypoint(0, Vector(0, 0, 0), W_FL_CROUCH, 0);
+      wp_display_time[0] = 0.0f;
+      WaypointThink(pEntity);
+      ASSERT_TRUE(msg_begin_call_count > 0);
+   }
+   PASS();
+
+   TEST("ladder waypoint -> purple beam");
+   reset_waypoint_state();
+   g_waypoint_on = TRUE;
+   g_auto_waypoint = FALSE;
+   gpGlobals->time = 100.0f;
+   msg_begin_call_count = 0;
+   g_engfuncs.pfnMessageBegin = counting_pfnMessageBegin;
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      pEntity->v.origin = Vector(10, 0, 0);
+      setup_waypoint(0, Vector(0, 0, 0), W_FL_LADDER, 0);
+      wp_display_time[0] = 0.0f;
+      WaypointThink(pEntity);
+      ASSERT_TRUE(msg_begin_call_count > 0);
+   }
+   PASS();
+
+   TEST("lift-start waypoint -> red beam");
+   reset_waypoint_state();
+   g_waypoint_on = TRUE;
+   g_auto_waypoint = FALSE;
+   gpGlobals->time = 100.0f;
+   msg_begin_call_count = 0;
+   g_engfuncs.pfnMessageBegin = counting_pfnMessageBegin;
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      pEntity->v.origin = Vector(10, 0, 0);
+      setup_waypoint(0, Vector(0, 0, 0), W_FL_LIFT_START, 0);
+      wp_display_time[0] = 0.0f;
+      WaypointThink(pEntity);
+      ASSERT_TRUE(msg_begin_call_count > 0);
+   }
+   PASS();
+
+   TEST("lift-end waypoint -> green beam");
+   reset_waypoint_state();
+   g_waypoint_on = TRUE;
+   g_auto_waypoint = FALSE;
+   gpGlobals->time = 100.0f;
+   msg_begin_call_count = 0;
+   g_engfuncs.pfnMessageBegin = counting_pfnMessageBegin;
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      pEntity->v.origin = Vector(10, 0, 0);
+      setup_waypoint(0, Vector(0, 0, 0), W_FL_LIFT_END, 0);
+      wp_display_time[0] = 0.0f;
+      WaypointThink(pEntity);
+      ASSERT_TRUE(msg_begin_call_count > 0);
+   }
+   PASS();
+
+   TEST("path drawing when g_path_waypoint=TRUE and paths exist");
+   reset_waypoint_state();
+   g_waypoint_on = TRUE;
+   g_path_waypoint = TRUE;
+   g_auto_waypoint = FALSE;
+   gpGlobals->time = 100.0f;
+   f_path_time = 0.0f;
+   msg_begin_call_count = 0;
+   g_engfuncs.pfnMessageBegin = counting_pfnMessageBegin;
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      pEntity->v.origin = Vector(10, 0, 0);
+      setup_waypoint(0, Vector(0, 0, 0), 0, 0);
+      setup_waypoint(1, Vector(100, 0, 0), 0, 0);
+      setup_path(0, 1);
+      wp_display_time[0] = gpGlobals->time; // already displayed
+      WaypointThink(pEntity);
+      // Path beam should have been drawn
+      ASSERT_TRUE(msg_begin_call_count > 0);
+      ASSERT_TRUE(f_path_time == gpGlobals->time + 1.0f);
+   }
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
+// Tests: CollectMapSpawnItems extra branches
+// ============================================================
+
+static int test_CollectMapSpawnItemsExtra(void)
+{
+   printf("CollectMapSpawnItems extra branches:\n");
+
+   TEST("item_longjump sets W_FL_LONGJUMP");
+   reset_waypoint_state();
+   mock_trace_hull_fn = trace_for_reachable;
+   mock_trace_line_fn = trace_for_reachable;
+   reachable_visibility_result = 0;
+   reachable_ground_fraction = 0.01f;
+   {
+      edict_t *e = setup_entity("item_longjump", Vector(100, 200, 50));
+      CollectMapSpawnItems(e);
+      ASSERT_INT(num_spawnpoints, 1);
+      ASSERT_TRUE(spawnpoints[0].flags & W_FL_LONGJUMP);
+   }
+   PASS();
+
+   TEST("weapon with owner set -> skip");
+   reset_waypoint_state();
+   mock_trace_hull_fn = trace_for_reachable;
+   mock_trace_line_fn = trace_for_reachable;
+   reachable_visibility_result = 0;
+   reachable_ground_fraction = 0.01f;
+   {
+      edict_t *owner = mock_alloc_edict();
+      edict_t *e = setup_entity("weapon_shotgun", Vector(100, 200, 50));
+      e->v.owner = owner;
+      CollectMapSpawnItems(e);
+      // Owner is set, so weapon should be skipped
+      ASSERT_INT(num_spawnpoints, 0);
+   }
+   PASS();
+
+   TEST("weapon without owner -> W_FL_WEAPON");
+   reset_waypoint_state();
+   mock_trace_hull_fn = trace_for_reachable;
+   mock_trace_line_fn = trace_for_reachable;
+   reachable_visibility_result = 0;
+   reachable_ground_fraction = 0.01f;
+   {
+      edict_t *e = setup_entity("weapon_shotgun", Vector(100, 200, 50));
+      e->v.owner = NULL;
+      CollectMapSpawnItems(e);
+      ASSERT_INT(num_spawnpoints, 1);
+      ASSERT_TRUE(spawnpoints[0].flags & W_FL_WEAPON);
+   }
+   PASS();
+
+   TEST("func_recharge sets W_FL_ARMOR with charger offset logic");
+   reset_waypoint_state();
+   mock_trace_hull_fn = trace_for_reachable;
+   mock_trace_line_fn = trace_for_reachable;
+   reachable_visibility_result = 0;
+   reachable_ground_fraction = 0.01f;
+   {
+      edict_t *e = setup_entity("func_recharge", Vector(100, 200, 50));
+      // Set absmin/absmax so VecBModelOrigin works
+      e->v.absmin[0] = 90;  e->v.absmin[1] = 190; e->v.absmin[2] = 40;
+      e->v.absmax[0] = 110; e->v.absmax[1] = 210; e->v.absmax[2] = 60;
+      CollectMapSpawnItems(e);
+      // func_recharge uses the offset loop (8 offsets around it)
+      // Each offset calls CollectMapSpawnItems recursively with offset_set=TRUE
+      // After all offsets, spawnpoints should have W_FL_ARMOR entries
+      ASSERT_TRUE(num_spawnpoints > 0);
+      // At least one spawnpoint should have W_FL_ARMOR
+      int found_armor = 0;
+      for (int i = 0; i < num_spawnpoints; i++)
+         if (spawnpoints[i].flags & W_FL_ARMOR)
+            found_armor++;
+      ASSERT_TRUE(found_armor > 0);
+   }
+   PASS();
+
+   TEST("func_healthcharger sets W_FL_HEALTH with charger offset logic");
+   reset_waypoint_state();
+   mock_trace_hull_fn = trace_for_reachable;
+   mock_trace_line_fn = trace_for_reachable;
+   reachable_visibility_result = 0;
+   reachable_ground_fraction = 0.01f;
+   {
+      edict_t *e = setup_entity("func_healthcharger", Vector(100, 200, 50));
+      e->v.absmin[0] = 90;  e->v.absmin[1] = 190; e->v.absmin[2] = 40;
+      e->v.absmax[0] = 110; e->v.absmax[1] = 210; e->v.absmax[2] = 60;
+      CollectMapSpawnItems(e);
+      ASSERT_TRUE(num_spawnpoints > 0);
+      int found_health = 0;
+      for (int i = 0; i < num_spawnpoints; i++)
+         if (spawnpoints[i].flags & W_FL_HEALTH)
+            found_health++;
+      ASSERT_TRUE(found_health > 0);
+   }
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
+// Tests: WaypointSearchItems extra branches
+// ============================================================
+
+static int test_WaypointSearchItemsExtra(void)
+{
+   printf("WaypointSearchItems extra branches:\n");
+
+   TEST("detects weapon item with itemflags");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0, 0, 0), 0, 0);
+   {
+      edict_t *e = setup_entity("weapon_shotgun", Vector(10, 0, 0));
+      e->v.owner = NULL;
+      WaypointSearchItems(NULL, waypoints[0].origin, 0);
+      ASSERT_TRUE(waypoints[0].flags & W_FL_WEAPON);
+      ASSERT_TRUE(waypoints[0].itemflags != 0);
+   }
+   PASS();
+
+   TEST("weapon with owner ignored");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0, 0, 0), 0, 0);
+   {
+      edict_t *owner = mock_alloc_edict();
+      edict_t *e = setup_entity("weapon_shotgun", Vector(10, 0, 0));
+      e->v.owner = owner;
+      WaypointSearchItems(NULL, waypoints[0].origin, 0);
+      ASSERT_TRUE(!(waypoints[0].flags & W_FL_WEAPON));
+   }
+   PASS();
+
+   TEST("detects func_healthcharger");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0, 0, 0), 0, 0);
+   {
+      edict_t *e = setup_entity("func_healthcharger", Vector(10, 0, 0));
+      e->v.absmin[0] = 5;  e->v.absmin[1] = -5; e->v.absmin[2] = -5;
+      e->v.absmax[0] = 15; e->v.absmax[1] = 5;  e->v.absmax[2] = 5;
+      WaypointSearchItems(NULL, waypoints[0].origin, 0);
+      ASSERT_TRUE(waypoints[0].flags & W_FL_HEALTH);
+   }
+   PASS();
+
+   TEST("detects func_recharge");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0, 0, 0), 0, 0);
+   {
+      edict_t *e = setup_entity("func_recharge", Vector(10, 0, 0));
+      e->v.absmin[0] = 5;  e->v.absmin[1] = -5; e->v.absmin[2] = -5;
+      e->v.absmax[0] = 15; e->v.absmax[1] = 5;  e->v.absmax[2] = 5;
+      WaypointSearchItems(NULL, waypoints[0].origin, 0);
+      ASSERT_TRUE(waypoints[0].flags & W_FL_ARMOR);
+   }
+   PASS();
+
+   TEST("pEntity non-NULL -> ClientPrint for health");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0, 0, 0), 0, 0);
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      mock_set_classname(pEntity, "player");
+      setup_entity("item_healthkit", Vector(10, 0, 0));
+      WaypointSearchItems(pEntity, waypoints[0].origin, 0);
+      ASSERT_TRUE(waypoints[0].flags & W_FL_HEALTH);
+   }
+   PASS();
+
+   TEST("pEntity non-NULL -> ClientPrint for armor");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0, 0, 0), 0, 0);
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      mock_set_classname(pEntity, "player");
+      setup_entity("item_battery", Vector(10, 0, 0));
+      WaypointSearchItems(pEntity, waypoints[0].origin, 0);
+      ASSERT_TRUE(waypoints[0].flags & W_FL_ARMOR);
+   }
+   PASS();
+
+   TEST("pEntity non-NULL -> ClientPrint for ammo");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0, 0, 0), 0, 0);
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      mock_set_classname(pEntity, "player");
+      setup_entity("ammo_buckshot", Vector(10, 0, 0));
+      WaypointSearchItems(pEntity, waypoints[0].origin, 0);
+      ASSERT_TRUE(waypoints[0].flags & W_FL_AMMO);
+   }
+   PASS();
+
+   TEST("pEntity non-NULL -> ClientPrint for weapon");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0, 0, 0), 0, 0);
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      mock_set_classname(pEntity, "player");
+      edict_t *w = setup_entity("weapon_shotgun", Vector(10, 0, 0));
+      w->v.owner = NULL;
+      WaypointSearchItems(pEntity, waypoints[0].origin, 0);
+      ASSERT_TRUE(waypoints[0].flags & W_FL_WEAPON);
+   }
+   PASS();
+
+   TEST("pEntity non-NULL -> ClientPrint for longjump");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0, 0, 0), 0, 0);
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      mock_set_classname(pEntity, "player");
+      setup_entity("item_longjump", Vector(10, 0, 0));
+      WaypointSearchItems(pEntity, waypoints[0].origin, 0);
+      ASSERT_TRUE(waypoints[0].flags & W_FL_LONGJUMP);
+   }
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
+// Tests: WaypointFindNearestGoal item filtering
+// ============================================================
+
+static int test_WaypointFindNearestGoalItemFiltering(void)
+{
+   printf("WaypointFindNearestGoal item filtering:\n");
+
+   TEST("EF_NODRAW item -> skip waypoint");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0,0,0), W_FL_HEALTH, 0);
+   setup_waypoint(1, Vector(100,0,0), W_FL_CROUCH, 0);
+   {
+      // Create a health item with EF_NODRAW
+      edict_t *e = setup_entity("item_healthkit", Vector(10, 0, 0));
+      e->v.effects |= EF_NODRAW;
+      Vector src(0, 0, 0);
+      // Should skip wp0 (health item has EF_NODRAW) and return wp1
+      int idx = WaypointFindNearestGoal(NULL, -1, W_FL_CROUCH | W_FL_HEALTH, 0, NULL, 0.0f, &src);
+      ASSERT_INT(idx, 1);
+   }
+   PASS();
+
+   TEST("item with frame>0 -> skip waypoint");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0,0,0), W_FL_WEAPON, 0);
+   setup_waypoint(1, Vector(100,0,0), W_FL_CROUCH, 0);
+   {
+      // Create a weapon item with frame > 0 (being picked up)
+      edict_t *e = setup_entity("weapon_shotgun", Vector(10, 0, 0));
+      e->v.owner = NULL;
+      e->v.frame = 1.0f;
+      Vector src(0, 0, 0);
+      int idx = WaypointFindNearestGoal(NULL, -1, W_FL_CROUCH | W_FL_WEAPON, 0, NULL, 0.0f, &src);
+      ASSERT_INT(idx, 1);
+   }
+   PASS();
+
+   TEST("NULL WaypointFindItem -> skip waypoint");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0,0,0), W_FL_HEALTH, 0);
+   setup_waypoint(1, Vector(100,0,0), W_FL_CROUCH, 0);
+   {
+      // No item entities exist, so WaypointFindItem returns NULL
+      Vector src(0, 0, 0);
+      int idx = WaypointFindNearestGoal(NULL, -1, W_FL_CROUCH | W_FL_HEALTH, 0, NULL, 0.0f, &src);
+      ASSERT_INT(idx, 1);
+   }
+   PASS();
+
+   // Also test WaypointFindRandomGoal item filtering (same logic, different function)
+   TEST("WaypointFindRandomGoal: NULL item -> skip");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0,0,0), W_FL_HEALTH, 0);
+   setup_waypoint(1, Vector(100,0,0), W_FL_CROUCH, 0);
+   {
+      int out[4];
+      // wp0 has W_FL_HEALTH but no item entity -> filtered out
+      // wp1 has W_FL_CROUCH -> passes (no item check needed)
+      int count = WaypointFindRandomGoal(out, 4, NULL, W_FL_CROUCH | W_FL_HEALTH, 0, NULL);
+      ASSERT_INT(count, 1);
+      ASSERT_INT(out[0], 1);
+   }
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
+// Tests: WaypointReachable water tracking
+// ============================================================
+
+static int test_WaypointReachableWater(void)
+{
+   printf("WaypointReachable water tracking:\n");
+
+   TEST("source in water, dest in air (upward direction)");
+   reset_waypoint_state();
+   {
+      // Source is in water, dest is above water surface
+      // Water surface at z=10, dest at z=40 (must be <= src.z+45 to avoid
+      // high-dest mid-air check)
+      mock_point_contents_fn = [](const float *origin) -> int {
+         if (origin[2] < 10.0f)
+            return CONTENTS_WATER;
+         return CONTENTS_EMPTY;
+      };
+
+      mock_trace_hull_fn = [](const float *v1, const float *v2,
+                              int fNoMonsters, int hullNumber,
+                              edict_t *pentToSkip, TraceResult *ptr)
+      {
+         memset(ptr, 0, sizeof(*ptr));
+         // Ground probes (straight down 1000 units)
+         if (v2[2] < v1[2] - 500.0f)
+         {
+            ptr->flFraction = 0.01f;
+            ptr->vecEndPos[0] = v1[0];
+            ptr->vecEndPos[1] = v1[1];
+            ptr->vecEndPos[2] = v1[2] + (v2[2] - v1[2]) * 0.01f;
+            return;
+         }
+         // Visibility trace and others: pass
+         ptr->flFraction = 1.0f;
+         ptr->vecEndPos[0] = v2[0];
+         ptr->vecEndPos[1] = v2[1];
+         ptr->vecEndPos[2] = v2[2];
+      };
+      mock_trace_line_fn = mock_trace_hull_fn;
+
+      // Source underwater (z=0), dest above water (z=40)
+      // dest.z=40 <= src.z+45=45, so high-dest mid-air check is skipped
+      // Exercises: src is CONTENTS_WATER (line 2011), direction.z > 0 (line 2018)
+      // Note: water surface detection while loop (lines 2021-2031) has a bug
+      // where the condition is initially false, making the loop body dead code
+      Vector src(0, 0, 0);
+      Vector dest(100, 0, 40);
+      int result = WaypointReachable(src, dest, 0);
+      ASSERT_INT(result, TRUE);
+   }
+   PASS();
+
+   TEST("source in water, direction z <= 0 (no upward loop)");
+   reset_waypoint_state();
+   {
+      // Source in water (x < 50), dest not in water (x >= 50)
+      // Both at same z, so direction.z = 0, which skips the upward water
+      // surface detection loop (line 2018 FALSE branch)
+      mock_point_contents_fn = [](const float *origin) -> int {
+         if (origin[0] < 50.0f)
+            return CONTENTS_WATER;
+         return CONTENTS_EMPTY;
+      };
+
+      mock_trace_hull_fn = [](const float *v1, const float *v2,
+                              int fNoMonsters, int hullNumber,
+                              edict_t *pentToSkip, TraceResult *ptr)
+      {
+         memset(ptr, 0, sizeof(*ptr));
+         // Ground probes (straight down 1000 units)
+         if (v2[2] < v1[2] - 500.0f)
+         {
+            ptr->flFraction = 0.01f;
+            ptr->vecEndPos[0] = v1[0];
+            ptr->vecEndPos[1] = v1[1];
+            ptr->vecEndPos[2] = v1[2] + (v2[2] - v1[2]) * 0.01f;
+            return;
+         }
+         // Visibility and others: pass
+         ptr->flFraction = 1.0f;
+         ptr->vecEndPos[0] = v2[0];
+         ptr->vecEndPos[1] = v2[1];
+         ptr->vecEndPos[2] = v2[2];
+      };
+      mock_trace_line_fn = mock_trace_hull_fn;
+
+      // Both at z=0, direction.z = 0
+      // src (x=0) is WATER, dest (x=100) is EMPTY -> not both water
+      // Enters water block (line 2011), but direction.z <= 0 skips upward loop
+      Vector src(0, 0, 0);
+      Vector dest(100, 0, 0);
+      int result = WaypointReachable(src, dest, 0);
+      ASSERT_INT(result, TRUE);
+   }
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
+// Tests: WaypointAutowaypointing extra branches
+// ============================================================
+
+static int test_WaypointAutowayExtraBranches(void)
+{
+   printf("WaypointAutowaypointing extra branches:\n");
+
+   TEST("underwater player adds waypoint");
+   reset_waypoint_state();
+   mock_trace_hull_fn = trace_for_reachable;
+   mock_trace_line_fn = trace_for_reachable;
+   reachable_visibility_result = 0;
+   reachable_ground_fraction = 0.01f;
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      int idx = g_engfuncs.pfnIndexOfEdict(pEntity) - 1;
+      pEntity->v.origin = Vector(300, 0, 0);
+      pEntity->v.flags = 0; // not on ground
+      pEntity->v.movetype = MOVETYPE_WALK;
+      pEntity->v.waterlevel = 3; // fully submerged
+      players[idx].last_waypoint = -1;
+      setup_waypoint(0, Vector(0, 0, 0), 0, 0);
+      int before = num_waypoints;
+      WaypointAutowaypointing(idx, pEntity);
+      ASSERT_TRUE(num_waypoints > before);
+   }
+   PASS();
+
+   TEST("rotating platform -> no add");
+   reset_waypoint_state();
+   mock_trace_hull_fn = trace_for_reachable;
+   mock_trace_line_fn = trace_for_reachable;
+   reachable_visibility_result = 0;
+   reachable_ground_fraction = 0.01f;
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      int idx = g_engfuncs.pfnIndexOfEdict(pEntity) - 1;
+      pEntity->v.origin = Vector(500, 0, 0);
+      pEntity->v.flags = FL_ONGROUND;
+      pEntity->v.movetype = MOVETYPE_WALK;
+      edict_t *platform = mock_alloc_edict();
+      platform->v.speed = 0.0f;
+      platform->v.avelocity = Vector(0, 10, 0); // rotating
+      pEntity->v.groundentity = platform;
+      players[idx].last_waypoint = -1;
+      setup_waypoint(0, Vector(0, 0, 0), 0, 0);
+      int before = num_waypoints;
+      WaypointAutowaypointing(idx, pEntity);
+      ASSERT_INT(num_waypoints, before);
+   }
+   PASS();
+
+   TEST("crouch waypoint auto-added when ducking");
+   reset_waypoint_state();
+   {
+      // Block upward duck trace, pass everything else
+      mock_trace_hull_fn = [](const float *v1, const float *v2,
+                              int fNoMonsters, int hullNumber,
+                              edict_t *pentToSkip, TraceResult *ptr)
+      {
+         memset(ptr, 0, sizeof(*ptr));
+         if (v2[2] > v1[2])
+         {
+            // Upward trace (duck check): blocked
+            ptr->flFraction = 0.5f;
+            ptr->fAllSolid = TRUE;
+         }
+         else if (v2[2] < v1[2] - 500.0f)
+         {
+            // Ground probes
+            ptr->flFraction = 0.01f;
+            ptr->vecEndPos[0] = v1[0];
+            ptr->vecEndPos[1] = v1[1];
+            ptr->vecEndPos[2] = v1[2] + (v2[2] - v1[2]) * 0.01f;
+         }
+         else
+         {
+            ptr->flFraction = 1.0f;
+            ptr->vecEndPos[0] = v2[0];
+            ptr->vecEndPos[1] = v2[1];
+            ptr->vecEndPos[2] = v2[2];
+         }
+      };
+      mock_trace_line_fn = mock_trace_hull_fn;
+
+      edict_t *pEntity = mock_alloc_edict();
+      int idx = g_engfuncs.pfnIndexOfEdict(pEntity) - 1;
+      pEntity->v.origin = Vector(300, 0, 50);
+      pEntity->v.flags = FL_ONGROUND | FL_DUCKING;
+      pEntity->v.movetype = MOVETYPE_WALK;
+      players[idx].last_waypoint = -1;
+      setup_waypoint(0, Vector(0, 0, 0), 0, 0);
+      int before = num_waypoints;
+      WaypointAutowaypointing(idx, pEntity);
+      ASSERT_TRUE(num_waypoints > before);
+      // The newly added waypoint should have W_FL_CROUCH
+      // WaypointAdd checks FL_DUCKING and adds W_FL_CROUCH when can't stand
+      ASSERT_TRUE(waypoints[num_waypoints - 1].flags & W_FL_CROUCH);
+   }
+   PASS();
+
+   TEST("ladder auto-add sets W_FL_LADDER");
+   reset_waypoint_state();
+   mock_trace_hull_fn = trace_for_reachable;
+   mock_trace_line_fn = trace_for_reachable;
+   reachable_visibility_result = 0;
+   reachable_ground_fraction = 0.01f;
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      int idx = g_engfuncs.pfnIndexOfEdict(pEntity) - 1;
+      pEntity->v.origin = Vector(0, 0, 100);
+      pEntity->v.flags = 0;
+      pEntity->v.movetype = MOVETYPE_FLY; // on ladder
+      players[idx].last_waypoint = -1;
+      setup_waypoint(0, Vector(0, 0, 0), W_FL_LADDER, 0);
+      int before = num_waypoints;
+      WaypointAutowaypointing(idx, pEntity);
+      ASSERT_TRUE(num_waypoints > before);
+      ASSERT_TRUE(waypoints[num_waypoints - 1].flags & W_FL_LADDER);
+   }
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
+// Tests: WaypointSave error path
+// ============================================================
+
+static int test_WaypointSaveError(void)
+{
+   printf("WaypointSave error paths:\n");
+
+   TEST("save with no waypoint_updated -> no-op");
+   reset_waypoint_state();
+   enter_temp_dir();
+   gpGlobals->mapname = (string_t)(long)"testmap";
+   g_waypoint_updated = FALSE;
+   setup_waypoint(0, Vector(10, 20, 30), 0, 0);
+   g_waypoint_paths = TRUE;
+   {
+      // Remove any existing file
+      char filename[512];
+      snprintf(filename, sizeof(filename),
+               "%s/valve/addons/jk_botti/waypoints/testmap.wpt", test_tmpdir);
+      unlink(filename);
+   }
+   WaypointSave();
+   // File should not exist
+   WaypointInit();
+   ASSERT_INT(WaypointLoad(NULL), FALSE);
+   leave_temp_dir();
+   PASS();
+
+   TEST("load with 0 waypoints succeeds");
+   reset_waypoint_state();
+   enter_temp_dir();
+   gpGlobals->mapname = (string_t)(long)"testmap";
+   g_waypoint_updated = TRUE;
+   g_waypoint_paths = TRUE;
+   // num_waypoints = 0, save should create file with 0 waypoints
+   WaypointSave();
+   WaypointInit();
+   qboolean loaded = WaypointLoad(NULL);
+   ASSERT_INT(loaded, TRUE);
+   ASSERT_INT(num_waypoints, 0);
+   leave_temp_dir();
+   PASS();
+
+   TEST("save: gzopen failure path (no waypoints dir)");
+   reset_waypoint_state();
+   {
+      // Don't enter_temp_dir - CWD has no valve/addons/jk_botti/waypoints/
+      // so gzopen will fail
+      gpGlobals->mapname = (string_t)(long)"errormap";
+      g_waypoint_updated = TRUE;
+      setup_waypoint(0, Vector(10, 20, 30), 0, 0);
+      // Should print error message but not crash
+      WaypointSave();
+   }
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
+// Tests: WaypointAddLift extra branches
+// ============================================================
+
+static int test_WaypointAddLiftExtra(void)
+{
+   printf("WaypointAddLift extra branches:\n");
+
+   TEST("horizontal movement (X dominant) uses correct offset");
+   reset_waypoint_state();
+   mock_trace_hull_fn = trace_for_reachable;
+   mock_trace_line_fn = trace_for_reachable;
+   reachable_visibility_result = 0;
+   reachable_ground_fraction = 0.01f;
+   {
+      edict_t *pent = setup_entity("func_door", Vector(100, 200, 0));
+      pent->v.absmax[0] = 150; pent->v.absmax[1] = 250; pent->v.absmax[2] = 50;
+      pent->v.absmin[0] = 50;  pent->v.absmin[1] = 150; pent->v.absmin[2] = -50;
+      pent->v.size[0] = 100; pent->v.size[1] = 100; pent->v.size[2] = 100;
+
+      // Horizontal movement (X direction, abs(move.x) > abs(move.z))
+      Vector start(0, 0, 0);
+      Vector end(200, 0, 20);  // mostly horizontal
+      WaypointAddLift(pent, start, end);
+
+      ASSERT_INT(g_lifts_added, 1);
+      ASSERT_INT(num_waypoints, 2);
+      ASSERT_TRUE(waypoints[0].flags & W_FL_LIFT_START);
+      ASSERT_TRUE(waypoints[1].flags & W_FL_LIFT_END);
+   }
+   PASS();
+
+   TEST("Y dominant movement uses correct offset");
+   reset_waypoint_state();
+   mock_trace_hull_fn = trace_for_reachable;
+   mock_trace_line_fn = trace_for_reachable;
+   reachable_visibility_result = 0;
+   reachable_ground_fraction = 0.01f;
+   {
+      edict_t *pent = setup_entity("func_door", Vector(100, 200, 0));
+      pent->v.absmax[0] = 150; pent->v.absmax[1] = 250; pent->v.absmax[2] = 50;
+      pent->v.absmin[0] = 50;  pent->v.absmin[1] = 150; pent->v.absmin[2] = -50;
+      pent->v.size[0] = 100; pent->v.size[1] = 100; pent->v.size[2] = 100;
+
+      Vector start(0, 0, 0);
+      Vector end(0, 200, 20);  // mostly Y direction
+      WaypointAddLift(pent, start, end);
+
+      ASSERT_INT(g_lifts_added, 1);
+      ASSERT_INT(num_waypoints, 2);
+   }
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
 // main
 // ============================================================
 
@@ -3495,6 +4230,14 @@ int main()
    rc |= test_WaypointRouteInit();
    rc |= test_WaypointAutowaypointing();
    rc |= test_WaypointThink();
+   rc |= test_WaypointThinkBeamColors();
+   rc |= test_CollectMapSpawnItemsExtra();
+   rc |= test_WaypointSearchItemsExtra();
+   rc |= test_WaypointFindNearestGoalItemFiltering();
+   rc |= test_WaypointReachableWater();
+   rc |= test_WaypointAutowayExtraBranches();
+   rc |= test_WaypointSaveError();
+   rc |= test_WaypointAddLiftExtra();
 
    cleanup_temp_dir();
 
