@@ -298,7 +298,11 @@ static char *mock_pfnInfoKeyValue(char *infobuffer, char *key)
 
 static int mock_pfnGetPlayerUserId(edict_t *e)
 {
-   (void)e;
+   if (!e) return 0;
+   // Return ENTINDEX if edict is allocated (within mock_next_edict range)
+   for (int i = 1; i < mock_next_edict && i < MOCK_MAX_EDICTS; i++)
+      if (&mock_edicts[i] == e)
+         return i; // non-zero = valid user
    return 0;
 }
 
@@ -357,6 +361,12 @@ static float mock_pfnCVarGetFloat(const char *szVarName)
       return mock_cvar_bm_gluon_mod_val;
    return 0.0f;
 }
+
+// DLL function stubs (MDLL_CmdStart/CmdEnd for UTIL_SelectWeapon)
+static void mock_pfnCmdStart(const edict_t *player, const struct usercmd_s *cmd, unsigned int random_seed)
+{ (void)player; (void)cmd; (void)random_seed; }
+static void mock_pfnCmdEnd(const edict_t *player)
+{ (void)player; }
 
 // Metamod util stubs
 static int mock_mutil_GetUserMsgID(plid_t plid, const char *msgname, int *size)
@@ -570,4 +580,6 @@ void mock_reset(void)
 
    // Initialize gamedll funcs (for MDLL_CmdStart/CmdEnd)
    memset(&mock_dll_functions, 0, sizeof(mock_dll_functions));
+   mock_dll_functions.pfnCmdStart = mock_pfnCmdStart;
+   mock_dll_functions.pfnCmdEnd = mock_pfnCmdEnd;
 }
