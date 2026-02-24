@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <math.h>
+#include <limits.h>
 
 #include "test_common.h"
 
@@ -62,6 +63,94 @@ static int test_neuralnet_construction(void)
    PASS();
 
    delete nnet;
+   return 0;
+}
+
+static int test_neuron_overflow(void)
+{
+   printf("neuron overflow:\n");
+
+   TEST("calc_needed_weights returns -1 on INT_MAX input");
+   ASSERT_INT(CNeuron::calc_needed_weights(INT_MAX), -1);
+   PASS();
+
+   TEST("calc_needed_weights returns -1 on negative input");
+   ASSERT_INT(CNeuron::calc_needed_weights(-1), -1);
+   PASS();
+
+   return 0;
+}
+
+static int test_single_layer_network(void)
+{
+   printf("single-layer network (num_hidden=0):\n");
+
+   TEST("construction with 0 hidden layers");
+   CNeuralNet *nnet = new CNeuralNet(2, 1, 0, 0);
+   ASSERT_INT(nnet->get_num_inputs(), 2);
+   ASSERT_INT(nnet->get_num_outputs(), 1);
+   ASSERT_TRUE(nnet->get_num_weights() > 0);
+   PASS();
+
+   TEST("run produces output");
+   double input[2] = {0.5, 0.3};
+   double output[1] = {0.0};
+   ASSERT_PTR_NOT_NULL(nnet->run(input, output));
+   PASS();
+
+   TEST("run with scale produces output");
+   double scale[1] = {5.0};
+   double output2[1] = {0.0};
+   ASSERT_PTR_NOT_NULL(nnet->run(input, output2, scale));
+   PASS();
+
+   delete nnet;
+   return 0;
+}
+
+static int test_multi_hidden_network(void)
+{
+   printf("multi-hidden network (3 hidden layers):\n");
+
+   TEST("construction with 3 hidden layers");
+   CNeuralNet *nnet = new CNeuralNet(2, 1, 3, 4);
+   ASSERT_INT(nnet->get_num_inputs(), 2);
+   ASSERT_INT(nnet->get_num_outputs(), 1);
+   ASSERT_TRUE(nnet->get_num_weights() > 0);
+   PASS();
+
+   TEST("run produces output");
+   double input[2] = {0.5, 0.3};
+   double output[1] = {0.0};
+   ASSERT_PTR_NOT_NULL(nnet->run(input, output));
+   PASS();
+
+   delete nnet;
+   return 0;
+}
+
+static int test_neuralnet_print(void)
+{
+   printf("neuralnet print:\n");
+
+   TEST("print on 1-hidden network does not crash");
+   CNeuralNet *nnet = new CNeuralNet(2, 1, 1, 3);
+   nnet->print();
+   delete nnet;
+   PASS();
+
+   TEST("print on single-layer network does not crash");
+   CNeuralNet *nnet2 = new CNeuralNet(2, 1, 0, 0);
+   nnet2->print();
+   delete nnet2;
+   PASS();
+
+   TEST("print on multi-hidden network does not crash");
+   CNeuralNet *nnet3 = new CNeuralNet(2, 1, 3, 4);
+   nnet3->print();
+   delete nnet3;
+   PASS();
+
    return 0;
 }
 
@@ -194,6 +283,14 @@ int main(void)
    printf("=== neuralnet tests ===\n\n");
 
    rc |= test_neuralnet_construction();
+   printf("\n");
+   rc |= test_neuron_overflow();
+   printf("\n");
+   rc |= test_single_layer_network();
+   printf("\n");
+   rc |= test_multi_hidden_network();
+   printf("\n");
+   rc |= test_neuralnet_print();
    printf("\n");
    rc |= test_population();
    printf("\n");

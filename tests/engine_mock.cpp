@@ -32,6 +32,7 @@
 // ============================================================
 
 float mock_cvar_bm_gluon_mod_val = 0.0f;
+float mock_cvar_displaysoundlist_val = 0.0f;
 
 // ============================================================
 // Mock edict pool
@@ -359,6 +360,8 @@ static float mock_pfnCVarGetFloat(const char *szVarName)
 {
    if (strcmp(szVarName, "bm_gluon_mod") == 0)
       return mock_cvar_bm_gluon_mod_val;
+   if (strcmp(szVarName, "displaysoundlist") == 0)
+      return mock_cvar_displaysoundlist_val;
    return 0.0f;
 }
 
@@ -511,6 +514,7 @@ void mock_reset(void)
 
    // Clear mock cvar values
    mock_cvar_bm_gluon_mod_val = 0.0f;
+   mock_cvar_displaysoundlist_val = 0.0f;
 
    // Clear extern globals
    memset(bots, 0, sizeof(bots));
