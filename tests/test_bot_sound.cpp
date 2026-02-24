@@ -863,6 +863,191 @@ static int test_save_sound_owner_match_priority(void)
 }
 
 // ============================================================
+// 12. CSoundEnt::Spawn
+// ============================================================
+
+static int test_spawn(void)
+{
+   TEST("Spawn: sets m_nextthink to time+1");
+   mock_reset();
+
+   float time_before = gpGlobals->time;
+   pSoundEnt->Spawn();
+   ASSERT_TRUE(pSoundEnt->m_nextthink == time_before + 1.0f);
+   // Spawn calls Initialize which resets the lists
+   ASSERT_INT(pSoundEnt->ISoundsInList(SOUNDLISTTYPE_FREE), MAX_WORLD_SOUNDS);
+   ASSERT_INT(pSoundEnt->ISoundsInList(SOUNDLISTTYPE_ACTIVE), 0);
+   PASS();
+   return 0;
+}
+
+// ============================================================
+// 13. Debug paths
+// ============================================================
+
+static int test_think_show_report(void)
+{
+   TEST("Think: m_fShowReport=TRUE exercises report path");
+   mock_reset();
+
+   CSoundEnt::InsertSound(NULL, 1, Vector(10, 20, 30), 50, 10.0f, -1);
+   pSoundEnt->m_fShowReport = TRUE;
+   pSoundEnt->Think();
+   // No crash, report path exercised
+   ASSERT_INT(pSoundEnt->ISoundsInList(SOUNDLISTTYPE_ACTIVE), 1);
+   PASS();
+   return 0;
+}
+
+static int test_think_debug_2(void)
+{
+   TEST("Think: m_bDebug=2 exercises particle effect path");
+   mock_reset();
+
+   // Insert a sound with a valid player edict (exercises is_player branch)
+   // Use mock_alloc_edict so we don't conflict with later allocs
+   edict_t *player = mock_alloc_edict(); // index 1, which is <= maxClients
+   mock_set_classname(player, "player");
+   CSoundEnt::InsertSound(player, 1, Vector(10, 20, 30), 50, 10.0f, -1);
+
+   // Insert a sound with a non-player edict (index > maxClients)
+   edict_t *entity = mock_alloc_edict();
+   while (ENTINDEX(entity) <= (int)gpGlobals->maxClients)
+      entity = mock_alloc_edict();
+   mock_set_classname(entity, "monster_zombie");
+   CSoundEnt::InsertSound(entity, 2, Vector(50, 60, 70), 80, 10.0f, -1);
+
+   // Insert a sound with zero volume (should be skipped)
+   CSoundEnt::InsertSound(NULL, 3, Vector(0, 0, 0), 0, 10.0f, -1);
+
+   pSoundEnt->m_bDebug = 2;
+   pSoundEnt->Think();
+   // No crash, particle effect path exercised for player and non-player
+   PASS();
+   return 0;
+}
+
+static int test_alloc_when_full_debug(void)
+{
+   TEST("IAllocSound: m_bDebug=1 on overflow prints message");
+   mock_reset();
+
+   pSoundEnt->m_bDebug = TRUE;
+   // Exhaust all sounds
+   for (int i = 0; i < MAX_WORLD_SOUNDS; i++)
+      pSoundEnt->IAllocSound();
+
+   ASSERT_INT(pSoundEnt->ISoundsInList(SOUNDLISTTYPE_FREE), 0);
+   // This should hit the debug printf path
+   ASSERT_INT(pSoundEnt->IAllocSound(), SOUNDLIST_EMPTY);
+   PASS();
+   return 0;
+}
+
+static int test_insert_null_alloc_failure_debug(void)
+{
+   TEST("InsertSound: alloc failure with m_bDebug=1 prints message");
+   mock_reset();
+
+   pSoundEnt->m_bDebug = TRUE;
+   // Exhaust all sounds
+   for (int i = 0; i < MAX_WORLD_SOUNDS; i++)
+      pSoundEnt->IAllocSound();
+
+   // InsertSound with NULL edict -> tries IAllocSound -> fails -> debug msg
+   CSoundEnt::InsertSound(NULL, 1, Vector(0, 0, 0), 10, 1.0f, -1);
+   // Should not crash, debug message path exercised
+   PASS();
+   return 0;
+}
+
+static int test_get_edict_channel_alloc_failure_debug(void)
+{
+   TEST("GetEdictChannelSound: alloc failure with m_bDebug=1");
+   mock_reset();
+
+   pSoundEnt->m_bDebug = TRUE;
+   // Exhaust all sounds
+   for (int i = 0; i < MAX_WORLD_SOUNDS; i++)
+      pSoundEnt->IAllocSound();
+
+   edict_t *e = mock_alloc_edict();
+   CSound *pSound = CSoundEnt::GetEdictChannelSound(e, 5);
+   ASSERT_PTR_NULL(pSound);
+   PASS();
+   return 0;
+}
+
+static int test_init_displaysoundlist(void)
+{
+   TEST("Initialize: displaysoundlist cvar=1 -> m_fShowReport=TRUE");
+   mock_reset();
+
+   mock_cvar_displaysoundlist_val = 1.0f;
+   pSoundEnt->Initialize();
+   ASSERT_INT(pSoundEnt->m_fShowReport, TRUE);
+   // Restore
+   mock_cvar_displaysoundlist_val = 0.0f;
+   PASS();
+   return 0;
+}
+
+static int test_sounds_in_list_invalid_debug(void)
+{
+   TEST("ISoundsInList: invalid type with m_bDebug=1 prints message");
+   mock_reset();
+
+   pSoundEnt->m_bDebug = TRUE;
+   ASSERT_INT(pSoundEnt->ISoundsInList(999), 0);
+   PASS();
+   return 0;
+}
+
+static int test_sound_pointer_invalid_debug(void)
+{
+   TEST("SoundPointerForIndex: too large with m_bDebug=1");
+   mock_reset();
+
+   pSoundEnt->m_bDebug = TRUE;
+   ASSERT_PTR_NULL(CSoundEnt::SoundPointerForIndex(MAX_WORLD_SOUNDS));
+   PASS();
+
+   TEST("SoundPointerForIndex: negative with m_bDebug=1");
+   mock_reset();
+
+   pSoundEnt->m_bDebug = TRUE;
+   ASSERT_PTR_NULL(CSoundEnt::SoundPointerForIndex(-1));
+   PASS();
+   return 0;
+}
+
+static int test_client_sound_index_bogus_debug(void)
+{
+   TEST("ClientSoundIndex: bogus index with m_bDebug=1");
+   mock_reset();
+
+   pSoundEnt->m_bDebug = TRUE;
+   // edict at index 0 -> result = 0 - 1 = -1 -> bogus (< 0)
+   int idx = CSoundEnt::ClientSoundIndex(&mock_edicts[0]);
+   ASSERT_INT(idx, -1);
+   PASS();
+   return 0;
+}
+
+static int test_insert_debug_2(void)
+{
+   TEST("InsertSound: m_bDebug=2 exercises particle path");
+   mock_reset();
+
+   pSoundEnt->m_bDebug = 2;
+   CSoundEnt::InsertSound(NULL, 1, Vector(100, 200, 300), 50, 2.0f, -1);
+   // No crash, particle effect path exercised
+   ASSERT_INT(pSoundEnt->ISoundsInList(SOUNDLISTTYPE_ACTIVE), 1);
+   PASS();
+   return 0;
+}
+
+// ============================================================
 // Main
 // ============================================================
 
@@ -934,6 +1119,21 @@ int main(void)
    failures += test_save_sound_bot_at_exactly_64();
    failures += test_save_sound_bot_at_63_9();
    failures += test_save_sound_owner_match_priority();
+
+   printf("=== CSoundEnt::Spawn tests ===\n");
+   failures += test_spawn();
+
+   printf("=== Debug path tests ===\n");
+   failures += test_think_show_report();
+   failures += test_think_debug_2();
+   failures += test_alloc_when_full_debug();
+   failures += test_insert_null_alloc_failure_debug();
+   failures += test_get_edict_channel_alloc_failure_debug();
+   failures += test_init_displaysoundlist();
+   failures += test_sounds_in_list_invalid_debug();
+   failures += test_sound_pointer_invalid_debug();
+   failures += test_client_sound_index_bogus_debug();
+   failures += test_insert_debug_2();
 
    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
    return failures ? 1 : 0;
