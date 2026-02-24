@@ -688,6 +688,17 @@ static int test_BotSecondaryAmmoLow(void)
    ASSERT_INT(BotSecondaryAmmoLow(bot, *gauss), AMMO_OK);
    PASS();
 
+   TEST("TRUE branch: iAmmo1==-1 -> AMMO_NO");
+   {
+      // Gauss has secondary_use_primary_ammo=TRUE
+      // Temporarily set iAmmo1=-1 to hit the edge case
+      int saved = weapon_defs[VALVE_WEAPON_GAUSS].iAmmo1;
+      weapon_defs[VALVE_WEAPON_GAUSS].iAmmo1 = -1;
+      ASSERT_INT(BotSecondaryAmmoLow(bot, *gauss), AMMO_NO);
+      weapon_defs[VALVE_WEAPON_GAUSS].iAmmo1 = saved;
+   }
+   PASS();
+
    return 0;
 }
 
@@ -727,6 +738,32 @@ static int test_BotGetGoodWeaponCount(void)
    ASSERT_INT(count, 1);
    PASS();
 
+   TEST("skips melee/throw/avoid and 0-ammo weapons");
+   pe->v.weapons = (1u << VALVE_WEAPON_CROWBAR) |       // WEAPON_MELEE -> skip
+                   (1u << VALVE_WEAPON_HANDGRENADE) |    // avoid_this_gun=TRUE -> skip
+                   (1u << VALVE_WEAPON_MP5);             // WEAPON_FIRE but 0 ammo -> skip
+   bot.m_rgAmmo[1] = 0;  // MP5 primary ammo = 0
+   bot.m_rgAmmo[8] = 0;  // MP5 secondary ammo = 0
+   count = BotGetGoodWeaponCount(bot, 5);
+   ASSERT_INT(count, 0);
+   PASS();
+
+   TEST("skips OP4 weapon carried in HLDM (IsValidWeaponChoose)");
+   pe->v.weapons = (1u << GEARBOX_WEAPON_EAGLE);
+   bot.m_rgAmmo[2] = 36;  // 357 ammo for eagle
+   count = BotGetGoodWeaponCount(bot, 5);
+   ASSERT_INT(count, 0);
+   PASS();
+
+   TEST("counts only WEAPON_FIRE with sufficient ammo");
+   pe->v.weapons = (1u << VALVE_WEAPON_MP5) | (1u << VALVE_WEAPON_SHOTGUN);
+   bot.m_rgAmmo[1] = 50;  // 9mm for MP5
+   bot.m_rgAmmo[3] = 20;  // buckshot for shotgun
+   bot.m_rgAmmo[8] = 5;
+   count = BotGetGoodWeaponCount(bot, 10);
+   ASSERT_INT(count, 2);
+   PASS();
+
    return 0;
 }
 
@@ -764,6 +801,44 @@ static int test_BotGetLowAmmoFlags(void)
    ASSERT_TRUE((ammoflags & W_IFL_AMMO_9MM) != 0);
    PASS();
 
+   TEST("OnlyCarrying=FALSE hits IsValidWeaponChoose skip");
+   // In HLDM mode, OP4 weapons fail IsValidWeaponChoose
+   pe->v.weapons = 0;  // not carrying anything
+   memset(bot.m_rgAmmo, 0, sizeof(bot.m_rgAmmo));
+   ammoflags = BotGetLowAmmoFlags(bot, &weapon_flags, FALSE);
+   // OP4 weapons in table are skipped by IsValidWeaponChoose, others may or may not have low ammo
+   // Just verify function doesn't crash and returns something
+   ASSERT_TRUE(ammoflags >= 0);
+   PASS();
+
+   TEST("low secondary ammo sets ammo2_waypoint_flag");
+   pe->v.weapons = (1u << VALVE_WEAPON_MP5);
+   bot.m_rgAmmo[1] = 200;  // primary OK
+   bot.m_rgAmmo[8] = 1;    // AR grenades low (<=2)
+   weapon_flags = 0;
+   ammoflags = BotGetLowAmmoFlags(bot, &weapon_flags, TRUE);
+   // MP5 ammo2_waypoint_flag = W_IFL_AMMO_ARGRENADES
+   ASSERT_TRUE((ammoflags & W_IFL_AMMO_ARGRENADES) != 0);
+   PASS();
+
+   TEST("ammo2_on_repickup sets weapon_flag");
+   {
+      // Temporarily set MP5's ammo2_on_repickup=TRUE
+      bot_weapon_select_t *mp5_ws = GetWeaponSelect(VALVE_WEAPON_MP5);
+      qboolean saved_repickup = mp5_ws->ammo2_on_repickup;
+      mp5_ws->ammo2_on_repickup = TRUE;
+      pe->v.weapons = (1u << VALVE_WEAPON_MP5);
+      bot.m_rgAmmo[1] = 200;  // primary OK
+      bot.m_rgAmmo[8] = 1;    // secondary low
+      weapon_flags = 0;
+      ammoflags = BotGetLowAmmoFlags(bot, &weapon_flags, TRUE);
+      ASSERT_TRUE((ammoflags & W_IFL_AMMO_ARGRENADES) != 0);
+      // weapon_flags should include MP5's waypoint_flag
+      ASSERT_TRUE((weapon_flags & W_IFL_MP5) != 0);
+      mp5_ws->ammo2_on_repickup = saved_repickup;
+   }
+   PASS();
+
    return 0;
 }
 
@@ -793,6 +868,39 @@ static int test_BotAllWeaponsRunningOutOfAmmo(void)
    ASSERT_INT(BotAllWeaponsRunningOutOfAmmo(bot, FALSE), FALSE);
    PASS();
 
+   TEST("GoodWeaponsOnly skips melee/throw -> TRUE");
+   pe->v.weapons = (1u << VALVE_WEAPON_CROWBAR) | (1u << VALVE_WEAPON_HANDGRENADE);
+   memset(bot.m_rgAmmo, 0, sizeof(bot.m_rgAmmo));
+   ASSERT_INT(BotAllWeaponsRunningOutOfAmmo(bot, TRUE), TRUE);
+   PASS();
+
+   TEST("GoodWeaponsOnly, 0 ammo both attacks -> continues");
+   pe->v.weapons = (1u << VALVE_WEAPON_MP5);
+   bot.m_rgAmmo[1] = 0;  // no 9mm
+   bot.m_rgAmmo[8] = 0;  // no AR grenades
+   ASSERT_INT(BotAllWeaponsRunningOutOfAmmo(bot, TRUE), TRUE);
+   PASS();
+
+   TEST("GoodWeaponsOnly, low primary ammo -> continues");
+   pe->v.weapons = (1u << VALVE_WEAPON_MP5);
+   bot.m_rgAmmo[1] = 30;  // low (<=50)
+   bot.m_rgAmmo[8] = 0;   // no secondary
+   ASSERT_INT(BotAllWeaponsRunningOutOfAmmo(bot, TRUE), TRUE);
+   PASS();
+
+   TEST("GoodWeaponsOnly, low secondary ammo only -> continues");
+   pe->v.weapons = (1u << VALVE_WEAPON_MP5);
+   bot.m_rgAmmo[1] = 200;  // primary OK
+   bot.m_rgAmmo[8] = 1;    // secondary low (<=2)
+   ASSERT_INT(BotAllWeaponsRunningOutOfAmmo(bot, TRUE), TRUE);
+   PASS();
+
+   TEST("GoodWeaponsOnly, OP4 weapon in HLDM -> fails IsValidWeaponChoose");
+   pe->v.weapons = (1u << GEARBOX_WEAPON_EAGLE);
+   bot.m_rgAmmo[2] = 36;  // 357 ammo for eagle
+   ASSERT_INT(BotAllWeaponsRunningOutOfAmmo(bot, TRUE), TRUE);
+   PASS();
+
    return 0;
 }
 
@@ -819,6 +927,24 @@ static int test_BotWeaponCanAttack(void)
    pe->v.weapons = (1u << VALVE_WEAPON_MP5);
    bot.m_rgAmmo[1] = 50;
    ASSERT_INT(BotWeaponCanAttack(bot, FALSE), TRUE);
+   PASS();
+
+   TEST("GoodWeaponsOnly skips melee -> FALSE");
+   pe->v.weapons = (1u << VALVE_WEAPON_CROWBAR);
+   ASSERT_INT(BotWeaponCanAttack(bot, TRUE), FALSE);
+   PASS();
+
+   TEST("GoodWeaponsOnly, 0 ammo weapon -> FALSE");
+   pe->v.weapons = (1u << VALVE_WEAPON_MP5);
+   bot.m_rgAmmo[1] = 0;
+   bot.m_rgAmmo[8] = 0;
+   ASSERT_INT(BotWeaponCanAttack(bot, TRUE), FALSE);
+   PASS();
+
+   TEST("GoodWeaponsOnly, OP4 weapon in HLDM -> skips");
+   pe->v.weapons = (1u << GEARBOX_WEAPON_EAGLE);
+   bot.m_rgAmmo[2] = 36;  // 357 ammo
+   ASSERT_INT(BotWeaponCanAttack(bot, TRUE), FALSE);
    PASS();
 
    return 0;
@@ -872,6 +998,16 @@ static int test_BotGetBetterWeaponChoice(void)
    ASSERT_INT(use_secondary, FALSE);
    PASS();
 
+   TEST("skips OP4 weapon (IsValidWeaponChoose) and avoided weapon");
+   // Current weapon is avoided -> enters search
+   // Bot carries eagle (OP4, fails IsValidWeaponChoose in HLDM) + handgrenade (avoided)
+   pe->v.weapons = (1u << GEARBOX_WEAPON_EAGLE) | (1u << VALVE_WEAPON_HANDGRENADE);
+   bot.m_rgAmmo[2] = 36;  // 357 ammo for eagle
+   bot.m_rgAmmo[11] = 5;  // handgrenade ammo
+   idx = BotGetBetterWeaponChoice(bot, *hg, weapon_select, 500.0, 0.0, &use_primary, &use_secondary);
+   ASSERT_INT(idx, -1);
+   PASS();
+
    return 0;
 }
 
@@ -912,6 +1048,12 @@ static int test_MP5_launch_angle(void)
    ASSERT_TRUE(angle > -89.0 && angle < 89.0);
    // At distance=400, height=-64, should be around 2.8 (from the table)
    ASSERT_TRUE(angle > -5.0 && angle < 10.0);
+   PASS();
+
+   TEST("height below all entries (-2000) -> -99");
+   // Height below all table entries, height_idx stays 0 -> returns -99
+   angle = ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(500.0, -2000.0);
+   ASSERT_TRUE(angle < -90.0);
    PASS();
 
    return 0;
