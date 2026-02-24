@@ -4194,6 +4194,188 @@ static int test_WaypointAddLiftExtra(void)
 }
 
 // ============================================================
+// Tests: waypoint.h inline wrapper functions
+// ============================================================
+
+static int test_WaypointInlineWrappers(void)
+{
+   printf("WaypointInlineWrappers:\n");
+
+   // --- WaypointFindNearest wrappers ---
+
+   TEST("FindNearest(edict_t*, float)");
+   reset_waypoint_state();
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      pEntity->v.origin = Vector(0, 0, 0);
+      pEntity->v.view_ofs = Vector(0, 0, 17);
+      setup_waypoint(0, Vector(200, 0, 0), 0, 0);
+      setup_waypoint(1, Vector(50, 0, 0), 0, 0);
+      int idx = WaypointFindNearest(pEntity, 9999.0);
+      ASSERT_INT(idx, 1);
+   }
+   PASS();
+
+   TEST("FindNearest(Vector&, edict_t*, float)");
+   reset_waypoint_state();
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      setup_waypoint(0, Vector(200, 0, 0), 0, 0);
+      setup_waypoint(1, Vector(50, 0, 0), 0, 0);
+      Vector src(0, 0, 0);
+      int idx = WaypointFindNearest(src, pEntity, 9999.0);
+      ASSERT_INT(idx, 1);
+   }
+   PASS();
+
+   TEST("FindNearest(edict_t*, float, qboolean)");
+   reset_waypoint_state();
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      pEntity->v.origin = Vector(0, 0, 0);
+      pEntity->v.view_ofs = Vector(0, 0, 17);
+      setup_waypoint(0, Vector(200, 0, 0), 0, 0);
+      setup_waypoint(1, Vector(50, 0, 0), 0, 0);
+      int idx = WaypointFindNearest(pEntity, 9999.0, FALSE);
+      ASSERT_INT(idx, 1);
+   }
+   PASS();
+
+   TEST("FindNearest(Vector&, edict_t*, float, qboolean)");
+   reset_waypoint_state();
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      setup_waypoint(0, Vector(200, 0, 0), 0, 0);
+      setup_waypoint(1, Vector(50, 0, 0), 0, 0);
+      Vector src(0, 0, 0);
+      int idx = WaypointFindNearest(src, pEntity, 9999.0, FALSE);
+      ASSERT_INT(idx, 1);
+   }
+   PASS();
+
+   // --- WaypointFindNearestGoal wrappers ---
+
+   TEST("FindNearestGoal(edict_t*, src, flags, itemflags, exclude[])");
+   reset_waypoint_state();
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      setup_waypoint(0, Vector(0, 0, 0), W_FL_CROUCH, 0);
+      setup_waypoint(1, Vector(100, 0, 0), W_FL_CROUCH, 0x01);
+      setup_waypoint(2, Vector(200, 0, 0), W_FL_CROUCH, 0x01);
+      setup_route_matrix(3);
+      shortest_path[0 * 3 + 1] = 500;
+      from_to[0 * 3 + 1] = 1;
+      shortest_path[0 * 3 + 2] = 100;
+      from_to[0 * 3 + 2] = 2;
+      int exclude[] = {-1};
+      int idx = WaypointFindNearestGoal(pEntity, 0, W_FL_CROUCH, 0x01, exclude);
+      ASSERT_INT(idx, 2);
+   }
+   PASS();
+
+   TEST("FindNearestGoal(Vector&, edict_t*, float, int flags)");
+   reset_waypoint_state();
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      setup_waypoint(0, Vector(0, 0, 0), W_FL_CROUCH, 0);
+      setup_waypoint(1, Vector(100, 0, 0), W_FL_CROUCH, 0);
+      setup_waypoint(2, Vector(1000, 0, 0), W_FL_CROUCH, 0);
+      Vector src(90, 0, 0);
+      int idx = WaypointFindNearestGoal(src, pEntity, 9999.0, W_FL_CROUCH);
+      ASSERT_INT(idx, 1);
+   }
+   PASS();
+
+   TEST("FindNearestGoal(edict_t*, src, flags, exclude[])");
+   reset_waypoint_state();
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      setup_waypoint(0, Vector(0, 0, 0), W_FL_CROUCH, 0);
+      setup_waypoint(1, Vector(100, 0, 0), W_FL_CROUCH, 0);
+      setup_waypoint(2, Vector(200, 0, 0), W_FL_CROUCH, 0);
+      setup_route_matrix(3);
+      shortest_path[0 * 3 + 1] = 100;
+      from_to[0 * 3 + 1] = 1;
+      shortest_path[0 * 3 + 2] = 200;
+      from_to[0 * 3 + 2] = 2;
+      int exclude[] = {1, -1};
+      int idx = WaypointFindNearestGoal(pEntity, 0, W_FL_CROUCH, exclude);
+      ASSERT_INT(idx, 2);
+   }
+   PASS();
+
+   TEST("FindNearestGoal(edict_t*, src, flags, itemflags)");
+   reset_waypoint_state();
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      setup_waypoint(0, Vector(0, 0, 0), W_FL_CROUCH, 0);
+      setup_waypoint(1, Vector(100, 0, 0), W_FL_CROUCH, 0x02);
+      setup_waypoint(2, Vector(200, 0, 0), W_FL_CROUCH, 0x02);
+      setup_route_matrix(3);
+      shortest_path[0 * 3 + 1] = 500;
+      from_to[0 * 3 + 1] = 1;
+      shortest_path[0 * 3 + 2] = 100;
+      from_to[0 * 3 + 2] = 2;
+      int idx = WaypointFindNearestGoal(pEntity, 0, W_FL_CROUCH, 0x02);
+      ASSERT_INT(idx, 2);
+   }
+   PASS();
+
+   TEST("FindNearestGoal(edict_t*, src, flags)");
+   reset_waypoint_state();
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      setup_waypoint(0, Vector(0, 0, 0), W_FL_CROUCH, 0);
+      setup_waypoint(1, Vector(100, 0, 0), W_FL_CROUCH, 0);
+      setup_route_matrix(2);
+      shortest_path[0 * 2 + 1] = 100;
+      from_to[0 * 2 + 1] = 1;
+      int idx = WaypointFindNearestGoal(pEntity, 0, W_FL_CROUCH);
+      ASSERT_INT(idx, 1);
+   }
+   PASS();
+
+   // --- WaypointFindRandomGoal wrappers ---
+
+   TEST("FindRandomGoal(edict_t*, flags, itemflags, exclude[])");
+   reset_waypoint_state();
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      setup_waypoint(0, Vector(0, 0, 0), W_FL_CROUCH, 0x01);
+      setup_waypoint(1, Vector(100, 0, 0), W_FL_CROUCH, 0x01);
+      setup_waypoint(2, Vector(200, 0, 0), W_FL_JUMP, 0);
+      int exclude[] = {0, -1};
+      int idx = WaypointFindRandomGoal(pEntity, W_FL_CROUCH, 0x01, exclude);
+      ASSERT_INT(idx, 1);
+   }
+   PASS();
+
+   TEST("FindRandomGoal(edict_t*, flags)");
+   reset_waypoint_state();
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      setup_waypoint(0, Vector(0, 0, 0), W_FL_CROUCH, 0);
+      int idx = WaypointFindRandomGoal(pEntity, W_FL_CROUCH);
+      ASSERT_INT(idx, 0);
+   }
+   PASS();
+
+   TEST("FindRandomGoal(edict_t*, flags, exclude[])");
+   reset_waypoint_state();
+   {
+      edict_t *pEntity = mock_alloc_edict();
+      setup_waypoint(0, Vector(0, 0, 0), W_FL_CROUCH, 0);
+      setup_waypoint(1, Vector(100, 0, 0), W_FL_CROUCH, 0);
+      int exclude[] = {0, -1};
+      int idx = WaypointFindRandomGoal(pEntity, W_FL_CROUCH, exclude);
+      ASSERT_INT(idx, 1);
+   }
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
 // main
 // ============================================================
 
@@ -4238,6 +4420,7 @@ int main()
    rc |= test_WaypointAutowayExtraBranches();
    rc |= test_WaypointSaveError();
    rc |= test_WaypointAddLiftExtra();
+   rc |= test_WaypointInlineWrappers();
 
    cleanup_temp_dir();
 
