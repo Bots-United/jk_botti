@@ -67,4 +67,43 @@ static int tests_passed = 0;
    } \
 } while(0)
 
+#define ASSERT_FALSE(cond) do { \
+   if ((cond)) { \
+      printf("FAIL\n    condition should be false: %s\n", #cond); \
+      return 1; \
+   } \
+} while(0)
+
+#define ASSERT_FLOAT_NEAR(actual, expected, eps) do { \
+   float _a = (actual), _e = (expected), _eps = (eps); \
+   if (fabs(_a - _e) > _eps) { \
+      printf("FAIL\n    expected: %f (+/- %f)\n    got:      %f\n", \
+             (double)_e, (double)_eps, (double)_a); \
+      return 1; \
+   } \
+} while(0)
+
+#ifndef EPSILON
+#define EPSILON 1e-4f
+#endif
+
+#define ASSERT_FLOAT(actual, expected) do { \
+   float _a = (actual), _e = (expected); \
+   if (fabsf(_a - _e) > EPSILON) { \
+      printf("FAIL\n    expected: %f\n    got:      %f\n", \
+             (double)_e, (double)_a); \
+      return 1; \
+   } \
+} while(0)
+
+#define ASSERT_VEC(v, ex, ey, ez) do { \
+   if (fabsf((v).x - (float)(ex)) > EPSILON || \
+       fabsf((v).y - (float)(ey)) > EPSILON || \
+       fabsf((v).z - (float)(ez)) > EPSILON) { \
+      printf("FAIL\n    expected: (%f, %f, %f)\n    got:      (%f, %f, %f)\n", \
+             (float)(ex), (float)(ey), (float)(ez), (v).x, (v).y, (v).z); \
+      return 1; \
+   } \
+} while(0)
+
 #endif // TEST_COMMON_H

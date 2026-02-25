@@ -11,27 +11,6 @@
 
 extern qboolean is_team_play;
 
-// Tolerance for floating-point comparisons
-#define EPSILON 1e-4f
-
-#define ASSERT_FLOAT(actual, expected) do { \
-   float _a = (actual), _e = (expected); \
-   if (fabsf(_a - _e) > EPSILON) { \
-      printf("FAIL\n    expected: %f\n    got:      %f\n", _e, _a); \
-      return 1; \
-   } \
-} while(0)
-
-#define ASSERT_VEC(v, ex, ey, ez) do { \
-   if (fabsf((v).x - (float)(ex)) > EPSILON || \
-       fabsf((v).y - (float)(ey)) > EPSILON || \
-       fabsf((v).z - (float)(ez)) > EPSILON) { \
-      printf("FAIL\n    expected: (%f, %f, %f)\n    got:      (%f, %f, %f)\n", \
-             (float)(ex), (float)(ey), (float)(ez), (v).x, (v).y, (v).z); \
-      return 1; \
-   } \
-} while(0)
-
 static float vec_dot(const Vector &a, const Vector &b)
 {
    return a.x * b.x + a.y * b.y + a.z * b.z;
