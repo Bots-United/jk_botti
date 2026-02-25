@@ -231,14 +231,7 @@ static void reset_navigate_mocks(void)
    pSoundEnt->Initialize();
 }
 
-#define ASSERT_FLOAT_NEAR(actual, expected, eps) do { \
-   float _a = (actual), _e = (expected); \
-   if (fabs(_a - _e) > (eps)) { \
-      printf("FAIL\n    expected: %f (+-%.6f)\n    got:      %f\n", \
-             (double)_e, (double)(eps), (double)_a); \
-      return 1; \
-   } \
-} while(0)
+
 
 // ============================================================
 // Trace helpers
