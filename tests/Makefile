@@ -70,9 +70,9 @@ BOT_WEAPONS_OBJS = engine_mock.o test_bot_weapons.o \
 test_bot_weapons: $(BOT_WEAPONS_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_WEAPONS_OBJS) -lm
 
-# Bot navigate tests
+# Bot navigate tests (bot_navigate.cpp is #included in test file, not linked separately)
 BOT_NAVIGATE_OBJS = engine_mock.o test_bot_navigate.o \
-	bot_navigate.o bot_weapons.o util.o safe_snprintf.o random_num.o
+	bot_weapons.o util.o safe_snprintf.o random_num.o
 
 test_bot_navigate: $(BOT_NAVIGATE_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_NAVIGATE_OBJS) -lm
