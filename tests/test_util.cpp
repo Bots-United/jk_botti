@@ -1194,14 +1194,14 @@ static int test_varargs2(void)
 
    TEST("basic format string");
    char buf[128];
-   char *result = UTIL_VarArgs2(buf, sizeof(buf), "hello %s %d", "world", 42);
+   char *result = UTIL_VarArgs2(buf, sizeof(buf), (char*)"hello %s %d", "world", 42);
    ASSERT_STR(result, "hello world 42");
    ASSERT_PTR_EQ(result, buf);
    PASS();
 
    TEST("truncation on small buffer");
    char small[8];
-   UTIL_VarArgs2(small, sizeof(small), "abcdefghijklmnop");
+   UTIL_VarArgs2(small, sizeof(small), (char*)"abcdefghijklmnop");
    ASSERT_TRUE(strlen(small) < sizeof(small));
    PASS();
 
