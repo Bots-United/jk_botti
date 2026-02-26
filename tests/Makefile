@@ -164,7 +164,14 @@ BOT_QUERY_HOOK_LINUX_OBJS = engine_mock.o test_bot_query_hook_linux.o \
 test_bot_query_hook_linux: $(BOT_QUERY_HOOK_LINUX_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_QUERY_HOOK_LINUX_OBJS) -lm -lpthread
 
-ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_geneticalg test_waypoint test_bot_navigate test_bot_skill test_bot_sound test_h_export test_bot_config_init test_bot_models test_bot_client test_bot test_commands test_dll test_engine test_bot_query_hook test_bot_query_hook_linux
+# bot_query_hook_win32 tests (source #included with -D_WIN32, mock Win32 headers)
+test_bot_query_hook_win32.o: test_bot_query_hook_win32.cpp ../bot_query_hook_win32.cpp ../bot_query_hook.h windows.h winsock2.h
+	${CXX} -Wall -D_WIN32 -I. -I".." $(COVERAGE_FLAGS) -c $< -o $@
+
+test_bot_query_hook_win32: test_bot_query_hook_win32.o
+	${CXX} $(COVERAGE_FLAGS) -o $@ test_bot_query_hook_win32.o
+
+ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_geneticalg test_waypoint test_bot_navigate test_bot_skill test_bot_sound test_h_export test_bot_config_init test_bot_models test_bot_client test_bot test_commands test_dll test_engine test_bot_query_hook test_bot_query_hook_linux test_bot_query_hook_win32
 
 all: $(ALL_TESTS)
 
@@ -193,6 +200,7 @@ run: $(ALL_TESTS)
 	./test_engine
 	./test_bot_query_hook
 	./test_bot_query_hook_linux
+	./test_bot_query_hook_win32
 
 VALGRIND = valgrind --leak-check=full --error-exitcode=1
 
@@ -221,6 +229,7 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_engine
 	$(VALGRIND) ./test_bot_query_hook
 	$(VALGRIND) ./test_bot_query_hook_linux
+	$(VALGRIND) ./test_bot_query_hook_win32
 
 coverage:
 	$(MAKE) clean
