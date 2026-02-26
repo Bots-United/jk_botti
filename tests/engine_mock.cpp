@@ -79,36 +79,36 @@ enginefuncs_t g_engfuncs;
 
 // Metamod globals
 static meta_globals_t mock_metaglobals;
-meta_globals_t *gpMetaGlobals = &mock_metaglobals;
+__attribute__((weak)) meta_globals_t *gpMetaGlobals = &mock_metaglobals;
 
 static mutil_funcs_t mock_mutil_funcs;
-mutil_funcs_t *gpMetaUtilFuncs = &mock_mutil_funcs;
+__attribute__((weak)) mutil_funcs_t *gpMetaUtilFuncs = &mock_mutil_funcs;
 
 static DLL_FUNCTIONS mock_dll_functions;
 static gamedll_funcs_t mock_gamedll_funcs = { &mock_dll_functions, NULL };
-gamedll_funcs_t *gpGamedllFuncs = &mock_gamedll_funcs;
+__attribute__((weak)) gamedll_funcs_t *gpGamedllFuncs = &mock_gamedll_funcs;
 
-plugin_info_t Plugin_info;
+__attribute__((weak)) plugin_info_t Plugin_info;
 
 // ============================================================
 // Extern globals from production .cpp files
 // ============================================================
 
-bot_weapon_t weapon_defs[MAX_WEAPONS];
-bot_t bots[32];
-player_t players[32];
-qboolean b_observer_mode = FALSE;
-qboolean is_team_play = FALSE;
-qboolean checked_teamplay = FALSE;
-qboolean b_botdontshoot = FALSE;
-int num_logos = 0;
-int submod_id = SUBMOD_HLDM;
-int submod_weaponflag = WEAPON_SUBMOD_HLDM;
-int bot_shoot_breakables = 0;
-int m_spriteTexture = 0;
+__attribute__((weak)) bot_weapon_t weapon_defs[MAX_WEAPONS];
+__attribute__((weak)) bot_t bots[32];
+__attribute__((weak)) player_t players[32];
+__attribute__((weak)) qboolean b_observer_mode = FALSE;
+__attribute__((weak)) qboolean is_team_play = FALSE;
+__attribute__((weak)) qboolean checked_teamplay = FALSE;
+__attribute__((weak)) qboolean b_botdontshoot = FALSE;
+__attribute__((weak)) int num_logos = 0;
+__attribute__((weak)) int submod_id = SUBMOD_HLDM;
+__attribute__((weak)) int submod_weaponflag = WEAPON_SUBMOD_HLDM;
+__attribute__((weak)) int bot_shoot_breakables = 0;
+__attribute__((weak)) int m_spriteTexture = 0;
 __attribute__((weak)) int num_waypoints = 0;
 __attribute__((weak)) WAYPOINT waypoints[MAX_WAYPOINTS];
-bot_skill_settings_t skill_settings[5];
+__attribute__((weak)) bot_skill_settings_t skill_settings[5];
 __attribute__((weak)) CSoundEnt *pSoundEnt = NULL;
 
 // ============================================================
@@ -447,23 +447,23 @@ __attribute__((weak)) void SaveSound(edict_t *pEdict, const Vector &origin, int 
 { (void)pEdict; (void)origin; (void)volume; (void)channel; (void)flDuration; }
 
 // commands.cpp
-void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const char *arg3)
+__attribute__((weak)) void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const char *arg3)
 { (void)pBot; (void)arg1; (void)arg2; (void)arg3; }
-const cfg_bot_record_t *GetUnusedCfgBotRecord(void) { return NULL; }
+__attribute__((weak)) const cfg_bot_record_t *GetUnusedCfgBotRecord(void) { return NULL; }
 
 // dll.cpp
-void jkbotti_ClientPutInServer(edict_t *pEntity) { (void)pEntity; }
-BOOL jkbotti_ClientConnect(edict_t *pEntity, const char *pszName,
+__attribute__((weak)) void jkbotti_ClientPutInServer(edict_t *pEntity) { (void)pEntity; }
+__attribute__((weak)) BOOL jkbotti_ClientConnect(edict_t *pEntity, const char *pszName,
                            const char *pszAddress, char szRejectReason[128])
 { (void)pEntity; (void)pszName; (void)pszAddress; (void)szRejectReason; return TRUE; }
 
 // bot.cpp
-void BotCreate(const char *skin, const char *name, int skill, int top_color,
+__attribute__((weak)) void BotCreate(const char *skin, const char *name, int skill, int top_color,
                int bottom_color, int cfg_bot_index)
 { (void)skin; (void)name; (void)skill; (void)top_color; (void)bottom_color; (void)cfg_bot_index; }
-void BotThink(bot_t &pBot) { (void)pBot; }
-void BotCheckTeamplay(void) {}
-void BotKick(bot_t &pBot) { (void)pBot; }
+__attribute__((weak)) void BotThink(bot_t &pBot) { (void)pBot; }
+__attribute__((weak)) void BotCheckTeamplay(void) {}
+__attribute__((weak)) void BotKick(bot_t &pBot) { (void)pBot; }
 
 // bot_chat.cpp (weak: overridden by test_bot_chat.cpp which #includes bot_chat.cpp)
 __attribute__((weak)) void LoadBotChat(void) {}
@@ -473,13 +473,13 @@ __attribute__((weak)) void BotChatTalk(bot_t &pBot) { (void)pBot; }
 __attribute__((weak)) void BotChatEndGame(bot_t &pBot) { (void)pBot; }
 
 // bot_skill.cpp
-void ResetSkillsToDefault(void) {}
+__attribute__((weak)) void ResetSkillsToDefault(void) {}
 
 // bot_models.cpp
-void LoadBotModels(void) {}
+__attribute__((weak)) void LoadBotModels(void) {}
 
 // dlls/util.h (EMIT_SOUND_DYN not used by bot_combat.o/util.o but may be needed)
-void EMIT_SOUND_DYN(edict_t *entity, int channel, const char *sample,
+__attribute__((weak)) void EMIT_SOUND_DYN(edict_t *entity, int channel, const char *sample,
                     float volume, float attenuation, int flags, int pitch)
 { (void)entity; (void)channel; (void)sample; (void)volume;
   (void)attenuation; (void)flags; (void)pitch; }
