@@ -2370,7 +2370,7 @@ static int test_bot_should_detonate_satchel(void)
    pSatchel->v.owner = pBotEdict;
    pSatchel->v.origin = Vector(300, 0, 0);
 
-   edict_t *pEnemy = create_enemy_player(Vector(350, 0, 0));
+   (void)create_enemy_player(Vector(350, 0, 0));
    testbot.f_satchel_detonate_time = 10.0;
    ASSERT_INT(BotShouldDetonateSatchel(testbot), TRUE);
    PASS();
@@ -2393,7 +2393,7 @@ static int test_bot_should_detonate_satchel(void)
    pSatchel->v.owner = otherBot; // owned by someone else
    pSatchel->v.origin = Vector(300, 0, 0);
 
-   pEnemy = create_enemy_player(Vector(350, 0, 0));
+   (void)create_enemy_player(Vector(350, 0, 0));
    testbot.f_satchel_detonate_time = 10.0;
    testbot.b_satchel_detonating = TRUE;
    ASSERT_INT(BotShouldDetonateSatchel(testbot), FALSE);
@@ -2455,7 +2455,7 @@ static int test_bot_detonate_satchel(void)
    pSatchel->v.owner = pBotEdict;
    pSatchel->v.origin = Vector(300, 0, 0);
 
-   edict_t *pEnemy = create_enemy_player(Vector(350, 0, 0));
+   (void)create_enemy_player(Vector(350, 0, 0));
 
    testbot.f_satchel_detonate_time = gpGlobals->time - 1.0; // timeout reached
    testbot.f_satchel_check_time = 0;
@@ -2479,7 +2479,7 @@ static int test_bot_detonate_satchel(void)
    pSatchel->v.owner = pBotEdict;
    pSatchel->v.origin = Vector(300, 0, 0);
 
-   pEnemy = create_enemy_player(Vector(350, 0, 0));
+   (void)create_enemy_player(Vector(350, 0, 0));
 
    testbot.f_satchel_detonate_time = gpGlobals->time - 1.0;
    testbot.f_satchel_check_time = 0;
@@ -2505,7 +2505,7 @@ static int test_bot_detonate_satchel(void)
    pSatchel->v.owner = pBotEdict;
    pSatchel->v.origin = Vector(50, 0, 0); // too close to bot (< 200)
 
-   pEnemy = create_enemy_player(Vector(350, 0, 0));
+   (void)create_enemy_player(Vector(350, 0, 0));
 
    testbot.f_satchel_detonate_time = gpGlobals->time - 1.0; // timeout
    testbot.f_satchel_check_time = 0;
@@ -2559,7 +2559,7 @@ static int test_bot_shoot_tripmine(void)
    give_bot_weapon(testbot, VALVE_WEAPON_GLOCK, 17, 50, 0);
    // Need weapon_select initialized
    // BotFireWeapon needs the glock entry
-   qboolean result = BotShootTripmine(testbot);
+   BotShootTripmine(testbot);
    // Result depends on whether glock is available in weapon_select
    // In any case, pBotEnemy should be NULL after (restored)
    ASSERT_PTR_NULL(testbot.pBotEnemy);
@@ -3096,7 +3096,7 @@ static int test_bot_fire_weapon_min_skill_both(void)
       weapon_select[glock_idx].primary_skill_level = 1;
       weapon_select[glock_idx].secondary_skill_level = 2;
 
-      qboolean res = BotFireWeapon(Vector(200, 0, 0), testbot, 0);
+      BotFireWeapon(Vector(200, 0, 0), testbot, 0);
       // Should fall through to min-skill fallback
 
       // Restore
@@ -3239,7 +3239,6 @@ static int test_bot_fire_weapon_underwater(void)
          pBotEdict->v.weapons = (1u << weapon_select[idx].iId);
          testbot.f_primary_charging = -1;
          testbot.f_secondary_charging = -1;
-         int saved_idx = testbot.current_weapon_index;
          // Should NOT reset current_weapon_index since weapon is underwater-capable
          BotFireWeapon(Vector(200, 0, 0), testbot, 0);
          // Note: current_weapon_index might change due to reuse/selection logic,
@@ -3449,7 +3448,6 @@ static int test_bot_shoot_at_enemy_not_visible_reset(void)
    mock_trace_line_fn = AlternatingTrace::trace;
    mock_trace_hull_fn = trace_nohit;
 
-   float old_reaction = testbot.f_reaction_target_time;
    BotShootAtEnemy(testbot);
    // Should have hit the "not visible during fire" path (line 1867)
    // which calls BotResetReactionTime

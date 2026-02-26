@@ -94,7 +94,77 @@ WAYPOINT_OBJS = engine_mock.o test_waypoint.o bot_weapons.o util.o safe_snprintf
 test_waypoint: $(WAYPOINT_OBJS) $(ZLIB_LIB)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(WAYPOINT_OBJS) $(ZLIB_LIB) -lm
 
-ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_geneticalg test_waypoint test_bot_navigate test_bot_skill test_bot_sound
+# h_export tests (h_export.cpp is #included in test file, standalone)
+test_h_export: test_h_export.o
+	${CXX} $(COVERAGE_FLAGS) -o $@ test_h_export.o
+
+# bot_config_init tests
+BOT_CONFIG_INIT_OBJS = engine_mock.o test_bot_config_init.o \
+	bot_config_init.o util.o safe_snprintf.o random_num.o
+
+test_bot_config_init: $(BOT_CONFIG_INIT_OBJS)
+	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_CONFIG_INIT_OBJS) -lm
+
+# bot_models tests
+BOT_MODELS_OBJS = engine_mock.o test_bot_models.o \
+	bot_models.o util.o safe_snprintf.o random_num.o
+
+test_bot_models: $(BOT_MODELS_OBJS)
+	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_MODELS_OBJS) -lm
+
+# bot_client tests
+BOT_CLIENT_OBJS = engine_mock.o test_bot_client.o \
+	bot_client.o bot_weapons.o util.o safe_snprintf.o random_num.o
+
+test_bot_client: $(BOT_CLIENT_OBJS)
+	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_CLIENT_OBJS) -lm
+
+# bot tests
+BOT_OBJS = engine_mock.o test_bot.o \
+	bot.o bot_config_init.o bot_weapons.o util.o safe_snprintf.o random_num.o
+
+test_bot: $(BOT_OBJS)
+	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_OBJS) -lm
+
+# commands tests
+COMMANDS_OBJS = engine_mock.o test_commands.o \
+	commands.o bot_weapons.o util.o safe_snprintf.o random_num.o
+
+test_commands: $(COMMANDS_OBJS)
+	${CXX} $(COVERAGE_FLAGS) -o $@ $(COMMANDS_OBJS) -lm
+
+# dll tests (dll.cpp needs VER_NOTE as a proper C string literal)
+dll.o: ../dll.cpp
+	${CXX} ${TEST_CXXFLAGS} -UVER_NOTE -DVER_NOTE='"test"' -c $< -o $@
+
+DLL_OBJS = engine_mock.o test_dll.o \
+	dll.o bot_weapons.o bot_sound.o util.o safe_snprintf.o random_num.o
+
+test_dll: $(DLL_OBJS)
+	${CXX} $(COVERAGE_FLAGS) -o $@ $(DLL_OBJS) -lm
+
+# engine tests
+ENGINE_OBJS = engine_mock.o test_engine.o \
+	engine.o bot_weapons.o bot_sound.o util.o safe_snprintf.o random_num.o
+
+test_engine: $(ENGINE_OBJS)
+	${CXX} $(COVERAGE_FLAGS) -o $@ $(ENGINE_OBJS) -lm
+
+# bot_query_hook tests
+BOT_QUERY_HOOK_OBJS = engine_mock.o test_bot_query_hook.o \
+	bot_query_hook.o util.o safe_snprintf.o random_num.o
+
+test_bot_query_hook: $(BOT_QUERY_HOOK_OBJS)
+	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_QUERY_HOOK_OBJS) -lm
+
+# bot_query_hook_linux tests
+BOT_QUERY_HOOK_LINUX_OBJS = engine_mock.o test_bot_query_hook_linux.o \
+	bot_query_hook_linux.o util.o safe_snprintf.o random_num.o
+
+test_bot_query_hook_linux: $(BOT_QUERY_HOOK_LINUX_OBJS)
+	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_QUERY_HOOK_LINUX_OBJS) -lm -lpthread
+
+ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_geneticalg test_waypoint test_bot_navigate test_bot_skill test_bot_sound test_h_export test_bot_config_init test_bot_models test_bot_client test_bot test_commands test_dll test_engine test_bot_query_hook test_bot_query_hook_linux
 
 all: $(ALL_TESTS)
 
@@ -113,6 +183,16 @@ run: $(ALL_TESTS)
 	./test_bot_navigate
 	./test_bot_skill
 	./test_bot_sound
+	./test_h_export
+	./test_bot_config_init
+	./test_bot_models
+	./test_bot_client
+	./test_bot
+	./test_commands
+	./test_dll
+	./test_engine
+	./test_bot_query_hook
+	./test_bot_query_hook_linux
 
 VALGRIND = valgrind --leak-check=full --error-exitcode=1
 
@@ -131,6 +211,16 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_bot_navigate
 	$(VALGRIND) ./test_bot_skill
 	$(VALGRIND) ./test_bot_sound
+	$(VALGRIND) ./test_h_export
+	$(VALGRIND) ./test_bot_config_init
+	$(VALGRIND) ./test_bot_models
+	$(VALGRIND) ./test_bot_client
+	$(VALGRIND) ./test_bot
+	$(VALGRIND) ./test_commands
+	$(VALGRIND) ./test_dll
+	$(VALGRIND) ./test_engine
+	$(VALGRIND) ./test_bot_query_hook
+	$(VALGRIND) ./test_bot_query_hook_linux
 
 coverage:
 	$(MAKE) clean
