@@ -105,6 +105,12 @@ static HANDLE FindDirectory(HANDLE hFile, char *dirname, int sizeof_dirname, cha
    }
 }
 
+static void CloseDirectory(HANDLE hFile)
+{
+   if (hFile != NULL)
+      FindClose(hFile);
+}
+
 #else
 
 // Linux directory wildcard routines...
@@ -137,6 +143,12 @@ static DIR *FindDirectory(DIR *directory, char *dirname, int sizeof_dirname, cha
    /* at end of directory? */
    closedir(directory);
    return NULL;
+}
+
+static void CloseDirectory(DIR *directory)
+{
+   if (directory != NULL)
+      closedir(directory);
 }
 #endif
 
@@ -220,6 +232,9 @@ void LoadBotModels(void)
       }
 
       if (number_skins == MAX_SKINS)
+      {
+         CloseDirectory(directory);
          break;  // break out if max models reached
+      }
    }
 }
