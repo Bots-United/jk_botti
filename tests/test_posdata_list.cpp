@@ -254,6 +254,81 @@ static int test_timetrim_remove_last_no_crash(void)
    return 0;
 }
 
+static int test_future_time_clamp(void)
+{
+   posdata_t pool[TEST_POOL_SIZE];
+   posdata_t *latest = NULL, *oldest = NULL;
+   memset(pool, 0, sizeof(pool));
+
+   printf("posdata future time clamp:\n");
+
+   // Add a node at time 5.0
+   posdata_t *n0 = posdata_get_slot(pool, TEST_POOL_SIZE, 5.0f, &latest, &oldest);
+   posdata_link_as_latest(&latest, &oldest, n0);
+   n0->time = 100.0f;  // simulate a future time
+
+   // get_slot with current_time=10.0 should clamp the future node's time
+   posdata_t *n1 = posdata_get_slot(pool, TEST_POOL_SIZE, 10.0f, &latest, &oldest);
+   posdata_link_as_latest(&latest, &oldest, n1);
+
+   TEST("future time clamped to current_time");
+   ASSERT_TRUE(n0->time <= 10.0f);
+   PASS();
+
+   return 0;
+}
+
+static int test_timetrim_empty_list(void)
+{
+   posdata_t *latest = NULL, *oldest = NULL;
+
+   printf("posdata timetrim on empty list:\n");
+
+   TEST("timetrim on empty list: no crash");
+   posdata_timetrim(&latest, &oldest, 5.0f);
+   ASSERT_PTR_NULL(latest);
+   ASSERT_PTR_NULL(oldest);
+   PASS();
+
+   return 0;
+}
+
+static int test_timetrim_all_removed(void)
+{
+   posdata_t pool[TEST_POOL_SIZE];
+   posdata_t *latest = NULL, *oldest = NULL;
+   memset(pool, 0, sizeof(pool));
+
+   printf("posdata timetrim removes all entries:\n");
+
+   // Add 3 nodes at times 1.0, 2.0, 3.0
+   posdata_t *n0 = posdata_get_slot(pool, TEST_POOL_SIZE, 1.0f, &latest, &oldest);
+   posdata_link_as_latest(&latest, &oldest, n0);
+   posdata_t *n1 = posdata_get_slot(pool, TEST_POOL_SIZE, 2.0f, &latest, &oldest);
+   posdata_link_as_latest(&latest, &oldest, n1);
+   posdata_t *n2 = posdata_get_slot(pool, TEST_POOL_SIZE, 3.0f, &latest, &oldest);
+   posdata_link_as_latest(&latest, &oldest, n2);
+
+   // Trim all entries (cutoff >= all times)
+   posdata_timetrim(&latest, &oldest, 10.0f);
+
+   TEST("all removed: latest is NULL");
+   ASSERT_PTR_NULL(latest);
+   PASS();
+
+   TEST("all removed: oldest is NULL");
+   ASSERT_PTR_NULL(oldest);
+   PASS();
+
+   TEST("all removed: all slots freed");
+   ASSERT_INT(n0->inuse, FALSE);
+   ASSERT_INT(n1->inuse, FALSE);
+   ASSERT_INT(n2->inuse, FALSE);
+   PASS();
+
+   return 0;
+}
+
 int main(void)
 {
    int rc = 0;
@@ -271,6 +346,12 @@ int main(void)
    rc |= test_steal_slot_no_cycle();
    printf("\n");
    rc |= test_timetrim_remove_last_no_crash();
+   printf("\n");
+   rc |= test_future_time_clamp();
+   printf("\n");
+   rc |= test_timetrim_empty_list();
+   printf("\n");
+   rc |= test_timetrim_all_removed();
 
    printf("\n%d/%d tests passed.\n", tests_passed, tests_run);
 

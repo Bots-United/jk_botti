@@ -85,6 +85,36 @@ static int test_sanitize(void)
    ASSERT_STR(buf, "ABC");
    PASS();
 
+   TEST("high-ASCII 0x80 removed");
+   strcpy(buf, "A\x80""B");
+   bot_name_sanitize(buf);
+   ASSERT_STR(buf, "AB");
+   PASS();
+
+   TEST("high-ASCII 0xFF removed");
+   strcpy(buf, "X\xFF""Y");
+   bot_name_sanitize(buf);
+   ASSERT_STR(buf, "XY");
+   PASS();
+
+   TEST("mixed high-ASCII 0x80-0xFF all removed");
+   strcpy(buf, "\x80\x90\xA0\xB0\xC0\xD0\xE0\xF0");
+   bot_name_sanitize(buf);
+   ASSERT_STR(buf, "");
+   PASS();
+
+   TEST("high-ASCII interleaved with printable");
+   strcpy(buf, "H\x80""e\x90""l\xA0""l\xB0""o");
+   bot_name_sanitize(buf);
+   ASSERT_STR(buf, "Hello");
+   PASS();
+
+   TEST("0x7E kept but 0x7F and 0x80 removed");
+   strcpy(buf, "~\x7F\x80!");
+   bot_name_sanitize(buf);
+   ASSERT_STR(buf, "~!");
+   PASS();
+
    return 0;
 }
 
@@ -128,6 +158,18 @@ static int test_strip_hlds_tag(void)
    strcpy(buf, "PlainBot");
    bot_name_strip_hlds_tag(buf);
    ASSERT_STR(buf, "PlainBot");
+   PASS();
+
+   TEST("(10)Bot unchanged (two-digit not valid)");
+   strcpy(buf, "(10)Bot");
+   bot_name_strip_hlds_tag(buf);
+   ASSERT_STR(buf, "(10)Bot");
+   PASS();
+
+   TEST("empty string unchanged");
+   strcpy(buf, "");
+   bot_name_strip_hlds_tag(buf);
+   ASSERT_STR(buf, "");
    PASS();
 
    return 0;

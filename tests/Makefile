@@ -98,16 +98,19 @@ test_waypoint: $(WAYPOINT_OBJS) $(ZLIB_LIB)
 test_h_export: test_h_export.o
 	${CXX} $(COVERAGE_FLAGS) -o $@ test_h_export.o
 
-# bot_config_init tests
+# bot_config_init tests (bot_config_init.cpp is #included in test file)
+test_bot_config_init.o: test_bot_config_init.cpp ../bot_config_init.cpp ../bot_config_init.h
+	${CXX} ${TEST_CXXFLAGS} -c $< -o $@
+
 BOT_CONFIG_INIT_OBJS = engine_mock.o test_bot_config_init.o \
-	bot_config_init.o util.o safe_snprintf.o random_num.o
+	safe_snprintf.o random_num.o
 
 test_bot_config_init: $(BOT_CONFIG_INIT_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_CONFIG_INIT_OBJS) -lm
 
-# bot_models tests
+# bot_models tests (bot_models.cpp is #included in test file, not linked separately)
 BOT_MODELS_OBJS = engine_mock.o test_bot_models.o \
-	bot_models.o util.o safe_snprintf.o random_num.o
+	util.o safe_snprintf.o random_num.o
 
 test_bot_models: $(BOT_MODELS_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_MODELS_OBJS) -lm
@@ -119,9 +122,12 @@ BOT_CLIENT_OBJS = engine_mock.o test_bot_client.o \
 test_bot_client: $(BOT_CLIENT_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_CLIENT_OBJS) -lm
 
-# bot tests
+# bot tests (bot.cpp is #included in test file, not linked separately)
+test_bot.o: test_bot.cpp ../bot.cpp
+	${CXX} ${TEST_CXXFLAGS} -c $< -o $@
+
 BOT_OBJS = engine_mock.o test_bot.o \
-	bot.o bot_config_init.o bot_weapons.o util.o safe_snprintf.o random_num.o
+	bot_config_init.o bot_weapons.o util.o safe_snprintf.o random_num.o
 
 test_bot: $(BOT_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_OBJS) -lm
@@ -135,7 +141,7 @@ test_commands: $(COMMANDS_OBJS)
 
 # dll tests (dll.cpp needs VER_NOTE as a proper C string literal)
 dll.o: ../dll.cpp
-	${CXX} ${TEST_CXXFLAGS} -UVER_NOTE -DVER_NOTE='"test"' -c $< -o $@
+	${CXX} ${TEST_CXXFLAGS} -UVER_NOTE -DVER_NOTE='"test"' -UVER_MAJOR -DVER_MAJOR=0 -UVER_MINOR -DVER_MINOR=0 -c $< -o $@
 
 DLL_OBJS = engine_mock.o test_dll.o \
 	dll.o bot_weapons.o bot_sound.o util.o safe_snprintf.o random_num.o
@@ -150,19 +156,22 @@ ENGINE_OBJS = engine_mock.o test_engine.o \
 test_engine: $(ENGINE_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(ENGINE_OBJS) -lm
 
-# bot_query_hook tests
+# bot_query_hook tests (bot_query_hook.cpp is #included in test file)
+test_bot_query_hook.o: test_bot_query_hook.cpp ../bot_query_hook.cpp ../bot_query_hook.h
+	${CXX} ${TEST_CXXFLAGS} -c $< -o $@
+
 BOT_QUERY_HOOK_OBJS = engine_mock.o test_bot_query_hook.o \
-	bot_query_hook.o util.o safe_snprintf.o random_num.o
+	util.o safe_snprintf.o random_num.o
 
 test_bot_query_hook: $(BOT_QUERY_HOOK_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_QUERY_HOOK_OBJS) -lm
 
-# bot_query_hook_linux tests
-BOT_QUERY_HOOK_LINUX_OBJS = engine_mock.o test_bot_query_hook_linux.o \
-	bot_query_hook_linux.o util.o safe_snprintf.o random_num.o
+# bot_query_hook_linux tests (bot_query_hook_linux.cpp is #included in test file)
+test_bot_query_hook_linux.o: test_bot_query_hook_linux.cpp ../bot_query_hook_linux.cpp ../bot_query_hook.h
+	${CXX} -Wall -I".." $(COVERAGE_FLAGS) -c $< -o $@
 
-test_bot_query_hook_linux: $(BOT_QUERY_HOOK_LINUX_OBJS)
-	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_QUERY_HOOK_LINUX_OBJS) -lm -lpthread
+test_bot_query_hook_linux: test_bot_query_hook_linux.o
+	${CXX} $(COVERAGE_FLAGS) -o $@ test_bot_query_hook_linux.o -lpthread
 
 # bot_query_hook_win32 tests (source #included with -D_WIN32, mock Win32 headers)
 test_bot_query_hook_win32.o: test_bot_query_hook_win32.cpp ../bot_query_hook_win32.cpp ../bot_query_hook.h windows.h winsock2.h
