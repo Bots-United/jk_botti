@@ -315,11 +315,11 @@ static int test_CGeneticAlgorithm(void)
       CGeneticAlgorithm ga_high(0.2, 0.7, 100);
       ASSERT_INT(ga_high.get_crossover_interleave(5), 5);
 
-      // interleave < 1 returns random in [1, num_genes+1]
+      // interleave < 1 returns random in [1, num_genes]
       fast_random_seed(42);
       CGeneticAlgorithm ga_low(0.2, 0.7, 0);
       int val = ga_low.get_crossover_interleave(5);
-      ASSERT_TRUE(val >= 1 && val <= 6);
+      ASSERT_TRUE(val >= 1 && val <= 5);
    }
    PASS();
 

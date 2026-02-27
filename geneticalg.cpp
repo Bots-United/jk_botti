@@ -140,7 +140,7 @@ int CGeneticAlgorithm::get_crossover_interleave(int num_genes)
       return num_genes;
 
    if (m_crossover_interleave < 1)
-      return get_random_int(1, num_genes + 1);
+      return get_random_int(1, num_genes);
 
    return m_crossover_interleave;
 }
