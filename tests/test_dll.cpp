@@ -2353,6 +2353,55 @@ static int test_pm_playsound_valid_player(void)
    return 0;
 }
 
+extern void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch);
+
+static int test_pm_playsound_volume_formula(void)
+{
+   TEST("new_PM_PlaySound: volume maps [0,1] to [0,1000]");
+
+   reset_test_state();
+
+   // Install the hook so old_PM_PlaySound is non-NULL
+   struct playermove_s &ppmove = pm_move_test_ppmove;
+   memset(&ppmove, 0, sizeof(ppmove));
+   ppmove.PM_PlaySound = tracking_old_pm_playsound;
+   api_table.pfnPM_Move(&ppmove, TRUE);
+
+   // Set up valid player
+   mock_current_player = 0;
+   edict_t *pPlayer = &mock_edicts[1];
+   memset(pPlayer, 0, sizeof(*pPlayer));
+   pPlayer->v.pContainingEntity = pPlayer;
+   pPlayer->v.origin = Vector(100, 200, 300);
+   gpGlobals->maxClients = 1;
+
+   // Set up CSoundEnt so SaveSound stores the sound
+   static CSoundEnt soundEnt;
+   pSoundEnt = &soundEnt;
+   pSoundEnt->Initialize();
+
+   // Call with volume=0 (silent)
+   new_PM_PlaySound(1, "player/step.wav", 0.0f, 1.0f, 0, 100);
+
+   // volume=0 should give ivolume=0, not 500
+   CSound *snd = CSoundEnt::GetEdictChannelSound(pPlayer, 1);
+   ASSERT_PTR_NOT_NULL(snd);
+   ASSERT_INT(snd->m_iVolume, 0);
+
+   pSoundEnt->Initialize();
+
+   // Call with volume=1.0 (max)
+   new_PM_PlaySound(2, "player/step.wav", 1.0f, 1.0f, 0, 100);
+
+   snd = CSoundEnt::GetEdictChannelSound(pPlayer, 2);
+   ASSERT_PTR_NOT_NULL(snd);
+   ASSERT_INT(snd->m_iVolume, 1000);
+
+   pSoundEnt = NULL;
+   PASS();
+   return 0;
+}
+
 // ============================================================
 // StartFrame alive player waypoint loop tests
 // ============================================================
@@ -2679,6 +2728,7 @@ int main(void)
    fail |= test_pm_playsound_deathmatch_0();
    fail |= test_pm_playsound_invalid_player();
    fail |= test_pm_playsound_valid_player();
+   fail |= test_pm_playsound_volume_formula();
 
    printf("=== StartFrame tests ===\n");
    fail |= test_startframe_deathmatch_0_ignored();

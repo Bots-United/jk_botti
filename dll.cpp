@@ -505,7 +505,7 @@ static void PlayerPostThink_Post( edict_t *pEdict )
 }
 
 
-static void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch)
+void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch)
 {
    if (gpGlobals->deathmatch)
    {
@@ -520,7 +520,7 @@ static void new_PM_PlaySound(int channel, const char *sample, float volume, floa
 
          if(!FNullEnt(pPlayer))
          {
-            int ivolume = (int)(1000*((volume+1)/2));
+            int ivolume = (int)(1000*volume + 0.5f);
             SaveSound(pPlayer, pPlayer->v.origin, ivolume, channel, 5.0f);
          }
       }
