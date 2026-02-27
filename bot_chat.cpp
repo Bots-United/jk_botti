@@ -697,10 +697,9 @@ void BotChatTalk(bot_t &pBot)
 
    if ((bot_chat_count > 0) && (pBot.f_bot_chat_time < gpGlobals->time))
    {
-      pBot.f_bot_chat_time = gpGlobals->time + 30.0;
-
       if (RANDOM_LONG2(1,100) <= pBot.chat_percent)
       {
+         pBot.f_bot_chat_time = gpGlobals->time + 30.0;
          int chat_index;
          qboolean used;
          int i, recent_count;

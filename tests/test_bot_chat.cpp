@@ -1189,17 +1189,19 @@ static int test_BotChatTalk(void)
    ASSERT_INT(bot.b_bot_say, FALSE);
    PASS();
 
-   TEST("skip: percent=0");
+   TEST("skip: percent=0 -> no chat and no cooldown");
    reset_chat_state();
    bot_edict = &mock_edicts[1];
    setup_bot_for_chat_test(bot, bot_edict);
    bot.chat_percent = 0;
+   bot.f_bot_chat_time = 0.0;
    bot_chat_count = 1;
    safe_strcopy(bot_chat[0].text, sizeof(bot_chat[0].text), "test");
    bot_chat[0].can_modify = FALSE;
    BotChatTalk(bot);
-   // Even though percent check fails, f_bot_chat_time still set to +30s
    ASSERT_INT(bot.b_bot_say, FALSE);
+   // Cooldown should NOT be set when percent check suppresses chat
+   ASSERT_FLOAT_NEAR(bot.f_bot_chat_time, 0.0, 0.01);
    PASS();
 
    TEST("success: sets message and 30s cooldown");
