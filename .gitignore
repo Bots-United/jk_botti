@@ -19,3 +19,9 @@ tmp/
 *.gcov
 coverage.info
 tests/coverage_report/
+
+.c*/
+
+zlib/Makefile
+zlib/configure.log
+zlib/zlib.pc
