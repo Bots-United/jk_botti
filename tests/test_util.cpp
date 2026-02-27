@@ -1765,7 +1765,7 @@ static int test_fvisible_enemy(void)
 
    TEST("head blocked, feet visible -> TRUE (covers feet_offset path)");
    pEnemy->v.solid = SOLID_SLIDEBOX;
-   // Head at maxs.z - 6 = 30, feet at mins.z - 6 = -42
+   // Head at maxs.z - 6 = 30, feet at mins.z + 6 = -30
    // We need trace to block for head but pass for feet.
    static int s_trace_call_count;
    s_trace_call_count = 0;

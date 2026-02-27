@@ -773,7 +773,7 @@ qboolean FVisibleEnemy( const Vector &vecOrigin, edict_t *pEdict, edict_t *pEnem
          return(TRUE);
 
       // then check if feet are visible
-      Vector feet_offset = Vector(0, 0, pEnemy->v.mins.z - 6);
+      Vector feet_offset = Vector(0, 0, pEnemy->v.mins.z + 6);
       if (FVisibleEnemyOffset( vecOrigin, feet_offset, pEdict, pEnemy ))
          return(TRUE);
    }
