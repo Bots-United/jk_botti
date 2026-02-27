@@ -879,7 +879,7 @@ int WaypointFindRunawayPath(int runner, int enemy)
       runner_distance = WaypointDistanceFromTo(runner, index);
       enemy_distance = WaypointDistanceFromTo(enemy, index);
 
-      if(runner_distance == WAYPOINT_MAX_DISTANCE)
+      if(runner_distance >= WAYPOINT_MAX_DISTANCE)
          continue;
 
       difference = enemy_distance - runner_distance;

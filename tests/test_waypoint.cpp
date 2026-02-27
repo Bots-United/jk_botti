@@ -859,11 +859,11 @@ static int test_WaypointRouteMatrix(void)
    setup_waypoint(1, Vector(100,0,0), 0, 0);
    setup_waypoint(2, Vector(200,0,0), 0, 0);
    setup_route_matrix(3);
-   // Override: make runner's self-distance also WAYPOINT_MAX_DISTANCE
-   // so all runner_distance checks fail (runner can reach nothing)
-   shortest_path[0 * 3 + 0] = WAYPOINT_MAX_DISTANCE;
-   shortest_path[0 * 3 + 1] = WAYPOINT_MAX_DISTANCE;
-   shortest_path[0 * 3 + 2] = WAYPOINT_MAX_DISTANCE;
+   // Use WAYPOINT_UNREACHABLE (65535) -- the real value Floyd's algorithm
+   // leaves for unreachable paths (not WAYPOINT_MAX_DISTANCE which is 65534)
+   shortest_path[0 * 3 + 0] = WAYPOINT_UNREACHABLE;
+   shortest_path[0 * 3 + 1] = WAYPOINT_UNREACHABLE;
+   shortest_path[0 * 3 + 2] = WAYPOINT_UNREACHABLE;
    ASSERT_INT(WaypointFindRunawayPath(0, 1), -1);
    PASS();
 
