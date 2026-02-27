@@ -2363,6 +2363,40 @@ static int test_WaypointFindItem(void)
    }
    PASS();
 
+   TEST("finds func_healthcharger near W_FL_HEALTH waypoint");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0,0,0), W_FL_HEALTH, 0);
+   {
+      edict_t *e = setup_entity("func_healthcharger", Vector(10, 0, 0));
+      edict_t *result = WaypointFindItem(0);
+      ASSERT_PTR_EQ(result, e);
+   }
+   PASS();
+
+   TEST("func_healthcharger ignored without W_FL_HEALTH flag");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0,0,0), W_FL_ARMOR, 0);
+   setup_entity("func_healthcharger", Vector(10, 0, 0));
+   ASSERT_PTR_NULL(WaypointFindItem(0));
+   PASS();
+
+   TEST("finds func_recharge near W_FL_ARMOR waypoint");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0,0,0), W_FL_ARMOR, 0);
+   {
+      edict_t *e = setup_entity("func_recharge", Vector(10, 0, 0));
+      edict_t *result = WaypointFindItem(0);
+      ASSERT_PTR_EQ(result, e);
+   }
+   PASS();
+
+   TEST("func_recharge ignored without W_FL_ARMOR flag");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0,0,0), W_FL_HEALTH, 0);
+   setup_entity("func_recharge", Vector(10, 0, 0));
+   ASSERT_PTR_NULL(WaypointFindItem(0));
+   PASS();
+
    return 0;
 }
 
