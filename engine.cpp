@@ -138,7 +138,7 @@ static void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short
    }
 
    // event causes client recoil?
-   if(pei->recoil[0] != 0.0f && pei->recoil[1] != 0.0f && !FNullEnt(pInvoker))
+   if((pei->recoil[0] != 0.0f || pei->recoil[1] != 0.0f) && !FNullEnt(pInvoker))
    {
       // gauss uses bug fix that sends two events at same time,
       // ignore the duplicated one...

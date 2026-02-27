@@ -566,6 +566,34 @@ static int test_PlaybackEvent_zero_volume_no_sound(void)
    return 0;
 }
 
+static int test_PlaybackEvent_recoil_one_zero_component(void)
+{
+   TEST("PlaybackEvent: recoil with one zero component applies recoil");
+
+   test_reset();
+   gpGlobals->deathmatch = 1;
+
+   // Register firehornet event (recoil={0.0, 2.0}) with eventindex=30
+   gpMetaGlobals->status = MRES_IGNORED;
+   unsigned short idx = 30;
+   gpMetaGlobals->orig_ret = (void *)&idx;
+   g_eng_hooks_post.pfnPrecacheEvent(1, "events/firehornet.sc");
+
+   edict_t *bot_edict = setup_bot(5);
+   bots[5].f_recoil = 0.0f;
+
+   g_eng_hooks.pfnPlaybackEvent(0, bot_edict, 30, 0.0f, NULL, NULL,
+                                 0.0f, 0.0f, 0, 0, 0, 0);
+
+   // recoil={0.0, 2.0}: RANDOM_FLOAT2 clamped to [0.0, 2.0]
+   // With && bug: 0.0 != 0.0 is FALSE, so recoil never applied (stays 0.0)
+   // With || fix: 2.0 != 0.0 is TRUE, so recoil IS applied
+   ASSERT_TRUE(bots[5].f_recoil != 0.0f);
+
+   PASS();
+   return 0;
+}
+
 // ============================================================
 // Tests: pfnEmitSound
 // ============================================================
@@ -1719,6 +1747,9 @@ int main(void)
    fail |= test_GetPlayerUserId_HLDM_bot();
    fail |= test_GetPlayerUserId_OP4_non_bot();
    fail |= test_GetPlayerUserId_deathmatch_0();
+
+   // PlaybackEvent recoil tests
+   fail |= test_PlaybackEvent_recoil_one_zero_component();
 
    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
    return fail ? EXIT_FAILURE : EXIT_SUCCESS;
