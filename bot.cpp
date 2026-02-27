@@ -1283,6 +1283,11 @@ static void BotFindItem( bot_t &pBot )
                         can_pickup = TRUE;
                      }
                   }
+                  else
+                  {
+                     // don't have this weapon, pick it up
+                     can_pickup = TRUE;
+                  }
                }
                else
                {

@@ -4411,7 +4411,7 @@ static int test_BotDoStrafe_ladder_angle_variations(void)
 
 static int test_BotFindItem_weapon_dont_have(void)
 {
-   TEST("BotFindItem: weapon_shotgun, bot doesn't own -> no pickup");
+   TEST("BotFindItem: weapon_shotgun, bot doesn't own -> picks it up");
    setup_engine_funcs();
 
    edict_t *e = mock_alloc_edict();
@@ -4427,9 +4427,8 @@ static int test_BotFindItem_weapon_dont_have(void)
 
    BotFindItem(bot);
 
-   // Bot has shotgun in weapon_select but doesn't own it -> no pickup
-   // (only picks up if owns and ammo low, or unknown weapon)
-   ASSERT_PTR_NULL(bot.pBotPickupItem);
+   // Bot doesn't own shotgun -> should pick it up
+   ASSERT_PTR_NOT_NULL(bot.pBotPickupItem);
 
    PASS();
    return 0;
