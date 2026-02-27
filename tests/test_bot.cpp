@@ -4380,7 +4380,7 @@ static int test_BotDoStrafe_ladder_waypoint_slow(void)
 
 static int test_BotDoStrafe_ladder_angle_variations(void)
 {
-   TEST("BotDoStrafe: ladder angle_diff > 45 -> strafe");
+   TEST("BotDoStrafe: ladder angle_diff > 45 -> strafe right");
    setup_engine_funcs();
 
    edict_t *e = mock_alloc_edict();
@@ -4390,16 +4390,83 @@ static int test_BotDoStrafe_ladder_angle_variations(void)
    bot.b_on_ladder = TRUE;
    bot.curr_waypoint_index = 0;
    waypoints[0].flags = W_FL_LADDER;
-   waypoints[0].origin = Vector(100, 100, 50); // waypoint at ~45 degrees
+   waypoints[0].origin = Vector(100, 100, 50);
    num_waypoints = 1;
 
-   // Velocity going right at high speed (angle_diff > 45)
+   // Velocity going right at high speed (angle_diff = 90 > 45)
    e->v.velocity = Vector(30, 0, 0); // moving at yaw 0
    e->v.v_angle = Vector(0, -90, 0); // looking at yaw -90
 
    BotDoStrafe(bot);
 
+   ASSERT_FLOAT(bot.f_strafe_direction, -1.0f); // strafe right
+   ASSERT_FLOAT(bot.f_move_direction, 1.0f);
    ASSERT_FLOAT(bot.f_move_speed, 150.0f * bot.f_move_direction);
+
+   PASS();
+   return 0;
+}
+
+static int test_BotDoStrafe_ladder_angle_behind(void)
+{
+   TEST("BotDoStrafe: ladder angle_diff > 135 -> move forward (fast)");
+   setup_engine_funcs();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_alive_bot(bot, e);
+   bot.pBotEnemy = NULL;
+   bot.b_on_ladder = TRUE;
+   bot.curr_waypoint_index = 0;
+   waypoints[0].flags = W_FL_LADDER;
+   waypoints[0].origin = Vector(100, 100, 50);
+   num_waypoints = 1;
+
+   // Velocity nearly opposite to look direction (angle_diff ~= 170 > 135)
+   // move_dir = yaw of velocity, look_dir = v_angle.y
+   // angle_diff = WrapAngle(move_dir - look_dir)
+   // velocity at yaw ~0, looking at yaw ~-170 -> angle_diff ~= 170
+   e->v.velocity = Vector(30, 1, 0);   // moving at yaw ~0
+   e->v.v_angle = Vector(0, -170, 0);  // looking at yaw -170
+
+   BotDoStrafe(bot);
+
+   // angle_diff > 135: should move forward (not strafe)
+   ASSERT_FLOAT(bot.f_strafe_direction, 0.0f);
+   ASSERT_FLOAT(bot.f_move_direction, 1.0f);
+
+   PASS();
+   return 0;
+}
+
+static int test_BotDoStrafe_ladder_angle_behind_slow(void)
+{
+   TEST("BotDoStrafe: ladder angle_diff <= -135 -> move backward (slow)");
+   setup_engine_funcs();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_alive_bot(bot, e);
+   bot.pBotEnemy = NULL;
+   bot.b_on_ladder = TRUE;
+   bot.curr_waypoint_index = 0;
+   waypoints[0].flags = W_FL_LADDER;
+   waypoints[0].origin = Vector(100, 100, 50);
+   num_waypoints = 1;
+
+   // Slow velocity, waypoint behind look direction
+   // waypoint_dir ~= 45, look_dir = -135 -> angle_diff = WrapAngle(45 - (-135)) = WrapAngle(180) = 180 or -180
+   // Let's use look_dir = 180+45 = 225 -> wrapped = -135
+   // waypoint at (100,100,50) from origin (0,0,0): yaw = atan2(100,100) ~= 45
+   // angle_diff = WrapAngle(45 - 225) = WrapAngle(-180) = 180 > 135
+   e->v.velocity = Vector(0, 5, 0); // slow velocity
+   e->v.v_angle = Vector(0, 225, 0); // looking away from waypoint
+
+   BotDoStrafe(bot);
+
+   // angle_diff > 135: should move backward (slow path)
+   ASSERT_FLOAT(bot.f_strafe_direction, 0.0f);
+   ASSERT_FLOAT(bot.f_move_direction, -1.0f);
 
    PASS();
    return 0;
@@ -5157,6 +5224,8 @@ int main(void)
    fail |= test_BotDoStrafe_ladder_waypoint_fast();
    fail |= test_BotDoStrafe_ladder_waypoint_slow();
    fail |= test_BotDoStrafe_ladder_angle_variations();
+   fail |= test_BotDoStrafe_ladder_angle_behind();
+   fail |= test_BotDoStrafe_ladder_angle_behind_slow();
 
    // Phase 4: BotFindItem weapon/ammo
    fail |= test_BotFindItem_weapon_dont_have();

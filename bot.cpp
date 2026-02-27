@@ -2107,13 +2107,13 @@ static void BotDoStrafe(bot_t &pBot)
 
              float angle_diff = UTIL_WrapAngle(move_dir - look_dir);
 
-             if(angle_diff > 135.0f || angle_diff <= 135.0f)
+             if(angle_diff > 135.0f || angle_diff <= -135.0f)
              {
                 // move forward
                 pBot.f_strafe_direction = 0.0;
                 pBot.f_move_direction = 1.0;
              }
-             if(angle_diff > 45.0f)
+             else if(angle_diff > 45.0f)
             {
                // strafe on right
                pBot.f_strafe_direction = -1.0;
@@ -2145,13 +2145,13 @@ static void BotDoStrafe(bot_t &pBot)
 
             float angle_diff = UTIL_WrapAngle(waypoint_dir - look_dir);
 
-             if(angle_diff > 135.0f || angle_diff <= 135.0f)
+             if(angle_diff > 135.0f || angle_diff <= -135.0f)
              {
                 // move backwards
                 pBot.f_strafe_direction = 0.0;
                 pBot.f_move_direction = -1.0;
              }
-             if(angle_diff > 45.0f)
+             else if(angle_diff > 45.0f)
             {
                // strafe on left
                pBot.f_strafe_direction = 1.0;
