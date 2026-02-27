@@ -316,7 +316,7 @@ static int test_change_pitch_both_positive_current_gt_ideal(void)
    float diff = BotChangePitch(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.x, 40.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 20.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 10.0f, 0.01f);  // remaining: |40 - 30|
    PASS();
    return 0;
 }
@@ -336,7 +336,7 @@ static int test_change_pitch_both_positive_current_lt_ideal(void)
    float diff = BotChangePitch(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.x, 20.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 40.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);  // remaining: |20 - 50|
    PASS();
    return 0;
 }
@@ -356,7 +356,7 @@ static int test_change_pitch_pos_to_neg(void)
    float diff = BotChangePitch(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.x, 0.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 40.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);  // remaining: |0 - (-30)|
    PASS();
    return 0;
 }
@@ -376,7 +376,7 @@ static int test_change_pitch_neg_to_pos(void)
    float diff = BotChangePitch(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.x, 0.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 40.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);  // remaining: |0 - 30|
    PASS();
    return 0;
 }
@@ -396,7 +396,7 @@ static int test_change_pitch_both_negative(void)
    float diff = BotChangePitch(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.x, -40.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 20.0f, 0.01f);  // remaining: |-40 - (-20)|
    PASS();
    return 0;
 }
@@ -416,7 +416,7 @@ static int test_change_pitch_speed_clamped(void)
    float diff = BotChangePitch(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.x, 12.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 2.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 0.0f, 0.01f);  // reached ideal exactly
    PASS();
    return 0;
 }
@@ -440,7 +440,7 @@ static int test_change_yaw_both_positive_current_gt_ideal(void)
    float diff = BotChangeYaw(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.y, 80.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 20.0f, 0.01f);  // remaining: |80 - 60|
    PASS();
    return 0;
 }
@@ -460,7 +460,7 @@ static int test_change_yaw_both_positive_current_lt_ideal(void)
    float diff = BotChangeYaw(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.y, 40.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 60.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 50.0f, 0.01f);  // remaining: |40 - 90|
    PASS();
    return 0;
 }
@@ -480,7 +480,7 @@ static int test_change_yaw_pos_to_neg(void)
    float diff = BotChangeYaw(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.y, 0.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 40.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);  // remaining: |0 - (-30)|
    PASS();
    return 0;
 }
@@ -500,7 +500,7 @@ static int test_change_yaw_neg_to_pos(void)
    float diff = BotChangeYaw(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.y, 0.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 40.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);  // remaining: |0 - 30|
    PASS();
    return 0;
 }
@@ -520,7 +520,7 @@ static int test_change_yaw_both_negative(void)
    float diff = BotChangeYaw(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.y, -70.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 40.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);  // remaining: |-70 - (-40)|
    PASS();
    return 0;
 }
@@ -540,7 +540,7 @@ static int test_change_yaw_speed_clamped(void)
    float diff = BotChangeYaw(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.y, 48.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 3.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 0.0f, 0.01f);  // reached ideal exactly
    PASS();
    return 0;
 }

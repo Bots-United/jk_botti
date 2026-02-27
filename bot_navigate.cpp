@@ -99,7 +99,7 @@ float BotChangePitch( bot_t &pBot, float speed )
 
    pEdict->v.v_angle.x = current;
 
-   return diff;  // return number of degrees left to turn
+   return fabs(current - ideal);  // return number of degrees left to turn
 }
 
 
@@ -173,7 +173,7 @@ float BotChangeYaw( bot_t &pBot, float speed )
 
    pEdict->v.v_angle.y = current;
 
-   return diff;  // return number of degrees left to turn
+   return fabs(current - ideal);  // return number of degrees left to turn
 }
 
 
