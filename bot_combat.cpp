@@ -386,7 +386,11 @@ static Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolea
       newer = &newertmp;
    }
 
-   // don't mix dead data with alive data
+   // Don't mix dead data with alive data.
+   // When one sample is dead and other alive (target just died or respawned),
+   // use the dead/last-known position instead of the new spawn location.
+   // This prevents unnatural aim snaps to potentially non-visible respawn
+   // locations -- a respawned target is effectively a new entity.
    if(!newer->was_alive && older->was_alive)
    {
       return(TracePredictedMovement(pBot, pPlayer, newer->origin, newer->velocity, fabs(gpGlobals->time - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity));
