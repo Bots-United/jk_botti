@@ -963,7 +963,6 @@ void BotFindEnemy( bot_t &pBot )
       // search the world for players...
       for (i = 1; i <= gpGlobals->maxClients; i++)
       {
-         Vector v_player;
          edict_t *pPlayer = INDEXENT(i);
 
          // skip invalid players and skip self (i.e. this bot)
@@ -1005,7 +1004,7 @@ void BotFindEnemy( bot_t &pBot )
 
             nearestdistance = distance;
             pNewEnemy = pPlayer;
-            v_newenemy = v_player;
+            v_newenemy = pPlayer->v.origin;
 
 #if DEBUG_ENEMY_SELECT
        enemy_type = "player";
