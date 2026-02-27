@@ -930,7 +930,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
          if (pBot.pBotEnemy != NULL)
             pBot.f_waypoint_goal_time = gpGlobals->time + 0.25;
          else   // a little delay time, since we'll touch the waypoint before we actually get what it has
-            pBot.f_waypoint_goal_time = gpGlobals->time + 0.25;
+            pBot.f_waypoint_goal_time = gpGlobals->time + 0.5;
 
          // don't pick same object too often
          if(pBot.wpt_goal_type == WPT_GOAL_HEALTH ||
