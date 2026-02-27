@@ -132,7 +132,7 @@ static void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short
    // event creates sound?
    if(pei->volume > 0.0f && !FNullEnt(pInvoker))
    {
-      int ivolume = (int)(1000*pei->volume);
+      int ivolume = (int)(1000*pei->volume + 0.5f);
 
       SaveSound((edict_t*)pInvoker, pInvoker->v.origin, ivolume, CHAN_WEAPON, 5.0f);
    }
@@ -160,7 +160,7 @@ static void pfnEmitSound(edict_t *entity, int channel, const char *sample, float
 {
    if (gpGlobals->deathmatch && !FNullEnt(entity))
    {
-      int ivolume = (int)(1000*volume);
+      int ivolume = (int)(1000*volume + 0.5f);
       const char *classname = (const char *)STRING(entity->v.classname);
       float duration = 5.0f;
 

@@ -297,7 +297,7 @@ static int test_PrecacheEvent_Post_known_event(void)
    ASSERT_TRUE(count_active_sounds() > 0);
    CSound *s = get_first_active_sound();
    ASSERT_PTR_NOT_NULL(s);
-   ASSERT_INT(s->m_iVolume, 959); // (int)(1000*0.96f) on x87
+   ASSERT_INT(s->m_iVolume, 960); // (int)(1000*0.96f + 0.5f)
 
    PASS();
    return 0;
@@ -680,7 +680,7 @@ static int test_EmitSound_other_entity(void)
    ASSERT_TRUE(count_active_sounds() > 0);
    CSound *s = get_first_active_sound();
    ASSERT_PTR_NOT_NULL(s);
-   ASSERT_INT(s->m_iVolume, 699); // (int)(1000*0.7f) on x87
+   ASSERT_INT(s->m_iVolume, 700); // (int)(1000*0.7f + 0.5f)
    ASSERT_FLOAT(s->m_flExpireTime, gpGlobals->time + 5.0f);
 
    PASS();
