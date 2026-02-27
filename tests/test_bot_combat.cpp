@@ -2912,6 +2912,26 @@ static int test_bot_find_enemy_sound_enemy_path(void)
    ASSERT_INT(bots[bot_idx].wpt_goal_type, WPT_GOAL_ENEMY);
    PASS();
 
+   // Reset for next test in same sound environment
+   bots[bot_idx].pBotEnemy = NULL;
+   pSoundEnt->Initialize();
+
+   TEST("sound enemy: ideal_yaw faces enemy, not world origin");
+   // Place enemy at (0, -300, 0) behind bot (+Y facing would miss too)
+   // Bot at origin facing +X, enemy behind/left -> not in view cone for
+   // normal player scan, found only via sound.
+   edict_t *pEnemy2 = create_enemy_player(Vector(0, -300, 0));
+   bots[bot_idx].pEdict->v.v_angle = Vector(0, 0, 0); // face +X
+   bots[bot_idx].pEdict->v.ideal_yaw = 0;
+   bots[bot_idx].f_next_find_visible_sound_enemy_time = 0;
+   CSoundEnt::InsertSound(pEnemy2, 1, Vector(0, -300, 0), 2000, 5.0, -1);
+   BotFindEnemy(bots[bot_idx]);
+   ASSERT_PTR_EQ(bots[bot_idx].pBotEnemy, pEnemy2);
+   // With the bug, v_newenemy is (0,0,0) from init, so ideal_yaw would be
+   // 0 or -90 (depending on VecToAngles of zero vec). Correct: ~-90.
+   ASSERT_FLOAT_NEAR(bots[bot_idx].pEdict->v.ideal_yaw, -90.0, 1.0);
+   PASS();
+
    pSoundEnt = NULL;
    return 0;
 }

@@ -1081,6 +1081,7 @@ void BotFindEnemy( bot_t &pBot )
          //UTIL_HostSay(pEdict, 0, msg);
 
          is_sound_enemy = TRUE;
+         v_newenemy = pNewEnemy->v.origin;
 
 #if DEBUG_ENEMY_SELECT
          enemy_type = "sound-enemy";
