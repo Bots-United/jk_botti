@@ -942,6 +942,29 @@ static int test_MessageBegin_MSG_ALL_SVC_INTERMISSION(void)
    return 0;
 }
 
+static int test_MessageBegin_bot_unknown_msg_clears(void)
+{
+   TEST("pfnMessageBegin: bot + unknown msg -> clears botMsgFn");
+
+   test_reset();
+   gpGlobals->deathmatch = 1;
+
+   edict_t *bot_edict = setup_bot(0);
+
+   // Set stale handler from previous message
+   botMsgFunction = BotClient_Valve_WeaponList;
+   botMsgEndFunction = NULL;
+
+   // Send an unknown message type (9999) to the bot
+   g_eng_hooks.pfnMessageBegin(MSG_ONE, 9999, NULL, bot_edict);
+
+   // botMsgFunction should be cleared, not stale
+   ASSERT_PTR_NULL((void*)botMsgFunction);
+
+   PASS();
+   return 0;
+}
+
 static int test_MessageBegin_non_bot_player(void)
 {
    TEST("pfnMessageBegin: non-bot player -> clears botMsgFn");
@@ -1652,6 +1675,7 @@ int main(void)
    fail |= test_MessageBegin_bot_Health();
    fail |= test_MessageBegin_MSG_ALL_DeathMsg();
    fail |= test_MessageBegin_MSG_ALL_SVC_INTERMISSION();
+   fail |= test_MessageBegin_bot_unknown_msg_clears();
    fail |= test_MessageBegin_non_bot_player();
    fail |= test_MessageBegin_other_dest_WeaponList();
 

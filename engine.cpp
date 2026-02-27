@@ -233,6 +233,7 @@ static void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, ed
          // is this message for a bot?
          if (index != -1)
          {
+            botMsgFunction = NULL;     // no msg function until known otherwise
             botMsgEndFunction = NULL;  // no msg end function until known otherwise
             botMsgIndex = index;       // index of bot receiving message
 
