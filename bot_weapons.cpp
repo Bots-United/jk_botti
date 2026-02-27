@@ -832,19 +832,19 @@ float ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(float distance, float
    float dis2_diff = fabs(distances[dis_idx] - distance);
    float total_diff = dis1_diff + dis2_diff;
 
-   // height_idx - 1
-   float angle_1 = (dis1_diff/total_diff) * mp5_grenade_angles[height_idx - 1].distance.angles[dis_idx - 1] +
-                   (dis2_diff/total_diff) * mp5_grenade_angles[height_idx - 1].distance.angles[dis_idx];
+   // height_idx - 1 (weight for each point is proportional to distance from the OTHER point)
+   float angle_1 = (dis2_diff/total_diff) * mp5_grenade_angles[height_idx - 1].distance.angles[dis_idx - 1] +
+                   (dis1_diff/total_diff) * mp5_grenade_angles[height_idx - 1].distance.angles[dis_idx];
    // height_idx
-   float angle_2 = (dis1_diff/total_diff) * mp5_grenade_angles[height_idx].distance.angles[dis_idx - 1] +
-                   (dis2_diff/total_diff) * mp5_grenade_angles[height_idx].distance.angles[dis_idx];
+   float angle_2 = (dis2_diff/total_diff) * mp5_grenade_angles[height_idx].distance.angles[dis_idx - 1] +
+                   (dis1_diff/total_diff) * mp5_grenade_angles[height_idx].distance.angles[dis_idx];
 
    // get weighted medium of both height, height_idx - 1, height_idx
    float height1_diff = fabs(mp5_grenade_angles[height_idx - 1].height - height);
    float height2_diff = fabs(mp5_grenade_angles[height_idx].height - height);
    total_diff = height1_diff + height2_diff;
 
-   float launch_angle = (height1_diff/total_diff) * angle_1 + (height2_diff/total_diff) * angle_2;
+   float launch_angle = (height2_diff/total_diff) * angle_1 + (height1_diff/total_diff) * angle_2;
 
    return(launch_angle);
 }
