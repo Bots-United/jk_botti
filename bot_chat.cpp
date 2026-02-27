@@ -345,7 +345,7 @@ static void BotSwapCharacter(const char *in_string, char *out_string, int sizeof
       is_bad = !isalpha(out_string[pos]) || !isalpha(out_string[pos+1]) || (out_string[pos-1] == '%');
    }
 
-   if (count < 20)
+   if (count < len && count < 20)
    {
       temp = out_string[pos];
       out_string[pos] = out_string[pos+1];

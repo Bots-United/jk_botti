@@ -372,11 +372,12 @@ static int test_BotSwapCharacter(void)
    ASSERT_STR(out, "x");
    PASS();
 
-   TEST("retry loop with non-alpha middle chars");
-   // All middle chars are digits (non-alpha), forcing retry loop
+   TEST("all non-alpha middle -> no swap");
+   // All middle chars are digits, len < 20, retry loop exhausts at count==len
+   // Bug: only checks count < 20, should also check count < len
    fast_random_seed(42);
    BotSwapCharacter("a123456789b", out, sizeof(out));
-   ASSERT_INT((int)strlen(out), 11);
+   ASSERT_STR(out, "a123456789b");
    PASS();
 
    return 0;
