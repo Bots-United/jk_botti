@@ -476,7 +476,7 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
          int temp = atoi(arg1);
 
          if ((temp < 0) || (temp > 100))
-            printfunc(PRINTFUNC_INFO, arg, "invalid bot_whine_percent value!\n");
+            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_whine_percent value!\n");
          else
             bot_whine_percent = temp;
       }
@@ -493,7 +493,7 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
          int temp = atoi(arg1);
 
          if ((temp < 0) || (temp > 100))
-            printfunc(PRINTFUNC_INFO, arg, "invalid bot_endgame_percent value!\n");
+            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_endgame_percent value!\n");
          else
             bot_endgame_percent = temp;
       }

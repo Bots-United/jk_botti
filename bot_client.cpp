@@ -242,7 +242,7 @@ void BotClient_Valve_AmmoPickup(void *p, int bot_index)
 
       ammount = *(int *)p;
 
-      bots[bot_index].m_rgAmmo[index] = ammount;
+      bots[bot_index].m_rgAmmo[index] += ammount;
 
       ammo_index = bots[bot_index].current_weapon.iId;
 
@@ -435,7 +435,7 @@ void BotClient_Valve_ScreenFade(void *p, int bot_index)
    static int duration;
    static int hold_time;
    //static int fade_flags;
-   int length;
+   float length;
 
    if (state == 0)
    {
@@ -456,7 +456,7 @@ void BotClient_Valve_ScreenFade(void *p, int bot_index)
    {
       state = 0;
 
-      length = (duration + hold_time) / 4096;
+      length = (duration + hold_time) / 4096.0f;
       bots[bot_index].blinded_time = gpGlobals->time + length - 2.0;
    }
    else

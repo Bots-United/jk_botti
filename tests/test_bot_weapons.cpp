@@ -591,6 +591,17 @@ static int test_IsValidSecondaryAttack(void)
    ASSERT_INT(IsValidSecondaryAttack(bot, *mp5, 50.0, 0.0, TRUE), TRUE);
    PASS();
 
+   TEST("iAmmo2=-1 with secondary_use_primary_ammo: no OOB, uses primary");
+   // Gauss: iAmmo2=-1, secondary_use_primary_ammo=TRUE, iAmmo1=6
+   // With the bug, m_rgAmmo[-1] reads current_weapon.iAmmo2 (adjacent struct field).
+   // Set it high so the OOB read would satisfy min_secondary_ammo, masking
+   // the fact that primary ammo is empty.
+   bot.current_weapon.iAmmo2 = 999; // this is what m_rgAmmo[-1] would read
+   bot.m_rgAmmo[6] = 0; // no primary (uranium) ammo
+   ASSERT_INT(IsValidSecondaryAttack(bot, *gauss, 200.0, 0.0, FALSE), FALSE);
+   bot.current_weapon.iAmmo2 = 0;
+   PASS();
+
    return 0;
 }
 
@@ -888,9 +899,16 @@ static int test_BotAllWeaponsRunningOutOfAmmo(void)
    ASSERT_INT(BotAllWeaponsRunningOutOfAmmo(bot, TRUE), TRUE);
    PASS();
 
-   TEST("GoodWeaponsOnly, low secondary ammo only -> continues");
+   TEST("GoodWeaponsOnly, low secondary ammo only -> has enough (primary OK)");
    pe->v.weapons = (1u << VALVE_WEAPON_MP5);
    bot.m_rgAmmo[1] = 200;  // primary OK
+   bot.m_rgAmmo[8] = 1;    // secondary low (<=2), but primary is fine
+   ASSERT_INT(BotAllWeaponsRunningOutOfAmmo(bot, TRUE), FALSE);
+   PASS();
+
+   TEST("GoodWeaponsOnly, both primary and secondary low -> running out");
+   pe->v.weapons = (1u << VALVE_WEAPON_MP5);
+   bot.m_rgAmmo[1] = 10;   // primary low (<=50)
    bot.m_rgAmmo[8] = 1;    // secondary low (<=2)
    ASSERT_INT(BotAllWeaponsRunningOutOfAmmo(bot, TRUE), TRUE);
    PASS();
@@ -1036,18 +1054,22 @@ static int test_MP5_launch_angle(void)
    ASSERT_TRUE(angle < -90.0);
    PASS();
 
-   TEST("same level, mid distance (500) -> valid angle");
+   TEST("same level, exact table entry (distance=500, height=0) -> -8.5");
    angle = ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(500.0, 0.0);
-   ASSERT_TRUE(angle > -89.0 && angle < 89.0);
-   // At distance=500, height=0, should be around -8.5 (from the table)
-   ASSERT_TRUE(angle < 0.0 && angle > -15.0);
+   // Exact table entry: distance=500 at index 2, height=0 -> -8.5
+   ASSERT_FLOAT_NEAR(angle, -8.5f, 0.01f);
    PASS();
 
-   TEST("downward target (height=-64, distance=400) -> positive angle");
+   TEST("interpolated distance (600, height=0) -> between -8.5 and -12.5");
+   angle = ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(600.0, 0.0);
+   // Between distance=500 (-8.5) and distance=700 (-12.5), at midpoint -> -10.5
+   ASSERT_FLOAT_NEAR(angle, -10.5f, 0.01f);
+   PASS();
+
+   TEST("downward target (height=-64, distance=400) -> 2.8");
    angle = ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(400.0, -64.0);
-   ASSERT_TRUE(angle > -89.0 && angle < 89.0);
-   // At distance=400, height=-64, should be around 2.8 (from the table)
-   ASSERT_TRUE(angle > -5.0 && angle < 10.0);
+   // Exact table entry: distance=400 at index 1, height=-64 -> 2.8
+   ASSERT_FLOAT_NEAR(angle, 2.8f, 0.01f);
    PASS();
 
    TEST("height below all entries (-2000) -> -99");

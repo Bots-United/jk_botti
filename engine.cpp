@@ -132,13 +132,13 @@ static void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short
    // event creates sound?
    if(pei->volume > 0.0f && !FNullEnt(pInvoker))
    {
-      int ivolume = (int)(1000*pei->volume);
+      int ivolume = (int)(1000*pei->volume + 0.5f);
 
       SaveSound((edict_t*)pInvoker, pInvoker->v.origin, ivolume, CHAN_WEAPON, 5.0f);
    }
 
    // event causes client recoil?
-   if(pei->recoil[0] != 0.0f && pei->recoil[1] != 0.0f && !FNullEnt(pInvoker))
+   if((pei->recoil[0] != 0.0f || pei->recoil[1] != 0.0f) && !FNullEnt(pInvoker))
    {
       // gauss uses bug fix that sends two events at same time,
       // ignore the duplicated one...
@@ -160,7 +160,7 @@ static void pfnEmitSound(edict_t *entity, int channel, const char *sample, float
 {
    if (gpGlobals->deathmatch && !FNullEnt(entity))
    {
-      int ivolume = (int)(1000*volume);
+      int ivolume = (int)(1000*volume + 0.5f);
       const char *classname = (const char *)STRING(entity->v.classname);
       float duration = 5.0f;
 
@@ -233,6 +233,7 @@ static void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, ed
          // is this message for a bot?
          if (index != -1)
          {
+            botMsgFunction = NULL;     // no msg function until known otherwise
             botMsgEndFunction = NULL;  // no msg end function until known otherwise
             botMsgIndex = index;       // index of bot receiving message
 

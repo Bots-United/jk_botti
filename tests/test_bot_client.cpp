@@ -251,6 +251,34 @@ static int test_AmmoPickup_updates(void)
    return 0;
 }
 
+static int test_AmmoPickup_adds_to_existing(void)
+{
+   TEST("AmmoPickup: adds to existing ammo, not replaces");
+   mock_reset();
+
+   int bi = 0;
+   edict_t *bot_edict = mock_alloc_edict();
+   bots[bi].pEdict = bot_edict;
+
+   bots[bi].current_weapon.iId = VALVE_WEAPON_SHOTGUN;
+   weapon_defs[VALVE_WEAPON_SHOTGUN].iAmmo1 = 3;
+   weapon_defs[VALVE_WEAPON_SHOTGUN].iAmmo2 = -1;
+
+   // Bot already has 10 shells
+   bots[bi].m_rgAmmo[3] = 10;
+
+   // Pick up 8 more shells
+   msg_int(BotClient_Valve_AmmoPickup, bi, 3);   // ammo index
+   msg_int(BotClient_Valve_AmmoPickup, bi, 8);   // amount picked up
+
+   // Should be 10 + 8 = 18, not just 8
+   ASSERT_INT(bots[bi].m_rgAmmo[3], 18);
+   ASSERT_INT(bots[bi].current_weapon.iAmmo1, 18);
+
+   PASS();
+   return 0;
+}
+
 // ============================================================
 // ItemPickup tests
 // ============================================================
@@ -512,6 +540,41 @@ static int test_ScreenFade_sets_blinded_time(void)
    return 0;
 }
 
+static int test_ScreenFade_sub_second_not_truncated(void)
+{
+   TEST("ScreenFade: sub-second duration not truncated to zero");
+   mock_reset();
+
+   int bi = 0;
+   edict_t *bot_edict = mock_alloc_edict();
+   bots[bi].pEdict = bot_edict;
+   bots[bi].blinded_time = 0.0f;
+
+   gpGlobals->time = 10.0f;
+
+   // 0.5s duration + 0.25s hold = 0.75s total
+   int duration = 2048;  // 0.5 sec in 1/4096 units
+   int hold_time = 1024; // 0.25 sec
+   int fade_flags = 0;
+   int r = 255, g = 255, b = 255, a = 200;
+
+   msg_int(BotClient_Valve_ScreenFade, bi, duration);
+   msg_int(BotClient_Valve_ScreenFade, bi, hold_time);
+   msg_int(BotClient_Valve_ScreenFade, bi, fade_flags);
+   msg_int(BotClient_Valve_ScreenFade, bi, r);
+   msg_int(BotClient_Valve_ScreenFade, bi, g);
+   msg_int(BotClient_Valve_ScreenFade, bi, b);
+   msg_int(BotClient_Valve_ScreenFade, bi, a);
+
+   // length = (2048 + 1024) / 4096.0 = 0.75
+   // blinded_time = 10 + 0.75 - 2.0 = 8.75
+   // With int truncation bug: length = 0, blinded_time = 10 + 0 - 2 = 8.0
+   ASSERT_FLOAT_NEAR(bots[bi].blinded_time, 8.75f, 0.01f);
+
+   PASS();
+   return 0;
+}
+
 // ============================================================
 // main
 // ============================================================
@@ -528,6 +591,7 @@ int main(void)
    fail |= test_CurrentWeapon_inactive();
    fail |= test_AmmoX_updates_reserve();
    fail |= test_AmmoPickup_updates();
+   fail |= test_AmmoPickup_adds_to_existing();
    fail |= test_ItemPickup_longjump();
    fail |= test_ItemPickup_other();
    fail |= test_Damage_from_enemy();
@@ -537,6 +601,7 @@ int main(void)
    fail |= test_DeathMsg_bot_suicide();
    fail |= test_DeathMsg_world_kill();
    fail |= test_ScreenFade_sets_blinded_time();
+   fail |= test_ScreenFade_sub_second_not_truncated();
 
    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
    return fail ? EXIT_FAILURE : EXIT_SUCCESS;

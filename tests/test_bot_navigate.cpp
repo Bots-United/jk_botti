@@ -316,7 +316,7 @@ static int test_change_pitch_both_positive_current_gt_ideal(void)
    float diff = BotChangePitch(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.x, 40.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 20.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 10.0f, 0.01f);  // remaining: |40 - 30|
    PASS();
    return 0;
 }
@@ -336,7 +336,7 @@ static int test_change_pitch_both_positive_current_lt_ideal(void)
    float diff = BotChangePitch(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.x, 20.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 40.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);  // remaining: |20 - 50|
    PASS();
    return 0;
 }
@@ -356,7 +356,7 @@ static int test_change_pitch_pos_to_neg(void)
    float diff = BotChangePitch(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.x, 0.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 40.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);  // remaining: |0 - (-30)|
    PASS();
    return 0;
 }
@@ -376,7 +376,7 @@ static int test_change_pitch_neg_to_pos(void)
    float diff = BotChangePitch(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.x, 0.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 40.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);  // remaining: |0 - 30|
    PASS();
    return 0;
 }
@@ -396,7 +396,7 @@ static int test_change_pitch_both_negative(void)
    float diff = BotChangePitch(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.x, -40.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 20.0f, 0.01f);  // remaining: |-40 - (-20)|
    PASS();
    return 0;
 }
@@ -416,7 +416,7 @@ static int test_change_pitch_speed_clamped(void)
    float diff = BotChangePitch(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.x, 12.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 2.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 0.0f, 0.01f);  // reached ideal exactly
    PASS();
    return 0;
 }
@@ -440,7 +440,7 @@ static int test_change_yaw_both_positive_current_gt_ideal(void)
    float diff = BotChangeYaw(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.y, 80.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 20.0f, 0.01f);  // remaining: |80 - 60|
    PASS();
    return 0;
 }
@@ -460,7 +460,7 @@ static int test_change_yaw_both_positive_current_lt_ideal(void)
    float diff = BotChangeYaw(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.y, 40.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 60.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 50.0f, 0.01f);  // remaining: |40 - 90|
    PASS();
    return 0;
 }
@@ -480,7 +480,7 @@ static int test_change_yaw_pos_to_neg(void)
    float diff = BotChangeYaw(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.y, 0.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 40.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);  // remaining: |0 - (-30)|
    PASS();
    return 0;
 }
@@ -500,7 +500,7 @@ static int test_change_yaw_neg_to_pos(void)
    float diff = BotChangeYaw(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.y, 0.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 40.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);  // remaining: |0 - 30|
    PASS();
    return 0;
 }
@@ -520,7 +520,7 @@ static int test_change_yaw_both_negative(void)
    float diff = BotChangeYaw(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.y, -70.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 40.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 30.0f, 0.01f);  // remaining: |-70 - (-40)|
    PASS();
    return 0;
 }
@@ -540,7 +540,7 @@ static int test_change_yaw_speed_clamped(void)
    float diff = BotChangeYaw(bot, 100.0f);
 
    ASSERT_FLOAT_NEAR(pEdict->v.v_angle.y, 48.0f, 0.01f);
-   ASSERT_FLOAT_NEAR(diff, 3.0f, 0.01f);
+   ASSERT_FLOAT_NEAR(diff, 0.0f, 0.01f);  // reached ideal exactly
    PASS();
    return 0;
 }
@@ -1424,6 +1424,31 @@ static int test_track_sound_still_valid(void)
 
    qboolean result = BotUpdateTrackSoundGoal(bot);
    ASSERT_INT(result, TRUE);
+   PASS();
+   return 0;
+}
+
+static int test_track_sound_timer_expired(void)
+{
+   TEST("BotUpdateTrackSoundGoal: timer expired -> stops tracking");
+   mock_reset();
+   reset_navigate_mocks();
+
+   edict_t *pEdict = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, pEdict);
+
+   bot.wpt_goal_type = WPT_GOAL_TRACK_SOUND;
+   // Timer set to a past time (expired)
+   bot.f_track_sound_time = gpGlobals->time - 1.0f;
+   bot.b_low_health = FALSE;
+   bot.b_has_enough_ammo_for_good_weapon = TRUE;
+   bot.waypoint_goal = 5;
+
+   qboolean result = BotUpdateTrackSoundGoal(bot);
+   ASSERT_INT(result, FALSE);
+   ASSERT_INT(bot.waypoint_goal, -1);
+   ASSERT_INT(bot.wpt_goal_type, WPT_GOAL_NONE);
    PASS();
    return 0;
 }
@@ -3428,6 +3453,39 @@ static int test_head_toward_goal_reached_with_enemy(void)
    return 0;
 }
 
+static int test_head_toward_goal_time_enemy_vs_no_enemy(void)
+{
+   TEST("BotHeadTowardWaypoint: goal time longer without enemy");
+   mock_reset();
+   reset_navigate_mocks();
+
+   edict_t *pEdict = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, pEdict);
+   pEdict->v.origin = Vector(100, 0, 0);
+
+   setup_waypoint(0, Vector(100, 0, 0), W_FL_HEALTH);
+   setup_waypoint(1, Vector(200, 0, 0));
+   bot.curr_waypoint_index = 0;
+   bot.waypoint_goal = 0;
+   bot.wpt_goal_type = WPT_GOAL_HEALTH;
+   bot.waypoint_origin = waypoints[0].origin;
+   bot.f_waypoint_time = gpGlobals->time;
+   bot.pBotEnemy = NULL; // no enemy
+
+   mock_WaypointFindPath_results[0] = 1;
+   mock_WaypointFindPath_count = 1;
+   mock_trace_hull_fn = trace_all_clear;
+
+   BotHeadTowardWaypoint(bot);
+
+   // Without enemy, should wait longer to pick up items
+   float no_enemy_time = bot.f_waypoint_goal_time;
+   ASSERT_TRUE(no_enemy_time > gpGlobals->time + 0.25f + 0.01f);
+   PASS();
+   return 0;
+}
+
 static int test_head_toward_exclude_points(void)
 {
    TEST("BotHeadTowardWaypoint: goal reached -> shifts exclude_points");
@@ -4820,6 +4878,7 @@ int main(void)
    failures += test_track_sound_low_health();
    failures += test_track_sound_no_ammo();
    failures += test_track_sound_still_valid();
+   failures += test_track_sound_timer_expired();
 
    printf("=== BotEvaluateGoal tests ===\n");
    failures += test_evaluate_goal_no_goal();
@@ -4921,6 +4980,7 @@ int main(void)
    failures += test_head_toward_item_min_distance();
    failures += test_head_toward_exit_water_min_distance();
    failures += test_head_toward_goal_reached_with_enemy();
+   failures += test_head_toward_goal_time_enemy_vs_no_enemy();
    failures += test_head_toward_exclude_points();
    failures += test_head_toward_track_sound_update();
    failures += test_head_toward_goal_time_reset();

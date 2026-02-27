@@ -270,7 +270,7 @@ static void BotPickLogo(bot_t &pBot)
       if (used)
          logo_index++;
 
-      if (logo_index == MAX_BOT_LOGOS)
+      if (logo_index >= num_logos)
          logo_index = 0;
 
       check_count++;
@@ -441,8 +441,8 @@ char * GetSpecificTeam(char * teamstr, size_t slen, qboolean get_smallest, qbool
             if(!pClient || pClient->free || FNullEnt(pClient) || GETPLAYERUSERID(pClient) <= 0 || STRING(pClient->v.netname)[0] == 0)
                continue;
 
-            // skip bots?
-            if(only_count_bots && UTIL_GetBotIndex(pClient) != -1)
+            // only count bots? skip non-bots
+            if(only_count_bots && UTIL_GetBotIndex(pClient) == -1)
                continue;
 
             // match team
@@ -1283,6 +1283,11 @@ static void BotFindItem( bot_t &pBot )
                         can_pickup = TRUE;
                      }
                   }
+                  else
+                  {
+                     // don't have this weapon, pick it up
+                     can_pickup = TRUE;
+                  }
                }
                else
                {
@@ -2102,13 +2107,13 @@ static void BotDoStrafe(bot_t &pBot)
 
              float angle_diff = UTIL_WrapAngle(move_dir - look_dir);
 
-             if(angle_diff > 135.0f || angle_diff <= 135.0f)
+             if(angle_diff > 135.0f || angle_diff <= -135.0f)
              {
                 // move forward
                 pBot.f_strafe_direction = 0.0;
                 pBot.f_move_direction = 1.0;
              }
-             if(angle_diff > 45.0f)
+             else if(angle_diff > 45.0f)
             {
                // strafe on right
                pBot.f_strafe_direction = -1.0;
@@ -2140,13 +2145,13 @@ static void BotDoStrafe(bot_t &pBot)
 
             float angle_diff = UTIL_WrapAngle(waypoint_dir - look_dir);
 
-             if(angle_diff > 135.0f || angle_diff <= 135.0f)
+             if(angle_diff > 135.0f || angle_diff <= -135.0f)
              {
                 // move backwards
                 pBot.f_strafe_direction = 0.0;
                 pBot.f_move_direction = -1.0;
              }
-             if(angle_diff > 45.0f)
+             else if(angle_diff > 45.0f)
             {
                // strafe on left
                pBot.f_strafe_direction = 1.0;

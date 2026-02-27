@@ -99,7 +99,7 @@ float BotChangePitch( bot_t &pBot, float speed )
 
    pEdict->v.v_angle.x = current;
 
-   return diff;  // return number of degrees left to turn
+   return fabs(current - ideal);  // return number of degrees left to turn
 }
 
 
@@ -173,7 +173,7 @@ float BotChangeYaw( bot_t &pBot, float speed )
 
    pEdict->v.v_angle.y = current;
 
-   return diff;  // return number of degrees left to turn
+   return fabs(current - ideal);  // return number of degrees left to turn
 }
 
 
@@ -372,7 +372,7 @@ qboolean BotUpdateTrackSoundGoal( bot_t &pBot )
    // check track-sound-time if we should stop tracking
    // check if target has been erased
    // check our state -> do we want to keep tracking
-   if((pBot.f_track_sound_time <= 0.0f && pBot.f_track_sound_time < gpGlobals->time) ||
+   if((pBot.f_track_sound_time > 0.0f && pBot.f_track_sound_time < gpGlobals->time) ||
         !pBot.b_has_enough_ammo_for_good_weapon || pBot.b_low_health)
    {
       if(pBot.waypoint_goal != -1)
@@ -930,7 +930,7 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
          if (pBot.pBotEnemy != NULL)
             pBot.f_waypoint_goal_time = gpGlobals->time + 0.25;
          else   // a little delay time, since we'll touch the waypoint before we actually get what it has
-            pBot.f_waypoint_goal_time = gpGlobals->time + 0.25;
+            pBot.f_waypoint_goal_time = gpGlobals->time + 0.5;
 
          // don't pick same object too often
          if(pBot.wpt_goal_type == WPT_GOAL_HEALTH ||

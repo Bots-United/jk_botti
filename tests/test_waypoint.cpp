@@ -859,11 +859,11 @@ static int test_WaypointRouteMatrix(void)
    setup_waypoint(1, Vector(100,0,0), 0, 0);
    setup_waypoint(2, Vector(200,0,0), 0, 0);
    setup_route_matrix(3);
-   // Override: make runner's self-distance also WAYPOINT_MAX_DISTANCE
-   // so all runner_distance checks fail (runner can reach nothing)
-   shortest_path[0 * 3 + 0] = WAYPOINT_MAX_DISTANCE;
-   shortest_path[0 * 3 + 1] = WAYPOINT_MAX_DISTANCE;
-   shortest_path[0 * 3 + 2] = WAYPOINT_MAX_DISTANCE;
+   // Use WAYPOINT_UNREACHABLE (65535) -- the real value Floyd's algorithm
+   // leaves for unreachable paths (not WAYPOINT_MAX_DISTANCE which is 65534)
+   shortest_path[0 * 3 + 0] = WAYPOINT_UNREACHABLE;
+   shortest_path[0 * 3 + 1] = WAYPOINT_UNREACHABLE;
+   shortest_path[0 * 3 + 2] = WAYPOINT_UNREACHABLE;
    ASSERT_INT(WaypointFindRunawayPath(0, 1), -1);
    PASS();
 
@@ -2363,6 +2363,40 @@ static int test_WaypointFindItem(void)
    }
    PASS();
 
+   TEST("finds func_healthcharger near W_FL_HEALTH waypoint");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0,0,0), W_FL_HEALTH, 0);
+   {
+      edict_t *e = setup_entity("func_healthcharger", Vector(10, 0, 0));
+      edict_t *result = WaypointFindItem(0);
+      ASSERT_PTR_EQ(result, e);
+   }
+   PASS();
+
+   TEST("func_healthcharger ignored without W_FL_HEALTH flag");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0,0,0), W_FL_ARMOR, 0);
+   setup_entity("func_healthcharger", Vector(10, 0, 0));
+   ASSERT_PTR_NULL(WaypointFindItem(0));
+   PASS();
+
+   TEST("finds func_recharge near W_FL_ARMOR waypoint");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0,0,0), W_FL_ARMOR, 0);
+   {
+      edict_t *e = setup_entity("func_recharge", Vector(10, 0, 0));
+      edict_t *result = WaypointFindItem(0);
+      ASSERT_PTR_EQ(result, e);
+   }
+   PASS();
+
+   TEST("func_recharge ignored without W_FL_ARMOR flag");
+   reset_waypoint_state();
+   setup_waypoint(0, Vector(0,0,0), W_FL_HEALTH, 0);
+   setup_entity("func_recharge", Vector(10, 0, 0));
+   ASSERT_PTR_NULL(WaypointFindItem(0));
+   PASS();
+
    return 0;
 }
 
@@ -3858,12 +3892,14 @@ static int test_WaypointReachableWater(void)
 {
    printf("WaypointReachable water tracking:\n");
 
-   TEST("source in water, dest in air (upward direction)");
+   TEST("water surface detection prevents false unreachable at pool edge");
    reset_waypoint_state();
    {
-      // Source is in water, dest is above water surface
-      // Water surface at z=10, dest at z=40 (must be <= src.z+45 to avoid
-      // high-dest mid-air check)
+      // Source at z=0 in water, dest at z=20 in air.  Water surface at z=10.
+      // Ground: z=-200 (deep pool) when x < 150, z=-5 (shallow) when x >= 150.
+      // Without water surface detection, the height jump at the pool edge
+      // (200 -> 25) exceeds 45 and returns FALSE.  With proper waterlevel,
+      // effective heights are clamped and the path is reachable.
       mock_point_contents_fn = [](const float *origin) -> int {
          if (origin[2] < 10.0f)
             return CONTENTS_WATER;
@@ -3878,13 +3914,17 @@ static int test_WaypointReachableWater(void)
          // Ground probes (straight down 1000 units)
          if (v2[2] < v1[2] - 500.0f)
          {
-            ptr->flFraction = 0.01f;
+            float ground_z = (v1[0] < 150.0f) ? -200.0f : -5.0f;
+            float fall = v1[2] - ground_z;
+            ptr->flFraction = fall / 1000.0f;
+            if (ptr->flFraction > 1.0f) ptr->flFraction = 0.999f;
+            if (ptr->flFraction < 0.001f) ptr->flFraction = 0.001f;
             ptr->vecEndPos[0] = v1[0];
             ptr->vecEndPos[1] = v1[1];
-            ptr->vecEndPos[2] = v1[2] + (v2[2] - v1[2]) * 0.01f;
+            ptr->vecEndPos[2] = ground_z;
             return;
          }
-         // Visibility trace and others: pass
+         // Visibility and other traces: pass
          ptr->flFraction = 1.0f;
          ptr->vecEndPos[0] = v2[0];
          ptr->vecEndPos[1] = v2[1];
@@ -3892,13 +3932,8 @@ static int test_WaypointReachableWater(void)
       };
       mock_trace_line_fn = mock_trace_hull_fn;
 
-      // Source underwater (z=0), dest above water (z=40)
-      // dest.z=40 <= src.z+45=45, so high-dest mid-air check is skipped
-      // Exercises: src is CONTENTS_WATER (line 2011), direction.z > 0 (line 2018)
-      // Note: water surface detection while loop (lines 2021-2031) has a bug
-      // where the condition is initially false, making the loop body dead code
       Vector src(0, 0, 0);
-      Vector dest(100, 0, 40);
+      Vector dest(200, 0, 20);
       int result = WaypointReachable(src, dest, 0);
       ASSERT_INT(result, TRUE);
    }

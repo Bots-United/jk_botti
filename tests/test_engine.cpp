@@ -297,7 +297,7 @@ static int test_PrecacheEvent_Post_known_event(void)
    ASSERT_TRUE(count_active_sounds() > 0);
    CSound *s = get_first_active_sound();
    ASSERT_PTR_NOT_NULL(s);
-   ASSERT_INT(s->m_iVolume, 959); // (int)(1000*0.96f) on x87
+   ASSERT_INT(s->m_iVolume, 960); // (int)(1000*0.96f + 0.5f)
 
    PASS();
    return 0;
@@ -566,6 +566,34 @@ static int test_PlaybackEvent_zero_volume_no_sound(void)
    return 0;
 }
 
+static int test_PlaybackEvent_recoil_one_zero_component(void)
+{
+   TEST("PlaybackEvent: recoil with one zero component applies recoil");
+
+   test_reset();
+   gpGlobals->deathmatch = 1;
+
+   // Register firehornet event (recoil={0.0, 2.0}) with eventindex=30
+   gpMetaGlobals->status = MRES_IGNORED;
+   unsigned short idx = 30;
+   gpMetaGlobals->orig_ret = (void *)&idx;
+   g_eng_hooks_post.pfnPrecacheEvent(1, "events/firehornet.sc");
+
+   edict_t *bot_edict = setup_bot(5);
+   bots[5].f_recoil = 0.0f;
+
+   g_eng_hooks.pfnPlaybackEvent(0, bot_edict, 30, 0.0f, NULL, NULL,
+                                 0.0f, 0.0f, 0, 0, 0, 0);
+
+   // recoil={0.0, 2.0}: RANDOM_FLOAT2 clamped to [0.0, 2.0]
+   // With && bug: 0.0 != 0.0 is FALSE, so recoil never applied (stays 0.0)
+   // With || fix: 2.0 != 0.0 is TRUE, so recoil IS applied
+   ASSERT_TRUE(bots[5].f_recoil != 0.0f);
+
+   PASS();
+   return 0;
+}
+
 // ============================================================
 // Tests: pfnEmitSound
 // ============================================================
@@ -680,7 +708,7 @@ static int test_EmitSound_other_entity(void)
    ASSERT_TRUE(count_active_sounds() > 0);
    CSound *s = get_first_active_sound();
    ASSERT_PTR_NOT_NULL(s);
-   ASSERT_INT(s->m_iVolume, 699); // (int)(1000*0.7f) on x87
+   ASSERT_INT(s->m_iVolume, 700); // (int)(1000*0.7f + 0.5f)
    ASSERT_FLOAT(s->m_flExpireTime, gpGlobals->time + 5.0f);
 
    PASS();
@@ -937,6 +965,29 @@ static int test_MessageBegin_MSG_ALL_SVC_INTERMISSION(void)
    g_eng_hooks.pfnMessageBegin(MSG_ALL, SVC_INTERMISSION, NULL, NULL);
 
    ASSERT_INT(g_in_intermission, TRUE);
+
+   PASS();
+   return 0;
+}
+
+static int test_MessageBegin_bot_unknown_msg_clears(void)
+{
+   TEST("pfnMessageBegin: bot + unknown msg -> clears botMsgFn");
+
+   test_reset();
+   gpGlobals->deathmatch = 1;
+
+   edict_t *bot_edict = setup_bot(0);
+
+   // Set stale handler from previous message
+   botMsgFunction = BotClient_Valve_WeaponList;
+   botMsgEndFunction = NULL;
+
+   // Send an unknown message type (9999) to the bot
+   g_eng_hooks.pfnMessageBegin(MSG_ONE, 9999, NULL, bot_edict);
+
+   // botMsgFunction should be cleared, not stale
+   ASSERT_PTR_NULL((void*)botMsgFunction);
 
    PASS();
    return 0;
@@ -1652,6 +1703,7 @@ int main(void)
    fail |= test_MessageBegin_bot_Health();
    fail |= test_MessageBegin_MSG_ALL_DeathMsg();
    fail |= test_MessageBegin_MSG_ALL_SVC_INTERMISSION();
+   fail |= test_MessageBegin_bot_unknown_msg_clears();
    fail |= test_MessageBegin_non_bot_player();
    fail |= test_MessageBegin_other_dest_WeaponList();
 
@@ -1695,6 +1747,9 @@ int main(void)
    fail |= test_GetPlayerUserId_HLDM_bot();
    fail |= test_GetPlayerUserId_OP4_non_bot();
    fail |= test_GetPlayerUserId_deathmatch_0();
+
+   // PlaybackEvent recoil tests
+   fail |= test_PlaybackEvent_recoil_one_zero_component();
 
    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
    return fail ? EXIT_FAILURE : EXIT_SUCCESS;

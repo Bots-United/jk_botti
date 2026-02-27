@@ -372,11 +372,12 @@ static int test_BotSwapCharacter(void)
    ASSERT_STR(out, "x");
    PASS();
 
-   TEST("retry loop with non-alpha middle chars");
-   // All middle chars are digits (non-alpha), forcing retry loop
+   TEST("all non-alpha middle -> no swap");
+   // All middle chars are digits, len < 20, retry loop exhausts at count==len
+   // Bug: only checks count < 20, should also check count < len
    fast_random_seed(42);
    BotSwapCharacter("a123456789b", out, sizeof(out));
-   ASSERT_INT((int)strlen(out), 11);
+   ASSERT_STR(out, "a123456789b");
    PASS();
 
    return 0;
@@ -579,19 +580,19 @@ static int test_BotChatFillInName(void)
 
    TEST("no substitutions");
    reset_chat_state();
-   BotChatFillInName(out, sizeof(out), "hello world", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "hello world", "Victim", "Victim", "Bot");
    ASSERT_STR(out, "hello world");
    PASS();
 
    TEST("%%n replaced with chat_name");
    reset_chat_state();
-   BotChatFillInName(out, sizeof(out), "got you %n", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "got you %n", "Victim", "Victim", "Bot");
    ASSERT_STR(out, "got you Victim");
    PASS();
 
    TEST("multiple %%n");
    reset_chat_state();
-   BotChatFillInName(out, sizeof(out), "%n vs %n", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "%n vs %n", "Victim", "Victim", "Bot");
    ASSERT_STR(out, "Victim vs Victim");
    PASS();
 
@@ -600,7 +601,7 @@ static int test_BotChatFillInName(void)
    setup_mock_player(1, "RandomGuy");
    // With only 1 player, %r picks that player (even if same as chat_name/bot_name,
    // the retry loop will exhaust and still use it)
-   BotChatFillInName(out, sizeof(out), "ask %r", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "ask %r", "Victim", "Victim", "Bot");
    // The player name goes through BotChatName (with tag_percent=0, lower_percent=0 -> unchanged)
    ASSERT_STR(out, "ask RandomGuy");
    PASS();
@@ -608,32 +609,32 @@ static int test_BotChatFillInName(void)
    TEST("%%r with player_count==0 falls back to chat_name");
    reset_chat_state();
    // No players set up
-   BotChatFillInName(out, sizeof(out), "ask %r", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "ask %r", "Victim", "Victim", "Bot");
    ASSERT_STR(out, "ask Victim");
    PASS();
 
    TEST("unknown %%x passed through literally");
    reset_chat_state();
-   BotChatFillInName(out, sizeof(out), "hello %x there", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "hello %x there", "Victim", "Victim", "Bot");
    ASSERT_STR(out, "hello %x there");
    PASS();
 
    TEST("dangling %% at end");
    reset_chat_state();
-   BotChatFillInName(out, sizeof(out), "hello %", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "hello %", "Victim", "Victim", "Bot");
    ASSERT_STR(out, "hello %");
    PASS();
 
    TEST("empty input");
    reset_chat_state();
-   BotChatFillInName(out, sizeof(out), "", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "", "Victim", "Victim", "Bot");
    ASSERT_STR(out, "");
    PASS();
 
    TEST("truncation at buffer limit");
    reset_chat_state();
    char small[10];
-   BotChatFillInName(small, sizeof(small), "got you %n loser", "VictimName", "Bot");
+   BotChatFillInName(small, sizeof(small), "got you %n loser", "VictimName", "VictimName", "Bot");
    // Buffer is 10 bytes. "got you " = 8, then copying "VictimName"...
    // o starts at 0: g(0) o(1) t(2) (3) y(4) o(5) u(6) (7) -> then %n
    // Copying "VictimName" while o < 10: V(8) i(9) -> o=10, stops
@@ -641,11 +642,11 @@ static int test_BotChatFillInName(void)
    ASSERT_INT((int)strlen(small), 9);
    PASS();
 
-   TEST("%%r retry when only player matches chat_name");
+   TEST("%%r retry when only player matches raw_chat_name");
    reset_chat_state();
    setup_mock_player(1, "Victim");
-   // Only one player "Victim" which matches chat_name; retry loop exhausts, uses anyway
-   BotChatFillInName(out, sizeof(out), "ask %r", "Victim", "Bot");
+   // Only one player "Victim" which matches raw_chat_name; retry loop exhausts, uses anyway
+   BotChatFillInName(out, sizeof(out), "ask %r", "Victim", "Victim", "Bot");
    ASSERT_TRUE(strstr(out, "Victim") != NULL);
    PASS();
 
@@ -653,8 +654,19 @@ static int test_BotChatFillInName(void)
    reset_chat_state();
    setup_mock_player(1, "TestBot");
    // Only one player "TestBot" which matches bot_name; retry loop exhausts
-   BotChatFillInName(out, sizeof(out), "ask %r", "Other", "TestBot");
+   BotChatFillInName(out, sizeof(out), "ask %r", "Other", "Other", "TestBot");
    ASSERT_TRUE(strstr(out, "TestBot") != NULL);
+   PASS();
+
+   TEST("%%r filters by raw_chat_name, not processed chat_name");
+   reset_chat_state();
+   setup_mock_player(1, "[lvl3]Victim");
+   setup_mock_player(2, "Innocent");
+   // chat_name is processed ("victim"), raw_chat_name is "[lvl3]Victim"
+   // %r should filter "[lvl3]Victim" using raw_chat_name and pick "Innocent"
+   fast_random_seed(42);
+   BotChatFillInName(out, sizeof(out), "ask %r", "victim", "[lvl3]Victim", "Bot");
+   ASSERT_STR(out, "ask Innocent");
    PASS();
 
    return 0;
@@ -1188,17 +1200,19 @@ static int test_BotChatTalk(void)
    ASSERT_INT(bot.b_bot_say, FALSE);
    PASS();
 
-   TEST("skip: percent=0");
+   TEST("skip: percent=0 -> no chat and no cooldown");
    reset_chat_state();
    bot_edict = &mock_edicts[1];
    setup_bot_for_chat_test(bot, bot_edict);
    bot.chat_percent = 0;
+   bot.f_bot_chat_time = 0.0;
    bot_chat_count = 1;
    safe_strcopy(bot_chat[0].text, sizeof(bot_chat[0].text), "test");
    bot_chat[0].can_modify = FALSE;
    BotChatTalk(bot);
-   // Even though percent check fails, f_bot_chat_time still set to +30s
    ASSERT_INT(bot.b_bot_say, FALSE);
+   // Cooldown should NOT be set when percent check suppresses chat
+   ASSERT_FLOAT_NEAR(bot.f_bot_chat_time, 0.0, 0.01);
    PASS();
 
    TEST("success: sets message and 30s cooldown");

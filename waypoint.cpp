@@ -879,7 +879,7 @@ int WaypointFindRunawayPath(int runner, int enemy)
       runner_distance = WaypointDistanceFromTo(runner, index);
       enemy_distance = WaypointDistanceFromTo(enemy, index);
 
-      if(runner_distance == WAYPOINT_MAX_DISTANCE)
+      if(runner_distance >= WAYPOINT_MAX_DISTANCE)
          continue;
 
       difference = enemy_distance - runner_distance;
@@ -1085,8 +1085,8 @@ edict_t *WaypointFindItem( int wpt_index )
       {
          safe_strcopy(item_name, sizeof(item_name), STRING(pent->v.classname));
 
-         if((((waypoints[wpt_index].flags & W_FL_HEALTH) && (strncmp("item_health", item_name, 11) == 0)) || strncmp("func_healthcharger", item_name, 18) == 0) ||
-            (((waypoints[wpt_index].flags & W_FL_ARMOR) && (strncmp("item_battery", item_name, 12) == 0)) || strncmp("func_recharge", item_name, 13) == 0) ||
+         if(((waypoints[wpt_index].flags & W_FL_HEALTH) && ((strncmp("item_health", item_name, 11) == 0) || strncmp("func_healthcharger", item_name, 18) == 0)) ||
+            ((waypoints[wpt_index].flags & W_FL_ARMOR) && ((strncmp("item_battery", item_name, 12) == 0) || strncmp("func_recharge", item_name, 13) == 0)) ||
             ((waypoints[wpt_index].flags & W_FL_AMMO) && GetAmmoItemFlag(item_name) != 0) ||
             ((waypoints[wpt_index].flags & W_FL_LONGJUMP) && strcmp("item_longjump", item_name) == 0) ||
             ((waypoints[wpt_index].flags & W_FL_WEAPON) && GetWeaponItemFlag(item_name) != 0 && pent->v.owner == NULL))
@@ -2018,7 +2018,7 @@ static qboolean WaypointReachable(const Vector &v_src, const Vector &v_dest, con
             if(v_direction.z > 0.0f)
             {
                // go upwards until get to air
-               while((v_dest - v_check).Length() < (v_dest - v_src).Length())
+               while((v_dest - v_check).Length() <= (v_dest - v_src).Length())
                {
                   // advance one unit upwards
                   v_check = v_check + v_direction * (1.0f / v_direction.z);

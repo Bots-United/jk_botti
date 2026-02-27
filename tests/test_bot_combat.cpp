@@ -1532,6 +1532,24 @@ static int test_bot_find_enemy_expanded(void)
    mock_trace_line_fn = trace_nohit;
    mock_trace_hull_fn = trace_nohit;
 
+   TEST("player enemy: ideal_yaw faces enemy");
+   // Place enemy at +Y, orient bot to face +Y so enemy is in view cone
+   pEnemy = create_enemy_player(Vector(0, 200, 0));
+   pBotEdict->v.v_angle = Vector(0, 90, 0); // face +Y
+   pBotEdict->v.ideal_yaw = 0;
+   BotFindEnemy(testbot);
+   ASSERT_PTR_EQ(testbot.pBotEnemy, pEnemy);
+   // v_newenemy should be pPlayer->v.origin (0,200,0), giving ideal_yaw ~90
+   ASSERT_FLOAT_NEAR(pBotEdict->v.ideal_yaw, 90.0, 1.0);
+   PASS();
+
+   mock_reset();
+   setup_skill_settings();
+   pBotEdict = mock_alloc_edict();
+   setup_bot_for_test(testbot, pBotEdict);
+   mock_trace_line_fn = trace_nohit;
+   mock_trace_hull_fn = trace_nohit;
+
    TEST("reload timer after no enemy for 5+ seconds");
    testbot.f_bot_see_enemy_time = gpGlobals->time - 6.0;
    BotFindEnemy(testbot);
@@ -2892,6 +2910,26 @@ static int test_bot_find_enemy_sound_enemy_path(void)
    ASSERT_TRUE(bots[bot_idx].f_reaction_target_time > gpGlobals->time);
    ASSERT_INT(bots[bot_idx].waypoint_goal, -1);
    ASSERT_INT(bots[bot_idx].wpt_goal_type, WPT_GOAL_ENEMY);
+   PASS();
+
+   // Reset for next test in same sound environment
+   bots[bot_idx].pBotEnemy = NULL;
+   pSoundEnt->Initialize();
+
+   TEST("sound enemy: ideal_yaw faces enemy, not world origin");
+   // Place enemy at (0, -300, 0) behind bot (+Y facing would miss too)
+   // Bot at origin facing +X, enemy behind/left -> not in view cone for
+   // normal player scan, found only via sound.
+   edict_t *pEnemy2 = create_enemy_player(Vector(0, -300, 0));
+   bots[bot_idx].pEdict->v.v_angle = Vector(0, 0, 0); // face +X
+   bots[bot_idx].pEdict->v.ideal_yaw = 0;
+   bots[bot_idx].f_next_find_visible_sound_enemy_time = 0;
+   CSoundEnt::InsertSound(pEnemy2, 1, Vector(0, -300, 0), 2000, 5.0, -1);
+   BotFindEnemy(bots[bot_idx]);
+   ASSERT_PTR_EQ(bots[bot_idx].pBotEnemy, pEnemy2);
+   // With the bug, v_newenemy is (0,0,0) from init, so ideal_yaw would be
+   // 0 or -90 (depending on VecToAngles of zero vec). Correct: ~-90.
+   ASSERT_FLOAT_NEAR(bots[bot_idx].pEdict->v.ideal_yaw, -90.0, 1.0);
    PASS();
 
    pSoundEnt = NULL;

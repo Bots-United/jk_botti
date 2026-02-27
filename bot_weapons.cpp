@@ -501,7 +501,7 @@ qboolean IsValidSecondaryAttack(bot_t &pBot, const bot_weapon_select_t &select, 
    // the bot is close enough to the enemy to use secondary fire
    if (secondary_in_range &&
        ((weapon_defs[weapon_index].iAmmo2 == -1 && !select.secondary_use_primary_ammo) ||
-         (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo2] >= select.min_secondary_ammo) ||
+         (weapon_defs[weapon_index].iAmmo2 != -1 && pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo2] >= select.min_secondary_ammo) ||
          (select.secondary_use_primary_ammo &&
           (weapon_defs[weapon_index].iAmmo1 == -1 || pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] >= select.min_primary_ammo))))
    {
@@ -672,12 +672,9 @@ qboolean BotAllWeaponsRunningOutOfAmmo(bot_t &pBot, const qboolean GoodWeaponsOn
          !IsValidPrimaryAttack(pBot, pSelect[select_index], 0.0, 0.0, TRUE))
          continue;
 
-      // low primary ammo? continue
-      if(BotPrimaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
-         continue;
-
-      // low secondary ammo? continue
-      if(BotSecondaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
+      // both primary and secondary ammo low? continue
+      if(BotPrimaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW &&
+         BotSecondaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
          continue;
 
       // this gun had enough ammo
@@ -832,19 +829,19 @@ float ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(float distance, float
    float dis2_diff = fabs(distances[dis_idx] - distance);
    float total_diff = dis1_diff + dis2_diff;
 
-   // height_idx - 1
-   float angle_1 = (dis1_diff/total_diff) * mp5_grenade_angles[height_idx - 1].distance.angles[dis_idx - 1] +
-                   (dis2_diff/total_diff) * mp5_grenade_angles[height_idx - 1].distance.angles[dis_idx];
+   // height_idx - 1 (weight for each point is proportional to distance from the OTHER point)
+   float angle_1 = (dis2_diff/total_diff) * mp5_grenade_angles[height_idx - 1].distance.angles[dis_idx - 1] +
+                   (dis1_diff/total_diff) * mp5_grenade_angles[height_idx - 1].distance.angles[dis_idx];
    // height_idx
-   float angle_2 = (dis1_diff/total_diff) * mp5_grenade_angles[height_idx].distance.angles[dis_idx - 1] +
-                   (dis2_diff/total_diff) * mp5_grenade_angles[height_idx].distance.angles[dis_idx];
+   float angle_2 = (dis2_diff/total_diff) * mp5_grenade_angles[height_idx].distance.angles[dis_idx - 1] +
+                   (dis1_diff/total_diff) * mp5_grenade_angles[height_idx].distance.angles[dis_idx];
 
    // get weighted medium of both height, height_idx - 1, height_idx
    float height1_diff = fabs(mp5_grenade_angles[height_idx - 1].height - height);
    float height2_diff = fabs(mp5_grenade_angles[height_idx].height - height);
    total_diff = height1_diff + height2_diff;
 
-   float launch_angle = (height1_diff/total_diff) * angle_1 + (height2_diff/total_diff) * angle_2;
+   float launch_angle = (height2_diff/total_diff) * angle_1 + (height1_diff/total_diff) * angle_2;
 
    return(launch_angle);
 }

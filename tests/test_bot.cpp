@@ -2593,24 +2593,25 @@ static int test_BotPickLogo_collision_wraps(void)
 
 static int test_BotPickLogo_wraparound(void)
 {
-   TEST("BotPickLogo: wraps around MAX_BOT_LOGOS boundary");
+   TEST("BotPickLogo: wraps around num_logos boundary");
    setup_engine_funcs();
 
-   // Put a logo near the end (index MAX_BOT_LOGOS-1 would wrap)
-   num_logos = MAX_BOT_LOGOS;
-   for (int i = 0; i < MAX_BOT_LOGOS; i++)
-      safevoid_snprintf(bot_logos[i], sizeof(bot_logos[i]), "logo%d", i);
+   // Use fewer logos than MAX_BOT_LOGOS to test the fix
+   num_logos = 3;
+   strcpy(bot_logos[0], "lambda");
+   strcpy(bot_logos[1], "smiley");
+   strcpy(bot_logos[2], "skull");
 
    // Bot 0 uses the last logo
    bots[0].is_used = TRUE;
-   strcpy(bots[0].logo_name, bot_logos[MAX_BOT_LOGOS - 1]);
+   strcpy(bots[0].logo_name, "skull");
 
    bot_t bot;
    memset(&bot, 0, sizeof(bot));
-   mock_random_long_ret = MAX_BOT_LOGOS; // -> index MAX_BOT_LOGOS-1 (used) -> wraps to 0
+   mock_random_long_ret = 3; // RANDOM_LONG2(1,3)-1 = 2 -> "skull" (used) -> wraps to 0
 
    BotPickLogo(bot);
-   ASSERT_STR(bot.logo_name, "logo0");
+   ASSERT_STR(bot.logo_name, "lambda");
 
    PASS();
    return 0;
@@ -2736,6 +2737,60 @@ static int test_GetSpecificTeam_with_players(void)
    char *result = GetSpecificTeam(teamstr, sizeof(teamstr), TRUE, FALSE, FALSE);
    // Result might be NULL or a team name -- main thing is no crash
    (void)result;
+
+   PASS();
+   return 0;
+}
+
+static int test_GetSpecificTeam_only_count_bots(void)
+{
+   TEST("GetSpecificTeam: only_count_bots counts bots, not humans");
+   setup_engine_funcs();
+
+   is_team_play = TRUE;
+   strcpy(g_team_names[0], "red");
+   strcpy(g_team_names[1], "blue");
+   g_num_teams = 2;
+
+   // Allocate 3 edicts (indices 1, 2, 3)
+   edict_t *human = mock_alloc_edict();     // index 1: human on "red"
+   human->v.flags = FL_CLIENT;
+   human->v.netname = (string_t)(long)"Human";
+
+   edict_t *bot_edict = mock_alloc_edict(); // index 2: bot on "blue"
+   bot_edict->v.flags = FL_CLIENT;
+   bot_edict->v.netname = (string_t)(long)"Bot";
+   bots[0].pEdict = bot_edict;
+
+   edict_t *bot_edict2 = mock_alloc_edict(); // index 3: bot on "blue"
+   bot_edict2->v.flags = FL_CLIENT;
+   bot_edict2->v.netname = (string_t)(long)"Bot2";
+   bots[1].pEdict = bot_edict2;
+
+   gpGlobals->maxClients = 3;
+
+   // Override pfnGetInfoKeyBuffer to return team per edict
+   g_engfuncs.pfnGetInfoKeyBuffer = [](edict_t *e) -> char * {
+      static char red_buf[] = "red";
+      static char blue_buf[] = "blue";
+      // human (index 1) -> red, bots (index 2,3) -> blue
+      int idx = (int)(e - mock_edicts);
+      return (idx == 1) ? red_buf : blue_buf;
+   };
+   g_engfuncs.pfnInfoKeyValue = [](char *infobuffer, char *key) -> char * {
+      (void)key;
+      return infobuffer; // return the buffer itself as team name
+   };
+
+   char teamstr[MAX_TEAMNAME_LENGTH];
+   // Get largest team counting only bots: should be "blue" (2 bots)
+   char *result = GetSpecificTeam(teamstr, sizeof(teamstr), FALSE, TRUE, TRUE);
+   ASSERT_PTR_NOT_NULL(result);
+   ASSERT_STR(result, "blue");
+
+   // Clean up
+   bots[0].pEdict = NULL;
+   bots[1].pEdict = NULL;
 
    PASS();
    return 0;
@@ -4380,7 +4435,7 @@ static int test_BotDoStrafe_ladder_waypoint_slow(void)
 
 static int test_BotDoStrafe_ladder_angle_variations(void)
 {
-   TEST("BotDoStrafe: ladder angle_diff > 45 -> strafe");
+   TEST("BotDoStrafe: ladder angle_diff > 45 -> strafe right");
    setup_engine_funcs();
 
    edict_t *e = mock_alloc_edict();
@@ -4390,16 +4445,83 @@ static int test_BotDoStrafe_ladder_angle_variations(void)
    bot.b_on_ladder = TRUE;
    bot.curr_waypoint_index = 0;
    waypoints[0].flags = W_FL_LADDER;
-   waypoints[0].origin = Vector(100, 100, 50); // waypoint at ~45 degrees
+   waypoints[0].origin = Vector(100, 100, 50);
    num_waypoints = 1;
 
-   // Velocity going right at high speed (angle_diff > 45)
+   // Velocity going right at high speed (angle_diff = 90 > 45)
    e->v.velocity = Vector(30, 0, 0); // moving at yaw 0
    e->v.v_angle = Vector(0, -90, 0); // looking at yaw -90
 
    BotDoStrafe(bot);
 
+   ASSERT_FLOAT(bot.f_strafe_direction, -1.0f); // strafe right
+   ASSERT_FLOAT(bot.f_move_direction, 1.0f);
    ASSERT_FLOAT(bot.f_move_speed, 150.0f * bot.f_move_direction);
+
+   PASS();
+   return 0;
+}
+
+static int test_BotDoStrafe_ladder_angle_behind(void)
+{
+   TEST("BotDoStrafe: ladder angle_diff > 135 -> move forward (fast)");
+   setup_engine_funcs();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_alive_bot(bot, e);
+   bot.pBotEnemy = NULL;
+   bot.b_on_ladder = TRUE;
+   bot.curr_waypoint_index = 0;
+   waypoints[0].flags = W_FL_LADDER;
+   waypoints[0].origin = Vector(100, 100, 50);
+   num_waypoints = 1;
+
+   // Velocity nearly opposite to look direction (angle_diff ~= 170 > 135)
+   // move_dir = yaw of velocity, look_dir = v_angle.y
+   // angle_diff = WrapAngle(move_dir - look_dir)
+   // velocity at yaw ~0, looking at yaw ~-170 -> angle_diff ~= 170
+   e->v.velocity = Vector(30, 1, 0);   // moving at yaw ~0
+   e->v.v_angle = Vector(0, -170, 0);  // looking at yaw -170
+
+   BotDoStrafe(bot);
+
+   // angle_diff > 135: should move forward (not strafe)
+   ASSERT_FLOAT(bot.f_strafe_direction, 0.0f);
+   ASSERT_FLOAT(bot.f_move_direction, 1.0f);
+
+   PASS();
+   return 0;
+}
+
+static int test_BotDoStrafe_ladder_angle_behind_slow(void)
+{
+   TEST("BotDoStrafe: ladder angle_diff <= -135 -> move backward (slow)");
+   setup_engine_funcs();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_alive_bot(bot, e);
+   bot.pBotEnemy = NULL;
+   bot.b_on_ladder = TRUE;
+   bot.curr_waypoint_index = 0;
+   waypoints[0].flags = W_FL_LADDER;
+   waypoints[0].origin = Vector(100, 100, 50);
+   num_waypoints = 1;
+
+   // Slow velocity, waypoint behind look direction
+   // waypoint_dir ~= 45, look_dir = -135 -> angle_diff = WrapAngle(45 - (-135)) = WrapAngle(180) = 180 or -180
+   // Let's use look_dir = 180+45 = 225 -> wrapped = -135
+   // waypoint at (100,100,50) from origin (0,0,0): yaw = atan2(100,100) ~= 45
+   // angle_diff = WrapAngle(45 - 225) = WrapAngle(-180) = 180 > 135
+   e->v.velocity = Vector(0, 5, 0); // slow velocity
+   e->v.v_angle = Vector(0, 225, 0); // looking away from waypoint
+
+   BotDoStrafe(bot);
+
+   // angle_diff > 135: should move backward (slow path)
+   ASSERT_FLOAT(bot.f_strafe_direction, 0.0f);
+   ASSERT_FLOAT(bot.f_move_direction, -1.0f);
 
    PASS();
    return 0;
@@ -4411,7 +4533,7 @@ static int test_BotDoStrafe_ladder_angle_variations(void)
 
 static int test_BotFindItem_weapon_dont_have(void)
 {
-   TEST("BotFindItem: weapon_shotgun, bot doesn't own -> no pickup");
+   TEST("BotFindItem: weapon_shotgun, bot doesn't own -> picks it up");
    setup_engine_funcs();
 
    edict_t *e = mock_alloc_edict();
@@ -4427,9 +4549,8 @@ static int test_BotFindItem_weapon_dont_have(void)
 
    BotFindItem(bot);
 
-   // Bot has shotgun in weapon_select but doesn't own it -> no pickup
-   // (only picks up if owns and ammo low, or unknown weapon)
-   ASSERT_PTR_NULL(bot.pBotPickupItem);
+   // Bot doesn't own shotgun -> should pick it up
+   ASSERT_PTR_NOT_NULL(bot.pBotPickupItem);
 
    PASS();
    return 0;
@@ -5009,6 +5130,7 @@ int main(void)
    fail |= test_GetSpecificTeam_both_flags_null();
    fail |= test_GetSpecificTeam_neither_flag_null();
    fail |= test_GetSpecificTeam_with_players();
+   fail |= test_GetSpecificTeam_only_count_bots();
 
    // BotInFieldOfView
    fail |= test_BotInFieldOfView_straight_ahead();
@@ -5158,6 +5280,8 @@ int main(void)
    fail |= test_BotDoStrafe_ladder_waypoint_fast();
    fail |= test_BotDoStrafe_ladder_waypoint_slow();
    fail |= test_BotDoStrafe_ladder_angle_variations();
+   fail |= test_BotDoStrafe_ladder_angle_behind();
+   fail |= test_BotDoStrafe_ladder_angle_behind_slow();
 
    // Phase 4: BotFindItem weapon/ammo
    fail |= test_BotFindItem_weapon_dont_have();

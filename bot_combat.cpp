@@ -386,7 +386,11 @@ static Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolea
       newer = &newertmp;
    }
 
-   // don't mix dead data with alive data
+   // Don't mix dead data with alive data.
+   // When one sample is dead and other alive (target just died or respawned),
+   // use the dead/last-known position instead of the new spawn location.
+   // This prevents unnatural aim snaps to potentially non-visible respawn
+   // locations -- a respawned target is effectively a new entity.
    if(!newer->was_alive && older->was_alive)
    {
       return(TracePredictedMovement(pBot, pPlayer, newer->origin, newer->velocity, fabs(gpGlobals->time - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity));
@@ -963,7 +967,6 @@ void BotFindEnemy( bot_t &pBot )
       // search the world for players...
       for (i = 1; i <= gpGlobals->maxClients; i++)
       {
-         Vector v_player;
          edict_t *pPlayer = INDEXENT(i);
 
          // skip invalid players and skip self (i.e. this bot)
@@ -1005,7 +1008,7 @@ void BotFindEnemy( bot_t &pBot )
 
             nearestdistance = distance;
             pNewEnemy = pPlayer;
-            v_newenemy = v_player;
+            v_newenemy = pPlayer->v.origin;
 
 #if DEBUG_ENEMY_SELECT
        enemy_type = "player";
@@ -1082,6 +1085,7 @@ void BotFindEnemy( bot_t &pBot )
          //UTIL_HostSay(pEdict, 0, msg);
 
          is_sound_enemy = TRUE;
+         v_newenemy = pNewEnemy->v.origin;
 
 #if DEBUG_ENEMY_SELECT
          enemy_type = "sound-enemy";

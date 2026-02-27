@@ -306,9 +306,6 @@ CSound *CSoundEnt::GetEdictChannelSound( edict_t * pEdict, int iChannel )
 
    if(iSound == SOUNDLIST_EMPTY)
    {
-      if(iChannel == 0)
-         return NULL;
-
       iSound = pSoundEnt->IAllocSound();
 
       if ( iSound == SOUNDLIST_EMPTY )
@@ -476,6 +473,8 @@ int CSoundEnt :: ClientSoundIndex ( edict_t *pClient )
    {
       if(pSoundEnt->m_bDebug)
          UTIL_ConsolePrintf( "** ClientSoundIndex returning a bogus value! **\n" );
+
+      return -1;
    }
 
    return iReturn;
