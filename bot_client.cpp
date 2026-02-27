@@ -242,7 +242,7 @@ void BotClient_Valve_AmmoPickup(void *p, int bot_index)
 
       ammount = *(int *)p;
 
-      bots[bot_index].m_rgAmmo[index] = ammount;
+      bots[bot_index].m_rgAmmo[index] += ammount;
 
       ammo_index = bots[bot_index].current_weapon.iId;
 

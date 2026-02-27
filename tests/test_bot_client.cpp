@@ -251,6 +251,34 @@ static int test_AmmoPickup_updates(void)
    return 0;
 }
 
+static int test_AmmoPickup_adds_to_existing(void)
+{
+   TEST("AmmoPickup: adds to existing ammo, not replaces");
+   mock_reset();
+
+   int bi = 0;
+   edict_t *bot_edict = mock_alloc_edict();
+   bots[bi].pEdict = bot_edict;
+
+   bots[bi].current_weapon.iId = VALVE_WEAPON_SHOTGUN;
+   weapon_defs[VALVE_WEAPON_SHOTGUN].iAmmo1 = 3;
+   weapon_defs[VALVE_WEAPON_SHOTGUN].iAmmo2 = -1;
+
+   // Bot already has 10 shells
+   bots[bi].m_rgAmmo[3] = 10;
+
+   // Pick up 8 more shells
+   msg_int(BotClient_Valve_AmmoPickup, bi, 3);   // ammo index
+   msg_int(BotClient_Valve_AmmoPickup, bi, 8);   // amount picked up
+
+   // Should be 10 + 8 = 18, not just 8
+   ASSERT_INT(bots[bi].m_rgAmmo[3], 18);
+   ASSERT_INT(bots[bi].current_weapon.iAmmo1, 18);
+
+   PASS();
+   return 0;
+}
+
 // ============================================================
 // ItemPickup tests
 // ============================================================
@@ -528,6 +556,7 @@ int main(void)
    fail |= test_CurrentWeapon_inactive();
    fail |= test_AmmoX_updates_reserve();
    fail |= test_AmmoPickup_updates();
+   fail |= test_AmmoPickup_adds_to_existing();
    fail |= test_ItemPickup_longjump();
    fail |= test_ItemPickup_other();
    fail |= test_Damage_from_enemy();
