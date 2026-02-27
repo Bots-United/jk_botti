@@ -672,12 +672,9 @@ qboolean BotAllWeaponsRunningOutOfAmmo(bot_t &pBot, const qboolean GoodWeaponsOn
          !IsValidPrimaryAttack(pBot, pSelect[select_index], 0.0, 0.0, TRUE))
          continue;
 
-      // low primary ammo? continue
-      if(BotPrimaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
-         continue;
-
-      // low secondary ammo? continue
-      if(BotSecondaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
+      // both primary and secondary ammo low? continue
+      if(BotPrimaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW &&
+         BotSecondaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
          continue;
 
       // this gun had enough ammo

@@ -888,9 +888,16 @@ static int test_BotAllWeaponsRunningOutOfAmmo(void)
    ASSERT_INT(BotAllWeaponsRunningOutOfAmmo(bot, TRUE), TRUE);
    PASS();
 
-   TEST("GoodWeaponsOnly, low secondary ammo only -> continues");
+   TEST("GoodWeaponsOnly, low secondary ammo only -> has enough (primary OK)");
    pe->v.weapons = (1u << VALVE_WEAPON_MP5);
    bot.m_rgAmmo[1] = 200;  // primary OK
+   bot.m_rgAmmo[8] = 1;    // secondary low (<=2), but primary is fine
+   ASSERT_INT(BotAllWeaponsRunningOutOfAmmo(bot, TRUE), FALSE);
+   PASS();
+
+   TEST("GoodWeaponsOnly, both primary and secondary low -> running out");
+   pe->v.weapons = (1u << VALVE_WEAPON_MP5);
+   bot.m_rgAmmo[1] = 10;   // primary low (<=50)
    bot.m_rgAmmo[8] = 1;    // secondary low (<=2)
    ASSERT_INT(BotAllWeaponsRunningOutOfAmmo(bot, TRUE), TRUE);
    PASS();
