@@ -270,7 +270,7 @@ static void BotPickLogo(bot_t &pBot)
       if (used)
          logo_index++;
 
-      if (logo_index == MAX_BOT_LOGOS)
+      if (logo_index >= num_logos)
          logo_index = 0;
 
       check_count++;

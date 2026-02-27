@@ -2593,24 +2593,25 @@ static int test_BotPickLogo_collision_wraps(void)
 
 static int test_BotPickLogo_wraparound(void)
 {
-   TEST("BotPickLogo: wraps around MAX_BOT_LOGOS boundary");
+   TEST("BotPickLogo: wraps around num_logos boundary");
    setup_engine_funcs();
 
-   // Put a logo near the end (index MAX_BOT_LOGOS-1 would wrap)
-   num_logos = MAX_BOT_LOGOS;
-   for (int i = 0; i < MAX_BOT_LOGOS; i++)
-      safevoid_snprintf(bot_logos[i], sizeof(bot_logos[i]), "logo%d", i);
+   // Use fewer logos than MAX_BOT_LOGOS to test the fix
+   num_logos = 3;
+   strcpy(bot_logos[0], "lambda");
+   strcpy(bot_logos[1], "smiley");
+   strcpy(bot_logos[2], "skull");
 
    // Bot 0 uses the last logo
    bots[0].is_used = TRUE;
-   strcpy(bots[0].logo_name, bot_logos[MAX_BOT_LOGOS - 1]);
+   strcpy(bots[0].logo_name, "skull");
 
    bot_t bot;
    memset(&bot, 0, sizeof(bot));
-   mock_random_long_ret = MAX_BOT_LOGOS; // -> index MAX_BOT_LOGOS-1 (used) -> wraps to 0
+   mock_random_long_ret = 3; // RANDOM_LONG2(1,3)-1 = 2 -> "skull" (used) -> wraps to 0
 
    BotPickLogo(bot);
-   ASSERT_STR(bot.logo_name, "logo0");
+   ASSERT_STR(bot.logo_name, "lambda");
 
    PASS();
    return 0;
