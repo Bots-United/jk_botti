@@ -591,6 +591,17 @@ static int test_IsValidSecondaryAttack(void)
    ASSERT_INT(IsValidSecondaryAttack(bot, *mp5, 50.0, 0.0, TRUE), TRUE);
    PASS();
 
+   TEST("iAmmo2=-1 with secondary_use_primary_ammo: no OOB, uses primary");
+   // Gauss: iAmmo2=-1, secondary_use_primary_ammo=TRUE, iAmmo1=6
+   // With the bug, m_rgAmmo[-1] reads current_weapon.iAmmo2 (adjacent struct field).
+   // Set it high so the OOB read would satisfy min_secondary_ammo, masking
+   // the fact that primary ammo is empty.
+   bot.current_weapon.iAmmo2 = 999; // this is what m_rgAmmo[-1] would read
+   bot.m_rgAmmo[6] = 0; // no primary (uranium) ammo
+   ASSERT_INT(IsValidSecondaryAttack(bot, *gauss, 200.0, 0.0, FALSE), FALSE);
+   bot.current_weapon.iAmmo2 = 0;
+   PASS();
+
    return 0;
 }
 

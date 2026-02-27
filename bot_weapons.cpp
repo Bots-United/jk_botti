@@ -501,7 +501,7 @@ qboolean IsValidSecondaryAttack(bot_t &pBot, const bot_weapon_select_t &select, 
    // the bot is close enough to the enemy to use secondary fire
    if (secondary_in_range &&
        ((weapon_defs[weapon_index].iAmmo2 == -1 && !select.secondary_use_primary_ammo) ||
-         (pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo2] >= select.min_secondary_ammo) ||
+         (weapon_defs[weapon_index].iAmmo2 != -1 && pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo2] >= select.min_secondary_ammo) ||
          (select.secondary_use_primary_ammo &&
           (weapon_defs[weapon_index].iAmmo1 == -1 || pBot.m_rgAmmo[weapon_defs[weapon_index].iAmmo1] >= select.min_primary_ammo))))
    {
