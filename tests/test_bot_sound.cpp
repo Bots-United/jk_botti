@@ -390,13 +390,13 @@ static int test_get_edict_channel_new_nonzero(void)
 
 static int test_get_edict_channel_zero_no_match(void)
 {
-   TEST("GetEdictChannelSound: no match, channel 0 -> returns NULL");
+   TEST("GetEdictChannelSound: no match, channel 0 -> allocates new sound");
    mock_reset();
 
    edict_t *e = mock_alloc_edict();
    CSound *pSound = CSoundEnt::GetEdictChannelSound(e, 0);
-   ASSERT_PTR_NULL(pSound);
-   ASSERT_INT(pSoundEnt->ISoundsInList(SOUNDLISTTYPE_ACTIVE), 0);
+   ASSERT_PTR_NOT_NULL(pSound);
+   ASSERT_INT(pSoundEnt->ISoundsInList(SOUNDLISTTYPE_ACTIVE), 1);
    PASS();
    return 0;
 }

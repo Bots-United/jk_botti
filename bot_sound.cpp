@@ -306,9 +306,6 @@ CSound *CSoundEnt::GetEdictChannelSound( edict_t * pEdict, int iChannel )
 
    if(iSound == SOUNDLIST_EMPTY)
    {
-      if(iChannel == 0)
-         return NULL;
-
       iSound = pSoundEnt->IAllocSound();
 
       if ( iSound == SOUNDLIST_EMPTY )
