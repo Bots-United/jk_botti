@@ -1023,13 +1023,25 @@ static int test_sound_pointer_invalid_debug(void)
 
 static int test_client_sound_index_bogus_debug(void)
 {
-   TEST("ClientSoundIndex: bogus index with m_bDebug=1");
+   TEST("ClientSoundIndex: bogus index returns -1 (world edict)");
    mock_reset();
 
    pSoundEnt->m_bDebug = TRUE;
    // edict at index 0 -> result = 0 - 1 = -1 -> bogus (< 0)
    int idx = CSoundEnt::ClientSoundIndex(&mock_edicts[0]);
    ASSERT_INT(idx, -1);
+   PASS();
+
+   TEST("ClientSoundIndex: bogus index returns -1 (beyond maxClients)");
+   mock_reset();
+   {
+      // Allocate edicts until we get one past maxClients
+      edict_t *e;
+      do { e = mock_alloc_edict(); } while (ENTINDEX(e) <= (int)gpGlobals->maxClients);
+      // ENTINDEX(e) - 1 >= maxClients -> bogus, should return -1
+      idx = CSoundEnt::ClientSoundIndex(e);
+      ASSERT_INT(idx, -1);
+   }
    PASS();
    return 0;
 }
