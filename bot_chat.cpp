@@ -470,7 +470,7 @@ static void BotChatGetPlayers(void)
 }
 
 
-static void BotChatFillInName(char *bot_say_msg, int sizeof_msg, const char *chat_text, const char *chat_name, const char *bot_name)
+static void BotChatFillInName(char *bot_say_msg, int sizeof_msg, const char *chat_text, const char *chat_name, const char *raw_chat_name, const char *bot_name)
 {
    char random_name[64];
    int clen = strlen(chat_text);
@@ -497,14 +497,14 @@ static void BotChatFillInName(char *bot_say_msg, int sizeof_msg, const char *cha
                      int index = RANDOM_LONG2(0, player_count-1);
                      int count = 0;
 
-                     bool is_bad = (strcmp(player_names[index], chat_name) == 0) ||
+                     bool is_bad = (strcmp(player_names[index], raw_chat_name) == 0) ||
                                    (strcmp(player_names[index], bot_name) == 0);
 
                      while ((is_bad) && (count < 20))
                      {
                         index = RANDOM_LONG2(0, player_count-1);
 
-                        is_bad = (strcmp(player_names[index], chat_name) == 0) ||
+                        is_bad = (strcmp(player_names[index], raw_chat_name) == 0) ||
                                  (strcmp(player_names[index], bot_name) == 0);
 
                         count++;
@@ -600,7 +600,7 @@ void BotChatTaunt(bot_t &pBot, edict_t *victim_edict)
 
       bot_name = STRING(pBot.pEdict->v.netname);
 
-      BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, bot_name);
+      BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, temp_name, bot_name);
 
       // set chat flag and time to chat (typing one character takes 0.2sec) ...
       pBot.b_bot_say = TRUE;
@@ -673,7 +673,7 @@ void BotChatWhine(bot_t &pBot)
 
          bot_name = STRING(pEdict->v.netname);
 
-         BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, bot_name);
+         BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, temp_name, bot_name);
 
          // set chat flag and time to chat (typing one character takes 0.2sec) ...
          pBot.b_bot_say = TRUE;
@@ -738,7 +738,7 @@ void BotChatTalk(bot_t &pBot)
 
          bot_name = STRING(pEdict->v.netname);
 
-         BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, bot_name);
+         BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, chat_name, bot_name);
 
          // set chat flag and time to chat (typing one character takes 0.2sec) ...
          pBot.b_bot_say = TRUE;
@@ -797,7 +797,7 @@ void BotChatEndGame(bot_t &pBot)
 
       bot_name = STRING(pEdict->v.netname);
 
-      BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, bot_name);
+      BotChatFillInName(pBot.bot_say_msg, sizeof(pBot.bot_say_msg), chat_text, chat_name, chat_name, bot_name);
 
       // set chat flag and time to chat (typing one character takes 0.2sec) ...
       pBot.b_bot_say = TRUE;

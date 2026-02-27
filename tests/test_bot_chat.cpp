@@ -580,19 +580,19 @@ static int test_BotChatFillInName(void)
 
    TEST("no substitutions");
    reset_chat_state();
-   BotChatFillInName(out, sizeof(out), "hello world", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "hello world", "Victim", "Victim", "Bot");
    ASSERT_STR(out, "hello world");
    PASS();
 
    TEST("%%n replaced with chat_name");
    reset_chat_state();
-   BotChatFillInName(out, sizeof(out), "got you %n", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "got you %n", "Victim", "Victim", "Bot");
    ASSERT_STR(out, "got you Victim");
    PASS();
 
    TEST("multiple %%n");
    reset_chat_state();
-   BotChatFillInName(out, sizeof(out), "%n vs %n", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "%n vs %n", "Victim", "Victim", "Bot");
    ASSERT_STR(out, "Victim vs Victim");
    PASS();
 
@@ -601,7 +601,7 @@ static int test_BotChatFillInName(void)
    setup_mock_player(1, "RandomGuy");
    // With only 1 player, %r picks that player (even if same as chat_name/bot_name,
    // the retry loop will exhaust and still use it)
-   BotChatFillInName(out, sizeof(out), "ask %r", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "ask %r", "Victim", "Victim", "Bot");
    // The player name goes through BotChatName (with tag_percent=0, lower_percent=0 -> unchanged)
    ASSERT_STR(out, "ask RandomGuy");
    PASS();
@@ -609,32 +609,32 @@ static int test_BotChatFillInName(void)
    TEST("%%r with player_count==0 falls back to chat_name");
    reset_chat_state();
    // No players set up
-   BotChatFillInName(out, sizeof(out), "ask %r", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "ask %r", "Victim", "Victim", "Bot");
    ASSERT_STR(out, "ask Victim");
    PASS();
 
    TEST("unknown %%x passed through literally");
    reset_chat_state();
-   BotChatFillInName(out, sizeof(out), "hello %x there", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "hello %x there", "Victim", "Victim", "Bot");
    ASSERT_STR(out, "hello %x there");
    PASS();
 
    TEST("dangling %% at end");
    reset_chat_state();
-   BotChatFillInName(out, sizeof(out), "hello %", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "hello %", "Victim", "Victim", "Bot");
    ASSERT_STR(out, "hello %");
    PASS();
 
    TEST("empty input");
    reset_chat_state();
-   BotChatFillInName(out, sizeof(out), "", "Victim", "Bot");
+   BotChatFillInName(out, sizeof(out), "", "Victim", "Victim", "Bot");
    ASSERT_STR(out, "");
    PASS();
 
    TEST("truncation at buffer limit");
    reset_chat_state();
    char small[10];
-   BotChatFillInName(small, sizeof(small), "got you %n loser", "VictimName", "Bot");
+   BotChatFillInName(small, sizeof(small), "got you %n loser", "VictimName", "VictimName", "Bot");
    // Buffer is 10 bytes. "got you " = 8, then copying "VictimName"...
    // o starts at 0: g(0) o(1) t(2) (3) y(4) o(5) u(6) (7) -> then %n
    // Copying "VictimName" while o < 10: V(8) i(9) -> o=10, stops
@@ -642,11 +642,11 @@ static int test_BotChatFillInName(void)
    ASSERT_INT((int)strlen(small), 9);
    PASS();
 
-   TEST("%%r retry when only player matches chat_name");
+   TEST("%%r retry when only player matches raw_chat_name");
    reset_chat_state();
    setup_mock_player(1, "Victim");
-   // Only one player "Victim" which matches chat_name; retry loop exhausts, uses anyway
-   BotChatFillInName(out, sizeof(out), "ask %r", "Victim", "Bot");
+   // Only one player "Victim" which matches raw_chat_name; retry loop exhausts, uses anyway
+   BotChatFillInName(out, sizeof(out), "ask %r", "Victim", "Victim", "Bot");
    ASSERT_TRUE(strstr(out, "Victim") != NULL);
    PASS();
 
@@ -654,8 +654,19 @@ static int test_BotChatFillInName(void)
    reset_chat_state();
    setup_mock_player(1, "TestBot");
    // Only one player "TestBot" which matches bot_name; retry loop exhausts
-   BotChatFillInName(out, sizeof(out), "ask %r", "Other", "TestBot");
+   BotChatFillInName(out, sizeof(out), "ask %r", "Other", "Other", "TestBot");
    ASSERT_TRUE(strstr(out, "TestBot") != NULL);
+   PASS();
+
+   TEST("%%r filters by raw_chat_name, not processed chat_name");
+   reset_chat_state();
+   setup_mock_player(1, "[lvl3]Victim");
+   setup_mock_player(2, "Innocent");
+   // chat_name is processed ("victim"), raw_chat_name is "[lvl3]Victim"
+   // %r should filter "[lvl3]Victim" using raw_chat_name and pick "Innocent"
+   fast_random_seed(42);
+   BotChatFillInName(out, sizeof(out), "ask %r", "victim", "[lvl3]Victim", "Bot");
+   ASSERT_STR(out, "ask Innocent");
    PASS();
 
    return 0;
