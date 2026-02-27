@@ -441,8 +441,8 @@ char * GetSpecificTeam(char * teamstr, size_t slen, qboolean get_smallest, qbool
             if(!pClient || pClient->free || FNullEnt(pClient) || GETPLAYERUSERID(pClient) <= 0 || STRING(pClient->v.netname)[0] == 0)
                continue;
 
-            // skip bots?
-            if(only_count_bots && UTIL_GetBotIndex(pClient) != -1)
+            // only count bots? skip non-bots
+            if(only_count_bots && UTIL_GetBotIndex(pClient) == -1)
                continue;
 
             // match team

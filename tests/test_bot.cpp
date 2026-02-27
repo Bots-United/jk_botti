@@ -2742,6 +2742,60 @@ static int test_GetSpecificTeam_with_players(void)
    return 0;
 }
 
+static int test_GetSpecificTeam_only_count_bots(void)
+{
+   TEST("GetSpecificTeam: only_count_bots counts bots, not humans");
+   setup_engine_funcs();
+
+   is_team_play = TRUE;
+   strcpy(g_team_names[0], "red");
+   strcpy(g_team_names[1], "blue");
+   g_num_teams = 2;
+
+   // Allocate 3 edicts (indices 1, 2, 3)
+   edict_t *human = mock_alloc_edict();     // index 1: human on "red"
+   human->v.flags = FL_CLIENT;
+   human->v.netname = (string_t)(long)"Human";
+
+   edict_t *bot_edict = mock_alloc_edict(); // index 2: bot on "blue"
+   bot_edict->v.flags = FL_CLIENT;
+   bot_edict->v.netname = (string_t)(long)"Bot";
+   bots[0].pEdict = bot_edict;
+
+   edict_t *bot_edict2 = mock_alloc_edict(); // index 3: bot on "blue"
+   bot_edict2->v.flags = FL_CLIENT;
+   bot_edict2->v.netname = (string_t)(long)"Bot2";
+   bots[1].pEdict = bot_edict2;
+
+   gpGlobals->maxClients = 3;
+
+   // Override pfnGetInfoKeyBuffer to return team per edict
+   g_engfuncs.pfnGetInfoKeyBuffer = [](edict_t *e) -> char * {
+      static char red_buf[] = "red";
+      static char blue_buf[] = "blue";
+      // human (index 1) -> red, bots (index 2,3) -> blue
+      int idx = (int)(e - mock_edicts);
+      return (idx == 1) ? red_buf : blue_buf;
+   };
+   g_engfuncs.pfnInfoKeyValue = [](char *infobuffer, char *key) -> char * {
+      (void)key;
+      return infobuffer; // return the buffer itself as team name
+   };
+
+   char teamstr[MAX_TEAMNAME_LENGTH];
+   // Get largest team counting only bots: should be "blue" (2 bots)
+   char *result = GetSpecificTeam(teamstr, sizeof(teamstr), FALSE, TRUE, TRUE);
+   ASSERT_PTR_NOT_NULL(result);
+   ASSERT_STR(result, "blue");
+
+   // Clean up
+   bots[0].pEdict = NULL;
+   bots[1].pEdict = NULL;
+
+   PASS();
+   return 0;
+}
+
 static int test_BotCheckTeamplay_with_world_override(void)
 {
    TEST("BotCheckTeamplay: mp_teamoverride reads world team");
@@ -5076,6 +5130,7 @@ int main(void)
    fail |= test_GetSpecificTeam_both_flags_null();
    fail |= test_GetSpecificTeam_neither_flag_null();
    fail |= test_GetSpecificTeam_with_players();
+   fail |= test_GetSpecificTeam_only_count_bots();
 
    // BotInFieldOfView
    fail |= test_BotInFieldOfView_straight_ahead();
