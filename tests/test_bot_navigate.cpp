@@ -1428,6 +1428,31 @@ static int test_track_sound_still_valid(void)
    return 0;
 }
 
+static int test_track_sound_timer_expired(void)
+{
+   TEST("BotUpdateTrackSoundGoal: timer expired -> stops tracking");
+   mock_reset();
+   reset_navigate_mocks();
+
+   edict_t *pEdict = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, pEdict);
+
+   bot.wpt_goal_type = WPT_GOAL_TRACK_SOUND;
+   // Timer set to a past time (expired)
+   bot.f_track_sound_time = gpGlobals->time - 1.0f;
+   bot.b_low_health = FALSE;
+   bot.b_has_enough_ammo_for_good_weapon = TRUE;
+   bot.waypoint_goal = 5;
+
+   qboolean result = BotUpdateTrackSoundGoal(bot);
+   ASSERT_INT(result, FALSE);
+   ASSERT_INT(bot.waypoint_goal, -1);
+   ASSERT_INT(bot.wpt_goal_type, WPT_GOAL_NONE);
+   PASS();
+   return 0;
+}
+
 // ============================================================
 // 11. BotEvaluateGoal tests (STATIC)
 // ============================================================
@@ -4820,6 +4845,7 @@ int main(void)
    failures += test_track_sound_low_health();
    failures += test_track_sound_no_ammo();
    failures += test_track_sound_still_valid();
+   failures += test_track_sound_timer_expired();
 
    printf("=== BotEvaluateGoal tests ===\n");
    failures += test_evaluate_goal_no_goal();

@@ -372,7 +372,7 @@ qboolean BotUpdateTrackSoundGoal( bot_t &pBot )
    // check track-sound-time if we should stop tracking
    // check if target has been erased
    // check our state -> do we want to keep tracking
-   if((pBot.f_track_sound_time <= 0.0f && pBot.f_track_sound_time < gpGlobals->time) ||
+   if((pBot.f_track_sound_time > 0.0f && pBot.f_track_sound_time < gpGlobals->time) ||
         !pBot.b_has_enough_ammo_for_good_weapon || pBot.b_low_health)
    {
       if(pBot.waypoint_goal != -1)
