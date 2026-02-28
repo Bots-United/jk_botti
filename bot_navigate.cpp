@@ -1752,6 +1752,30 @@ static qboolean BotTraceVerticalClearance(edict_t *pEdict, const Vector &v_forwa
 }
 
 
+// Trace 3 lines (center, right+16, left-16) vertically from forward_dist ahead.
+// Returns TRUE if all 3 traces are blocked (something hit). Opposite of BotTraceVerticalClearance.
+static qboolean BotTraceVerticalBlocked(edict_t *pEdict, const Vector &v_forward, const Vector &v_right, float forward_dist, float z_offset, float z_delta)
+{
+   TraceResult tr;
+   const float right_offsets[3] = { 0, 16, -16 };
+
+   for (int i = 0; i < 3; i++)
+   {
+      Vector v_source = pEdict->v.origin + v_right * right_offsets[i] + v_forward * forward_dist;
+      v_source.z = v_source.z + z_offset;
+      Vector v_dest = v_source + Vector(0, 0, z_delta);
+
+      UTIL_TraceMove( v_source, v_dest, dont_ignore_monsters,
+                      pEdict->v.pContainingEntity, &tr);
+
+      if (tr.flFraction > 0.999999f)
+         return FALSE;
+   }
+
+   return TRUE;
+}
+
+
 qboolean BotCanJumpUp( bot_t &pBot, qboolean *bDuckJump)
 {
    Vector v_jump, v_forward, v_right, v_up;
@@ -1819,8 +1843,8 @@ qboolean BotCanDuckUnder( bot_t &pBot )
    if (!BotTraceHorizontalClearance(pEdict, v_forward, v_right, -36 + 37, 24))
       return FALSE;
 
-   // check that there IS an obstruction above (inverted: want all traces to hit)
-   if (BotTraceVerticalClearance(pEdict, v_forward, v_right, 24, -35, 72))
+   // check that there IS an obstruction above (want all traces to hit)
+   if (!BotTraceVerticalBlocked(pEdict, v_forward, v_right, 24, -35, 72))
       return FALSE;
 
    return TRUE;
