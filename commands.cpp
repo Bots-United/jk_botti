@@ -85,6 +85,85 @@ cfg_bot_record_t * cfg_bot_record;
 typedef void (*printfunc_t)(int printtype, void *arg, char *msg);
 
 
+static qboolean check_and_set_int(const char *name, int *value,
+   const char *arg2, const char *arg3,
+   const char *label, char *msg, size_t msgsize,
+   const printfunc_t printfunc, void *pfarg)
+{
+   if ((arg2 != NULL) && (*arg2 != 0) && !FStrEq(arg2, name))
+      return FALSE;
+   if ((arg3 != NULL) && (*arg3 != 0)) {
+      int temp = atoi(arg3);
+      *value = temp;
+      safevoid_snprintf(msg, msgsize, "'%s' for %s is %s'%i'.\n", name, label, "now ", temp);
+   } else {
+      safevoid_snprintf(msg, msgsize, "'%s' for %s is %s'%i'.\n", name, label, "", *value);
+   }
+   printfunc(PRINTFUNC_INFO, pfarg, msg);
+   return TRUE;
+}
+
+static qboolean check_and_set_qboolean(const char *name, qboolean *value,
+   const char *arg2, const char *arg3,
+   const char *label, char *msg, size_t msgsize,
+   const printfunc_t printfunc, void *pfarg)
+{
+   if ((arg2 != NULL) && (*arg2 != 0) && !FStrEq(arg2, name))
+      return FALSE;
+   if ((arg3 != NULL) && (*arg3 != 0)) {
+      qboolean temp;
+      if(!stricmp(arg3, "on") || !stricmp(arg3, "true"))
+         temp = TRUE;
+      else if(!stricmp(arg3, "off") || !stricmp(arg3, "false"))
+         temp = FALSE;
+      else
+         temp = atoi(arg3) ? TRUE : FALSE;
+      *value = temp;
+      safevoid_snprintf(msg, msgsize, "'%s' for %s is %s'%s'.\n", name, label, "now ", temp ? "on" : "off");
+   } else {
+      safevoid_snprintf(msg, msgsize, "'%s' for %s is %s'%s'.\n", name, label, "", *value ? "on" : "off");
+   }
+   printfunc(PRINTFUNC_INFO, pfarg, msg);
+   return TRUE;
+}
+
+static qboolean check_and_set_float(const char *name, float *value,
+   const char *arg2, const char *arg3,
+   const char *label, char *msg, size_t msgsize,
+   const printfunc_t printfunc, void *pfarg)
+{
+   if ((arg2 != NULL) && (*arg2 != 0) && !FStrEq(arg2, name))
+      return FALSE;
+   if ((arg3 != NULL) && (*arg3 != 0)) {
+      float temp = atof(arg3);
+      *value = temp;
+      safevoid_snprintf(msg, msgsize, "'%s' for %s is %s'%.4f'.\n", name, label, "now ", temp);
+   } else {
+      safevoid_snprintf(msg, msgsize, "'%s' for %s is %s'%.4f'.\n", name, label, "", *value);
+   }
+   printfunc(PRINTFUNC_INFO, pfarg, msg);
+   return TRUE;
+}
+
+static qboolean check_and_set_float100(const char *name, float *value,
+   const char *arg2, const char *arg3,
+   const char *label, char *msg, size_t msgsize,
+   const printfunc_t printfunc, void *pfarg)
+{
+   if ((arg2 != NULL) && (*arg2 != 0) && !FStrEq(arg2, name))
+      return FALSE;
+   if ((arg3 != NULL) && (*arg3 != 0)) {
+      float temp = atof(arg3)/100;
+      *value = temp;
+      safevoid_snprintf(msg, msgsize, "'%s' for %s is %s'%.0f'.\n", name, label, "now ", temp*100);
+   } else {
+      safevoid_snprintf(msg, msgsize, "'%s' for %s is %s'%.0f'.\n", name, label, "", (*value)*100);
+   }
+   printfunc(PRINTFUNC_INFO, pfarg, msg);
+   return TRUE;
+}
+
+
 //
 const cfg_bot_record_t * GetUnusedCfgBotRecord(void)
 {
@@ -736,60 +815,21 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
          {
             qboolean got_match = FALSE;
 
-#define CHECK_AND_SET_BOTWEAPON_INT(setting) \
-   if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
-      got_match = TRUE; \
-      if ((arg3 != NULL) && (*arg3 != 0)) { \
-         int temp = atoi(arg3); \
-         pSelect[select_index].setting = temp; \
-         safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%i'.\n", #setting, arg1, "now ", temp); \
-      } else \
-         safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%i'.\n", #setting, arg1, "", pSelect[select_index].setting); \
-      printfunc(PRINTFUNC_INFO, arg, msg); \
-   }
-#define CHECK_AND_SET_BOTWEAPON_QBOOLEAN(setting) \
-   if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
-      got_match = TRUE; \
-      if ((arg3 != NULL) && (*arg3 != 0)) { \
-         qboolean temp; \
-         if(!stricmp(arg3, "on") || !stricmp(arg3, "true")) \
-            temp = TRUE; \
-         else if(!stricmp(arg3, "off") || !stricmp(arg3, "false")) \
-            temp = FALSE; \
-         else \
-            temp = atoi(arg3) ? TRUE : FALSE; \
-         pSelect[select_index].setting = temp; \
-         safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%s'.\n", #setting, arg1, "now ", temp ? "on" : "off"); \
-      } else \
-         safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%s'.\n", #setting, arg1, "", pSelect[select_index].setting ? "on" : "off"); \
-      printfunc(PRINTFUNC_INFO, arg, msg); \
-   }
-#define CHECK_AND_SET_BOTWEAPON_FLOAT(setting) \
-   if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
-      got_match = TRUE; \
-      if ((arg3 != NULL) && (*arg3 != 0)) { \
-         float temp = atof(arg3); \
-         pSelect[select_index].setting = temp; \
-         safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%.4f'.\n", #setting, arg1, "now ", temp); \
-      } else \
-         safevoid_snprintf(msg, sizeof(msg), "'%s' for %s is %s'%.4f'.\n", #setting, arg1, "", pSelect[select_index].setting); \
-      printfunc(PRINTFUNC_INFO, arg, msg); \
-   }
-            CHECK_AND_SET_BOTWEAPON_INT(primary_skill_level)   // bot skill must be less than or equal to this value
-            CHECK_AND_SET_BOTWEAPON_INT(secondary_skill_level) // bot skill must be less than or equal to this value
-            CHECK_AND_SET_BOTWEAPON_FLOAT(aim_speed)           // aim speed, 0.0 worst, 1.0 best.
-            CHECK_AND_SET_BOTWEAPON_QBOOLEAN(avoid_this_gun)  // bot avoids using this weapon if possible
-            CHECK_AND_SET_BOTWEAPON_QBOOLEAN(prefer_higher_skill_attack) // bot uses better of primary and secondary attacks if both avaible
-            CHECK_AND_SET_BOTWEAPON_FLOAT(primary_min_distance)   // 0 = no minimum
-            CHECK_AND_SET_BOTWEAPON_FLOAT(primary_max_distance)   // 9999 = no maximum
-            CHECK_AND_SET_BOTWEAPON_FLOAT(secondary_min_distance) // 0 = no minimum
-            CHECK_AND_SET_BOTWEAPON_FLOAT(secondary_max_distance) // 9999 = no maximum
-            CHECK_AND_SET_BOTWEAPON_FLOAT(opt_distance) // optimal distance from target
-            CHECK_AND_SET_BOTWEAPON_INT(use_percent)   // times out of 100 to use this weapon when available
-            CHECK_AND_SET_BOTWEAPON_QBOOLEAN(can_use_underwater)     // can use this weapon underwater
-            CHECK_AND_SET_BOTWEAPON_INT(primary_fire_percent)   // times out of 100 to use primary fire
-            CHECK_AND_SET_BOTWEAPON_INT(low_ammo_primary)        // low ammo level
-            CHECK_AND_SET_BOTWEAPON_INT(low_ammo_secondary)      // low ammo level
+            got_match |= check_and_set_int("primary_skill_level", &pSelect[select_index].primary_skill_level, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+            got_match |= check_and_set_int("secondary_skill_level", &pSelect[select_index].secondary_skill_level, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+            got_match |= check_and_set_float("aim_speed", &pSelect[select_index].aim_speed, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+            got_match |= check_and_set_qboolean("avoid_this_gun", &pSelect[select_index].avoid_this_gun, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+            got_match |= check_and_set_qboolean("prefer_higher_skill_attack", &pSelect[select_index].prefer_higher_skill_attack, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+            got_match |= check_and_set_float("primary_min_distance", &pSelect[select_index].primary_min_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+            got_match |= check_and_set_float("primary_max_distance", &pSelect[select_index].primary_max_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+            got_match |= check_and_set_float("secondary_min_distance", &pSelect[select_index].secondary_min_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+            got_match |= check_and_set_float("secondary_max_distance", &pSelect[select_index].secondary_max_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+            got_match |= check_and_set_float("opt_distance", &pSelect[select_index].opt_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+            got_match |= check_and_set_int("use_percent", &pSelect[select_index].use_percent, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+            got_match |= check_and_set_qboolean("can_use_underwater", &pSelect[select_index].can_use_underwater, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+            got_match |= check_and_set_int("primary_fire_percent", &pSelect[select_index].primary_fire_percent, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+            got_match |= check_and_set_int("low_ammo_primary", &pSelect[select_index].low_ammo_primary, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+            got_match |= check_and_set_int("low_ammo_secondary", &pSelect[select_index].low_ammo_secondary, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
             if(!got_match)
             {
                snprintf(msg, sizeof(msg), "unknown weapon setting %s.\n", arg2);
@@ -858,105 +898,57 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
       {
          int skill_idx = atoi(arg1)-1;
          qboolean got_match = FALSE;
+         char skill_label[16];
+         safevoid_snprintf(skill_label, sizeof(skill_label), "skill[%d]", skill_idx+1);
 
-#define CHECK_AND_SET_BOTSKILL_INT(setting) \
-   if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
-      got_match = TRUE; \
-      if ((arg3 != NULL) && (*arg3 != 0)) { \
-         int temp = atoi(arg3); \
-         skill_settings[skill_idx].setting = temp; \
-         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%i'.\n", #setting, skill_idx+1, "now ", temp); \
-      } else \
-         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%i'.\n", #setting, skill_idx+1, "", skill_settings[skill_idx].setting); \
-      printfunc(PRINTFUNC_INFO, arg, msg); \
-   }
-#define CHECK_AND_SET_BOTSKILL_QBOOLEAN(setting) \
-   if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
-      got_match = TRUE; \
-      if ((arg3 != NULL) && (*arg3 != 0)) { \
-         qboolean temp; \
-         if(!stricmp(arg3, "on") || !stricmp(arg3, "true")) \
-            temp = TRUE; \
-         else if(!stricmp(arg3, "off") || !stricmp(arg3, "false")) \
-            temp = FALSE; \
-         else \
-            temp = atoi(arg3) ? TRUE : FALSE; \
-         skill_settings[skill_idx].setting = temp; \
-         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%s'.\n", #setting, skill_idx+1, "now ", temp ? "on" : "off"); \
-      } else \
-         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%s'.\n", #setting, skill_idx+1, "", skill_settings[skill_idx].setting ? "on" : "off"); \
-      printfunc(PRINTFUNC_INFO, arg, msg); \
-   }
-#define CHECK_AND_SET_BOTSKILL_FLOAT(setting) \
-   if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
-      got_match = TRUE; \
-      if ((arg3 != NULL) && (*arg3 != 0)) { \
-         float temp = atof(arg3); \
-         skill_settings[skill_idx].setting = temp; \
-         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%.4f'.\n", #setting, skill_idx+1, "now ", temp); \
-      } else \
-         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%.4f'.\n", #setting, skill_idx+1, "", skill_settings[skill_idx].setting); \
-      printfunc(PRINTFUNC_INFO, arg, msg); \
-   }
-#define CHECK_AND_SET_BOTSKILL_FLOAT100(setting) \
-   if ((arg2 == NULL) || (*arg2 == 0) || FStrEq(arg2, #setting)) { \
-      got_match = TRUE; \
-      if ((arg3 != NULL) && (*arg3 != 0)) { \
-         float temp = atof(arg3)/100; \
-         skill_settings[skill_idx].setting = temp; \
-         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%.0f'.\n", #setting, skill_idx+1, "now ", temp*100); \
-      } else \
-         safevoid_snprintf(msg, sizeof(msg), "'%s' for skill[%d] is %s'%.0f'.\n", #setting, skill_idx+1, "", skill_settings[skill_idx].setting*100); \
-      printfunc(PRINTFUNC_INFO, arg, msg); \
-   }
-         CHECK_AND_SET_BOTSKILL_INT(pause_frequency) // how often (out of 1000 times) the bot will pause, based on bot skill
+         got_match |= check_and_set_int("pause_frequency", &skill_settings[skill_idx].pause_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
 
-         CHECK_AND_SET_BOTSKILL_FLOAT(pause_time_min) // how long bot pauses (min, max)
-         CHECK_AND_SET_BOTSKILL_FLOAT(pause_time_max) //
+         got_match |= check_and_set_float("pause_time_min", &skill_settings[skill_idx].pause_time_min, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("pause_time_max", &skill_settings[skill_idx].pause_time_max, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
 
-         CHECK_AND_SET_BOTSKILL_FLOAT100(normal_strafe) // how much bot strafes when walking around
-         CHECK_AND_SET_BOTSKILL_FLOAT100(battle_strafe) // how much bot strafes when attacking enemy
+         got_match |= check_and_set_float100("normal_strafe", &skill_settings[skill_idx].normal_strafe, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float100("battle_strafe", &skill_settings[skill_idx].battle_strafe, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
 
-         CHECK_AND_SET_BOTSKILL_INT(keep_optimal_dist) // how often bot (out of 100 times) the bot try to keep at optimum distance of weapon when attacking
-         CHECK_AND_SET_BOTSKILL_FLOAT(shootcone_diameter) // bot tries to fire when aim line is less than [diameter / 2] apart from target
-         CHECK_AND_SET_BOTSKILL_FLOAT(shootcone_minangle) // OR angle between bot aim line and line to target is less than angle set here
+         got_match |= check_and_set_int("keep_optimal_dist", &skill_settings[skill_idx].keep_optimal_dist, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("shootcone_diameter", &skill_settings[skill_idx].shootcone_diameter, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("shootcone_minangle", &skill_settings[skill_idx].shootcone_minangle, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
 
-         CHECK_AND_SET_BOTSKILL_FLOAT(turn_skill) // BotAim turn_skill, how good bot is at aiming on enemy origin.
-         CHECK_AND_SET_BOTSKILL_FLOAT(turn_slowness) // Is bot's aim in slow motion?
-         CHECK_AND_SET_BOTSKILL_FLOAT(updown_turn_ration) // how much slower bots aims up and down than side ways?
+         got_match |= check_and_set_float("turn_skill", &skill_settings[skill_idx].turn_skill, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("turn_slowness", &skill_settings[skill_idx].turn_slowness, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("updown_turn_ration", &skill_settings[skill_idx].updown_turn_ration, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
 
-         CHECK_AND_SET_BOTSKILL_FLOAT(ping_emu_latency) // how much ping latency bot brain has.
-         CHECK_AND_SET_BOTSKILL_FLOAT(ping_emu_speed_varitation) // how well bot can predict target speed.
-         CHECK_AND_SET_BOTSKILL_FLOAT(ping_emu_position_varitation) // how well bot can predict target position.
+         got_match |= check_and_set_float("ping_emu_latency", &skill_settings[skill_idx].ping_emu_latency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("ping_emu_speed_varitation", &skill_settings[skill_idx].ping_emu_speed_varitation, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("ping_emu_position_varitation", &skill_settings[skill_idx].ping_emu_position_varitation, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
 
-         CHECK_AND_SET_BOTSKILL_FLOAT(hearing_sensitivity) // how well bot hears sounds
-         CHECK_AND_SET_BOTSKILL_FLOAT(track_sound_time_min) // how long bot tracks one sound
-         CHECK_AND_SET_BOTSKILL_FLOAT(track_sound_time_max)
+         got_match |= check_and_set_float("hearing_sensitivity", &skill_settings[skill_idx].hearing_sensitivity, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("track_sound_time_min", &skill_settings[skill_idx].track_sound_time_min, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("track_sound_time_max", &skill_settings[skill_idx].track_sound_time_max, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
 
-         CHECK_AND_SET_BOTSKILL_FLOAT(respawn_react_delay) // delay on players after respawn
-         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_min) //
-         CHECK_AND_SET_BOTSKILL_FLOAT(react_delay_max) //
+         got_match |= check_and_set_float("respawn_react_delay", &skill_settings[skill_idx].respawn_react_delay, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("react_delay_min", &skill_settings[skill_idx].react_delay_min, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("react_delay_max", &skill_settings[skill_idx].react_delay_max, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
 
-         CHECK_AND_SET_BOTSKILL_FLOAT(weaponchange_rate_min) // how fast changing weapons (min, max)
-         CHECK_AND_SET_BOTSKILL_FLOAT(weaponchange_rate_max) //
+         got_match |= check_and_set_float("weaponchange_rate_min", &skill_settings[skill_idx].weaponchange_rate_min, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("weaponchange_rate_max", &skill_settings[skill_idx].weaponchange_rate_max, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
 
-         CHECK_AND_SET_BOTSKILL_QBOOLEAN(can_longjump) // and can longjump.
-         CHECK_AND_SET_BOTSKILL_INT(random_jump_frequency) // how often (out of 100 times) the bot will do random jump
-         CHECK_AND_SET_BOTSKILL_INT(random_jump_duck_frequency) // how often (out of 100 times) the bot will do random duck when random jumping
-         CHECK_AND_SET_BOTSKILL_INT(random_duck_frequency) // how often (out of 100 times) the bot will do random duck jumping in combat mode
-         CHECK_AND_SET_BOTSKILL_INT(random_longjump_frequency) // how often (out of 100 times) the bot will do random longjump instead of random jump
+         got_match |= check_and_set_qboolean("can_longjump", &skill_settings[skill_idx].can_longjump, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_int("random_jump_frequency", &skill_settings[skill_idx].random_jump_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_int("random_jump_duck_frequency", &skill_settings[skill_idx].random_jump_duck_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_int("random_duck_frequency", &skill_settings[skill_idx].random_duck_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_int("random_longjump_frequency", &skill_settings[skill_idx].random_longjump_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
 
 #if 0
-         CHECK_AND_SET_BOTSKILL_QBOOLEAN(can_taujump) // can tau jump?
-         CHECK_AND_SET_BOTSKILL_INT(attack_taujump_frequency) // how often (out of 100 times) the bot will do tau jump at far away enemy
-         CHECK_AND_SET_BOTSKILL_INT(flee_taujump_frequency) // how often (out of 100 times) the bot will taujump away from enemy
-         CHECK_AND_SET_BOTSKILL_FLOAT(attack_taujump_distance) // how far enemy have to be to bot to use tau jump
-         CHECK_AND_SET_BOTSKILL_FLOAT(flee_taujump_distance) // max distance to flee enemy from
-         CHECK_AND_SET_BOTSKILL_FLOAT(flee_taujump_health) // how much bot has health left when tries to escape
-         CHECK_AND_SET_BOTSKILL_FLOAT(flee_taujump_escape_distance) // how long way bot tries to move away
+         got_match |= check_and_set_qboolean("can_taujump", &skill_settings[skill_idx].can_taujump, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_int("attack_taujump_frequency", &skill_settings[skill_idx].attack_taujump_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_int("flee_taujump_frequency", &skill_settings[skill_idx].flee_taujump_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("attack_taujump_distance", &skill_settings[skill_idx].attack_taujump_distance, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("flee_taujump_distance", &skill_settings[skill_idx].flee_taujump_distance, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("flee_taujump_health", &skill_settings[skill_idx].flee_taujump_health, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("flee_taujump_escape_distance", &skill_settings[skill_idx].flee_taujump_escape_distance, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
 
-         CHECK_AND_SET_BOTSKILL_QBOOLEAN(can_shoot_through_walls) // can shoot through walls by sound
-         CHECK_AND_SET_BOTSKILL_INT(wallshoot_frequency) // how often (out of 100 times) the bot will try attack enemy behind wall
+         got_match |= check_and_set_qboolean("can_shoot_through_walls", &skill_settings[skill_idx].can_shoot_through_walls, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_int("wallshoot_frequency", &skill_settings[skill_idx].wallshoot_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
 #endif
 
          if(!got_match)
