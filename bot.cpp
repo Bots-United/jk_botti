@@ -993,24 +993,8 @@ static qboolean BotEntityIsVisible( bot_t &pBot, const Vector & dest )
 }
 
 
-static void BotFindItem( bot_t &pBot )
+static qboolean BotFindItemCheckExpiry(bot_t &pBot)
 {
-   edict_t *pent = NULL;
-   edict_t *pPickupEntity = NULL;
-   Vector pickup_origin;
-   Vector entity_origin;
-   float radius = 500;
-   qboolean can_pickup;
-   float min_distance;
-   char item_name[40];
-   TraceResult tr;
-   Vector vecStart;
-   Vector vecEnd;
-   int angle_to_entity;
-   int itemflag, select_index;
-   bot_weapon_select_t *pSelect = &weapon_select[0];
-   edict_t *pEdict = pBot.pEdict;
-
    // forget about our item if it's been five seconds
    if (pBot.f_last_item_found > 0 && pBot.f_last_item_found + 5.0 < gpGlobals->time)
    {
@@ -1029,6 +1013,290 @@ static void BotFindItem( bot_t &pBot )
 
    // halt the rest of the function
    if (pBot.f_find_item > gpGlobals->time || pBot.pBotPickupItem)
+      return TRUE;
+
+   return FALSE;
+}
+
+
+static qboolean BotFindItemCheckFuncLadder(bot_t &pBot, edict_t *pent,
+                                            Vector &entity_origin, const Vector &vecStart)
+{
+   edict_t *pEdict = pBot.pEdict;
+   TraceResult tr;
+
+   // force ladder origin to same z coordinate as bot since
+   // the VecBModelOrigin is the center of the ladder.  For
+   // LONG ladders, the center MAY be hundreds of units above
+   // the bot.  Fake an origin at the same level as the bot...
+
+   entity_origin.z = pEdict->v.origin.z;
+   Vector vecEnd = entity_origin;
+
+   // trace a line from bot's eyes to func_ladder entity...
+   UTIL_TraceMove( vecStart, vecEnd, dont_ignore_monsters,
+                   pEdict->v.pContainingEntity, &tr);
+
+   // check if traced all the way up to the entity (didn't hit wall)
+   if (tr.flFraction > 0.999999f)
+   {
+      // find distance to item for later use...
+      float distance = (vecEnd - vecStart).Length( );
+
+      // use the ladder about 100% of the time, if haven't
+      // used a ladder in at least 5 seconds...
+      if ((RANDOM_LONG2(1, 100) <= 100) &&
+          ((pBot.f_end_use_ladder_time + 5.0) < gpGlobals->time))
+      {
+         // if close to ladder...
+         if (distance < 100)
+         {
+            // don't avoid walls for a while
+            pBot.f_dont_avoid_wall_time = gpGlobals->time + 5.0;
+         }
+
+         return TRUE;
+      }
+   }
+
+   return FALSE;
+}
+
+
+// Returns: 0=no match, 1=matched not usable, 2=can_pickup
+static int BotFindItemCheckCharger(bot_t &pBot, edict_t *pent, const char *item_name,
+                                    float distance, int angle_to_entity, qboolean is_health)
+{
+   edict_t *pEdict = pBot.pEdict;
+   const char *charger_name = is_health ? "func_healthcharger" : "func_recharge";
+   float stat = is_health ? pEdict->v.health : pEdict->v.armorvalue;
+   float stat_max = is_health ? (float)VALVE_MAX_NORMAL_HEALTH : (float)VALVE_MAX_NORMAL_BATTERY;
+   qboolean &b_use_station = is_health ? pBot.b_use_health_station : pBot.b_use_HEV_station;
+   float &f_use_time = is_health ? pBot.f_use_health_time : pBot.f_use_HEV_time;
+
+   if (strcmp(charger_name, item_name) != 0 || !(stat < stat_max) || pent->v.frame != 0)
+   {
+      // don't need or can't use this item...
+      b_use_station = FALSE;
+      return 0;
+   }
+
+   // check if flag not set...
+   if (!b_use_station)
+   {
+      // check if close enough and facing it directly...
+      if ((distance < PLAYER_SEARCH_RADIUS) &&
+          (angle_to_entity <= 10))
+      {
+         b_use_station = TRUE;
+         f_use_time = gpGlobals->time;
+         pBot.v_use_target = UTIL_GetOriginWithExtent(pBot, pent);
+      }
+
+      // if close to station...
+      if (distance < 100)
+      {
+         // don't avoid walls for a while
+         pBot.f_dont_avoid_wall_time = gpGlobals->time + 5.0;
+      }
+
+      return 2;  // can_pickup
+   }
+
+   return 1;  // matched not usable
+}
+
+
+static qboolean BotFindItemCheckFuncButton(bot_t &pBot, edict_t *pent, const char *item_name,
+                                            TraceResult &tr, float distance, int angle_to_entity)
+{
+   // check if entity is a button...
+   if (!(FIsClassname(item_name, tr.pHit) && strcmp("func_button", item_name) == 0))
+      return FALSE;
+
+   // use the button about 100% of the time, if haven't
+   // used a button in at least 5 seconds...
+   if ((RANDOM_LONG2(1, 100) <= 100) &&
+       ((pBot.f_use_button_time + 5) < gpGlobals->time))
+   {
+      // check if flag not set and facing it...
+      if (!pBot.b_use_button)
+      {
+         // check if close enough and facing it directly...
+         if ((distance < PLAYER_SEARCH_RADIUS) &&
+             (angle_to_entity <= 10))
+         {
+            pBot.b_use_button = TRUE;
+            pBot.b_lift_moving = FALSE;
+            pBot.v_use_target = UTIL_GetOriginWithExtent(pBot, pent);
+            pBot.f_use_button_time = gpGlobals->time;
+         }
+
+         // if close to button...
+         if (distance < 100)
+         {
+            // don't avoid walls for a while
+            pBot.f_dont_avoid_wall_time = gpGlobals->time + 5.0;
+         }
+
+         return TRUE;
+      }
+
+      return FALSE;
+   }
+   else
+   {
+      // don't need or can't use this item...
+      pBot.b_use_button = FALSE;
+      return FALSE;
+   }
+}
+
+
+static qboolean BotFindItemCheckWeapon(bot_t &pBot, edict_t *pent, int itemflag)
+{
+   if (pent->v.effects & EF_NODRAW)
+   {
+      // someone owns this weapon or it hasn't respawned yet
+      return FALSE;
+   }
+
+   edict_t *pEdict = pBot.pEdict;
+   bot_weapon_select_t *pSelect = &weapon_select[0];
+
+   // check if player has already
+   int select_index = -1;
+   qboolean found = FALSE;
+   while(pSelect[++select_index].iId)
+   {
+      if((itemflag & pSelect[select_index].waypoint_flag) == 0)
+         continue;
+
+      found = TRUE;
+      break;
+   }
+
+   if(found)
+   {
+      //does player have this weapon
+      if(pEdict->v.weapons & (1u<<pSelect[select_index].iId))
+      {
+         // is ammo low?
+         if(BotPrimaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
+         {
+            return TRUE;
+         }
+      }
+      else
+      {
+         // don't have this weapon, pick it up
+         return TRUE;
+      }
+   }
+   else
+   {
+      return TRUE;
+   }
+
+   return FALSE;
+}
+
+
+static qboolean BotFindItemCheckAmmo(bot_t &pBot, edict_t *pent, int itemflag)
+{
+   if (pent->v.effects & EF_NODRAW)
+   {
+      // someone owns this weapon or it hasn't respawned yet
+      return FALSE;
+   }
+
+   bot_weapon_select_t *pSelect = &weapon_select[0];
+   qboolean can_pickup = FALSE;
+
+   // check if player is running out of this ammo on any weapon
+   int select_index = -1;
+   while(pSelect[++select_index].iId)
+   {
+      if(itemflag & pSelect[select_index].ammo1_waypoint_flag)
+      {
+         if(BotPrimaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
+            can_pickup = TRUE;
+         else if(BotSecondaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
+            can_pickup = TRUE;
+      }
+      else if(itemflag & pSelect[select_index].ammo2_waypoint_flag)
+      {
+         if(BotPrimaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
+            can_pickup = TRUE;
+         else if(BotSecondaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
+            can_pickup = TRUE;
+      }
+
+      if(can_pickup)
+      {
+         break;
+      }
+   }
+
+   return can_pickup;
+}
+
+
+static void BotFindItemCheckTripmine(bot_t &pBot, edict_t *pent)
+{
+   edict_t *pEdict = pBot.pEdict;
+   float distance = (pent->v.origin - pEdict->v.origin).Length( );
+
+   if (pBot.b_see_tripmine)
+   {
+      // see if this tripmine is closer to bot...
+      if (distance < (pBot.v_tripmine - pEdict->v.origin).Length())
+      {
+         pBot.tripmine_edict = pent;
+         pBot.v_tripmine = pent->v.origin;
+         pBot.b_shoot_tripmine = FALSE;
+
+         // see if bot is far enough to shoot the tripmine...
+         if (distance >= 375)
+         {
+            pBot.b_shoot_tripmine = TRUE;
+         }
+      }
+   }
+   else
+   {
+      pBot.b_see_tripmine = TRUE;
+      pBot.tripmine_edict = pent;
+      pBot.v_tripmine = pent->v.origin;
+      pBot.b_shoot_tripmine = FALSE;
+
+      // see if bot is far enough to shoot the tripmine...
+      if (distance >= 375)  // 375 is damage radius
+      {
+         pBot.b_shoot_tripmine = TRUE;
+      }
+   }
+}
+
+
+static void BotFindItem( bot_t &pBot )
+{
+   edict_t *pent = NULL;
+   edict_t *pPickupEntity = NULL;
+   Vector pickup_origin;
+   Vector entity_origin;
+   float radius = 500;
+   qboolean can_pickup;
+   float min_distance;
+   char item_name[40];
+   TraceResult tr;
+   Vector vecStart;
+   Vector vecEnd;
+   int angle_to_entity;
+   int itemflag;
+   edict_t *pEdict = pBot.pEdict;
+
+   if (BotFindItemCheckExpiry(pBot))
       return;
 
    // try find again after 0.1sec
@@ -1067,39 +1335,7 @@ static void BotFindItem( bot_t &pBot )
          // DON'T search for ladders if there are waypoints in this level...
          if ((strcmp("func_ladder", item_name) == 0) && (num_waypoints == 0))
          {
-            // force ladder origin to same z coordinate as bot since
-            // the VecBModelOrigin is the center of the ladder.  For
-            // LONG ladders, the center MAY be hundreds of units above
-            // the bot.  Fake an origin at the same level as the bot...
-
-            entity_origin.z = pEdict->v.origin.z;
-            vecEnd = entity_origin;
-
-            // trace a line from bot's eyes to func_ladder entity...
-            UTIL_TraceMove( vecStart, vecEnd, dont_ignore_monsters,
-                            pEdict->v.pContainingEntity, &tr);
-
-            // check if traced all the way up to the entity (didn't hit wall)
-            if (tr.flFraction > 0.999999f)
-            {
-               // find distance to item for later use...
-               float distance = (vecEnd - vecStart).Length( );
-
-               // use the ladder about 100% of the time, if haven't
-               // used a ladder in at least 5 seconds...
-               if ((RANDOM_LONG2(1, 100) <= 100) &&
-                   ((pBot.f_end_use_ladder_time + 5.0) < gpGlobals->time))
-               {
-                  // if close to ladder...
-                  if (distance < 100)
-                  {
-                     // don't avoid walls for a while
-                     pBot.f_dont_avoid_wall_time = gpGlobals->time + 5.0;
-                  }
-
-                  can_pickup = TRUE;
-               }
-            }
+            can_pickup = BotFindItemCheckFuncLadder(pBot, pent, entity_origin, vecStart);
          }
          else
          {
@@ -1107,129 +1343,24 @@ static void BotFindItem( bot_t &pBot )
             UTIL_TraceMove( vecStart, vecEnd, dont_ignore_monsters,
                             pEdict->v.pContainingEntity, &tr);
 
-            // check if traced all the way up to the entity (didn't hit wall)
+            // find distance to item for later use...
+            float distance = (vecEnd - vecStart).Length( );
 
-            //NOTE: disable check...
-            // wall chargers can be used behind walls.. known bug in hldm
-            // hlsdk/dlls/player.cpp - CBasePlayer::PlayerUse() -> "!!!UNDONE: traceline here to prevent USEing buttons through walls"
-            //if(FIsClassname(item_name, tr.pHit))
+            int charger_result = BotFindItemCheckCharger(pBot, pent, item_name, distance, angle_to_entity, TRUE);
+            if (charger_result == 2)
             {
-               // find distance to item for later use...
-               float distance = (vecEnd - vecStart).Length( );
-
-               // check if entity is wall mounted health charger...
-               // check if the bot can use this item and
-               // check if the recharger is ready to use (has power left)...
-               if (strcmp("func_healthcharger", item_name) == 0 &&
-                     (pEdict->v.health < VALVE_MAX_NORMAL_HEALTH) && (pent->v.frame == 0))
+               can_pickup = TRUE;
+            }
+            else
+            {
+               charger_result = BotFindItemCheckCharger(pBot, pent, item_name, distance, angle_to_entity, FALSE);
+               if (charger_result == 2)
                {
-                  // check if flag not set...
-                  if (!pBot.b_use_health_station)
-                  {
-                     // check if close enough and facing it directly...
-                     if ((distance < PLAYER_SEARCH_RADIUS) &&
-                         (angle_to_entity <= 10))
-                     {
-                        pBot.b_use_health_station = TRUE;
-                        pBot.f_use_health_time = gpGlobals->time;
-                        pBot.v_use_target = UTIL_GetOriginWithExtent(pBot, pent);
-                     }
-
-                     // if close to health station...
-                     if (distance < 100)
-                     {
-                        // don't avoid walls for a while
-                        pBot.f_dont_avoid_wall_time = gpGlobals->time + 5.0;
-                     }
-
-                     can_pickup = TRUE;
-                  }
-
-                  if(can_pickup)
-                     goto endloop;
+                  can_pickup = TRUE;
                }
-               else
+               else if (charger_result == 0)
                {
-                  // don't need or can't use this item...
-                  pBot.b_use_health_station = FALSE;
-               }
-
-               // check if entity is wall mounted HEV charger...
-               // check if the bot can use this item and
-               // check if the recharger is ready to use (has power left)...
-               if (strcmp("func_recharge", item_name) == 0 &&
-                     (pEdict->v.armorvalue < VALVE_MAX_NORMAL_BATTERY) && (pent->v.frame == 0))
-               {
-                  // check if flag not set and facing it...
-                  if (!pBot.b_use_HEV_station)
-                  {
-                     // check if close enough and facing it directly...
-                     if ((distance < PLAYER_SEARCH_RADIUS) &&
-                         (angle_to_entity <= 10))
-                     {
-                        pBot.b_use_HEV_station = TRUE;
-                        pBot.f_use_HEV_time = gpGlobals->time;
-                        pBot.v_use_target = UTIL_GetOriginWithExtent(pBot, pent);
-                     }
-
-                     // if close to HEV recharger...
-                     if (distance < 100)
-                     {
-                        // don't avoid walls for a while
-                        pBot.f_dont_avoid_wall_time = gpGlobals->time + 5.0;
-                     }
-
-                     can_pickup = TRUE;
-                  }
-
-                  if(can_pickup)
-                     goto endloop;
-               }
-               else
-               {
-                  // don't need or can't use this item...
-                  pBot.b_use_HEV_station = FALSE;
-               }
-
-               // check if entity is a button...
-               if (FIsClassname(item_name, tr.pHit) && strcmp("func_button", item_name) == 0)
-               {
-                  // use the button about 100% of the time, if haven't
-                  // used a button in at least 5 seconds...
-                  if ((RANDOM_LONG2(1, 100) <= 100) &&
-                      ((pBot.f_use_button_time + 5) < gpGlobals->time))
-                  {
-                     // check if flag not set and facing it...
-                     if (!pBot.b_use_button)
-                     {
-                        // check if close enough and facing it directly...
-                        if ((distance < PLAYER_SEARCH_RADIUS) &&
-                            (angle_to_entity <= 10))
-                        {
-                           pBot.b_use_button = TRUE;
-                           pBot.b_lift_moving = FALSE;
-                           pBot.v_use_target = UTIL_GetOriginWithExtent(pBot, pent);
-                           pBot.f_use_button_time = gpGlobals->time;
-                        }
-
-                        // if close to button...
-                        if (distance < 100)
-                        {
-                           // don't avoid walls for a while
-                           pBot.f_dont_avoid_wall_time = gpGlobals->time + 5.0;
-                        }
-
-                        can_pickup = TRUE;
-                     }
-
-                     if(can_pickup)
-                        goto endloop;
-                  }
-                  else
-                  {
-                     // don't need or can't use this item...
-                     pBot.b_use_button = FALSE;
-                  }
+                  can_pickup = BotFindItemCheckFuncButton(pBot, pent, item_name, tr, distance, angle_to_entity);
                }
             }
          }
@@ -1254,80 +1385,13 @@ static void BotFindItem( bot_t &pBot )
             // check if entity is a weapon...
             if ((itemflag = GetWeaponItemFlag(item_name)) != 0)
             {
-               if (pent->v.effects & EF_NODRAW)
-               {
-                  // someone owns this weapon or it hasn't respawned yet
-                  continue;
-               }
-
-               // check if player has already
-               select_index = -1;
-               qboolean found = FALSE;
-               while(pSelect[++select_index].iId)
-               {
-                  if((itemflag & pSelect[select_index].waypoint_flag) == 0)
-                     continue;
-
-                  found = TRUE;
-                  break;
-               }
-
-               if(found)
-               {
-                  //does player have this weapon
-                  if(pEdict->v.weapons & (1u<<pSelect[select_index].iId))
-                  {
-                     // is ammo low?
-                     if(BotPrimaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
-                     {
-                        can_pickup = TRUE;
-                     }
-                  }
-                  else
-                  {
-                     // don't have this weapon, pick it up
-                     can_pickup = TRUE;
-                  }
-               }
-               else
-               {
-                  can_pickup = TRUE;
-               }
+               can_pickup = BotFindItemCheckWeapon(pBot, pent, itemflag);
             }
 
             // pick up ammo
             else if ((itemflag = GetAmmoItemFlag(item_name)) != 0)
             {
-               if (pent->v.effects & EF_NODRAW)
-               {
-                  // someone owns this weapon or it hasn't respawned yet
-                  continue;
-               }
-
-               // check if player is running out of this ammo on any weapon
-               select_index = -1;
-               while(pSelect[++select_index].iId)
-               {
-                  if(itemflag & pSelect[select_index].ammo1_waypoint_flag)
-                  {
-                     if(BotPrimaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
-                        can_pickup = TRUE;
-                     else if(BotSecondaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
-                        can_pickup = TRUE;
-                  }
-                  else if(itemflag & pSelect[select_index].ammo2_waypoint_flag)
-                  {
-                     if(BotPrimaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
-                        can_pickup = TRUE;
-                     else if(BotSecondaryAmmoLow(pBot, pSelect[select_index]) == AMMO_LOW)
-                        can_pickup = TRUE;
-                  }
-
-                  if(can_pickup)
-                  {
-                     break;
-                  }
-               }
+               can_pickup = BotFindItemCheckAmmo(pBot, pent, itemflag);
             }
 
             // pick up longjump
@@ -1388,37 +1452,7 @@ static void BotFindItem( bot_t &pBot )
             // check if entity is an armed tripmine
             else if (strcmp("monster_tripmine", item_name) == 0)
             {
-               float distance = (pent->v.origin - pEdict->v.origin).Length( );
-
-               if (pBot.b_see_tripmine)
-               {
-                  // see if this tripmine is closer to bot...
-                  if (distance < (pBot.v_tripmine - pEdict->v.origin).Length())
-                  {
-                     pBot.tripmine_edict = pent;
-                     pBot.v_tripmine = pent->v.origin;
-                     pBot.b_shoot_tripmine = FALSE;
-
-                     // see if bot is far enough to shoot the tripmine...
-                     if (distance >= 375)
-                     {
-                        pBot.b_shoot_tripmine = TRUE;
-                     }
-                  }
-               }
-               else
-               {
-                  pBot.b_see_tripmine = TRUE;
-                  pBot.tripmine_edict = pent;
-                  pBot.v_tripmine = pent->v.origin;
-                  pBot.b_shoot_tripmine = FALSE;
-
-                  // see if bot is far enough to shoot the tripmine...
-                  if (distance >= 375)  // 375 is damage radius
-                  {
-                     pBot.b_shoot_tripmine = TRUE;
-                  }
-               }
+               BotFindItemCheckTripmine(pBot, pent);
             }
 
             // check if entity is an armed satchel charge
@@ -1434,7 +1468,6 @@ static void BotFindItem( bot_t &pBot )
          }  // end if object is visible
       }  // end else not "func_" entity
 
-endloop:
       if (can_pickup) // if the bot found something it can pickup...
       {
          float distance = (entity_origin - pEdict->v.origin).Length( );
@@ -1692,6 +1725,247 @@ static void BotCheckLogoSpraying(bot_t &pBot)
 }
 
 
+static void BotWanderHandleStation(bot_t &pBot, qboolean &b_use_station, float f_use_time)
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   if ((f_use_time + 10.0) > gpGlobals->time)
+   {
+      pBot.f_move_speed = 0;  // don't move while using station
+
+      // block strafing before using station
+      pBot.f_strafe_time = gpGlobals->time + 1.0f;
+      pBot.f_strafe_direction = 0.0f;
+
+      // aim at the button..
+      Vector v_target = pBot.v_use_target - GetGunPosition( pEdict );
+      Vector target_angle = UTIL_VecToAngles(v_target);
+
+      pEdict->v.idealpitch = UTIL_WrapAngle(target_angle.x);
+      pEdict->v.ideal_yaw = UTIL_WrapAngle(target_angle.y);
+
+      pBot.f_move_speed = pBot.f_max_speed;
+
+      pEdict->v.button = IN_USE;
+   }
+   else
+   {
+      // bot is stuck trying to "use" a station...
+
+      b_use_station = FALSE;
+
+      // don't look for items for a while since the bot
+      // could be stuck trying to get to an item
+      pBot.f_find_item = gpGlobals->time + 0.5;
+   }
+}
+
+
+static void BotWanderCheckWalls(bot_t &pBot, float &moved_distance)
+{
+   edict_t *pEdict = pBot.pEdict;
+   TraceResult tr;
+
+   // check if we should be avoiding walls
+   if (pBot.f_dont_avoid_wall_time <= gpGlobals->time)
+   {
+      // let's just randomly wander around
+      if (BotStuckInCorner( pBot ))
+      {
+         pEdict->v.ideal_yaw += 180;  // turn 180 degrees
+
+         BotFixIdealYaw(pEdict);
+
+         pBot.f_move_speed /= 3;  // move slowly while turning
+         pBot.b_not_maxspeed = TRUE;
+
+         pBot.f_dont_avoid_wall_time = gpGlobals->time + 1.0;
+
+         moved_distance = 2.0;  // dont use bot stuck code
+      }
+      else
+      {
+         Vector v_forward = UTIL_AnglesToForward(pEdict->v.v_angle);
+
+         if(RANDOM_LONG2(0,1))
+         {
+            // check if there is a wall on the left first...
+            if (BotCheckWallOnLeft( pBot ) || BotEdgeLeft(pBot, v_forward))
+            {
+               HandleWallOnLeft(pBot);
+            }
+            else if (BotCheckWallOnRight( pBot ) || BotEdgeRight(pBot, v_forward))
+            {
+               HandleWallOnRight(pBot);
+            }
+         }
+         else
+         {
+            // check if there is a wall on the right first...
+            if (BotCheckWallOnRight( pBot ) || BotEdgeRight(pBot, v_forward))
+            {
+               HandleWallOnRight(pBot);
+            }
+            else if (BotCheckWallOnLeft( pBot ) || BotEdgeLeft(pBot, v_forward))
+            {
+               HandleWallOnLeft(pBot);
+            }
+         }
+      }
+   }
+
+   // check if bot is about to hit a wall.  TraceResult gets returned
+   if ((pBot.f_dont_avoid_wall_time <= gpGlobals->time) &&
+       BotCantMoveForward( pBot, &tr ))
+   {
+      // ADD LATER
+      // need to check if bot can jump up or duck under here...
+      // ADD LATER
+
+      BotTurnAtWall( pBot, &tr, TRUE );
+   }
+}
+
+
+static void BotWanderHandleStuck(bot_t &pBot, float moved_distance)
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   // check if the bot hasn't moved much since the last location
+   // and IS UNDERWATER
+   if ((moved_distance <= 1.0f) && (pBot.f_prev_speed >= 1.0f) && pBot.b_in_water)
+   {
+      // the bot must be stuck!
+
+      pBot.f_dont_avoid_wall_time = gpGlobals->time + 1.0;
+      pBot.f_look_for_waypoint_time = gpGlobals->time + 1.0;
+
+      // try duck
+      pEdict->v.button |= IN_DUCK;  // duck down and move forward
+   }
+   // check if the bot hasn't moved much since the last location
+   // (and NOT on a ladder since ladder stuck handled elsewhere)
+   else if ((moved_distance <= 1.0f) && (pBot.f_prev_speed >= 1.0f) && !pBot.b_on_ladder)
+   {
+      qboolean bCrouchJump = FALSE;
+
+      // the bot must be stuck!
+
+      pBot.f_dont_avoid_wall_time = gpGlobals->time + 1.0;
+      pBot.f_look_for_waypoint_time = gpGlobals->time + 1.0;
+
+      if (BotCanJumpUp( pBot, &bCrouchJump ))  // can the bot jump onto something?
+      {
+         if ((pBot.f_jump_time + 2.0) <= gpGlobals->time)
+         {
+            pBot.f_jump_time = gpGlobals->time;
+            pEdict->v.button |= IN_JUMP;  // jump up and move forward
+
+            if (bCrouchJump)
+               pEdict->v.button |= IN_DUCK;  // also need to duck
+         }
+         else
+         {
+            // bot already tried jumping less than two seconds ago, just turn
+            BotRandomTurn(pBot);
+         }
+      }
+      else if (BotCanDuckUnder( pBot ))  // can the bot duck under something?
+      {
+         pEdict->v.button |= IN_DUCK;  // duck down and move forward
+      }
+      else
+      {
+         BotRandomTurn(pBot);
+
+         // is the bot trying to get to an item?...
+         if (pBot.pBotPickupItem != NULL)
+         {
+            // don't look for items for a while since the bot
+            // could be stuck trying to get to an item
+            pBot.f_find_item = gpGlobals->time + 0.5;
+         }
+      }
+   }
+}
+
+
+static void BotWanderFreeRoam(bot_t &pBot, float moved_distance)
+{
+   if (pBot.b_in_water)  // check if the bot is underwater...
+   {
+      BotUnderWater( pBot );
+   }
+
+   qboolean found_waypoint = FALSE;
+
+   // if the bot is not trying to get to something AND
+   // it is time to look for a waypoint AND
+   // there are waypoints in this level...
+
+   if ((pBot.pBotPickupItem == NULL) &&
+       (pBot.f_look_for_waypoint_time <= gpGlobals->time) &&
+       (num_waypoints != 0))
+   {
+      found_waypoint = BotHeadTowardWaypoint(pBot);
+   }
+
+   // check if the bot is on a ladder...
+   if (pBot.b_on_ladder)
+   {
+      // check if bot JUST got on the ladder...
+      if ((pBot.f_end_use_ladder_time + 1.0) < gpGlobals->time)
+         pBot.f_start_use_ladder_time = gpGlobals->time;
+
+      // go handle the ladder movement
+      BotOnLadder( pBot, moved_distance );
+
+      pBot.f_dont_avoid_wall_time = gpGlobals->time + 2.0;
+      pBot.f_end_use_ladder_time = gpGlobals->time;
+   }
+   else
+   {
+      // check if the bot JUST got off the ladder...
+      if ((pBot.f_end_use_ladder_time + 1.0) > gpGlobals->time)
+      {
+         pBot.ladder_dir = LADDER_UNKNOWN;
+      }
+   }
+
+   // if the bot isn't headed toward a waypoint...
+   if (found_waypoint == FALSE)
+   {
+      BotWanderCheckWalls(pBot, moved_distance);
+   }
+
+   // check if bot is on a ladder and has been on a ladder for
+   // more than 5 seconds...
+   if (pBot.b_on_ladder && (pBot.f_start_use_ladder_time > 0.0f) &&
+       ((pBot.f_start_use_ladder_time + 5.0) <= gpGlobals->time))
+   {
+      // bot is stuck on a ladder...
+      BotRandomTurn(pBot);
+
+      // don't look for items for 2 seconds
+      pBot.f_find_item = gpGlobals->time + 2.0;
+
+      pBot.f_start_use_ladder_time = 0.0;  // reset start ladder time
+   }
+
+   BotWanderHandleStuck(pBot, moved_distance);
+
+   // should the bot pause for a while here?
+   // (don't pause on ladders or while being "used"...
+   if (!pBot.b_on_ladder && (RANDOM_LONG2(1, 1000) <= skill_settings[pBot.bot_skill].pause_frequency))
+   {
+      // set the time that the bot will stop "pausing"
+      pBot.f_pause_time = gpGlobals->time +
+         RANDOM_FLOAT2(skill_settings[pBot.bot_skill].pause_time_min,
+                      skill_settings[pBot.bot_skill].pause_time_max);
+   }
+}
+
+
 //
 static void BotJustWanderAround(bot_t &pBot, float moved_distance)
 {
@@ -1752,69 +2026,13 @@ static void BotJustWanderAround(bot_t &pBot, float moved_distance)
    // check if should use wall mounted health station...
    else if (pBot.b_use_health_station)
    {
-      if ((pBot.f_use_health_time + 10.0) > gpGlobals->time)
-      {
-         pBot.f_move_speed = 0;  // don't move while using health station
-
-         // block strafing before using health station
-         pBot.f_strafe_time = gpGlobals->time + 1.0f;
-         pBot.f_strafe_direction = 0.0f;
-
-         // aim at the button..
-         Vector v_target = pBot.v_use_target - GetGunPosition( pEdict );
-         Vector target_angle = UTIL_VecToAngles(v_target);
-
-         pEdict->v.idealpitch = UTIL_WrapAngle(target_angle.x);
-         pEdict->v.ideal_yaw = UTIL_WrapAngle(target_angle.y);
-
-         pBot.f_move_speed = pBot.f_max_speed;
-
-         pEdict->v.button = IN_USE;
-      }
-      else
-      {
-         // bot is stuck trying to "use" a health station...
-
-         pBot.b_use_health_station = FALSE;
-
-         // don't look for items for a while since the bot
-         // could be stuck trying to get to an item
-         pBot.f_find_item = gpGlobals->time + 0.5;
-      }
+      BotWanderHandleStation(pBot, pBot.b_use_health_station, pBot.f_use_health_time);
    }
 
    // check if should use wall mounted HEV station...
    else if (pBot.b_use_HEV_station)
    {
-      if ((pBot.f_use_HEV_time + 10.0) > gpGlobals->time)
-      {
-         pBot.f_move_speed = 0;  // don't move while using HEV station
-
-         // block strafing before using hev
-         pBot.f_strafe_time = gpGlobals->time + 1.0f;
-         pBot.f_strafe_direction = 0.0f;
-
-         // aim at the button..
-         Vector v_target = pBot.v_use_target - GetGunPosition( pEdict );
-         Vector target_angle = UTIL_VecToAngles(v_target);
-
-         pEdict->v.idealpitch = UTIL_WrapAngle(target_angle.x);
-         pEdict->v.ideal_yaw = UTIL_WrapAngle(target_angle.y);
-
-         pBot.f_move_speed = pBot.f_max_speed;
-
-         pEdict->v.button = IN_USE;
-      }
-      else
-      {
-         // bot is stuck trying to "use" a HEV station...
-
-         pBot.b_use_HEV_station = FALSE;
-
-         // don't look for items for a while since the bot
-         // could be stuck trying to get to an item
-         pBot.f_find_item = gpGlobals->time + 0.5;
-      }
+      BotWanderHandleStation(pBot, pBot.b_use_HEV_station, pBot.f_use_HEV_time);
    }
 
    else if (pBot.b_use_button)
@@ -1830,190 +2048,208 @@ static void BotJustWanderAround(bot_t &pBot, float moved_distance)
 
    else
    {
-      if (pBot.b_in_water)  // check if the bot is underwater...
+      BotWanderFreeRoam(pBot, moved_distance);
+   }
+}
+
+
+static void BotDoStrafeCombat(bot_t &pBot)
+{
+   edict_t *pEdict = pBot.pEdict;
+   bool isMelee = (weapon_select[pBot.current_weapon_index].type & WEAPON_MELEE);
+
+   // don't go too close to enemy
+   // strafe instead
+   if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].battle_strafe && !isMelee)
+   {
+      if(pBot.f_strafe_time <= gpGlobals->time)
       {
-         BotUnderWater( pBot );
+         pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.5, 1.2);
+         pBot.f_strafe_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
+         pBot.f_move_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
       }
 
-      qboolean found_waypoint = FALSE;
-
-      // if the bot is not trying to get to something AND
-      // it is time to look for a waypoint AND
-      // there are waypoints in this level...
-
-      if ((pBot.pBotPickupItem == NULL) &&
-          (pBot.f_look_for_waypoint_time <= gpGlobals->time) &&
-          (num_waypoints != 0))
+      pBot.f_move_speed = 1.0;
+   }
+   else
+   {
+      if(pBot.f_strafe_time <= gpGlobals->time)
       {
-         found_waypoint = BotHeadTowardWaypoint(pBot);
-      }
+         pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.5, 1.2);
+         pBot.f_strafe_direction = RANDOM_FLOAT(-0.3, 0.3);
 
-      // check if the bot is on a ladder...
-      if (pBot.b_on_ladder)
-      {
-         // check if bot JUST got on the ladder...
-         if ((pBot.f_end_use_ladder_time + 1.0) < gpGlobals->time)
-            pBot.f_start_use_ladder_time = gpGlobals->time;
-
-         // go handle the ladder movement
-         BotOnLadder( pBot, moved_distance );
-
-         pBot.f_dont_avoid_wall_time = gpGlobals->time + 2.0;
-         pBot.f_end_use_ladder_time = gpGlobals->time;
-      }
-      else
-      {
-         // check if the bot JUST got off the ladder...
-         if ((pBot.f_end_use_ladder_time + 1.0) > gpGlobals->time)
+         if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].keep_optimal_dist || isMelee)
          {
-            pBot.ladder_dir = LADDER_UNKNOWN;
-         }
-      }
-
-      // if the bot isn't headed toward a waypoint...
-      if (found_waypoint == FALSE)
-      {
-         TraceResult tr;
-
-         // check if we should be avoiding walls
-         if (pBot.f_dont_avoid_wall_time <= gpGlobals->time)
-         {
-            // let's just randomly wander around
-            if (BotStuckInCorner( pBot ))
-            {
-               pEdict->v.ideal_yaw += 180;  // turn 180 degrees
-
-               BotFixIdealYaw(pEdict);
-
-               pBot.f_move_speed /= 3;  // move slowly while turning
-               pBot.b_not_maxspeed = TRUE;
-
-               pBot.f_dont_avoid_wall_time = gpGlobals->time + 1.0;
-
-               moved_distance = 2.0;  // dont use bot stuck code
-            }
+            if((UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy) - pEdict->v.origin).Length() < pBot.current_opt_distance || !isMelee)
+               pBot.f_move_direction = -1;
             else
-            {
-               Vector v_forward = UTIL_AnglesToForward(pEdict->v.v_angle);
-
-               if(RANDOM_LONG2(0,1))
-               {
-                  // check if there is a wall on the left first...
-                  if (BotCheckWallOnLeft( pBot ) || BotEdgeLeft(pBot, v_forward))
-                  {
-                     HandleWallOnLeft(pBot);
-                  }
-                  else if (BotCheckWallOnRight( pBot ) || BotEdgeRight(pBot, v_forward))
-                  {
-                     HandleWallOnRight(pBot);
-                  }
-               }
-               else
-               {
-                  // check if there is a wall on the right first...
-                  if (BotCheckWallOnRight( pBot ) || BotEdgeRight(pBot, v_forward))
-                  {
-                     HandleWallOnRight(pBot);
-                  }
-                  else if (BotCheckWallOnLeft( pBot ) || BotEdgeLeft(pBot, v_forward))
-                  {
-                     HandleWallOnLeft(pBot);
-                  }
-               }
-            }
+               pBot.f_move_direction = 1;
          }
-
-         // check if bot is about to hit a wall.  TraceResult gets returned
-         if ((pBot.f_dont_avoid_wall_time <= gpGlobals->time) &&
-             BotCantMoveForward( pBot, &tr ))
-         {
-            // ADD LATER
-            // need to check if bot can jump up or duck under here...
-            // ADD LATER
-
-            BotTurnAtWall( pBot, &tr, TRUE );
-         }
+         else
+            pBot.f_move_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
       }
 
-      // check if bot is on a ladder and has been on a ladder for
-      // more than 5 seconds...
-      if (pBot.b_on_ladder && (pBot.f_start_use_ladder_time > 0.0f) &&
-          ((pBot.f_start_use_ladder_time + 5.0) <= gpGlobals->time))
+      pBot.f_move_speed = 32.0;
+   }
+
+   if(pBot.f_dont_avoid_wall_time <= gpGlobals->time)
+   {
+      Vector v_forward = UTIL_AnglesToForward(pEdict->v.v_angle);
+
+      // check for walls, left and right
+      if(pBot.f_strafe_direction > 0.0f)
       {
-         // bot is stuck on a ladder...
-         BotRandomTurn(pBot);
-
-         // don't look for items for 2 seconds
-         pBot.f_find_item = gpGlobals->time + 2.0;
-
-         pBot.f_start_use_ladder_time = 0.0;  // reset start ladder time
+         if(BotCheckWallOnRight(pBot) || BotEdgeRight(pBot, v_forward))
+            pBot.f_strafe_direction = -pBot.f_strafe_direction;
+      }
+      else if(pBot.f_strafe_direction < 0.0f)
+      {
+         if(BotCheckWallOnLeft(pBot) || BotEdgeLeft(pBot, v_forward))
+            pBot.f_strafe_direction = -pBot.f_strafe_direction;
       }
 
-      // check if the bot hasn't moved much since the last location
-      // and IS UNDERWATER
-      if ((moved_distance <= 1.0f) && (pBot.f_prev_speed >= 1.0f) && pBot.b_in_water)
+      // check for walls, back and forward
+      if(pBot.f_move_direction > 0.0f)
       {
-         // the bot must be stuck!
-
-         pBot.f_dont_avoid_wall_time = gpGlobals->time + 1.0;
-         pBot.f_look_for_waypoint_time = gpGlobals->time + 1.0;
-
-         // try duck
-         pEdict->v.button |= IN_DUCK;  // duck down and move forward
+         if(BotCheckWallOnForward(pBot))
+            pBot.f_move_direction = -pBot.f_move_direction;
       }
-      // check if the bot hasn't moved much since the last location
-      // (and NOT on a ladder since ladder stuck handled elsewhere)
-      else if ((moved_distance <= 1.0f) && (pBot.f_prev_speed >= 1.0f) && !pBot.b_on_ladder)
+      else if(pBot.f_move_direction < 0.0f)
       {
-         qboolean bCrouchJump = FALSE;
+         if(BotCheckWallOnBack(pBot))
+            pBot.f_move_direction = -pBot.f_move_direction;
+      }
+   }
 
-         // the bot must be stuck!
+   // set move direction
+   pBot.f_move_speed *= pBot.f_move_direction;
+}
 
-         pBot.f_dont_avoid_wall_time = gpGlobals->time + 1.0;
-         pBot.f_look_for_waypoint_time = gpGlobals->time + 1.0;
 
-         if (BotCanJumpUp( pBot, &bCrouchJump ))  // can the bot jump onto something?
+static void BotDoStrafeLadder(bot_t &pBot)
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   // do we have ladder waypoint?
+   if(pBot.curr_waypoint_index != -1 && waypoints[pBot.curr_waypoint_index].flags & W_FL_LADDER)
+   {
+      if(pEdict->v.velocity.Make2D().Length() > 20.0f)
+      {
+          // First kill off sideways movement
+          float move_dir = UTIL_VecToAngles(pEdict->v.velocity).y;
+          float look_dir = pEdict->v.v_angle.y;
+
+          float angle_diff = UTIL_WrapAngle(move_dir - look_dir);
+
+          if(angle_diff > 135.0f || angle_diff <= -135.0f)
+          {
+             // move forward
+             pBot.f_strafe_direction = 0.0;
+             pBot.f_move_direction = 1.0;
+          }
+          else if(angle_diff > 45.0f)
          {
-            if ((pBot.f_jump_time + 2.0) <= gpGlobals->time)
-            {
-               pBot.f_jump_time = gpGlobals->time;
-               pEdict->v.button |= IN_JUMP;  // jump up and move forward
-
-               if (bCrouchJump)
-                  pEdict->v.button |= IN_DUCK;  // also need to duck
-            }
-            else
-            {
-               // bot already tried jumping less than two seconds ago, just turn
-               BotRandomTurn(pBot);
-            }
+            // strafe on right
+            pBot.f_strafe_direction = -1.0;
+            pBot.f_move_direction = 1.0;
          }
-         else if (BotCanDuckUnder( pBot ))  // can the bot duck under something?
+         else if(angle_diff <= -45.0f)
          {
-            pEdict->v.button |= IN_DUCK;  // duck down and move forward
+            // strafe on left
+            pBot.f_strafe_direction = 1.0;
+            pBot.f_move_direction = 1.0;
          }
          else
          {
-            BotRandomTurn(pBot);
+            // move backwards
+             pBot.f_strafe_direction = 0.0;
+            pBot.f_move_direction = -1.0;
+         }
+       }
+       else
+       {
+          // Then move towards waypoint sideways
+         Vector v_wp = waypoints[pBot.curr_waypoint_index].origin;
+         Vector v_dir = (v_wp - pEdict->v.origin);
 
-            // is the bot trying to get to an item?...
-            if (pBot.pBotPickupItem != NULL)
-            {
-               // don't look for items for a while since the bot
-               // could be stuck trying to get to an item
-               pBot.f_find_item = gpGlobals->time + 0.5;
-            }
+         Vector v_angles = UTIL_VecToAngles(v_dir);
+
+         float waypoint_dir = v_angles.y;
+         float look_dir = pEdict->v.v_angle.y;
+
+         float angle_diff = UTIL_WrapAngle(waypoint_dir - look_dir);
+
+          if(angle_diff > 135.0f || angle_diff <= -135.0f)
+          {
+             // move backwards
+             pBot.f_strafe_direction = 0.0;
+             pBot.f_move_direction = -1.0;
+          }
+          else if(angle_diff > 45.0f)
+         {
+            // strafe on left
+            pBot.f_strafe_direction = 1.0;
+            pBot.f_move_direction = 1.0;
+         }
+         else if(angle_diff <= -45.0f)
+         {
+            // strafe on right
+            pBot.f_strafe_direction = -1.0;
+            pBot.f_move_direction = 1.0;
+         }
+         else
+         {
+            // move forward
+             pBot.f_strafe_direction = 0.0;
+            pBot.f_move_direction = 1.0;
          }
       }
+   }
+   else
+   {
+      // move forward
+      pBot.f_strafe_direction = 0.0;
+      pBot.f_move_direction = 1.0;
+   }
 
-      // should the bot pause for a while here?
-      // (don't pause on ladders or while being "used"...
-      if (!pBot.b_on_ladder && (RANDOM_LONG2(1, 1000) <= skill_settings[pBot.bot_skill].pause_frequency))
+   pBot.f_move_speed = 150.0f;
+   pBot.b_not_maxspeed = TRUE;
+
+   // set move direction
+   pBot.f_move_speed *= pBot.f_move_direction;
+}
+
+
+static void BotDoStrafeNormal(bot_t &pBot)
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.1, 1.0);
+
+   if (RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].normal_strafe)
+   {
+      if (RANDOM_LONG2(1, 100) <= 50)
+         pBot.f_strafe_direction = -1.0;
+      else
+         pBot.f_strafe_direction = 1.0;
+   }
+   else
+      pBot.f_strafe_direction = 0.0 + RANDOM_FLOAT2(-0.005, 0.005);
+
+   if(pBot.f_dont_avoid_wall_time <= gpGlobals->time)
+   {
+      Vector v_forward = UTIL_AnglesToForward(pEdict->v.v_angle);
+
+      // check for walls, left and right
+      if(pBot.f_strafe_direction > 0.0f)
       {
-         // set the time that the bot will stop "pausing"
-         pBot.f_pause_time = gpGlobals->time +
-            RANDOM_FLOAT2(skill_settings[pBot.bot_skill].pause_time_min,
-                         skill_settings[pBot.bot_skill].pause_time_max);
+         if(BotCheckWallOnRight(pBot) || BotEdgeRight(pBot, v_forward))
+            pBot.f_strafe_direction = -pBot.f_strafe_direction;
+      }
+      else if(pBot.f_strafe_direction < 0.0f)
+      {
+         if(BotCheckWallOnLeft(pBot) || BotEdgeLeft(pBot, v_forward))
+            pBot.f_strafe_direction = -pBot.f_strafe_direction;
       }
    }
 }
@@ -2026,207 +2262,24 @@ static void BotDoStrafe(bot_t &pBot)
    // combat strafe
    if(pBot.pBotEnemy != NULL && FInViewCone(UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy), pEdict) && FVisibleEnemy( UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy), pEdict, pBot.pBotEnemy ))
    {
-      bool isMelee = (weapon_select[pBot.current_weapon_index].type & WEAPON_MELEE);
-      // don't go too close to enemy
-      // strafe instead
-      if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].battle_strafe && !isMelee)
-      {
-         if(pBot.f_strafe_time <= gpGlobals->time)
-         {
-            pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.5, 1.2);
-            pBot.f_strafe_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
-            pBot.f_move_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
-         }
-
-         pBot.f_move_speed = 1.0;
-      }
-      else
-      {
-         if(pBot.f_strafe_time <= gpGlobals->time)
-         {
-            pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.5, 1.2);
-            pBot.f_strafe_direction = RANDOM_FLOAT(-0.3, 0.3);
-
-            if(RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].keep_optimal_dist || isMelee)
-            {
-               if((UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy) - pEdict->v.origin).Length() < pBot.current_opt_distance || !isMelee)
-                  pBot.f_move_direction = -1;
-               else
-                  pBot.f_move_direction = 1;
-            }
-            else
-               pBot.f_move_direction = (RANDOM_LONG2(1, 100) <= 50) ? 1.0 : -1.0;
-         }
-
-         pBot.f_move_speed = 32.0;
-      }
-
-      if(pBot.f_dont_avoid_wall_time <= gpGlobals->time)
-      {
-         Vector v_forward = UTIL_AnglesToForward(pEdict->v.v_angle);
-
-         // check for walls, left and right
-         if(pBot.f_strafe_direction > 0.0f)
-         {
-            if(BotCheckWallOnRight(pBot) || BotEdgeRight(pBot, v_forward))
-               pBot.f_strafe_direction = -pBot.f_strafe_direction;
-         }
-         else if(pBot.f_strafe_direction < 0.0f)
-         {
-            if(BotCheckWallOnLeft(pBot) || BotEdgeLeft(pBot, v_forward))
-               pBot.f_strafe_direction = -pBot.f_strafe_direction;
-         }
-
-         // check for walls, back and forward
-         if(pBot.f_move_direction > 0.0f)
-         {
-            if(BotCheckWallOnForward(pBot))
-               pBot.f_move_direction = -pBot.f_move_direction;
-         }
-         else if(pBot.f_move_direction < 0.0f)
-         {
-            if(BotCheckWallOnBack(pBot))
-               pBot.f_move_direction = -pBot.f_move_direction;
-         }
-      }
-
-      // set move direction
-      pBot.f_move_speed *= pBot.f_move_direction;
+      BotDoStrafeCombat(pBot);
    }
    // ladder strage - on ladder and know about ladder
    else if (pBot.b_on_ladder)
    {
-      // do we have ladder waypoint?
-      if(pBot.curr_waypoint_index != -1 && waypoints[pBot.curr_waypoint_index].flags & W_FL_LADDER)
-      {
-         if(pEdict->v.velocity.Make2D().Length() > 20.0f)
-         {
-             // First kill off sideways movement
-             float move_dir = UTIL_VecToAngles(pEdict->v.velocity).y;
-             float look_dir = pEdict->v.v_angle.y;
-
-             float angle_diff = UTIL_WrapAngle(move_dir - look_dir);
-
-             if(angle_diff > 135.0f || angle_diff <= -135.0f)
-             {
-                // move forward
-                pBot.f_strafe_direction = 0.0;
-                pBot.f_move_direction = 1.0;
-             }
-             else if(angle_diff > 45.0f)
-            {
-               // strafe on right
-               pBot.f_strafe_direction = -1.0;
-               pBot.f_move_direction = 1.0;
-            }
-            else if(angle_diff <= -45.0f)
-            {
-               // strafe on left
-               pBot.f_strafe_direction = 1.0;
-               pBot.f_move_direction = 1.0;
-            }
-            else
-            {
-               // move backwards
-                pBot.f_strafe_direction = 0.0;
-               pBot.f_move_direction = -1.0;
-            }
-          }
-          else
-          {
-             // Then move towards waypoint sideways
-            Vector v_wp = waypoints[pBot.curr_waypoint_index].origin;
-            Vector v_dir = (v_wp - pEdict->v.origin);
-
-            Vector v_angles = UTIL_VecToAngles(v_dir);
-
-            float waypoint_dir = v_angles.y;
-            float look_dir = pEdict->v.v_angle.y;
-
-            float angle_diff = UTIL_WrapAngle(waypoint_dir - look_dir);
-
-             if(angle_diff > 135.0f || angle_diff <= -135.0f)
-             {
-                // move backwards
-                pBot.f_strafe_direction = 0.0;
-                pBot.f_move_direction = -1.0;
-             }
-             else if(angle_diff > 45.0f)
-            {
-               // strafe on left
-               pBot.f_strafe_direction = 1.0;
-               pBot.f_move_direction = 1.0;
-            }
-            else if(angle_diff <= -45.0f)
-            {
-               // strafe on right
-               pBot.f_strafe_direction = -1.0;
-               pBot.f_move_direction = 1.0;
-            }
-            else
-            {
-               // move forward
-                pBot.f_strafe_direction = 0.0;
-               pBot.f_move_direction = 1.0;
-            }
-         }
-      }
-      else
-      {
-         // move forward
-         pBot.f_strafe_direction = 0.0;
-         pBot.f_move_direction = 1.0;
-      }
-
-      pBot.f_move_speed = 150.0f;
-      pBot.b_not_maxspeed = TRUE;
-
-      // set move direction
-      pBot.f_move_speed *= pBot.f_move_direction;
+      BotDoStrafeLadder(pBot);
    }
    // normal strafe - time to strafe yet?
    else if (pBot.f_strafe_time < gpGlobals->time)
    {
-      pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.1, 1.0);
-
-      if (RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].normal_strafe)
-      {
-         if (RANDOM_LONG2(1, 100) <= 50)
-            pBot.f_strafe_direction = -1.0;
-         else
-            pBot.f_strafe_direction = 1.0;
-      }
-      else
-         pBot.f_strafe_direction = 0.0 + RANDOM_FLOAT2(-0.005, 0.005);
-
-      if(pBot.f_dont_avoid_wall_time <= gpGlobals->time)
-      {
-         Vector v_forward = UTIL_AnglesToForward(pEdict->v.v_angle);
-
-         // check for walls, left and right
-         if(pBot.f_strafe_direction > 0.0f)
-         {
-            if(BotCheckWallOnRight(pBot) || BotEdgeRight(pBot, v_forward))
-               pBot.f_strafe_direction = -pBot.f_strafe_direction;
-         }
-         else if(pBot.f_strafe_direction < 0.0f)
-         {
-            if(BotCheckWallOnLeft(pBot) || BotEdgeLeft(pBot, v_forward))
-               pBot.f_strafe_direction = -pBot.f_strafe_direction;
-         }
-      }
+      BotDoStrafeNormal(pBot);
    }
 }
 
 
-static void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distance)
+static qboolean BotRandomMovementHandlePending(bot_t &pBot)
 {
    edict_t *pEdict = pBot.pEdict;
-   float max_lj_distance = 0.0, target_distance;
-
-   //
-   // PART1 -- handle actions that are not finished
-   //
 
    // fix bot animation on longjumping
    if (pBot.b_longjump_do_jump)
@@ -2237,7 +2290,7 @@ static void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_
 
       pBot.f_duck_time = gpGlobals->time + RANDOM_FLOAT2(0.3, 0.5); //stay duck for some time to fix animation
 
-      return;
+      return TRUE;
    }
 
    // duck in mid-air after random jump!
@@ -2252,7 +2305,7 @@ static void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_
           pBot.f_random_jump_time = gpGlobals->time + RANDOM_FLOAT2(0.2, 0.4);
        }
 
-       return;
+       return TRUE;
    }
 
    // stop trying to longjump after half a second
@@ -2282,12 +2335,16 @@ static void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_
       pBot.b_longjump_do_jump = TRUE;
 
       //UTIL_ConsolePrintf("%s doing longjump! - combat\n", STRING(pEdict->v.netname));
-      return;
+      return TRUE;
    }
 
-   //
-   // PART2 -- return here if actions unfinished
-   //
+   return FALSE;
+}
+
+
+static qboolean BotRandomMovementCanStart(bot_t &pBot)
+{
+   edict_t *pEdict = pBot.pEdict;
 
    // random jump or duck or longjump?
    if (pBot.f_random_jump_time > gpGlobals->time ||
@@ -2295,23 +2352,90 @@ static void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_
        pBot.f_combat_longjump > gpGlobals->time ||
        pBot.b_combat_longjump)
    {
-      return;
+      return FALSE;
    }
 
    // Already jumping or ducking, or not on ground, or on ladder
    if(FBitSet(pEdict->v.button, IN_DUCK) || FBitSet(pEdict->v.button, IN_JUMP) ||
        !pBot.b_on_ground || pBot.b_on_ladder || pBot.b_in_water)
    {
-      return;
+      return FALSE;
    }
+
+   // don't jump if trying to pick up item.
+   if(pBot.pBotEnemy == NULL && !FNullEnt(pBot.pBotPickupItem) && !(pBot.pBotPickupItem->v.effects & EF_NODRAW) && !(pBot.pBotPickupItem->v.frame > 0))
+      return FALSE;
+
+   return TRUE;
+}
+
+
+static qboolean BotRandomMovementStartLongjump(bot_t &pBot, float max_lj_distance)
+{
+   edict_t *pEdict = pBot.pEdict;
+   Vector vecSrc, target_angle;
+   TraceResult tr;
+   int mod;
+
+   vecSrc = pEdict->v.origin;
+   mod = RANDOM_LONG2(1, 100) <= 50 ? -1 : 1;
+
+   // get a random angle (-30 or 30)
+   for (int i = 1; i >= -1; i-=2)
+   {
+      target_angle.x = -pEdict->v.v_angle.x;
+      target_angle.y = UTIL_WrapAngle(pEdict->v.v_angle.y + 30 * (mod * i));
+      target_angle.z = pEdict->v.v_angle.z;
+
+      // trace a hull toward the current waypoint the distance of a longjump (depending on gravity)
+      UTIL_TraceMove(vecSrc, vecSrc + UTIL_AnglesToForward(target_angle) * max_lj_distance, dont_ignore_monsters, pEdict, &tr);
+
+      // make sure it's clear
+      if (tr.flFraction > 0.999999f)
+      {
+         //UTIL_ConsolePrintf("%s - Clear longjump path found\n", STRING(pEdict->v.netname));
+         pBot.b_combat_longjump = TRUE;
+
+         pEdict->v.ideal_yaw += 30 * mod;
+
+         BotFixIdealYaw(pEdict);
+
+         break;
+      }
+   }
+
+   pBot.f_combat_longjump = gpGlobals->time + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
+
+   if(pBot.b_combat_longjump)
+   {
+      pBot.prev_random_type = 3;
+      return TRUE;
+   }
+
+   return FALSE;
+}
+
+
+static void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_distance)
+{
+   edict_t *pEdict = pBot.pEdict;
+   float max_lj_distance = 0.0, target_distance;
+
+   //
+   // PART1 -- handle actions that are not finished
+   //
+   if (BotRandomMovementHandlePending(pBot))
+      return;
+
+   //
+   // PART2 -- return here if actions unfinished
+   //
+   if (!BotRandomMovementCanStart(pBot))
+      return;
 
    //
    // PART3 -- start new actions, first check if contitions are right, then select, then act
    //
-
-   // don't jump if trying to pick up item.
-   if(pBot.pBotEnemy == NULL && !FNullEnt(pBot.pBotPickupItem) && !(pBot.pBotPickupItem->v.effects & EF_NODRAW) && !(pBot.pBotPickupItem->v.frame > 0))
-      return;
 
    qboolean jump, duck, lj;
 
@@ -2412,44 +2536,7 @@ static void BotDoRandomJumpingAndDuckingAndLongJumping(bot_t &pBot, float moved_
    // combat mode random longjumping
    if(lj)
    {
-      Vector vecSrc, target_angle;
-      TraceResult tr;
-      int mod;
-
-      vecSrc = pEdict->v.origin;
-      mod = RANDOM_LONG2(1, 100) <= 50 ? -1 : 1;
-
-      // get a random angle (-30 or 30)
-      for (int i = 1; i >= -1; i-=2)
-      {
-         target_angle.x = -pEdict->v.v_angle.x;
-         target_angle.y = UTIL_WrapAngle(pEdict->v.v_angle.y + 30 * (mod * i));
-         target_angle.z = pEdict->v.v_angle.z;
-
-         // trace a hull toward the current waypoint the distance of a longjump (depending on gravity)
-         UTIL_TraceMove(vecSrc, vecSrc + UTIL_AnglesToForward(target_angle) * max_lj_distance, dont_ignore_monsters, pEdict, &tr);
-
-         // make sure it's clear
-         if (tr.flFraction > 0.999999f)
-         {
-            //UTIL_ConsolePrintf("%s - Clear longjump path found\n", STRING(pEdict->v.netname));
-            pBot.b_combat_longjump = TRUE;
-
-            pEdict->v.ideal_yaw += 30 * mod;
-
-            BotFixIdealYaw(pEdict);
-
-            break;
-         }
-      }
-
-      pBot.f_combat_longjump = gpGlobals->time + RANDOM_FLOAT2(0.3, 0.6); // don't try too often
-
-      if(pBot.b_combat_longjump)
-      {
-         pBot.prev_random_type = 3;
-         return;
-      }
+      BotRandomMovementStartLongjump(pBot, max_lj_distance);
    }
 }
 
@@ -2471,22 +2558,8 @@ static void BotRunPlayerMove(bot_t &pBot, const float *viewangles, float forward
 }
 
 
-void BotThink( bot_t &pBot )
+static void BotThinkUpdateFrameTiming(bot_t &pBot)
 {
-   edict_t *pEdict = pBot.pEdict;
-
-   Vector v_diff;             // vector from previous to current location
-   float moved_distance;      // length of v_diff vector (distance bot moved)
-   TraceResult tr;
-   float f_strafe_speed;
-
-   pEdict->v.flags |= FL_THIRDPARTYBOT | FL_FAKECLIENT;
-
-   if(pBot.name[0] == 0)  // name filled in yet?
-      safe_strcopy(pBot.name, sizeof(pBot.name), STRING(pEdict->v.netname));
-   if(pBot.userid <= 0)  // user id filled in yet?
-      pBot.userid = GETPLAYERUSERID(pEdict);
-
    // New code, BotThink is not run on every StartFrame anymore.
    pBot.f_frame_time = gpGlobals->time - pBot.f_last_think_time;
    pBot.f_last_think_time = gpGlobals->time;
@@ -2541,6 +2614,12 @@ void BotThink( bot_t &pBot )
       pBot.total_counter=1;
    }
 #endif
+}
+
+
+static void BotThinkUpdatePhysicsState(bot_t &pBot)
+{
+   edict_t *pEdict = pBot.pEdict;
 
    pEdict->v.button = 0;
    pBot.f_move_speed = 0.0;
@@ -2554,6 +2633,279 @@ void BotThink( bot_t &pBot )
    pBot.b_low_health = BotLowHealth(pBot);
 
    BotUpdateHearingSensitivity(pBot);
+}
+
+
+static qboolean BotThinkHandleEnemy(bot_t &pBot)
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   // Only need to check ammo, since ammo check for weapons includes weapons ;)
+   pBot.b_has_enough_ammo_for_good_weapon = !BotAllWeaponsRunningOutOfAmmo(pBot, TRUE);
+
+   if(BotWeaponCanAttack(pBot, FALSE) &&
+      ((pBot.b_has_enough_ammo_for_good_weapon && !pBot.b_low_health) || pBot.f_last_time_attacked < gpGlobals->time + 3.0f))
+   {
+      // get enemy
+      BotFindEnemy( pBot );
+
+      if(pBot.pBotEnemy == NULL)
+      {
+         // if has zoom weapon and zooming, click off zoom
+         if(pBot.current_weapon_index != -1 &&
+            (weapon_select[pBot.current_weapon_index].type & WEAPON_FIRE_ZOOM) == WEAPON_FIRE_ZOOM &&
+            pEdict->v.fov != 0 &&
+            !(pEdict->v.button & (IN_ATTACK|IN_ATTACK2)))
+         {
+            pEdict->v.button |= IN_ATTACK2;
+         }
+
+         // if has aim spot weapon and have spot on, click spot off
+         if(pBot.current_weapon_index != -1 &&
+            weapon_select[pBot.current_weapon_index].iId == GEARBOX_WEAPON_EAGLE &&
+            pBot.eagle_secondary_state != 0 &&
+            !(pEdict->v.button & (IN_ATTACK|IN_ATTACK2)))
+         {
+            pEdict->v.button |= IN_ATTACK2;
+            pBot.eagle_secondary_state = 0;
+         }
+      }
+   }
+
+   BotDetonateSatchel(pBot);
+
+   qboolean DidShootAtEnemy = FALSE;
+
+   // does have an enemy?
+   if (pBot.pBotEnemy != NULL)
+   {
+      if(BotWeaponCanAttack(pBot, FALSE) && (!pBot.b_low_health || pBot.f_last_time_attacked < gpGlobals->time + 3.0f))
+      {
+         BotShootAtEnemy( pBot );  // shoot at the enemy
+         DidShootAtEnemy = (pBot.pBotEnemy != NULL);
+
+         pBot.f_pause_time = 0;  // dont't pause if enemy exists
+
+         // check if bot is on a ladder
+         if (pBot.b_on_ladder)
+         {
+            // bot is stuck on a ladder... jump off ladder
+            pEdict->v.button |= IN_JUMP;
+         }
+      }
+      else
+      {
+         //
+         pBot.f_pause_time = 0;
+
+         // need waypoint away from enemy?
+         edict_t *pAvoidEnemy = pBot.pBotEnemy;
+
+         // don't have an enemy anymore so null out the pointer...
+         BotRemoveEnemy(pBot, FALSE);
+
+         int enemy_waypoint = WaypointFindNearest(pAvoidEnemy, 1024);
+         int self_waypoint = WaypointFindNearest(pEdict, 1024);
+
+         if(enemy_waypoint != -1 && self_waypoint != -1)
+         {
+            int runaway_waypoint = WaypointFindRunawayPath(self_waypoint, enemy_waypoint);
+
+            //if(pBot.waypoint_goal != runaway_waypoint)
+            //   UTIL_ConsolePrintf("[%s] Set runaway waypoint: %d -> %d", pBot.name, pBot.waypoint_goal, runaway_waypoint);
+
+            pBot.wpt_goal_type = WPT_GOAL_LOCATION;
+            pBot.curr_waypoint_index = self_waypoint;
+            pBot.waypoint_goal = runaway_waypoint;
+
+            pBot.f_waypoint_goal_time = gpGlobals->time + 10.0f;
+         }
+      }
+   }
+
+   return DidShootAtEnemy;
+}
+
+
+static void BotThinkHandleNavigation(bot_t &pBot, qboolean did_shoot, float moved_distance)
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   if(did_shoot)
+   {
+      // do nothing
+   }
+   else if (pBot.f_pause_time > gpGlobals->time)  // is bot "paused"?
+   {
+      // you could make the bot look left then right, or look up
+      // and down, to make it appear that the bot is hunting for
+      // something (don't do anything right now)
+
+      if(pBot.f_pause_look_time <= gpGlobals->time)
+      {
+         if(RANDOM_LONG2(1, 100) <= 50)
+            pEdict->v.ideal_yaw += RANDOM_LONG2(30, 60);
+         else
+            pEdict->v.ideal_yaw -= RANDOM_LONG2(30, 60);
+
+         if(pEdict->v.idealpitch > -30)
+            pEdict->v.idealpitch -= RANDOM_LONG2(10, 30);
+         else if(pEdict->v.idealpitch < 30)
+            pEdict->v.idealpitch += RANDOM_LONG2(10, 30);
+
+         BotFixIdealYaw(pEdict);
+         BotFixIdealPitch(pEdict);
+
+         pBot.f_pause_look_time = gpGlobals->time + RANDOM_FLOAT(0.5, 1.0);
+      }
+   }
+   // next if lift-end and on moving platform
+   else if(pBot.curr_waypoint_index != -1 && waypoints[pBot.curr_waypoint_index].flags & W_FL_LIFT_END &&
+           !FNullEnt(pEdict->v.groundentity) && (!pEdict->v.groundentity->v.velocity.is_zero_vector()))
+   {
+      Vector v_to_wp = waypoints[pBot.curr_waypoint_index].origin - GetGunPosition( pEdict );
+
+      Vector wp_angle = UTIL_VecToAngles(v_to_wp);
+
+      pEdict->v.idealpitch = UTIL_WrapAngle(wp_angle.x);
+      pEdict->v.ideal_yaw = UTIL_WrapAngle(wp_angle.y);
+
+      pBot.f_move_speed = 50.0f;
+      pBot.b_not_maxspeed = TRUE;
+
+      pBot.f_strafe_direction = 0;
+      pBot.f_strafe_time = gpGlobals->time + 0.2f;
+   }
+   else
+   {
+      BotJustWanderAround(pBot, moved_distance);
+   }
+}
+
+
+static void BotThinkAdjustSpeedForWaypoint(bot_t &pBot)
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   // does the bot have a waypoint?
+   if (pBot.curr_waypoint_index != -1)
+   {
+      // check if the next waypoint is a door waypoint...
+      if (waypoints[pBot.curr_waypoint_index].flags & W_FL_DOOR)
+      {
+         pBot.f_move_speed = pBot.f_max_speed / 3;  // slow down for doors
+      }
+
+      // check if the next waypoint is a ladder waypoint...
+      if (waypoints[pBot.curr_waypoint_index].flags & W_FL_LADDER)
+      {
+         // check if the waypoint is at the top of a ladder AND
+         // the bot isn't currenly on a ladder...
+         if (pBot.waypoint_top_of_ladder && !pBot.b_on_ladder)
+         {
+            // is the bot on "ground" above the ladder?
+            if (pBot.b_on_ground)
+            {
+               float waypoint_distance = (pEdict->v.origin - pBot.waypoint_origin).Length();
+
+               if (waypoint_distance <= 20.0f)  // if VERY close...
+                  pBot.f_move_speed = 20.0f;  // go VERY slow
+               else if (waypoint_distance <= 100.0f)  // if fairly close...
+                  pBot.f_move_speed = 50.0f;  // go fairly slow
+
+               pBot.b_not_maxspeed = TRUE;
+
+               pBot.ladder_dir = LADDER_DOWN;
+            }
+            else  // bot must be in mid-air, go BACKWARDS to touch ladder...
+            {
+               pBot.f_move_speed = -pBot.f_max_speed;
+            }
+         }
+         else
+         {
+            // don't avoid walls for a while
+            pBot.f_dont_avoid_wall_time = gpGlobals->time + 5.0;
+
+            pBot.waypoint_top_of_ladder = FALSE;
+         }
+      }
+
+      // check if the next waypoint is a crouch waypoint...
+      if (waypoints[pBot.curr_waypoint_index].flags & W_FL_CROUCH)
+      {
+         // this might be duck-jump waypoint.. check if waypoint is at lower height than current bot origin
+         if(waypoints[pBot.curr_waypoint_index].origin.z < pEdict->v.origin.z)
+            pEdict->v.button |= IN_DUCK;  // duck down while moving forward
+      }
+   }
+}
+
+
+static void BotThinkFinalizeMovement(bot_t &pBot)
+{
+   edict_t *pEdict = pBot.pEdict;
+   float f_strafe_speed;
+
+   // save the previous speed (for checking if stuck)
+   pBot.f_prev_speed = pBot.f_move_speed;
+
+   // full strafe if bot isn't moving much else
+   if(pBot.f_move_speed == 0.0f)
+      f_strafe_speed = 0.0;
+   else if(pBot.f_move_speed <= 20.0f)
+      f_strafe_speed = pBot.f_strafe_direction * pBot.f_max_speed;
+   else
+      f_strafe_speed = pBot.f_strafe_direction * pBot.f_move_speed;
+
+   // normalize strafe and move to keep speed at normal level
+   if(f_strafe_speed != 0.0f || pBot.f_move_speed != 0.0f)
+   {
+      Vector2D calc;
+
+      calc.x = f_strafe_speed;
+      calc.y = pBot.f_move_speed;
+
+      calc = calc.Normalize() * (pBot.b_on_ladder || pBot.b_not_maxspeed ? pBot.f_move_speed : pBot.f_max_speed);
+
+      f_strafe_speed = calc.x;
+      pBot.f_move_speed = calc.y;
+
+      if(0)
+      {
+         Vector v_angle = pEdict->v.v_angle;
+         v_angle.x = 0;
+
+         Vector v_right = UTIL_AnglesToRight(v_angle);
+         Vector v_forward = UTIL_AnglesToForward(v_angle);
+
+         Vector v_beam = v_forward * calc.y + v_right * calc.x;
+         UTIL_DrawBeam(0, pEdict->v.origin, pEdict->v.origin + v_beam, 10, 2, 250, 50, 50, 200, 10);
+      }
+   }
+
+   BotRunPlayerMove(pBot, pEdict->v.v_angle, pBot.f_move_speed,
+                                f_strafe_speed, 0, pEdict->v.button, 0, (byte)pBot.msecval);
+}
+
+
+void BotThink( bot_t &pBot )
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   Vector v_diff;             // vector from previous to current location
+   float moved_distance;      // length of v_diff vector (distance bot moved)
+
+   pEdict->v.flags |= FL_THIRDPARTYBOT | FL_FAKECLIENT;
+
+   if(pBot.name[0] == 0)  // name filled in yet?
+      safe_strcopy(pBot.name, sizeof(pBot.name), STRING(pEdict->v.netname));
+   if(pBot.userid <= 0)  // user id filled in yet?
+      pBot.userid = GETPLAYERUSERID(pEdict);
+
+   BotThinkUpdateFrameTiming(pBot);
+
+   BotThinkUpdatePhysicsState(pBot);
 
    // does bot need to say a message and time to say a message?
    if ((pBot.b_bot_say) && (pBot.f_bot_say < gpGlobals->time))
@@ -2671,191 +3023,11 @@ void BotThink( bot_t &pBot )
    // turn towards ideal_yaw by yaw_speed degrees
    BotChangeYaw( pBot, pEdict->v.yaw_speed );
 
-   // Only need to check ammo, since ammo check for weapons includes weapons ;)
-   pBot.b_has_enough_ammo_for_good_weapon = !BotAllWeaponsRunningOutOfAmmo(pBot, TRUE);
+   qboolean DidShootAtEnemy = BotThinkHandleEnemy(pBot);
 
-   if(BotWeaponCanAttack(pBot, FALSE) &&
-      ((pBot.b_has_enough_ammo_for_good_weapon && !pBot.b_low_health) || pBot.f_last_time_attacked < gpGlobals->time + 3.0f))
-   {
-      // get enemy
-      BotFindEnemy( pBot );
+   BotThinkHandleNavigation(pBot, DidShootAtEnemy, moved_distance);
 
-      if(pBot.pBotEnemy == NULL)
-      {
-         // if has zoom weapon and zooming, click off zoom
-         if(pBot.current_weapon_index != -1 &&
-            (weapon_select[pBot.current_weapon_index].type & WEAPON_FIRE_ZOOM) == WEAPON_FIRE_ZOOM &&
-            pEdict->v.fov != 0 &&
-            !(pEdict->v.button & (IN_ATTACK|IN_ATTACK2)))
-         {
-            pEdict->v.button |= IN_ATTACK2;
-         }
-
-         // if has aim spot weapon and have spot on, click spot off
-         if(pBot.current_weapon_index != -1 &&
-            weapon_select[pBot.current_weapon_index].iId == GEARBOX_WEAPON_EAGLE &&
-            pBot.eagle_secondary_state != 0 &&
-            !(pEdict->v.button & (IN_ATTACK|IN_ATTACK2)))
-         {
-            pEdict->v.button |= IN_ATTACK2;
-            pBot.eagle_secondary_state = 0;
-         }
-      }
-   }
-
-   BotDetonateSatchel(pBot);
-
-   qboolean DidShootAtEnemy = FALSE;
-
-   // does have an enemy?
-   if (pBot.pBotEnemy != NULL)
-   {
-      if(BotWeaponCanAttack(pBot, FALSE) && (!pBot.b_low_health || pBot.f_last_time_attacked < gpGlobals->time + 3.0f))
-      {
-         BotShootAtEnemy( pBot );  // shoot at the enemy
-         DidShootAtEnemy = (pBot.pBotEnemy != NULL);
-
-         pBot.f_pause_time = 0;  // dont't pause if enemy exists
-
-         // check if bot is on a ladder
-         if (pBot.b_on_ladder)
-         {
-            // bot is stuck on a ladder... jump off ladder
-            pEdict->v.button |= IN_JUMP;
-         }
-      }
-      else
-      {
-         //
-         pBot.f_pause_time = 0;
-
-         // need waypoint away from enemy?
-         edict_t *pAvoidEnemy = pBot.pBotEnemy;
-
-         // don't have an enemy anymore so null out the pointer...
-         BotRemoveEnemy(pBot, FALSE);
-
-         int enemy_waypoint = WaypointFindNearest(pAvoidEnemy, 1024);
-         int self_waypoint = WaypointFindNearest(pEdict, 1024);
-
-         if(enemy_waypoint != -1 && self_waypoint != -1)
-         {
-            int runaway_waypoint = WaypointFindRunawayPath(self_waypoint, enemy_waypoint);
-
-            //if(pBot.waypoint_goal != runaway_waypoint)
-            //   UTIL_ConsolePrintf("[%s] Set runaway waypoint: %d -> %d", pBot.name, pBot.waypoint_goal, runaway_waypoint);
-
-            pBot.wpt_goal_type = WPT_GOAL_LOCATION;
-            pBot.curr_waypoint_index = self_waypoint;
-            pBot.waypoint_goal = runaway_waypoint;
-
-            pBot.f_waypoint_goal_time = gpGlobals->time + 10.0f;
-         }
-      }
-   }
-
-   if(DidShootAtEnemy)
-   {
-      // do nothing
-   }
-   else if (pBot.f_pause_time > gpGlobals->time)  // is bot "paused"?
-   {
-      // you could make the bot look left then right, or look up
-      // and down, to make it appear that the bot is hunting for
-      // something (don't do anything right now)
-
-      if(pBot.f_pause_look_time <= gpGlobals->time)
-      {
-         if(RANDOM_LONG2(1, 100) <= 50)
-            pEdict->v.ideal_yaw += RANDOM_LONG2(30, 60);
-         else
-            pEdict->v.ideal_yaw -= RANDOM_LONG2(30, 60);
-
-         if(pEdict->v.idealpitch > -30)
-            pEdict->v.idealpitch -= RANDOM_LONG2(10, 30);
-         else if(pEdict->v.idealpitch < 30)
-            pEdict->v.idealpitch += RANDOM_LONG2(10, 30);
-
-         BotFixIdealYaw(pEdict);
-         BotFixIdealPitch(pEdict);
-
-         pBot.f_pause_look_time = gpGlobals->time + RANDOM_FLOAT(0.5, 1.0);
-      }
-   }
-   // next if lift-end and on moving platform
-   else if(pBot.curr_waypoint_index != -1 && waypoints[pBot.curr_waypoint_index].flags & W_FL_LIFT_END &&
-           !FNullEnt(pEdict->v.groundentity) && (!pEdict->v.groundentity->v.velocity.is_zero_vector()))
-   {
-      Vector v_to_wp = waypoints[pBot.curr_waypoint_index].origin - GetGunPosition( pEdict );
-
-      Vector wp_angle = UTIL_VecToAngles(v_to_wp);
-
-      pEdict->v.idealpitch = UTIL_WrapAngle(wp_angle.x);
-      pEdict->v.ideal_yaw = UTIL_WrapAngle(wp_angle.y);
-
-      pBot.f_move_speed = 50.0f;
-      pBot.b_not_maxspeed = TRUE;
-
-      pBot.f_strafe_direction = 0;
-      pBot.f_strafe_time = gpGlobals->time + 0.2f;
-   }
-   else
-   {
-      BotJustWanderAround(pBot, moved_distance);
-   }
-
-   // does the bot have a waypoint?
-   if (pBot.curr_waypoint_index != -1)
-   {
-      // check if the next waypoint is a door waypoint...
-      if (waypoints[pBot.curr_waypoint_index].flags & W_FL_DOOR)
-      {
-         pBot.f_move_speed = pBot.f_max_speed / 3;  // slow down for doors
-      }
-
-      // check if the next waypoint is a ladder waypoint...
-      if (waypoints[pBot.curr_waypoint_index].flags & W_FL_LADDER)
-      {
-         // check if the waypoint is at the top of a ladder AND
-         // the bot isn't currenly on a ladder...
-         if (pBot.waypoint_top_of_ladder && !pBot.b_on_ladder)
-         {
-            // is the bot on "ground" above the ladder?
-            if (pBot.b_on_ground)
-            {
-               float waypoint_distance = (pEdict->v.origin - pBot.waypoint_origin).Length();
-
-               if (waypoint_distance <= 20.0f)  // if VERY close...
-                  pBot.f_move_speed = 20.0f;  // go VERY slow
-               else if (waypoint_distance <= 100.0f)  // if fairly close...
-                  pBot.f_move_speed = 50.0f;  // go fairly slow
-
-               pBot.b_not_maxspeed = TRUE;
-
-               pBot.ladder_dir = LADDER_DOWN;
-            }
-            else  // bot must be in mid-air, go BACKWARDS to touch ladder...
-            {
-               pBot.f_move_speed = -pBot.f_max_speed;
-            }
-         }
-         else
-         {
-            // don't avoid walls for a while
-            pBot.f_dont_avoid_wall_time = gpGlobals->time + 5.0;
-
-            pBot.waypoint_top_of_ladder = FALSE;
-         }
-      }
-
-      // check if the next waypoint is a crouch waypoint...
-      if (waypoints[pBot.curr_waypoint_index].flags & W_FL_CROUCH)
-      {
-         // this might be duck-jump waypoint.. check if waypoint is at lower height than current bot origin
-         if(waypoints[pBot.curr_waypoint_index].origin.z < pEdict->v.origin.z)
-            pEdict->v.button |= IN_DUCK;  // duck down while moving forward
-      }
-   }
+   BotThinkAdjustSpeedForWaypoint(pBot);
 
    if (pBot.f_grenade_search_time <= gpGlobals->time)
    {
@@ -2887,45 +3059,5 @@ void BotThink( bot_t &pBot )
 
    BotDoRandomJumpingAndDuckingAndLongJumping(pBot, moved_distance);
 
-   // save the previous speed (for checking if stuck)
-   pBot.f_prev_speed = pBot.f_move_speed;
-
-   // full strafe if bot isn't moving much else
-   if(pBot.f_move_speed == 0.0f)
-      f_strafe_speed = 0.0;
-   else if(pBot.f_move_speed <= 20.0f)
-      f_strafe_speed = pBot.f_strafe_direction * pBot.f_max_speed;
-   else
-      f_strafe_speed = pBot.f_strafe_direction * pBot.f_move_speed;
-
-   // normalize strafe and move to keep speed at normal level
-   if(f_strafe_speed != 0.0f || pBot.f_move_speed != 0.0f)
-   {
-      Vector2D calc;
-
-      calc.x = f_strafe_speed;
-      calc.y = pBot.f_move_speed;
-
-      calc = calc.Normalize() * (pBot.b_on_ladder || pBot.b_not_maxspeed ? pBot.f_move_speed : pBot.f_max_speed);
-
-      f_strafe_speed = calc.x;
-      pBot.f_move_speed = calc.y;
-
-      if(0)
-      {
-         Vector v_angle = pEdict->v.v_angle;
-         v_angle.x = 0;
-
-         Vector v_right = UTIL_AnglesToRight(v_angle);
-         Vector v_forward = UTIL_AnglesToForward(v_angle);
-
-         Vector v_beam = v_forward * calc.y + v_right * calc.x;
-         UTIL_DrawBeam(0, pEdict->v.origin, pEdict->v.origin + v_beam, 10, 2, 250, 50, 50, 200, 10);
-      }
-   }
-
-   BotRunPlayerMove(pBot, pEdict->v.v_angle, pBot.f_move_speed,
-                                f_strafe_speed, 0, pEdict->v.button, 0, (byte)pBot.msecval);
-
-   return;
+   BotThinkFinalizeMovement(pBot);
 }
