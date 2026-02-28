@@ -191,64 +191,70 @@ static float m_lip = 0;
 static Vector m_origin;
 
 
+static void SpawnInitWorld(void)
+{
+   // clear players array
+   //  note: posdata clean up first to prevent mem-leaks.
+   //  note2: WaypointInit (and maybe others) set different than zero init value for array object,
+   //   memset players need to be before anything else (except posdata free)
+   for(int i = 0; i < 32; i++)
+      free_posdata_list(i);
+   memset(players, 0, sizeof(players));
+
+   // do level initialization stuff here...
+   WaypointInit();
+   WaypointLoad(NULL);
+
+   // init sound system
+   *pSoundEnt = CSoundEnt();
+   pSoundEnt->Spawn();
+
+   PRECACHE_SOUND("weapons/xbow_hit1.wav");      // waypoint add
+   PRECACHE_SOUND("weapons/mine_activate.wav");  // waypoint delete
+   PRECACHE_SOUND("common/wpn_hudoff.wav");      // path add/delete start
+   PRECACHE_SOUND("common/wpn_hudon.wav");       // path add/delete done
+   PRECACHE_SOUND("common/wpn_moveselect.wav");  // path add/delete cancel
+   PRECACHE_SOUND("common/wpn_denyselect.wav");  // path add/delete error
+   PRECACHE_SOUND("player/sprayer.wav");         // logo spray sound
+
+   m_spriteTexture = PRECACHE_MODEL( "sprites/lgtning.spr");
+   PRECACHE_MODEL( "models/w_chainammo.mdl");
+
+   g_in_intermission = FALSE;
+
+   is_team_play = FALSE;
+   checked_teamplay = FALSE;
+
+   *g_team_list = 0;
+   memset(g_team_names, 0, sizeof(g_team_names));
+   memset(g_team_scores, 0, sizeof(g_team_scores));
+   g_num_teams = 0;
+   g_team_limit = FALSE;
+
+   frame_count = 0;
+
+   bot_cfg_pause_time = 0.0;
+   waypoint_time = -1.0;
+   spawn_time_reset = FALSE;
+
+   for(int i = 0; i < 32; i++)
+      bots[i].is_used = FALSE;
+
+   num_bots = 0;
+   need_to_open_cfg = TRUE;
+   FreeCfgBotRecord();//reset on mapchange
+
+   bot_check_time = gpGlobals->time + 5.0;
+}
+
+
 static int Spawn( edict_t *pent )
 {
    if (gpGlobals->deathmatch)
    {
       if (FIsClassname(pent, "worldspawn"))
       {
-         // clear players array
-         //  note: posdata clean up first to prevent mem-leaks.
-         //  note2: WaypointInit (and maybe others) set different than zero init value for array object,
-         //   memset players need to be before anything else (except posdata free)
-         for(int i = 0; i < 32; i++)
-            free_posdata_list(i);
-         memset(players, 0, sizeof(players));
-
-         // do level initialization stuff here...
-         WaypointInit();
-         WaypointLoad(NULL);
-
-         // init sound system
-         *pSoundEnt = CSoundEnt();
-         pSoundEnt->Spawn();
-
-         PRECACHE_SOUND("weapons/xbow_hit1.wav");      // waypoint add
-         PRECACHE_SOUND("weapons/mine_activate.wav");  // waypoint delete
-         PRECACHE_SOUND("common/wpn_hudoff.wav");      // path add/delete start
-         PRECACHE_SOUND("common/wpn_hudon.wav");       // path add/delete done
-         PRECACHE_SOUND("common/wpn_moveselect.wav");  // path add/delete cancel
-         PRECACHE_SOUND("common/wpn_denyselect.wav");  // path add/delete error
-         PRECACHE_SOUND("player/sprayer.wav");         // logo spray sound
-
-         m_spriteTexture = PRECACHE_MODEL( "sprites/lgtning.spr");
-         PRECACHE_MODEL( "models/w_chainammo.mdl");
-
-         g_in_intermission = FALSE;
-
-         is_team_play = FALSE;
-         checked_teamplay = FALSE;
-
-         *g_team_list = 0;
-         memset(g_team_names, 0, sizeof(g_team_names));
-         memset(g_team_scores, 0, sizeof(g_team_scores));
-         g_num_teams = 0;
-         g_team_limit = FALSE;
-
-         frame_count = 0;
-
-         bot_cfg_pause_time = 0.0;
-         waypoint_time = -1.0;
-         spawn_time_reset = FALSE;
-
-         for(int i = 0; i < 32; i++)
-            bots[i].is_used = FALSE;
-
-         num_bots = 0;
-         need_to_open_cfg = TRUE;
-         FreeCfgBotRecord();//reset on mapchange
-
-         bot_check_time = gpGlobals->time + 5.0;
+         SpawnInitWorld();
       }
       else if(FIsClassname(pent, "func_plat") || FIsClassname(pent, "func_door"))
       {
@@ -257,6 +263,53 @@ static int Spawn( edict_t *pent )
    }
 
    RETURN_META_VALUE (MRES_IGNORED, 0);
+}
+
+
+static void SpawnPostHandlePlat(edict_t *pent)
+{
+   if(m_height == 0)
+      m_height = pent->v.size.z + 8;
+
+   Vector v_position1 = m_origin;
+   Vector v_position2 = m_origin;
+   v_position2.z -= m_height;
+
+   Vector start, end;
+   if(!FStringNull(pent->v.targetname))
+   {
+      start = v_position1;
+      end = v_position2;
+   }
+   else
+   {
+      start = v_position2;
+      end = v_position1;
+   }
+
+   WaypointAddLift(pent, start, end);
+}
+
+
+static void SpawnPostHandleDoor(edict_t *pent)
+{
+   const int SF_DOOR_START_OPEN = 1;
+
+   Vector v_position1 = m_origin;
+   // Subtract 2 from size because the engine expands bboxes by 1 in all directions making the size too big
+   Vector v_position2 = m_origin + (pent->v.movedir * (fabs( pent->v.movedir.x * (pent->v.size.x-2) ) + fabs( pent->v.movedir.y * (pent->v.size.y-2) ) + fabs( pent->v.movedir.z * (pent->v.size.z-2) ) - m_lip));
+
+   if ( FBitSet (pent->v.spawnflags, SF_DOOR_START_OPEN) )
+   {
+      Vector swap = v_position1;
+      v_position1 = v_position2;
+      v_position2 = swap;
+   }
+
+   Vector start = v_position1;
+   Vector end = v_position2;
+
+   WaypointAddLift(pent, start, end);
 }
 
 
@@ -272,46 +325,11 @@ static int Spawn_Post( edict_t *pent )
    }
    else if(FIsClassname(pent, "func_plat"))
    {
-      if(m_height == 0)
-         m_height = pent->v.size.z + 8;
-
-      Vector v_position1 = m_origin;
-      Vector v_position2 = m_origin;
-      v_position2.z -= m_height;
-
-      Vector start, end;
-      if(!FStringNull(pent->v.targetname))
-      {
-         start = v_position1;
-         end = v_position2;
-      }
-      else
-      {
-         start = v_position2;
-         end = v_position1;
-      }
-
-      WaypointAddLift(pent, start, end);
+      SpawnPostHandlePlat(pent);
    }
    else if(FIsClassname(pent, "func_door"))
    {
-      const int SF_DOOR_START_OPEN = 1;
-
-      Vector v_position1 = m_origin;
-      // Subtract 2 from size because the engine expands bboxes by 1 in all directions making the size too big
-      Vector v_position2 = m_origin + (pent->v.movedir * (fabs( pent->v.movedir.x * (pent->v.size.x-2) ) + fabs( pent->v.movedir.y * (pent->v.size.y-2) ) + fabs( pent->v.movedir.z * (pent->v.size.z-2) ) - m_lip));
-
-      if ( FBitSet (pent->v.spawnflags, SF_DOOR_START_OPEN) )
-      {
-         Vector swap = v_position1;
-         v_position1 = v_position2;
-         v_position2 = swap;
-      }
-
-      Vector start = v_position1;
-      Vector end = v_position2;
-
-      WaypointAddLift(pent, start, end);
+      SpawnPostHandleDoor(pent);
    }
    else
       CollectMapSpawnItems(pent);
@@ -549,12 +567,186 @@ static void PM_Move(struct playermove_s *ppmove, qboolean server)
    RETURN_META (MRES_HANDLED);
 }
 
+static void StartFrameUpdateBots(void)
+{
+   int count = 0;
+
+   for (int bot_index = 0; bot_index < gpGlobals->maxClients; bot_index++)
+   {
+      if (bots[bot_index].is_used)   // is this slot used
+      {
+         if (gpGlobals->time >= bots[bot_index].bot_think_time)
+         {
+            BotThink(bots[bot_index]);
+
+            // randomness prevents all bots to run on same frame -> less laggy server
+            bots[bot_index].bot_think_time = gpGlobals->time + bot_think_spf * RANDOM_FLOAT2(0.95, 1.05);
+         }
+
+         count++;
+      }
+   }
+
+   if (count > num_bots)
+      num_bots = count;
+}
+
+
+static void StartFrameProcessAutowaypointing(void)
+{
+   int waypoint_player_count = 0;
+   int waypoint_player_index = 1;
+
+   WaypointAddSpawnObjects();
+
+   // 10 times / sec, note: this is extremely slow, do checking only for max 4 players on one frame
+   waypoint_time = gpGlobals->time + (1.0/10.0);
+
+   while(waypoint_player_index <= gpGlobals->maxClients)
+   {
+      edict_t *pPlayer = INDEXENT(waypoint_player_index++);
+
+      if (pPlayer && !pPlayer->free && !FBitSet(pPlayer->v.flags, FL_PROXY))
+      {
+         // Is player alive?
+         if(!IsAlive(pPlayer))
+            continue;
+
+         if (FBitSet(pPlayer->v.flags, FL_CLIENT) && !FBitSet(pPlayer->v.flags, FL_PROXY) &&
+            !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
+         {
+            WaypointThink(pPlayer);
+
+            if(++waypoint_player_count >= 2)
+               break;
+         }
+      }
+   }
+}
+
+
+static void StartFrameOpenConfigFile(void)
+{
+   char filename[256];
+   char mapname[64];
+
+   need_to_open_cfg = FALSE;  // only do this once!!!
+
+   // check if jk_botti_mapname.cfg file exists...
+   if(stricmp(STRING(gpGlobals->mapname), "logo") == 0)
+      safe_strcopy(mapname, sizeof(mapname), "_jk_botti_logo.cfg");
+   else
+      safevoid_snprintf(mapname, sizeof(mapname), "jk_botti_%s.cfg", STRING(gpGlobals->mapname));
+
+   UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti", mapname);
+
+   if ((bot_cfg_fp = fopen(filename, "r")) != NULL)
+   {
+      UTIL_ConsolePrintf("Executing %s\n", filename);
+      bot_cfg_linenumber = 0;
+   }
+   else
+   {
+      UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/jk_botti.cfg", NULL);
+
+      if ((bot_cfg_fp = fopen(filename, "r")) != NULL)
+      {
+         UTIL_ConsolePrintf("Executing %s\n", filename);
+         bot_cfg_linenumber = 0;
+      }
+      else
+      {
+         UTIL_ConsolePrintf("jk_botti.cfg file not found\n" );
+      }
+   }
+
+   bot_cfg_pause_time = gpGlobals->time + 0.1;
+   bot_check_time = gpGlobals->time + 1.0;
+}
+
+
+static void StartFrameManageBotCount(void)
+{
+   int client_count = UTIL_GetClientCount();
+   int bot_count = UTIL_GetBotCount();
+
+   if(debug_minmax)
+   {
+      UTIL_ConsolePrintf("client count: %d, bot count: %d, max_bots: %d, min_bots: %d\n",
+         client_count, bot_count, max_bots, min_bots);
+
+      UTIL_ConsolePrintf("client_count < max_bots: %s", client_count < max_bots ? "TRUE":"FALSE");
+      UTIL_ConsolePrintf("client_count > max_bots: %s", client_count > max_bots ? "TRUE":"FALSE");
+      UTIL_ConsolePrintf("bot_count < min_bots: %s", bot_count < min_bots ? "TRUE":"FALSE");
+      UTIL_ConsolePrintf("bot_count > min_bots: %s", bot_count > min_bots ? "TRUE":"FALSE");
+
+      UTIL_ConsolePrintf("Should add bot: %s", (client_count < gpGlobals->maxClients && (client_count < max_bots || bot_count < min_bots)) ? "TRUE":"FALSE");
+      UTIL_ConsolePrintf("Should remove bot: %s", (client_count > max_bots && bot_count > min_bots) ? "TRUE":"FALSE");
+
+      if(client_count > max_bots && bot_count > min_bots)
+         UTIL_ConsolePrintf("Test UTIL_PickRandomBot(), return value: %d", UTIL_PickRandomBot());
+   }
+
+   // need more clients
+   if(client_count < gpGlobals->maxClients && (client_count < max_bots || bot_count < min_bots))
+   {
+      const cfg_bot_record_t * record = GetUnusedCfgBotRecord();
+
+      if(record)
+         BotCreate( record->skin, record->name, record->skill, record->top_color, record->bottom_color, record->index );
+      else
+         BotCreate( NULL, NULL, -1, -1, -1, -1 );
+
+      bot_check_time = gpGlobals->time + 0.5;
+   }
+   // more than minimum count of bots and need to lower client count
+   else if(client_count > max_bots && bot_count > min_bots)
+   {
+      int pick = UTIL_PickRandomBot();
+
+      if(is_team_play && team_balancetype >= 1 && g_team_limit)
+      {
+         char balanceskin[MAX_TEAMNAME_LENGTH];
+
+         // get largest team, count by all players
+         if( GetSpecificTeam(balanceskin, sizeof(balanceskin), FALSE, TRUE, FALSE) ||
+         // get largest team, count by bots only
+             GetSpecificTeam(balanceskin, sizeof(balanceskin), FALSE, TRUE, TRUE) )
+         {
+            for(int i = 0; i < 32; i++)
+            {
+               char teamstr[MAX_TEAMNAME_LENGTH];
+
+               if(bots[i].is_used)
+               {
+                  if(!stricmp(UTIL_GetTeam(bots[i].pEdict, teamstr, sizeof(teamstr)), balanceskin))
+                  {
+                     pick = i;
+
+                     if(debug_minmax)
+                        UTIL_ConsolePrintf("Teambalance override, kicking from team: %s", balanceskin);
+
+                     break;
+                  }
+               }
+            }
+         }
+      }
+
+      if(pick != -1)
+         BotKick(bots[pick]);
+
+      bot_check_time = gpGlobals->time + 0.5;
+   }
+   else
+      bot_check_time = gpGlobals->time + ((!!debug_minmax) ? 5.0 : 0.5);
+}
+
+
 static void StartFrame( void )
 {
-   edict_t *pPlayer;
-   int bot_index;
-   int count;
    double begin_time;
+   int count;
 
    if (!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
@@ -567,100 +759,14 @@ static void StartFrame( void )
 
    // bot system
    if (bot_stop == 0)
-   {
-      count = 0;
-
-      for (bot_index = 0; bot_index < gpGlobals->maxClients; bot_index++)
-      {
-         if (bots[bot_index].is_used)   // is this slot used
-         {
-            if (gpGlobals->time >= bots[bot_index].bot_think_time)
-            {
-               BotThink(bots[bot_index]);
-
-               // randomness prevents all bots to run on same frame -> less laggy server
-               bots[bot_index].bot_think_time = gpGlobals->time + bot_think_spf * RANDOM_FLOAT2(0.95, 1.05);
-            }
-
-            count++;
-         }
-      }
-
-      if (count > num_bots)
-         num_bots = count;
-   }
+      StartFrameUpdateBots();
 
    // Autowaypointing engine
    if (gpGlobals->time >= waypoint_time)
-   {
-      int waypoint_player_count = 0;
-      int waypoint_player_index = 1;
-
-      WaypointAddSpawnObjects();
-
-      // 10 times / sec, note: this is extremely slow, do checking only for max 4 players on one frame
-      waypoint_time = gpGlobals->time + (1.0/10.0);
-
-      while(waypoint_player_index <= gpGlobals->maxClients)
-      {
-         pPlayer = INDEXENT(waypoint_player_index++);
-
-         if (pPlayer && !pPlayer->free && !FBitSet(pPlayer->v.flags, FL_PROXY))
-         {
-            // Is player alive?
-            if(!IsAlive(pPlayer))
-               continue;
-
-            if (FBitSet(pPlayer->v.flags, FL_CLIENT) && !FBitSet(pPlayer->v.flags, FL_PROXY) &&
-               !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
-            {
-               WaypointThink(pPlayer);
-
-               if(++waypoint_player_count >= 2)
-                  break;
-            }
-         }
-      }
-   }
+      StartFrameProcessAutowaypointing();
 
    if (need_to_open_cfg)  // have we open jk_botti.cfg file yet?
-   {
-      char filename[256];
-      char mapname[64];
-
-      need_to_open_cfg = FALSE;  // only do this once!!!
-
-      // check if jk_botti_mapname.cfg file exists...
-      if(stricmp(STRING(gpGlobals->mapname), "logo") == 0)
-         safe_strcopy(mapname, sizeof(mapname), "_jk_botti_logo.cfg");
-      else
-         safevoid_snprintf(mapname, sizeof(mapname), "jk_botti_%s.cfg", STRING(gpGlobals->mapname));
-
-      UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti", mapname);
-
-      if ((bot_cfg_fp = fopen(filename, "r")) != NULL)
-      {
-         UTIL_ConsolePrintf("Executing %s\n", filename);
-         bot_cfg_linenumber = 0;
-      }
-      else
-      {
-         UTIL_BuildFileName_N(filename, sizeof(filename), "addons/jk_botti/jk_botti.cfg", NULL);
-
-         if ((bot_cfg_fp = fopen(filename, "r")) != NULL)
-         {
-            UTIL_ConsolePrintf("Executing %s\n", filename);
-            bot_cfg_linenumber = 0;
-         }
-         else
-         {
-            UTIL_ConsolePrintf("jk_botti.cfg file not found\n" );
-         }
-      }
-
-      bot_cfg_pause_time = gpGlobals->time + 0.1;
-      bot_check_time = gpGlobals->time + 1.0;
-   }
+      StartFrameOpenConfigFile();
 
    if ((bot_cfg_fp) &&
        (bot_cfg_pause_time > 0.0f) && (bot_cfg_pause_time <= gpGlobals->time))
@@ -673,81 +779,7 @@ static void StartFrame( void )
 
    // check if time to see if a bot needs to be created...
    if (bot_check_time < gpGlobals->time && min_bots != -1 && max_bots != -1 && min_bots <= max_bots)
-   {
-      int client_count = UTIL_GetClientCount();
-      int bot_count = UTIL_GetBotCount();
-
-      if(debug_minmax)
-      {
-         UTIL_ConsolePrintf("client count: %d, bot count: %d, max_bots: %d, min_bots: %d\n",
-            client_count, bot_count, max_bots, min_bots);
-
-         UTIL_ConsolePrintf("client_count < max_bots: %s", client_count < max_bots ? "TRUE":"FALSE");
-         UTIL_ConsolePrintf("client_count > max_bots: %s", client_count > max_bots ? "TRUE":"FALSE");
-         UTIL_ConsolePrintf("bot_count < min_bots: %s", bot_count < min_bots ? "TRUE":"FALSE");
-         UTIL_ConsolePrintf("bot_count > min_bots: %s", bot_count > min_bots ? "TRUE":"FALSE");
-
-         UTIL_ConsolePrintf("Should add bot: %s", (client_count < gpGlobals->maxClients && (client_count < max_bots || bot_count < min_bots)) ? "TRUE":"FALSE");
-         UTIL_ConsolePrintf("Should remove bot: %s", (client_count > max_bots && bot_count > min_bots) ? "TRUE":"FALSE");
-
-         if(client_count > max_bots && bot_count > min_bots)
-            UTIL_ConsolePrintf("Test UTIL_PickRandomBot(), return value: %d", UTIL_PickRandomBot());
-      }
-
-      // need more clients
-      if(client_count < gpGlobals->maxClients && (client_count < max_bots || bot_count < min_bots))
-      {
-         const cfg_bot_record_t * record = GetUnusedCfgBotRecord();
-
-         if(record)
-            BotCreate( record->skin, record->name, record->skill, record->top_color, record->bottom_color, record->index );
-         else
-            BotCreate( NULL, NULL, -1, -1, -1, -1 );
-
-         bot_check_time = gpGlobals->time + 0.5;
-      }
-      // more than minimum count of bots and need to lower client count
-      else if(client_count > max_bots && bot_count > min_bots)
-      {
-         int pick = UTIL_PickRandomBot();
-
-         if(is_team_play && team_balancetype >= 1 && g_team_limit)
-         {
-            char balanceskin[MAX_TEAMNAME_LENGTH];
-
-            // get largest team, count by all players
-            if( GetSpecificTeam(balanceskin, sizeof(balanceskin), FALSE, TRUE, FALSE) ||
-            // get largest team, count by bots only
-                GetSpecificTeam(balanceskin, sizeof(balanceskin), FALSE, TRUE, TRUE) )
-            {
-               for(int i = 0; i < 32; i++)
-               {
-                  char teamstr[MAX_TEAMNAME_LENGTH];
-
-                  if(bots[i].is_used)
-                  {
-                     if(!stricmp(UTIL_GetTeam(bots[i].pEdict, teamstr, sizeof(teamstr)), balanceskin))
-                     {
-                        pick = i;
-
-                        if(debug_minmax)
-                           UTIL_ConsolePrintf("Teambalance override, kicking from team: %s", balanceskin);
-
-                        break;
-                     }
-                  }
-               }
-            }
-         }
-
-         if(pick != -1)
-            BotKick(bots[pick]);
-
-         bot_check_time = gpGlobals->time + 0.5;
-      }
-      else
-         bot_check_time = gpGlobals->time + ((!!debug_minmax) ? 5.0 : 0.5);
-   }
+      StartFrameManageBotCount();
 
    // -- Run Floyds for creating waypoint path matrix
    //
