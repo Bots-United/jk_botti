@@ -1925,6 +1925,147 @@ static int test_ProcessBotCfgFile_tabs_converted(void)
 }
 
 // ============================================================
+// Coverage improvement tests
+// ============================================================
+
+static int test_srv_bot_skill_setup_float100_query(void)
+{
+   TEST("ProcessCommand: bot_skill_setup normal_strafe query (get branch)");
+   reset_test_state();
+   memset(skill_settings, 0, sizeof(skill_settings));
+   skill_settings[1].normal_strafe = 0.75f;
+   // Query without setting: arg2=setting name, arg3=empty
+   setup_mock_argv("jk_botti", "bot_skill_setup", "2", "normal_strafe", "", "", "");
+   jk_botti_ServerCommand();
+   // Value should remain unchanged
+   ASSERT_FLOAT_NEAR(skill_settings[1].normal_strafe, 0.75f, 0.01f);
+   PASS();
+   return 0;
+}
+
+static int test_srv_team_blockedlist_set_twice(void)
+{
+   TEST("ProcessCommand: team_blockedlist set twice frees old");
+   reset_test_state();
+   // First set
+   setup_mock_argv("jk_botti", "team_blockedlist", "team1", NULL, NULL, NULL, NULL);
+   jk_botti_ServerCommand();
+   ASSERT_STR(team_blockedlist, "team1");
+   // Second set - should free old and set new
+   setup_mock_argv("jk_botti", "team_blockedlist", "team2", NULL, NULL, NULL, NULL);
+   jk_botti_ServerCommand();
+   ASSERT_STR(team_blockedlist, "team2");
+   PASS();
+   return 0;
+}
+
+static int test_ProcessBotCfgFile_pause_clamp(void)
+{
+   TEST("ProcessBotCfgFile: pause with time <= 0 clamps to 0.1");
+   reset_test_state();
+   gpGlobals->time = 0.0f;
+   bot_cfg_pause_time = 0.0;
+   FILE *fp = tmpfile();
+   ASSERT_PTR_NOT_NULL(fp);
+   // pause -5 with time=0 gives 0 + (-5) = -5, should clamp to 0.1
+   fprintf(fp, "pause -5\nbotskill 4\n");
+   rewind(fp);
+   bot_cfg_fp = fp;
+   bot_cfg_linenumber = 0;
+   ProcessBotCfgFile();
+   ASSERT_FLOAT_NEAR(bot_cfg_pause_time, 0.1f, 0.01f);
+   if (bot_cfg_fp) { fclose(bot_cfg_fp); bot_cfg_fp = NULL; }
+   PASS();
+   return 0;
+}
+
+static int test_ProcessBotCfgFile_config_error(void)
+{
+   TEST("ProcessBotCfgFile: invalid percent triggers PRINTFUNC_ERROR");
+   reset_test_state();
+   gpGlobals->time = 10.0;
+   bot_cfg_pause_time = 0.0;
+   bot_chat_percent = 10;
+   FILE *fp = tmpfile();
+   ASSERT_PTR_NOT_NULL(fp);
+   // 200 is out of range [0..100], triggers PRINTFUNC_ERROR path
+   fprintf(fp, "bot_chat_percent 200\n");
+   rewind(fp);
+   bot_cfg_fp = fp;
+   bot_cfg_linenumber = 0;
+   ProcessBotCfgFile();
+   // Value should remain unchanged due to error
+   ASSERT_INT(bot_chat_percent, 10);
+   if (bot_cfg_fp) { fclose(bot_cfg_fp); bot_cfg_fp = NULL; }
+   PASS();
+   return 0;
+}
+
+static int test_ProcessBotCfgFile_leading_spaces(void)
+{
+   TEST("ProcessBotCfgFile: leading spaces stripped");
+   reset_test_state();
+   gpGlobals->time = 10.0;
+   bot_cfg_pause_time = 0.0;
+   FILE *fp = tmpfile();
+   ASSERT_PTR_NOT_NULL(fp);
+   fprintf(fp, "   botskill 3\n");
+   rewind(fp);
+   bot_cfg_fp = fp;
+   default_bot_skill = 2;
+   bot_cfg_linenumber = 0;
+   ProcessBotCfgFile();
+   ASSERT_INT(default_bot_skill, 3);
+   if (bot_cfg_fp) { fclose(bot_cfg_fp); bot_cfg_fp = NULL; }
+   PASS();
+   return 0;
+}
+
+static int test_ProcessBotCfgFile_multiple_spaces(void)
+{
+   TEST("ProcessBotCfgFile: multiple spaces between args collapsed");
+   reset_test_state();
+   gpGlobals->time = 10.0;
+   bot_cfg_pause_time = 0.0;
+   FILE *fp = tmpfile();
+   ASSERT_PTR_NOT_NULL(fp);
+   fprintf(fp, "botskill    4\n");
+   rewind(fp);
+   bot_cfg_fp = fp;
+   default_bot_skill = 2;
+   bot_cfg_linenumber = 0;
+   ProcessBotCfgFile();
+   ASSERT_INT(default_bot_skill, 4);
+   if (bot_cfg_fp) { fclose(bot_cfg_fp); bot_cfg_fp = NULL; }
+   PASS();
+   return 0;
+}
+
+static int test_ProcessBotCfgFile_crlf(void)
+{
+   TEST("ProcessBotCfgFile: CR/LF line endings handled");
+   reset_test_state();
+   gpGlobals->time = 10.0;
+   bot_cfg_pause_time = 0.0;
+   FILE *fp = tmpfile();
+   ASSERT_PTR_NOT_NULL(fp);
+   // Write with \r\n line endings
+   fprintf(fp, "botskill 5\r\nmin_bots 3\n");
+   rewind(fp);
+   bot_cfg_fp = fp;
+   default_bot_skill = 2;
+   min_bots = -1;
+   bot_cfg_linenumber = 0;
+   ProcessBotCfgFile();
+   ASSERT_INT(default_bot_skill, 5);
+   ProcessBotCfgFile();
+   ASSERT_INT(min_bots, 3);
+   if (bot_cfg_fp) { fclose(bot_cfg_fp); bot_cfg_fp = NULL; }
+   PASS();
+   return 0;
+}
+
+// ============================================================
 // main
 // ============================================================
 
@@ -2067,6 +2208,16 @@ int main(void)
    fail |= test_ProcessBotCfgFile_quoted_args();
    fail |= test_ProcessBotCfgFile_empty_quoted_arg();
    fail |= test_ProcessBotCfgFile_tabs_converted();
+
+   // Coverage improvement tests
+   printf(" Coverage improvement:\n");
+   fail |= test_srv_bot_skill_setup_float100_query();
+   fail |= test_srv_team_blockedlist_set_twice();
+   fail |= test_ProcessBotCfgFile_pause_clamp();
+   fail |= test_ProcessBotCfgFile_config_error();
+   fail |= test_ProcessBotCfgFile_leading_spaces();
+   fail |= test_ProcessBotCfgFile_multiple_spaces();
+   fail |= test_ProcessBotCfgFile_crlf();
 
    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
    return fail ? EXIT_FAILURE : EXIT_SUCCESS;
