@@ -726,372 +726,423 @@ void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking )
 }
 
 
-//
-void BotFindEnemy( bot_t &pBot )
-{
 //#define DEBUG_ENEMY_SELECT 1
 #if DEBUG_ENEMY_SELECT
-   char info[1024];
-   const char *enemy_type = "";
+static char g_debug_enemy_info[1024];
+static const char *g_debug_enemy_type = "";
 #endif
-   edict_t *pNewEnemy;
-   Vector v_newenemy;
-   float nearestdistance;
-   qboolean chatprot = FALSE;
-   int i;
+
+
+// Early exit if b_botdontshoot; clears enemy, presses reload
+static qboolean BotFindEnemyCheckDontShoot(bot_t &pBot)
+{
+   if (!b_botdontshoot)
+      return FALSE;
 
    edict_t *pEdict = pBot.pEdict;
 
-   if (b_botdontshoot)
+   pBot.f_bot_see_enemy_time = -1;  // so we won't keep reloading
+   pBot.v_bot_see_enemy_origin = Vector(-99999,-99999,-99999);
+
+   pEdict->v.button |= IN_RELOAD;  // press reload button
+
+   BotRemoveEnemy(pBot, FALSE);
+
+   return TRUE;
+}
+
+
+// Validate existing enemy (dead/chat-protected, sticky breakable mode, visibility tracking).
+// Returns TRUE if enemy still valid (caller returns)
+static qboolean BotFindEnemyMaintainCurrent(bot_t &pBot)
+{
+   if (pBot.pBotEnemy == NULL)
+      return FALSE;
+
+   edict_t *pEdict = pBot.pEdict;
+
+   // if the enemy is dead?
+   // if the enemy is chat protected?
+   // is the enemy dead?, assume bot killed it
+   qboolean chatprot = FALSE;
+   if (!IsAlive(pBot.pBotEnemy) || TRUE == (chatprot = IsPlayerChatProtected(pBot.pBotEnemy)))
    {
-      pBot.f_bot_see_enemy_time = -1;  // so we won't keep reloading
-      pBot.v_bot_see_enemy_origin = Vector(-99999,-99999,-99999);
+      // the enemy is dead, jump for joy about 10% of the time
+      if (!chatprot && RANDOM_LONG2(1, 100) <= 10)
+         pEdict->v.button |= IN_JUMP;
 
-      pEdict->v.button |= IN_RELOAD;  // press reload button
-
+      // don't have an enemy anymore so null out the pointer...
       BotRemoveEnemy(pBot, FALSE);
 
+      // level look
+      pEdict->v.idealpitch = 0;
+
+      return FALSE;
+   }
+
+   // enemy is still alive
+
+   // mode 2: sticky breakable targeting — keep targeting a path-blocking
+   // breakable as long as bot hasn't moved too far away from it
+   if (bot_shoot_breakables == 2 && UTIL_LookupBreakable(pBot.pBotEnemy))
+   {
+      Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy);
+      float dist = (pEdict->v.origin - v_origin).Length();
+
+      if (dist < 500 && !v_origin.is_zero_vector() &&
+          FVisible( v_origin, pEdict, pBot.pBotEnemy ))
+      {
+         // face the breakable
+         Vector v_enemy = v_origin - pEdict->v.origin;
+         Vector bot_angles = UTIL_VecToAngles( v_enemy );
+
+         pEdict->v.ideal_yaw = bot_angles.y;
+
+         BotFixIdealYaw(pEdict);
+
+         pBot.f_bot_see_enemy_time = gpGlobals->time;
+         pBot.v_bot_see_enemy_origin = v_origin;
+
+         return TRUE; // keep targeting this breakable
+      }
+
+      // too far or not visible, drop it
+      BotRemoveEnemy(pBot, FALSE);
+      pEdict->v.idealpitch = 0;
+
+      return FALSE;
+   }
+
+   // non-breakable enemy visibility tracking
+   Vector vecPredEnemy = UTIL_AdjustOriginWithExtent(pBot, GetPredictedPlayerPosition(pBot, pBot.pBotEnemy), pBot.pBotEnemy);
+
+   Vector vecEnd = vecPredEnemy;
+   if(FCanShootInHead(pEdict, pBot.pBotEnemy, vecPredEnemy))
+      vecEnd += pBot.pBotEnemy->v.view_ofs;
+
+   if( FInViewCone( vecEnd, pEdict ) && FVisibleEnemy( vecEnd, pEdict, pBot.pBotEnemy ))
+   {
+      // face the enemy
+      Vector v_enemy = vecPredEnemy - pEdict->v.origin;
+      Vector bot_angles = UTIL_VecToAngles( v_enemy );
+
+      pEdict->v.ideal_yaw = bot_angles.y;
+
+      BotFixIdealYaw(pEdict);
+
+      // keep track of when we last saw an enemy
+      pBot.f_bot_see_enemy_time = gpGlobals->time;
+      pBot.v_bot_see_enemy_origin = UTIL_GetOrigin(pBot.pBotEnemy);
+
+      return TRUE; // don't change pBot.pBotEnemy
+   }
+
+   // enemy has gone out of bot's line of sight
+   if( pBot.f_bot_see_enemy_time > 0 && pBot.f_bot_see_enemy_time + 0.5 >= gpGlobals->time)
+   {
+      // start sound tracking
+      BotRemoveEnemy(pBot, TRUE);
+
+      // level look
+      pEdict->v.idealpitch = 0;
+   }
+
+   return FALSE;
+}
+
+
+// Mode 1: iterate func_breakables, update pNewEnemy/v_newenemy/nearestdistance
+static void BotFindEnemySearchBreakables(bot_t &pBot, edict_t *&pNewEnemy, Vector &v_newenemy, float &nearestdistance)
+{
+   if (bot_shoot_breakables != 1)
       return;
-   }
 
-   if (pBot.pBotEnemy != NULL)  // does the bot already have an enemy?
+   edict_t *pEdict = pBot.pEdict;
+
+   // search func_breakables that we collected at map start (We need to collect in order to get the material value)
+   breakable_list_t *pBreakable = NULL;
+   while((pBreakable = UTIL_FindBreakable(pBreakable)) != NULL)
    {
-      // if the enemy is dead?
-      // if the enemy is chat protected?
-      // is the enemy dead?, assume bot killed it
-      if (!IsAlive(pBot.pBotEnemy) || TRUE == (chatprot = IsPlayerChatProtected(pBot.pBotEnemy)))
+      // removed? null?
+      if(FNullEnt (pBreakable->pEdict))
+         continue;
+
+      // cannot take damage
+      if((int)pBreakable->pEdict->v.takedamage == DAMAGE_NO ||
+         pBreakable->pEdict->v.solid == SOLID_NOT ||
+         pBreakable->pEdict->v.deadflag == DEAD_DEAD ||
+         !pBreakable->material_breakable ||
+         pBreakable->pEdict->v.health <= 0)
+         continue;
+
+      if (pBreakable->pEdict->v.health > 8000)
+         continue; // skip breakables with large health
+
+      Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBreakable->pEdict);
+
+      // 0,0,0 is considered invalid
+      if(v_origin.is_zero_vector())
+         continue;
+
+      float distance = GetModifiedEnemyDistance(pBot, v_origin - pEdict->v.origin).Length();
+      if (distance >= nearestdistance)
+         continue;
+
+      // see if bot can't see ...
+      if (!(FInViewCone( v_origin, pEdict ) && FVisible( v_origin, pEdict, pBreakable->pEdict )))
+         continue;
+
+      nearestdistance = distance;
+      pNewEnemy = pBreakable->pEdict;
+      v_newenemy = v_origin;
+
+#if DEBUG_ENEMY_SELECT
+      g_debug_enemy_type = "breakable";
+      snprintf(g_debug_enemy_info, sizeof(g_debug_enemy_info), "%s[or:e-%.1f:%.1f:%.1f, or:o-%.1f:%.1f:%.1f, mins-%.1f:%.1f:%.1f, maxs-%.1f:%.1f:%.1f, absmin-%.1f:%.1f:%.1f, size-%.1f:%.1f:%.1f, td-%.0f, s-%d, df-%d, h-%.0f]",
+          g_debug_enemy_type, v_origin.x, v_origin.y, v_origin.z,
+          UTIL_GetOrigin(pBreakable->pEdict).x, UTIL_GetOrigin(pBreakable->pEdict).y, UTIL_GetOrigin(pBreakable->pEdict).z,
+          pBreakable->pEdict->v.mins.x, pBreakable->pEdict->v.mins.y, pBreakable->pEdict->v.mins.z,
+          pBreakable->pEdict->v.maxs.x, pBreakable->pEdict->v.maxs.y, pBreakable->pEdict->v.maxs.z,
+               pBreakable->pEdict->v.absmin.x, pBreakable->pEdict->v.absmin.y, pBreakable->pEdict->v.absmin.z,
+          pBreakable->pEdict->v.size.x, pBreakable->pEdict->v.size.y, pBreakable->pEdict->v.size.z,
+          pBreakable->pEdict->v.takedamage,
+          pBreakable->pEdict->v.solid,
+          pBreakable->pEdict->v.deadflag,
+          pBreakable->pEdict->v.health
+        );
+      g_debug_enemy_type = g_debug_enemy_info;
+#endif
+   }
+}
+
+
+// Search monsters within 1000 units
+static void BotFindEnemySearchMonsters(bot_t &pBot, edict_t *&pNewEnemy, Vector &v_newenemy, float &nearestdistance)
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   // search the world for monsters...
+   edict_t *pMonster = NULL;
+   while (!FNullEnt (pMonster = UTIL_FindEntityInSphere (pMonster, pEdict->v.origin, 1000)))
+   {
+      if (!(pMonster->v.flags & FL_MONSTER) || (int)pMonster->v.takedamage == DAMAGE_NO)
+         continue; // discard anything that is not a monster
+
+      if (!IsAlive (pMonster))
+         continue; // discard dead or dying monsters
+
+      // 0,0,0 is considered invalid
+      if(pMonster->v.origin.is_zero_vector())
+         continue;
+
+      if (FIsClassname(pMonster, "hornet"))
+         continue; // skip hornets
+
+      if (FIsClassname(pMonster, "monster_snark"))
+         continue; // skip snarks
+
+      if (pMonster->v.health > 4000)
+         continue; // skip monsters with large health
+
+      float distance = GetModifiedEnemyDistance(pBot, UTIL_GetOriginWithExtent(pBot, pMonster) - pEdict->v.origin).Length();
+      if (distance >= nearestdistance)
+         continue;
+
+      Vector vecEnd = pMonster->v.origin + pMonster->v.view_ofs;
+
+      // see if bot can't see ...
+      if (!(FInViewCone( vecEnd, pEdict ) && FVisibleEnemy( vecEnd, pEdict, pMonster )))
+         continue;
+
+      nearestdistance = distance;
+      pNewEnemy = pMonster;
+      v_newenemy = pMonster->v.origin;
+
+#if DEBUG_ENEMY_SELECT
+      g_debug_enemy_type = "monster";
+      snprintf(g_debug_enemy_info, sizeof(g_debug_enemy_info), "%s[or:o-%.1f:%.1f:%.1f, or:g-%.1f:%.1f:%.1f, td-%.0f(%f), df-%d, h-%.0f, f-%d, s-%d]",
+          g_debug_enemy_type,
+          pMonster->v.origin.x, pMonster->v.origin.y, pMonster->v.origin.z,
+          UTIL_GetOrigin(pMonster).x, UTIL_GetOrigin(pMonster).y, UTIL_GetOrigin(pMonster).z,
+          pMonster->v.takedamage, pMonster->v.takedamage - (long long)pMonster->v.takedamage,
+          pMonster->v.deadflag,
+          pMonster->v.health,
+          pMonster->v.flags,
+          pMonster->v.solid
+        );
+      g_debug_enemy_type = g_debug_enemy_info;
+#endif
+   }
+}
+
+
+// Search all clients for enemy players
+static void BotFindEnemySearchPlayers(bot_t &pBot, edict_t *&pNewEnemy, Vector &v_newenemy, float &nearestdistance)
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   // search the world for players...
+   for (int i = 1; i <= gpGlobals->maxClients; i++)
+   {
+      edict_t *pPlayer = INDEXENT(i);
+
+      // skip invalid players and skip self (i.e. this bot)
+      if ((pPlayer) && (!pPlayer->free) && (pPlayer != pEdict) && !FBitSet(pPlayer->v.flags, FL_PROXY))
       {
-         // the enemy is dead, jump for joy about 10% of the time
-         if (!chatprot && RANDOM_LONG2(1, 100) <= 10)
-            pEdict->v.button |= IN_JUMP;
+         if ((b_observer_mode) && !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
+            continue;
 
-         // don't have an enemy anymore so null out the pointer...
-         BotRemoveEnemy(pBot, FALSE);
+         // 0,0,0 is considered invalid
+         if(pPlayer->v.origin.is_zero_vector())
+            continue;
 
-         // level look
-         pEdict->v.idealpitch = 0;
-      }
-      else  // enemy is still alive
-      {
-         // mode 2: sticky breakable targeting — keep targeting a path-blocking
-         // breakable as long as bot hasn't moved too far away from it
-         if (bot_shoot_breakables == 2 && UTIL_LookupBreakable(pBot.pBotEnemy))
-         {
-            Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy);
-            float dist = (pEdict->v.origin - v_origin).Length();
+         // skip this player if not alive (i.e. dead or dying)
+         if (!IsAlive(pPlayer))
+            continue;
 
-            if (dist < 500 && !v_origin.is_zero_vector() &&
-                FVisible( v_origin, pEdict, pBot.pBotEnemy ))
-            {
-               // face the breakable
-               Vector v_enemy = v_origin - pEdict->v.origin;
-               Vector bot_angles = UTIL_VecToAngles( v_enemy );
+         // skip this player if facing wall
+         if(IsPlayerChatProtected(pPlayer))
+            continue;
 
-               pEdict->v.ideal_yaw = bot_angles.y;
+         // don't target teammates
+         if(AreTeamMates(pPlayer, pEdict))
+            continue;
 
-               BotFixIdealYaw(pEdict);
+         float distance = GetModifiedEnemyDistance(pBot, UTIL_GetOriginWithExtent(pBot, pPlayer) - pEdict->v.origin).Length();
+         if (distance >= nearestdistance)
+            continue;
 
-               pBot.f_bot_see_enemy_time = gpGlobals->time;
-               pBot.v_bot_see_enemy_origin = v_origin;
+         // skip this player if respawned lately
+         float time_since_respawn = UTIL_GetTimeSinceRespawn(pPlayer);
+         if(time_since_respawn != -1.0 && time_since_respawn < skill_settings[pBot.bot_skill].respawn_react_delay)
+            continue;
 
-               return; // keep targeting this breakable
-            }
+         Vector vecEnd = GetGunPosition(pPlayer);
 
-            // too far or not visible, drop it
-            BotRemoveEnemy(pBot, FALSE);
-            pEdict->v.idealpitch = 0;
-         }
-         else
-         {
-         Vector vecEnd;
-         Vector vecPredEnemy;
+         // see if bot can't see the player...
+         if (!(FInViewCone( vecEnd, pEdict ) && FVisibleEnemy( vecEnd, pEdict, pPlayer )))
+            continue;
 
-         vecPredEnemy = UTIL_AdjustOriginWithExtent(pBot, GetPredictedPlayerPosition(pBot, pBot.pBotEnemy), pBot.pBotEnemy);
+         nearestdistance = distance;
+         pNewEnemy = pPlayer;
+         v_newenemy = pPlayer->v.origin;
 
-         vecEnd = vecPredEnemy;
-         if(FCanShootInHead(pEdict, pBot.pBotEnemy, vecPredEnemy))
-            vecEnd += pBot.pBotEnemy->v.view_ofs;
-
-         if( FInViewCone( vecEnd, pEdict ) && FVisibleEnemy( vecEnd, pEdict, pBot.pBotEnemy ))
-         {
-            // face the enemy
-            Vector v_enemy = vecPredEnemy - pEdict->v.origin;
-            Vector bot_angles = UTIL_VecToAngles( v_enemy );
-
-            pEdict->v.ideal_yaw = bot_angles.y;
-
-            BotFixIdealYaw(pEdict);
-
-            // keep track of when we last saw an enemy
-            pBot.f_bot_see_enemy_time = gpGlobals->time;
-            pBot.v_bot_see_enemy_origin = UTIL_GetOrigin(pBot.pBotEnemy);
-
-            return; // don't change pBot.pBotEnemy
-         }
-
-         // enemy has gone out of bot's line of sight
-         if( pBot.f_bot_see_enemy_time > 0 && pBot.f_bot_see_enemy_time + 0.5 >= gpGlobals->time)
-         {
-            // start sound tracking
-            BotRemoveEnemy(pBot, TRUE);
-
-            // level look
-            pEdict->v.idealpitch = 0;
-         }
-         } // else (non-breakable enemy)
+#if DEBUG_ENEMY_SELECT
+         g_debug_enemy_type = "player";
+         snprintf(g_debug_enemy_info, sizeof(g_debug_enemy_info), "%s[or:o-%.1f:%.1f:%.1f, or:g-%.1f:%.1f:%.1f, mins-%.1f:%.1f:%.1f, maxs-%.1f:%.1f:%.1f, absmin-%.1f:%.1f:%.1f, size-%.1f:%.1f:%.1f, td-%.0f(%f), df-%d, h-%.0f, f-%d, s-%d]",
+          g_debug_enemy_type,
+          pPlayer->v.origin.x, pPlayer->v.origin.y, pPlayer->v.origin.z,
+          UTIL_GetOrigin(pPlayer).x, UTIL_GetOrigin(pPlayer).y, UTIL_GetOrigin(pPlayer).z,
+          pPlayer->v.mins.x, pPlayer->v.mins.y, pPlayer->v.mins.z,
+          pPlayer->v.maxs.x, pPlayer->v.maxs.y, pPlayer->v.maxs.z,
+               pPlayer->v.absmin.x, pPlayer->v.absmin.y, pPlayer->v.absmin.z,
+          pPlayer->v.size.x, pPlayer->v.size.y, pPlayer->v.size.z,
+          pPlayer->v.takedamage, pPlayer->v.takedamage - (long long)pPlayer->v.takedamage,
+          pPlayer->v.deadflag,
+          pPlayer->v.health,
+          pPlayer->v.flags,
+          pPlayer->v.solid
+        );
+         g_debug_enemy_type = g_debug_enemy_info;
+#endif
       }
    }
+}
 
-   pNewEnemy = NULL;
-   v_newenemy = Vector(0,0,0);
-   nearestdistance = 99999;
 
-   if (pNewEnemy == NULL)
+// Mode 2: trace forward 100 units for path-blocking breakable
+static void BotFindEnemySearchPathBreakable(bot_t &pBot, edict_t *&pNewEnemy, Vector &v_newenemy)
+{
+   if (bot_shoot_breakables != 2 || pNewEnemy != NULL)
+      return;
+
+   edict_t *pEdict = pBot.pEdict;
+
+   TraceResult tr;
+   Vector v_src = pEdict->v.origin;
+   Vector v_dest = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * 100;
+
+   UTIL_TraceHull(v_src, v_dest, dont_ignore_monsters, head_hull, pEdict, &tr);
+
+   if (tr.pHit && !FNullEnt(tr.pHit))
    {
-      breakable_list_t * pBreakable;
-      edict_t *pMonster;
-      Vector vecEnd;
+      breakable_list_t *pBreakable = UTIL_LookupBreakable(tr.pHit);
 
-      // mode 1: search all func_breakables (original behavior)
-      if (bot_shoot_breakables == 1)
+      if (pBreakable != NULL &&
+          (int)pBreakable->pEdict->v.takedamage != DAMAGE_NO &&
+          pBreakable->pEdict->v.solid != SOLID_NOT &&
+          pBreakable->pEdict->v.deadflag != DEAD_DEAD &&
+          pBreakable->pEdict->v.health > 0 &&
+          pBreakable->pEdict->v.health <= 8000)
       {
-         // search func_breakables that we collected at map start (We need to collect in order to get the material value)
-         pBreakable = NULL;
-         while((pBreakable = UTIL_FindBreakable(pBreakable)) != NULL)
+         Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBreakable->pEdict);
+
+         if (!v_origin.is_zero_vector() &&
+             FInViewCone( v_origin, pEdict ) &&
+             FVisible( v_origin, pEdict, pBreakable->pEdict ))
          {
-            // removed? null?
-            if(FNullEnt (pBreakable->pEdict))
-               continue;
-
-            // cannot take damage
-            if((int)pBreakable->pEdict->v.takedamage == DAMAGE_NO ||
-               pBreakable->pEdict->v.solid == SOLID_NOT ||
-               pBreakable->pEdict->v.deadflag == DEAD_DEAD ||
-               !pBreakable->material_breakable ||
-               pBreakable->pEdict->v.health <= 0)
-               continue;
-
-            if (pBreakable->pEdict->v.health > 8000)
-          continue; // skip breakables with large health
-
-            Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBreakable->pEdict);
-
-            // 0,0,0 is considered invalid
-            if(v_origin.is_zero_vector())
-               continue;
-
-            float distance = GetModifiedEnemyDistance(pBot, v_origin - pEdict->v.origin).Length();
-            if (distance >= nearestdistance)
-               continue;
-
-            // see if bot can't see ...
-            if (!(FInViewCone( v_origin, pEdict ) && FVisible( v_origin, pEdict, pBreakable->pEdict )))
-               continue;
-
-            nearestdistance = distance;
             pNewEnemy = pBreakable->pEdict;
             v_newenemy = v_origin;
 
 #if DEBUG_ENEMY_SELECT
-       enemy_type = "breakable";
-       snprintf(info, sizeof(info), "%s[or:e-%.1f:%.1f:%.1f, or:o-%.1f:%.1f:%.1f, mins-%.1f:%.1f:%.1f, maxs-%.1f:%.1f:%.1f, absmin-%.1f:%.1f:%.1f, size-%.1f:%.1f:%.1f, td-%.0f, s-%d, df-%d, h-%.0f]",
-           enemy_type, v_origin.x, v_origin.y, v_origin.z,
-           UTIL_GetOrigin(pBreakable->pEdict).x, UTIL_GetOrigin(pBreakable->pEdict).y, UTIL_GetOrigin(pBreakable->pEdict).z,
-           pBreakable->pEdict->v.mins.x, pBreakable->pEdict->v.mins.y, pBreakable->pEdict->v.mins.z,
-           pBreakable->pEdict->v.maxs.x, pBreakable->pEdict->v.maxs.y, pBreakable->pEdict->v.maxs.z,
-                pBreakable->pEdict->v.absmin.x, pBreakable->pEdict->v.absmin.y, pBreakable->pEdict->v.absmin.z,
-           pBreakable->pEdict->v.size.x, pBreakable->pEdict->v.size.y, pBreakable->pEdict->v.size.z,
-           pBreakable->pEdict->v.takedamage,
-           pBreakable->pEdict->v.solid,
-           pBreakable->pEdict->v.deadflag,
-           pBreakable->pEdict->v.health
-         );
-       enemy_type = info;
+            g_debug_enemy_type = "breakable-path";
 #endif
-         }
-      }
-
-      // search the world for monsters...
-      pMonster = NULL;
-      while (!FNullEnt (pMonster = UTIL_FindEntityInSphere (pMonster, pEdict->v.origin, 1000)))
-      {
-         if (!(pMonster->v.flags & FL_MONSTER) || (int)pMonster->v.takedamage == DAMAGE_NO)
-            continue; // discard anything that is not a monster
-
-         if (!IsAlive (pMonster))
-            continue; // discard dead or dying monsters
-
-         // 0,0,0 is considered invalid
-         if(pMonster->v.origin.is_zero_vector())
-            continue;
-
-         if (FIsClassname(pMonster, "hornet"))
-            continue; // skip hornets
-
-         if (FIsClassname(pMonster, "monster_snark"))
-            continue; // skip snarks
-
-         if (pMonster->v.health > 4000)
-       continue; // skip monsters with large health
-
-         float distance = GetModifiedEnemyDistance(pBot, UTIL_GetOriginWithExtent(pBot, pMonster) - pEdict->v.origin).Length();
-         if (distance >= nearestdistance)
-            continue;
-
-         vecEnd = pMonster->v.origin + pMonster->v.view_ofs;
-
-         // see if bot can't see ...
-         if (!(FInViewCone( vecEnd, pEdict ) && FVisibleEnemy( vecEnd, pEdict, pMonster )))
-            continue;
-
-         nearestdistance = distance;
-         pNewEnemy = pMonster;
-         v_newenemy = pMonster->v.origin;
-
-#if DEBUG_ENEMY_SELECT
-    enemy_type = "monster";
-    snprintf(info, sizeof(info), "%s[or:o-%.1f:%.1f:%.1f, or:g-%.1f:%.1f:%.1f, td-%.0f(%f), df-%d, h-%.0f, f-%d, s-%d]",
-        enemy_type,
-        pMonster->v.origin.x, pMonster->v.origin.y, pMonster->v.origin.z,
-        UTIL_GetOrigin(pMonster).x, UTIL_GetOrigin(pMonster).y, UTIL_GetOrigin(pMonster).z,
-        pMonster->v.takedamage, pMonster->v.takedamage - (long long)pMonster->v.takedamage,
-        pMonster->v.deadflag,
-        pMonster->v.health,
-        pMonster->v.flags,
-        pMonster->v.solid
-      );
-    enemy_type = info;
-#endif
-      }
-
-      // search the world for players...
-      for (i = 1; i <= gpGlobals->maxClients; i++)
-      {
-         edict_t *pPlayer = INDEXENT(i);
-
-         // skip invalid players and skip self (i.e. this bot)
-         if ((pPlayer) && (!pPlayer->free) && (pPlayer != pEdict) && !FBitSet(pPlayer->v.flags, FL_PROXY))
-         {
-            if ((b_observer_mode) && !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
-               continue;
-
-            // 0,0,0 is considered invalid
-            if(pPlayer->v.origin.is_zero_vector())
-               continue;
-
-            // skip this player if not alive (i.e. dead or dying)
-            if (!IsAlive(pPlayer))
-               continue;
-
-            // skip this player if facing wall
-            if(IsPlayerChatProtected(pPlayer))
-               continue;
-
-            // don't target teammates
-            if(AreTeamMates(pPlayer, pEdict))
-               continue;
-
-            float distance = GetModifiedEnemyDistance(pBot, UTIL_GetOriginWithExtent(pBot, pPlayer) - pEdict->v.origin).Length();
-            if (distance >= nearestdistance)
-               continue;
-
-            // skip this player if respawned lately
-            float time_since_respawn = UTIL_GetTimeSinceRespawn(pPlayer);
-            if(time_since_respawn != -1.0 && time_since_respawn < skill_settings[pBot.bot_skill].respawn_react_delay)
-               continue;
-
-            vecEnd = GetGunPosition(pPlayer);
-
-            // see if bot can't see the player...
-            if (!(FInViewCone( vecEnd, pEdict ) && FVisibleEnemy( vecEnd, pEdict, pPlayer )))
-               continue;
-
-            nearestdistance = distance;
-            pNewEnemy = pPlayer;
-            v_newenemy = pPlayer->v.origin;
-
-#if DEBUG_ENEMY_SELECT
-       enemy_type = "player";
-       snprintf(info, sizeof(info), "%s[or:o-%.1f:%.1f:%.1f, or:g-%.1f:%.1f:%.1f, mins-%.1f:%.1f:%.1f, maxs-%.1f:%.1f:%.1f, absmin-%.1f:%.1f:%.1f, size-%.1f:%.1f:%.1f, td-%.0f(%f), df-%d, h-%.0f, f-%d, s-%d]",
-        enemy_type,
-        pPlayer->v.origin.x, pPlayer->v.origin.y, pPlayer->v.origin.z,
-        UTIL_GetOrigin(pPlayer).x, UTIL_GetOrigin(pPlayer).y, UTIL_GetOrigin(pPlayer).z,
-        pPlayer->v.mins.x, pPlayer->v.mins.y, pPlayer->v.mins.z,
-        pPlayer->v.maxs.x, pPlayer->v.maxs.y, pPlayer->v.maxs.z,
-             pPlayer->v.absmin.x, pPlayer->v.absmin.y, pPlayer->v.absmin.z,
-        pPlayer->v.size.x, pPlayer->v.size.y, pPlayer->v.size.z,
-        pPlayer->v.takedamage, pPlayer->v.takedamage - (long long)pPlayer->v.takedamage,
-        pPlayer->v.deadflag,
-        pPlayer->v.health,
-        pPlayer->v.flags,
-        pPlayer->v.solid
-      );
-       enemy_type = info;
-#endif
-         }
-      }
-
-      // mode 2: only shoot breakables blocking the bot's path
-      if (bot_shoot_breakables == 2 && pNewEnemy == NULL)
-      {
-         TraceResult tr;
-         Vector v_src = pEdict->v.origin;
-         Vector v_dest = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * 100;
-
-         UTIL_TraceHull(v_src, v_dest, dont_ignore_monsters, head_hull, pEdict, &tr);
-
-         if (tr.pHit && !FNullEnt(tr.pHit))
-         {
-            pBreakable = UTIL_LookupBreakable(tr.pHit);
-
-            if (pBreakable != NULL &&
-                (int)pBreakable->pEdict->v.takedamage != DAMAGE_NO &&
-                pBreakable->pEdict->v.solid != SOLID_NOT &&
-                pBreakable->pEdict->v.deadflag != DEAD_DEAD &&
-                pBreakable->pEdict->v.health > 0 &&
-                pBreakable->pEdict->v.health <= 8000)
-            {
-               Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBreakable->pEdict);
-
-               if (!v_origin.is_zero_vector() &&
-                   FInViewCone( v_origin, pEdict ) &&
-                   FVisible( v_origin, pEdict, pBreakable->pEdict ))
-               {
-                  pNewEnemy = pBreakable->pEdict;
-                  v_newenemy = v_origin;
-
-#if DEBUG_ENEMY_SELECT
-                  enemy_type = "breakable-path";
-#endif
-               }
-            }
          }
       }
    }
+}
 
-   qboolean is_sound_enemy = FALSE;
 
-   // check sounds for any potential targets
-   if (FNullEnt(pNewEnemy) && pBot.f_next_find_visible_sound_enemy_time <= gpGlobals->time)
+// Sound-based detection via BotFindVisibleSoundEnemy. Returns TRUE = is_sound_enemy
+static qboolean BotFindEnemySearchSound(bot_t &pBot, edict_t *&pNewEnemy, Vector &v_newenemy)
+{
+   if (!FNullEnt(pNewEnemy) || pBot.f_next_find_visible_sound_enemy_time > gpGlobals->time)
+      return FALSE;
+
+   // only run this 5fps
+   pNewEnemy = BotFindVisibleSoundEnemy(pBot);
+   pBot.f_next_find_visible_sound_enemy_time = gpGlobals->time + 0.2f;
+
+   if(!FNullEnt(pNewEnemy))
    {
-      // only run this 5fps
-      pNewEnemy = BotFindVisibleSoundEnemy(pBot);
-      pBot.f_next_find_visible_sound_enemy_time = gpGlobals->time + 0.2f;
-
-      if(!FNullEnt(pNewEnemy))
-      {
-         //char msg[32];
-         //safevoid_snprintf(msg, sizeof(msg), "Found sound enemy! %d", RANDOM_LONG2(0,0x7fffffff));
-         //UTIL_HostSay(pEdict, 0, msg);
-
-         is_sound_enemy = TRUE;
-         v_newenemy = pNewEnemy->v.origin;
+      v_newenemy = pNewEnemy->v.origin;
 
 #if DEBUG_ENEMY_SELECT
-         enemy_type = "sound-enemy";
+      g_debug_enemy_type = "sound-enemy";
 #endif
-      }
+
+      return TRUE;
    }
+
+   return FALSE;
+}
+
+
+//
+void BotFindEnemy( bot_t &pBot )
+{
+#if DEBUG_ENEMY_SELECT
+   g_debug_enemy_type = "";
+#endif
+
+   edict_t *pEdict = pBot.pEdict;
+
+   if (BotFindEnemyCheckDontShoot(pBot))
+      return;
+
+   if (BotFindEnemyMaintainCurrent(pBot))
+      return;
+
+   edict_t *pNewEnemy = NULL;
+   Vector v_newenemy = Vector(0,0,0);
+   float nearestdistance = 99999;
+
+   BotFindEnemySearchBreakables(pBot, pNewEnemy, v_newenemy, nearestdistance);
+   BotFindEnemySearchMonsters(pBot, pNewEnemy, v_newenemy, nearestdistance);
+   BotFindEnemySearchPlayers(pBot, pNewEnemy, v_newenemy, nearestdistance);
+   BotFindEnemySearchPathBreakable(pBot, pNewEnemy, v_newenemy);
+
+   qboolean is_sound_enemy = BotFindEnemySearchSound(pBot, pNewEnemy, v_newenemy);
 
    //
    if (!FNullEnt(pNewEnemy))
@@ -1114,7 +1165,7 @@ void BotFindEnemy( bot_t &pBot )
       if(pBot.waypoint_goal != -1)
          UTIL_ConsolePrintf("[%s] Found enemy, forget goal: %d -> %d", pBot.name, pBot.waypoint_goal, -1);
 
-      UTIL_ConsolePrintf("[%s] Found enemy, type: %s", pBot.name, enemy_type);
+      UTIL_ConsolePrintf("[%s] Found enemy, type: %s", pBot.name, g_debug_enemy_type);
 #endif
 
       // clear goal waypoint
@@ -1221,21 +1272,10 @@ static qboolean CheckWeaponFireConditions(bot_t & pBot, const bot_weapon_select_
 }
 
 
-//
-static qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, const bot_fire_delay_t &delay, qboolean use_primary, qboolean use_secondary)
+// Setup special weapon behaviors (zoom, eagle aimspot, M249 duck)
+static void BotFireSelectedWeaponSetupSpecial(bot_t &pBot, const bot_weapon_select_t &select, qboolean &use_primary, qboolean &use_secondary)
 {
    edict_t *pEdict = pBot.pEdict;
-   const int iId = select.iId;
-
-   // Select primary or secondary based on bot skill and random percent
-   if(use_primary && use_secondary)
-   {
-      BotSelectAttack(pBot, select, use_primary, use_secondary);
-   }
-
-   // Check if weapon can be fired and setup bot for firing this weapon
-   if(!CheckWeaponFireConditions(pBot, select, use_primary, use_secondary))
-      return FALSE;
 
    // use secondary once to enable zoom
    if(use_primary && (select.type & WEAPON_FIRE_ZOOM) == WEAPON_FIRE_ZOOM && pEdict->v.fov == 0)
@@ -1254,85 +1294,84 @@ static qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &s
       pBot.f_duck_time = gpGlobals->time + 0.5f;
       pEdict->v.button |= IN_DUCK;
    }
+}
 
-   if (use_primary)
+
+// Set shoot time for primary or secondary fire (charge, hold, or delay)
+static void BotFireSelectedWeaponSetShootTime(bot_t &pBot, const bot_weapon_select_t &select, const bot_fire_delay_t &delay, qboolean is_primary)
+{
+   edict_t *pEdict = pBot.pEdict;
+   const int iId = select.iId;
+
+   pEdict->v.button |= is_primary ? IN_ATTACK : IN_ATTACK2;
+
+   if (is_primary ? select.primary_fire_charge : select.secondary_fire_charge)
    {
-      pEdict->v.button |= IN_ATTACK;  // use primary attack
+      pBot.charging_weapon_id = iId;
 
-      if (select.primary_fire_charge)
-      {
-         pBot.charging_weapon_id = iId;
+      // release fire after the appropriate delay...
+      if (is_primary)
+         pBot.f_primary_charging = gpGlobals->time + select.primary_charge_delay;
+      else
+         pBot.f_secondary_charging = gpGlobals->time + select.secondary_charge_delay;
 
-         // release primary fire after the appropriate delay...
-         pBot.f_primary_charging = gpGlobals->time +
-                        select.primary_charge_delay;
-
-         pBot.f_shoot_time = gpGlobals->time;  // keep charging
-      }
+      pBot.f_shoot_time = gpGlobals->time;  // keep charging
+   }
+   else
+   {
+      // set next time to shoot
+      if (is_primary ? select.primary_fire_hold : select.secondary_fire_hold)
+         pBot.f_shoot_time = gpGlobals->time;  // don't let button up
       else
       {
-         // set next time to shoot
-         if (select.primary_fire_hold)
-            pBot.f_shoot_time = gpGlobals->time;  // don't let button up
-         else
-         {
-            int skill = pBot.bot_skill;
-            float base_delay, min_delay, max_delay;
+         int skill = pBot.bot_skill;
+         float base_delay, min_delay, max_delay;
 
+         if (is_primary)
+         {
             base_delay = delay.primary_base_delay;
             min_delay = delay.primary_min_delay[skill];
             max_delay = delay.primary_max_delay[skill];
-
-            if(min_delay == 0 && max_delay == 0)
-               pBot.f_shoot_time = gpGlobals->time + base_delay;
-            else
-               pBot.f_shoot_time = gpGlobals->time + base_delay + RANDOM_FLOAT2(min_delay, max_delay);
          }
+         else
+         {
+            base_delay = delay.secondary_base_delay;
+            min_delay = delay.secondary_min_delay[skill];
+            max_delay = delay.secondary_max_delay[skill];
+         }
+
+         if(min_delay == 0 && max_delay == 0)
+            pBot.f_shoot_time = gpGlobals->time + base_delay;
+         else
+            pBot.f_shoot_time = gpGlobals->time + base_delay + RANDOM_FLOAT2(min_delay, max_delay);
       }
 
       // after throwing satchel, set up detonation tracking and switch to better weapon
-      if (select.iId == VALVE_WEAPON_SATCHEL)
+      if (is_primary && iId == VALVE_WEAPON_SATCHEL)
       {
          pBot.f_satchel_detonate_time = gpGlobals->time + 30.0;  // 30s force-detonate deadline
          pBot.f_satchel_check_time = gpGlobals->time + 2.0;      // first check after throw settles
          pBot.current_weapon_index = -1;  // force re-eval -> switch to better weapon
       }
    }
-   else // MUST be use_secondary...
+}
+
+
+//
+static qboolean BotFireSelectedWeapon(bot_t & pBot, const bot_weapon_select_t &select, const bot_fire_delay_t &delay, qboolean use_primary, qboolean use_secondary)
+{
+   // Select primary or secondary based on bot skill and random percent
+   if(use_primary && use_secondary)
    {
-      pEdict->v.button |= IN_ATTACK2;  // use secondary attack
-
-      if (select.secondary_fire_charge)
-      {
-         pBot.charging_weapon_id = iId;
-
-         // release secondary fire after the appropriate delay...
-         pBot.f_secondary_charging = gpGlobals->time +
-                        select.secondary_charge_delay;
-
-         pBot.f_shoot_time = gpGlobals->time;  // keep charging
-      }
-      else
-      {
-         // set next time to shoot
-         if (select.secondary_fire_hold)
-            pBot.f_shoot_time = gpGlobals->time;  // don't let button up
-         else
-         {
-            int skill = pBot.bot_skill;
-            float base_delay, min_delay, max_delay;
-
-            base_delay = delay.secondary_base_delay;
-            min_delay = delay.secondary_min_delay[skill];
-            max_delay = delay.secondary_max_delay[skill];
-
-            if(min_delay == 0 && max_delay == 0)
-               pBot.f_shoot_time = gpGlobals->time + base_delay;
-            else
-               pBot.f_shoot_time = gpGlobals->time + base_delay + RANDOM_FLOAT2(min_delay, max_delay);
-         }
-      }
+      BotSelectAttack(pBot, select, use_primary, use_secondary);
    }
+
+   // Check if weapon can be fired and setup bot for firing this weapon
+   if(!CheckWeaponFireConditions(pBot, select, use_primary, use_secondary))
+      return FALSE;
+
+   BotFireSelectedWeaponSetupSpecial(pBot, select, use_primary, use_secondary);
+   BotFireSelectedWeaponSetShootTime(pBot, select, delay, use_primary);
 
    return TRUE;  // weapon was fired
 }
@@ -1362,42 +1401,12 @@ static qboolean TrySelectWeapon(bot_t &pBot, const int select_index, const bot_w
 }
 
 
-// specifing a weapon_choice allows you to choose the weapon the bot will
-// use (assuming enough ammo exists for that weapon)
-// BotFireWeapon will return TRUE if weapon was fired, FALSE otherwise
-static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
+// Reset weapon if can't use underwater
+static void BotFireWeaponHandleUnderwater(bot_t &pBot, const bot_weapon_select_t *pSelect)
 {
-   bot_weapon_select_t *pSelect;
-   bot_fire_delay_t *pDelay;
-   int select_index, better_index;
-   int iId;
-   qboolean use_primary;
-   qboolean use_secondary;
-   float distance;
-   float height;
-   int min_skill;
-   int min_index;
-   qboolean min_use_primary;
-   qboolean min_use_secondary;
-   int avoid_skill;
-   int avoid_index;
-   qboolean avoid_use_primary;
-   qboolean avoid_use_secondary;
-   select_list_t * tmp_select_list;
-
-   if (FNullEnt(pBot.pBotEnemy))
-     return FALSE;
-
-   distance = v_enemy.Length();  // how far away is the enemy?
-   height = v_enemy.z; // how high is enemy?
-
-   pSelect = &weapon_select[0];
-   pDelay = &fire_delay[0];
-
-   // keep weapon only if can be used underwater
    if(pBot.b_in_water)
    {
-      select_index = pBot.current_weapon_index;
+      int select_index = pBot.current_weapon_index;
 
       if(select_index < 0 || !pSelect[select_index].can_use_underwater)
       {
@@ -1406,158 +1415,128 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
          pBot.f_secondary_charging = -1;
       }
    }
+}
 
-   // are we charging the primary fire?
-   if (pBot.f_primary_charging > 0)
+
+// Handle charging weapon release/continue for primary or secondary fire
+static qboolean BotFireWeaponHandleCharging(bot_t &pBot, const bot_weapon_select_t *pSelect, const bot_fire_delay_t *pDelay, qboolean is_primary)
+{
+   float &f_charging = is_primary ? pBot.f_primary_charging : pBot.f_secondary_charging;
+
+   if (f_charging <= 0)
+      return FALSE;
+
+   int iId = pBot.charging_weapon_id;
+
+   // is it time to fire the charged weapon?
+   if (f_charging <= gpGlobals->time)
    {
-      iId = pBot.charging_weapon_id;
+      // we DON'T set pEdict->v.button here to release the
+      // fire button which will fire the charged weapon
 
-      // is it time to fire the charged weapon?
-      if (pBot.f_primary_charging <= gpGlobals->time)
+      f_charging = -1;  // -1 means not charging
+
+      // find the correct fire delay for this weapon
+      int select_index = 0;
+
+      while ((pSelect[select_index].iId) &&
+             (pSelect[select_index].iId != iId))
+         select_index++;
+
+      // set next time to shoot
+      int skill = pBot.bot_skill;
+      float base_delay, min_delay, max_delay;
+
+      if (is_primary)
       {
-         // we DON'T set pEdict->v.button here to release the
-         // fire button which will fire the charged weapon
-
-         pBot.f_primary_charging = -1;  // -1 means not charging
-
-         // find the correct fire delay for this weapon
-         select_index = 0;
-
-         while ((pSelect[select_index].iId) &&
-                (pSelect[select_index].iId != iId))
-            select_index++;
-
-         // set next time to shoot
-         int skill = pBot.bot_skill;
-         float base_delay, min_delay, max_delay;
-
          base_delay = pDelay[select_index].primary_base_delay;
          min_delay = pDelay[select_index].primary_min_delay[skill];
          max_delay = pDelay[select_index].primary_max_delay[skill];
-
-         pBot.f_shoot_time = gpGlobals->time + base_delay +
-            RANDOM_FLOAT2(min_delay, max_delay);
-
-         return TRUE;
       }
       else
       {
-         pBot.pEdict->v.button |= IN_ATTACK;   // charge the weapon
-         pBot.f_shoot_time = gpGlobals->time;  // keep charging
-
-         return TRUE;
-      }
-   }
-
-   // are we charging the secondary fire?
-   if (pBot.f_secondary_charging > 0)
-   {
-      iId = pBot.charging_weapon_id;
-
-      // is it time to fire the charged weapon?
-      if (pBot.f_secondary_charging <= gpGlobals->time)
-      {
-         // we DON'T set pEdict->v.button here to release the
-         // fire button which will fire the charged weapon
-
-         pBot.f_secondary_charging = -1;  // -1 means not charging
-
-         // find the correct fire delay for this weapon
-         select_index = 0;
-
-         while ((pSelect[select_index].iId) &&
-                (pSelect[select_index].iId != iId))
-            select_index++;
-
-         // set next time to shoot
-         int skill = pBot.bot_skill;
-         float base_delay, min_delay, max_delay;
-
          base_delay = pDelay[select_index].secondary_base_delay;
          min_delay = pDelay[select_index].secondary_min_delay[skill];
          max_delay = pDelay[select_index].secondary_max_delay[skill];
-
-         pBot.f_shoot_time = gpGlobals->time + base_delay +
-            RANDOM_FLOAT2(min_delay, max_delay);
-
-         return TRUE;
       }
-      else
-      {
-         pBot.pEdict->v.button |= IN_ATTACK2;  // charge the weapon
-         pBot.f_shoot_time = gpGlobals->time;  // keep charging
 
-         return TRUE;
-      }
+      pBot.f_shoot_time = gpGlobals->time + base_delay +
+         RANDOM_FLOAT2(min_delay, max_delay);
    }
-
-   // check if we can reuse currently active weapon
-   if(pBot.current_weapon_index >= 0 && !pSelect[pBot.current_weapon_index].avoid_this_gun)
+   else
    {
-      select_index = pBot.current_weapon_index;
+      pBot.pEdict->v.button |= is_primary ? IN_ATTACK : IN_ATTACK2;  // charge the weapon
+      pBot.f_shoot_time = gpGlobals->time;  // keep charging
+   }
 
-      use_primary = FALSE;
-      use_secondary = FALSE;
+   return TRUE;
+}
 
-      // Check if we can use this weapon
-      if ((weapon_choice == pSelect[select_index].iId || weapon_choice == 0) ||
-          (IsValidWeaponChoose(pBot, pSelect[select_index]) &&
-           BotCanUseWeapon(pBot, pSelect[select_index]) &&
-           IsValidToFireAtTheMoment(pBot, pSelect[select_index])))
+
+// Try reusing current weapon. Returns: 1=fired, 0=error, -1=fall through
+static int BotFireWeaponTryReuseCurrent(bot_t &pBot, const bot_weapon_select_t *pSelect, const bot_fire_delay_t *pDelay, float distance, float height, int weapon_choice)
+{
+   if(pBot.current_weapon_index < 0 || pSelect[pBot.current_weapon_index].avoid_this_gun)
+      return -1;
+
+   int select_index = pBot.current_weapon_index;
+
+   qboolean use_primary = FALSE;
+   qboolean use_secondary = FALSE;
+
+   // Check if we can use this weapon
+   if ((weapon_choice == pSelect[select_index].iId || weapon_choice == 0) ||
+       (IsValidWeaponChoose(pBot, pSelect[select_index]) &&
+        BotCanUseWeapon(pBot, pSelect[select_index]) &&
+        IsValidToFireAtTheMoment(pBot, pSelect[select_index])))
+   {
+      int better_index = -1;
+
+      if(weapon_choice == 0)
       {
-         better_index = -1;
+         // Check if we REALLY want to change to other weapon (aka current gun IS shit)
+         better_index = BotGetBetterWeaponChoice(pBot, pSelect[select_index], pSelect, distance, height, &use_primary, &use_secondary);
+         if(better_index > -1)
+            select_index = better_index;
+      }
 
-         if(weapon_choice == 0)
-         {
-            // Check if we REALLY want to change to other weapon (aka current gun IS shit)
-            better_index = BotGetBetterWeaponChoice(pBot, pSelect[select_index], pSelect, distance, height, &use_primary, &use_secondary);
-            if(better_index > -1)
-               select_index = better_index;
-         }
+      if(better_index == -1)
+      {
+         // Check if this weapon is ok for current contitions
+         use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
+         use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
+      }
 
-         if(better_index == -1)
-         {
-            // Check if this weapon is ok for current contitions
-            use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
-            use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
-         }
+      // check if bot has enough skill for attack
+      if(use_primary && !BotSkilledEnoughForPrimaryAttack(pBot, pSelect[select_index]))
+         use_primary = FALSE;
+      if(use_secondary && !BotSkilledEnoughForSecondaryAttack(pBot, pSelect[select_index]))
+         use_secondary = FALSE;
 
-         // check if bot has enough skill for attack
-         if(use_primary && !BotSkilledEnoughForPrimaryAttack(pBot, pSelect[select_index]))
-            use_primary = FALSE;
-         if(use_secondary && !BotSkilledEnoughForSecondaryAttack(pBot, pSelect[select_index]))
-            use_secondary = FALSE;
+      if(use_primary || use_secondary)
+      {
+         if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
+            return 0; //error
 
-         if(use_primary || use_secondary)
-         {
-            if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
-               return FALSE; //error
-
-            return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], use_primary, use_secondary));
-         }
+         return BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], use_primary, use_secondary) ? 1 : 0;
       }
    }
 
-   // don't change weapon too fast
-   if(pBot.f_weaponchange_time >= gpGlobals->time && pBot.current_weapon_index >= 0 && weapon_choice == 0)
-   {
-      // keep tracking the enemy even if we cannot hit right now
-      if(weapon_select[pBot.current_weapon_index].type & WEAPON_MELEE)
-         return TRUE;
+   return -1;
+}
 
-      return FALSE;
-   }
 
-   pBot.current_weapon_index = -1; // forget current weapon
-
+// Build alloca linked list of available weapons and randomly select one by percentage
+static qboolean BotFireWeaponChooseFromAvailable(bot_t &pBot, const bot_weapon_select_t *pSelect, const bot_fire_delay_t *pDelay, float distance, float height, int weapon_choice)
+{
    //
    // 1. check which weapons are available and with which percents
    //
    int total_percent = 0;
-   tmp_select_list = NULL;
+   select_list_t *tmp_select_list = NULL;
 
    // loop through all the weapons until terminator is found...
-   select_index = -1;
+   int select_index = -1;
    while (pSelect[++select_index].iId)
    {
       // Check if we can use this weapon
@@ -1573,8 +1552,8 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
          continue;
 
       // Check if this weapon is ok for current contitions
-      use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
-      use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
+      qboolean use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
+      qboolean use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, weapon_choice != 0);
 
       // check if bot has enough skill for attack
       if(use_primary && !BotSkilledEnoughForPrimaryAttack(pBot, pSelect[select_index]))
@@ -1635,8 +1614,6 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
          }
 
          // this is our random choosed weapon!
-         use_primary = next->use_primary;
-         use_secondary = next->use_secondary;
          select_index = next->select_index;
 
          //UTIL_ConsolePrintf("choose: %d [%s]", choose, pSelect[select_index].weapon_name);
@@ -1644,24 +1621,31 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
          if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
             return FALSE; //error
 
-         return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], use_primary, use_secondary));
+         return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], next->use_primary, next->use_secondary));
       }
    }
 
+   return FALSE;
+}
+
+
+// Search for highest-skill non-avoided weapon, then best avoidable as last resort
+static qboolean BotFireWeaponFallbackSearch(bot_t &pBot, const bot_weapon_select_t *pSelect, const bot_fire_delay_t *pDelay, float distance, float height, int weapon_choice)
+{
    // AT THIS POINT:
    // We didn't find good weapon, now try find least skilled weapon that bot has, but avoid avoidable weapons
    // Also get best avoidable weapon bot can use
-   min_index = -1;
-   min_skill = -1;
-   min_use_primary = FALSE;
-   min_use_secondary = FALSE;
+   int min_index = -1;
+   int min_skill = -1;
+   qboolean min_use_primary = FALSE;
+   qboolean min_use_secondary = FALSE;
 
-   avoid_index = -1;
-   avoid_skill = 6;
-   avoid_use_primary = FALSE;
-   avoid_use_secondary = FALSE;
+   int avoid_index = -1;
+   int avoid_skill = 6;
+   qboolean avoid_use_primary = FALSE;
+   qboolean avoid_use_secondary = FALSE;
 
-   select_index = -1;
+   int select_index = -1;
    while (pSelect[++select_index].iId)
    {
       // Check if we can use this weapon
@@ -1680,8 +1664,8 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
       }
 
       // Check if this weapon is ok for current contitions
-      use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, TRUE);
-      use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, TRUE);
+      qboolean use_primary = IsValidPrimaryAttack(pBot, pSelect[select_index], distance, height, TRUE);
+      qboolean use_secondary = IsValidSecondaryAttack(pBot, pSelect[select_index], distance, height, TRUE);
       if(use_primary || use_secondary)
       {
          if(pSelect[select_index].avoid_this_gun)
@@ -1710,8 +1694,8 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
    if(min_index > -1 && min_skill > -1)
    {
       select_index = min_index;
-      use_primary = min_use_primary;
-      use_secondary = min_use_secondary;
+      qboolean use_primary = min_use_primary;
+      qboolean use_secondary = min_use_secondary;
 
       if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
          return FALSE; //error
@@ -1731,8 +1715,8 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
    if(avoid_index > -1 && avoid_skill < 6)
    {
       select_index = avoid_index;
-      use_primary = avoid_use_primary;
-      use_secondary = avoid_use_secondary;
+      qboolean use_primary = avoid_use_primary;
+      qboolean use_secondary = avoid_use_secondary;
 
       if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
          return FALSE; //error
@@ -1751,19 +1735,56 @@ static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_ch
 }
 
 
-void BotShootAtEnemy( bot_t &pBot )
+// specifing a weapon_choice allows you to choose the weapon the bot will
+// use (assuming enough ammo exists for that weapon)
+// BotFireWeapon will return TRUE if weapon was fired, FALSE otherwise
+static qboolean BotFireWeapon(const Vector & v_enemy, bot_t &pBot, int weapon_choice)
 {
-   float f_xy_distance;
-   Vector v_enemy;
-   Vector v_enemy_aimpos;
-   Vector v_predicted_pos;
+   if (FNullEnt(pBot.pBotEnemy))
+     return FALSE;
 
+   float distance = v_enemy.Length();  // how far away is the enemy?
+   float height = v_enemy.z; // how high is enemy?
+
+   const bot_weapon_select_t *pSelect = &weapon_select[0];
+   const bot_fire_delay_t *pDelay = &fire_delay[0];
+
+   BotFireWeaponHandleUnderwater(pBot, pSelect);
+
+   // are we charging primary or secondary fire?
+   if (BotFireWeaponHandleCharging(pBot, pSelect, pDelay, TRUE))
+      return TRUE;
+   if (BotFireWeaponHandleCharging(pBot, pSelect, pDelay, FALSE))
+      return TRUE;
+
+   // check if we can reuse currently active weapon
+   int reuse = BotFireWeaponTryReuseCurrent(pBot, pSelect, pDelay, distance, height, weapon_choice);
+   if(reuse >= 0)
+      return reuse ? TRUE : FALSE;
+
+   // don't change weapon too fast
+   if(pBot.f_weaponchange_time >= gpGlobals->time && pBot.current_weapon_index >= 0 && weapon_choice == 0)
+   {
+      // keep tracking the enemy even if we cannot hit right now
+      if(weapon_select[pBot.current_weapon_index].type & WEAPON_MELEE)
+         return TRUE;
+
+      return FALSE;
+   }
+
+   pBot.current_weapon_index = -1; // forget current weapon
+
+   if(BotFireWeaponChooseFromAvailable(pBot, pSelect, pDelay, distance, height, weapon_choice))
+      return TRUE;
+
+   return BotFireWeaponFallbackSearch(pBot, pSelect, pDelay, distance, height, weapon_choice);
+}
+
+
+// Choose aim point: feet (WEAPON_FIRE_AT_FEET with trace), head (FCanShootInHead), or center
+static Vector BotShootAtEnemyDetermineAimPoint(bot_t &pBot, const Vector &v_predicted_pos)
+{
    edict_t *pEdict = pBot.pEdict;
-
-   if (pBot.f_reaction_target_time > gpGlobals->time)
-      return;
-
-   v_predicted_pos = UTIL_AdjustOriginWithExtent(pBot, GetPredictedPlayerPosition(pBot, pBot.pBotEnemy), pBot.pBotEnemy);
 
    // do we need to aim at the feet?
    if (pBot.current_weapon_index != -1 && (weapon_select[pBot.current_weapon_index].type & WEAPON_FIRE_AT_FEET) == WEAPON_FIRE_AT_FEET)
@@ -1784,64 +1805,30 @@ void BotShootAtEnemy( bot_t &pBot )
            FIsClassname("player", tr.pHit)))
       {
          // aim at the feet for RPG type weapons
-         v_enemy_aimpos = v_predicted_pos - pBot.pBotEnemy->v.view_ofs;
+         return v_predicted_pos - pBot.pBotEnemy->v.view_ofs;
       }
       else
       {
-         v_enemy_aimpos = v_predicted_pos;
+         Vector v_aimpos = v_predicted_pos;
          if(FCanShootInHead(pEdict, pBot.pBotEnemy, v_predicted_pos))
-            v_enemy_aimpos += pBot.pBotEnemy->v.view_ofs;// aim for the head...
+            v_aimpos += pBot.pBotEnemy->v.view_ofs;// aim for the head...
+         return v_aimpos;
       }
    }
    else
    {
-      v_enemy_aimpos = v_predicted_pos;
+      Vector v_aimpos = v_predicted_pos;
       if(FCanShootInHead(pEdict, pBot.pBotEnemy, v_predicted_pos))
-         v_enemy_aimpos += pBot.pBotEnemy->v.view_ofs;// aim for the head...
+         v_aimpos += pBot.pBotEnemy->v.view_ofs;// aim for the head...
+      return v_aimpos;
    }
+}
 
-   // Enemy not visible?
-   if(!pBot.b_combat_longjump && !FVisibleEnemy(v_enemy_aimpos, pEdict, pBot.pBotEnemy))
-   {
-      BotRemoveEnemy(pBot, TRUE);
 
-      return;
-   }
-
-   v_enemy = v_enemy_aimpos - GetGunPosition(pEdict);
-
-   Vector enemy_angle = UTIL_VecToAngles( v_enemy );
-
-   if (enemy_angle.x > 180)
-      enemy_angle.x -=360;
-
-   if (enemy_angle.y > 180)
-      enemy_angle.y -=360;
-
-   // adjust the view angle pitch to aim correctly
-   enemy_angle.x = -enemy_angle.x;
-
-   if(!pBot.b_combat_longjump)
-   {
-      pEdict->v.idealpitch = enemy_angle.x;
-      BotFixIdealPitch(pEdict);
-
-      pEdict->v.ideal_yaw = enemy_angle.y;
-      BotFixIdealYaw(pEdict);
-   }
-
-   Vector v_enemy_xy = v_enemy;
-   v_enemy_xy.z = 0;  // ignore z component (up & down)
-
-   f_xy_distance = v_enemy_xy.Length();  // how far away is the enemy scum?
-
-   if (f_xy_distance > 20)      // run if distance to enemy is far
-      pBot.f_move_speed = pBot.f_max_speed;
-   else                     // don't move too fast if close enough
-   {
-      pBot.b_not_maxspeed = TRUE;
-      pBot.f_move_speed = pBot.f_max_speed/2;
-   }
+// Check shoot time, visibility, shoot cone; call BotFireWeapon; handle failure
+static void BotShootAtEnemyExecuteFire(bot_t &pBot, const Vector &v_enemy_aimpos, const Vector &v_enemy)
+{
+   edict_t *pEdict = pBot.pEdict;
 
    // is it time to shoot yet?
    if (pBot.f_shoot_time <= gpGlobals->time)
@@ -1871,6 +1858,64 @@ void BotShootAtEnemy( bot_t &pBot )
          BotResetReactionTime(pBot);
       }
    }
+}
+
+
+void BotShootAtEnemy( bot_t &pBot )
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   if (pBot.f_reaction_target_time > gpGlobals->time)
+      return;
+
+   Vector v_predicted_pos = UTIL_AdjustOriginWithExtent(pBot, GetPredictedPlayerPosition(pBot, pBot.pBotEnemy), pBot.pBotEnemy);
+
+   Vector v_enemy_aimpos = BotShootAtEnemyDetermineAimPoint(pBot, v_predicted_pos);
+
+   // Enemy not visible?
+   if(!pBot.b_combat_longjump && !FVisibleEnemy(v_enemy_aimpos, pEdict, pBot.pBotEnemy))
+   {
+      BotRemoveEnemy(pBot, TRUE);
+
+      return;
+   }
+
+   Vector v_enemy = v_enemy_aimpos - GetGunPosition(pEdict);
+
+   Vector enemy_angle = UTIL_VecToAngles( v_enemy );
+
+   if (enemy_angle.x > 180)
+      enemy_angle.x -=360;
+
+   if (enemy_angle.y > 180)
+      enemy_angle.y -=360;
+
+   // adjust the view angle pitch to aim correctly
+   enemy_angle.x = -enemy_angle.x;
+
+   if(!pBot.b_combat_longjump)
+   {
+      pEdict->v.idealpitch = enemy_angle.x;
+      BotFixIdealPitch(pEdict);
+
+      pEdict->v.ideal_yaw = enemy_angle.y;
+      BotFixIdealYaw(pEdict);
+   }
+
+   Vector v_enemy_xy = v_enemy;
+   v_enemy_xy.z = 0;  // ignore z component (up & down)
+
+   float f_xy_distance = v_enemy_xy.Length();  // how far away is the enemy scum?
+
+   if (f_xy_distance > 20)      // run if distance to enemy is far
+      pBot.f_move_speed = pBot.f_max_speed;
+   else                     // don't move too fast if close enough
+   {
+      pBot.b_not_maxspeed = TRUE;
+      pBot.f_move_speed = pBot.f_max_speed/2;
+   }
+
+   BotShootAtEnemyExecuteFire(pBot, v_enemy_aimpos, v_enemy);
 }
 
 
