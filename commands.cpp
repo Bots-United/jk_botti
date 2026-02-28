@@ -163,6 +163,46 @@ static qboolean check_and_set_float100(const char *name, float *value,
    return TRUE;
 }
 
+static void set_bool_toggle(int *value, const char *arg1,
+   char *enabled_msg, char *disabled_msg,
+   const printfunc_t printfunc, void *pfarg)
+{
+   if ((arg1 != NULL) && (*arg1 != 0))
+      *value = atoi(arg1) ? TRUE : FALSE;
+   printfunc(PRINTFUNC_INFO, pfarg, *value ? enabled_msg : disabled_msg);
+}
+
+static void set_percent_value(const char *name, int *value, const char *arg1,
+   char *msg, size_t msgsize,
+   const printfunc_t printfunc, void *pfarg)
+{
+   if ((arg1 != NULL) && (*arg1 != 0))
+   {
+      int temp = atoi(arg1);
+
+      if ((temp < 0) || (temp > 100))
+      {
+         safevoid_snprintf(msg, msgsize, "invalid %s value!\n", name);
+         printfunc(PRINTFUNC_ERROR, pfarg, msg);
+      }
+      else
+         *value = temp;
+   }
+
+   safevoid_snprintf(msg, msgsize, "%s is %d\n", name, *value);
+   printfunc(PRINTFUNC_INFO, pfarg, msg);
+}
+
+static void set_onoff_value(const char *name, int *value, const char *arg1,
+   char *msg, size_t msgsize,
+   const printfunc_t printfunc, void *pfarg)
+{
+   if ((arg1 != NULL) && (*arg1 != 0))
+      *value = !!atoi(arg1);
+   safevoid_snprintf(msg, msgsize, "%s is %s\n", name, (*value ? "on" : "off"));
+   printfunc(PRINTFUNC_INFO, pfarg, msg);
+}
+
 
 //
 const cfg_bot_record_t * GetUnusedCfgBotRecord(void)
@@ -287,6 +327,197 @@ static void UTIL_PrintBotInfo(const printfunc_t printfunc, void * arg)
    printfunc(PRINTFUNC_INFO, arg, msg);
 }
 
+static void ProcessBotWeaponCommand(const int cmdtype, const printfunc_t printfunc, void * arg, const char * arg1, const char * arg2, const char * arg3)
+{
+   char msg[128];
+
+   if ((arg1 != NULL) && (*arg1 != 0))
+   {
+      int select_index = -1;
+      bot_weapon_select_t *pSelect = &weapon_select[0];
+
+      while (pSelect[++select_index].iId)
+         if (FStrEq(pSelect[select_index].weapon_name, arg1))
+            break;
+
+      if(pSelect[select_index].iId)
+      {
+         qboolean got_match = FALSE;
+
+         got_match |= check_and_set_int("primary_skill_level", &pSelect[select_index].primary_skill_level, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_int("secondary_skill_level", &pSelect[select_index].secondary_skill_level, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("aim_speed", &pSelect[select_index].aim_speed, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_qboolean("avoid_this_gun", &pSelect[select_index].avoid_this_gun, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_qboolean("prefer_higher_skill_attack", &pSelect[select_index].prefer_higher_skill_attack, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("primary_min_distance", &pSelect[select_index].primary_min_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("primary_max_distance", &pSelect[select_index].primary_max_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("secondary_min_distance", &pSelect[select_index].secondary_min_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("secondary_max_distance", &pSelect[select_index].secondary_max_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_float("opt_distance", &pSelect[select_index].opt_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_int("use_percent", &pSelect[select_index].use_percent, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_qboolean("can_use_underwater", &pSelect[select_index].can_use_underwater, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_int("primary_fire_percent", &pSelect[select_index].primary_fire_percent, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_int("low_ammo_primary", &pSelect[select_index].low_ammo_primary, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         got_match |= check_and_set_int("low_ammo_secondary", &pSelect[select_index].low_ammo_secondary, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
+         if(!got_match)
+         {
+            snprintf(msg, sizeof(msg), "unknown weapon setting %s.\n", arg2);
+            printfunc(PRINTFUNC_ERROR, arg, msg);
+            if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
+            {
+               printfunc(PRINTFUNC_INFO, arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
+               printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
+               printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> - shows all setting values\n");
+               printfunc(PRINTFUNC_INFO, arg, "       botweapon weapons - shows weapon-names\n");
+            }
+         }
+      }
+      else if(FStrEq("weapons", arg1))
+      {
+         printfunc(PRINTFUNC_INFO, arg, "List of available weapons:\n");
+
+         select_index = -1;
+         pSelect = &weapon_select[0];
+
+         while (pSelect[++select_index].iId)
+         {
+            safevoid_snprintf(msg, sizeof(msg), "  %s\n", pSelect[select_index].weapon_name);
+            printfunc(PRINTFUNC_INFO, arg, msg);
+         }
+      }
+      else if((arg1 != NULL) && (*arg1 != 0) && FStrEq(arg1, "reset"))
+      {
+         //weapon select init
+         InitWeaponSelect(submod_id);
+         printfunc(PRINTFUNC_INFO, arg, "Bot weapon settings reset default.\n");
+      }
+      else
+      {
+         snprintf(msg, sizeof(msg), "Could not complete request! (unknown arg1: '%s')\n", arg1);
+         printfunc(PRINTFUNC_ERROR, arg, msg);
+         if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
+         {
+            printfunc(PRINTFUNC_INFO, arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
+            printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
+            printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> - shows all setting values\n");
+            printfunc(PRINTFUNC_INFO, arg, "       botweapon weapons - shows weapon-names\n");
+            printfunc(PRINTFUNC_INFO, arg, "       botweapon reset - reset values back to defaults for all skills\n");
+         }
+      }
+   }
+   else
+   {
+       printfunc(PRINTFUNC_ERROR, arg, "Could not complete request! (arg1 not given)\n");
+      if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
+      {
+          printfunc(PRINTFUNC_INFO, arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
+         printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
+         printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> - shows all setting values\n");
+         printfunc(PRINTFUNC_INFO, arg, "       botweapon weapons - shows weapon-names\n");
+         printfunc(PRINTFUNC_INFO, arg, "       botweapon reset - reset values back to defaults for all skills\n");
+      }
+   }
+}
+
+static void ProcessBotSkillSetupCommand(const int cmdtype, const printfunc_t printfunc, void * arg, const char * arg1, const char * arg2, const char * arg3)
+{
+   char msg[128];
+
+   if ((arg1 != NULL) && (*arg1 != 0) && atoi(arg1) >= 1 && atoi(arg1) <= 5)
+   {
+      int skill_idx = atoi(arg1)-1;
+      qboolean got_match = FALSE;
+      char skill_label[16];
+      safevoid_snprintf(skill_label, sizeof(skill_label), "skill[%d]", skill_idx+1);
+
+      got_match |= check_and_set_int("pause_frequency", &skill_settings[skill_idx].pause_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+
+      got_match |= check_and_set_float("pause_time_min", &skill_settings[skill_idx].pause_time_min, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("pause_time_max", &skill_settings[skill_idx].pause_time_max, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+
+      got_match |= check_and_set_float100("normal_strafe", &skill_settings[skill_idx].normal_strafe, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float100("battle_strafe", &skill_settings[skill_idx].battle_strafe, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+
+      got_match |= check_and_set_int("keep_optimal_dist", &skill_settings[skill_idx].keep_optimal_dist, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("shootcone_diameter", &skill_settings[skill_idx].shootcone_diameter, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("shootcone_minangle", &skill_settings[skill_idx].shootcone_minangle, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+
+      got_match |= check_and_set_float("turn_skill", &skill_settings[skill_idx].turn_skill, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("turn_slowness", &skill_settings[skill_idx].turn_slowness, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("updown_turn_ration", &skill_settings[skill_idx].updown_turn_ration, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+
+      got_match |= check_and_set_float("ping_emu_latency", &skill_settings[skill_idx].ping_emu_latency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("ping_emu_speed_varitation", &skill_settings[skill_idx].ping_emu_speed_varitation, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("ping_emu_position_varitation", &skill_settings[skill_idx].ping_emu_position_varitation, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+
+      got_match |= check_and_set_float("hearing_sensitivity", &skill_settings[skill_idx].hearing_sensitivity, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("track_sound_time_min", &skill_settings[skill_idx].track_sound_time_min, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("track_sound_time_max", &skill_settings[skill_idx].track_sound_time_max, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+
+      got_match |= check_and_set_float("respawn_react_delay", &skill_settings[skill_idx].respawn_react_delay, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("react_delay_min", &skill_settings[skill_idx].react_delay_min, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("react_delay_max", &skill_settings[skill_idx].react_delay_max, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+
+      got_match |= check_and_set_float("weaponchange_rate_min", &skill_settings[skill_idx].weaponchange_rate_min, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("weaponchange_rate_max", &skill_settings[skill_idx].weaponchange_rate_max, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+
+      got_match |= check_and_set_qboolean("can_longjump", &skill_settings[skill_idx].can_longjump, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_int("random_jump_frequency", &skill_settings[skill_idx].random_jump_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_int("random_jump_duck_frequency", &skill_settings[skill_idx].random_jump_duck_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_int("random_duck_frequency", &skill_settings[skill_idx].random_duck_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_int("random_longjump_frequency", &skill_settings[skill_idx].random_longjump_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+
+#if 0
+      got_match |= check_and_set_qboolean("can_taujump", &skill_settings[skill_idx].can_taujump, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_int("attack_taujump_frequency", &skill_settings[skill_idx].attack_taujump_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_int("flee_taujump_frequency", &skill_settings[skill_idx].flee_taujump_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("attack_taujump_distance", &skill_settings[skill_idx].attack_taujump_distance, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("flee_taujump_distance", &skill_settings[skill_idx].flee_taujump_distance, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("flee_taujump_health", &skill_settings[skill_idx].flee_taujump_health, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_float("flee_taujump_escape_distance", &skill_settings[skill_idx].flee_taujump_escape_distance, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+
+      got_match |= check_and_set_qboolean("can_shoot_through_walls", &skill_settings[skill_idx].can_shoot_through_walls, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+      got_match |= check_and_set_int("wallshoot_frequency", &skill_settings[skill_idx].wallshoot_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
+#endif
+
+      if(!got_match)
+      {
+         snprintf(msg, sizeof(msg), "unknown skill setting %s.\n", arg2);
+         printfunc(PRINTFUNC_ERROR, arg, msg);
+         if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
+         {
+             printfunc(PRINTFUNC_INFO, arg, "Usage: bot_skill_setup <skill> <setting> <value> - set value\n");
+            printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> <setting> - shows setting value\n");
+            printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> - shows all setting values\n");
+            printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup reset - reset values back to defaults for all skills\n");
+         }
+      }
+   }
+   else if((arg1 != NULL) && (*arg1 != 0) && FStrEq(arg1, "reset"))
+   {
+      ResetSkillsToDefault();
+      printfunc(PRINTFUNC_INFO, arg, "Bot skill settings reset default.\n");
+   }
+   else
+   {
+      if((arg1 == NULL) || (*arg1 == 0))
+          printfunc(PRINTFUNC_ERROR, arg, "Could not complete request! (arg1 not given)\n");
+       else
+       {
+          snprintf(msg, sizeof(msg), "Could not complete request! (invalid skill %d, use 1-5)\n", atoi(arg1));
+          printfunc(PRINTFUNC_ERROR, arg, msg);
+       }
+
+      if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
+      {
+          printfunc(PRINTFUNC_INFO, arg, "Usage: bot_skill_setup <skill> <setting> <value> - set value\n");
+         printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> <setting> - shows setting value\n");
+         printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> - shows all setting values\n");
+         printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup reset - reset values back to defaults for all skills\n");
+      }
+   }
+}
+
 //
 static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, void * arg, const char * pcmd, const char * arg1, const char * arg2, const char * arg3, const char * arg4, const char * arg5)
 {
@@ -355,38 +586,12 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
    }
    else if (FStrEq(pcmd, "debug_minmax"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-         if (temp)
-            debug_minmax = TRUE;
-         else
-            debug_minmax = FALSE;
-      }
-
-      if (debug_minmax)
-         printfunc(PRINTFUNC_INFO, arg, "debug_minmax mode ENABLED\n");
-      else
-         printfunc(PRINTFUNC_INFO, arg, "debug_minmax mode DISABLED\n");
-
+      set_bool_toggle(&debug_minmax, arg1, "debug_minmax mode ENABLED\n", "debug_minmax mode DISABLED\n", printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "observer"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-         if (temp)
-            b_observer_mode = TRUE;
-         else
-            b_observer_mode = FALSE;
-      }
-
-      if (b_observer_mode)
-         printfunc(PRINTFUNC_INFO, arg, "observer mode ENABLED\n");
-      else
-         printfunc(PRINTFUNC_INFO, arg, "observer mode DISABLED\n");
-
+      set_bool_toggle((int *)&b_observer_mode, arg1, "observer mode ENABLED\n", "observer mode DISABLED\n", printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "team_balancetype"))
@@ -475,26 +680,12 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
    }
    else if (FStrEq(pcmd, "randomize_bots_on_mapchange"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         randomize_bots_on_mapchange = !!atoi(arg1);
-      }
-
-      safevoid_snprintf(msg, sizeof(msg), "randomize_bots_on_mapchange is %s\n", (randomize_bots_on_mapchange?"on":"off"));
-      printfunc(PRINTFUNC_INFO, arg, msg);
-
+      set_onoff_value("randomize_bots_on_mapchange", &randomize_bots_on_mapchange, arg1, msg, sizeof(msg), printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "bot_add_level_tag"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         bot_add_level_tag = !!atoi(arg1);
-      }
-
-      safevoid_snprintf(msg, sizeof(msg), "bot_add_level_tag is %s\n", (bot_add_level_tag?"on":"off"));
-      printfunc(PRINTFUNC_INFO, arg, msg);
-
+      set_onoff_value("bot_add_level_tag", &bot_add_level_tag, arg1, msg, sizeof(msg), printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "botthinkfps"))
@@ -516,155 +707,47 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
    }
    else if (FStrEq(pcmd, "bot_chat_percent"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-
-         if ((temp < 0) || (temp > 100))
-            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_chat_percent value!\n");
-         else
-            bot_chat_percent = temp;
-      }
-
-      safevoid_snprintf(msg, sizeof(msg), "bot_chat_percent is %d\n", bot_chat_percent);
-      printfunc(PRINTFUNC_INFO, arg, msg);
-
+      set_percent_value("bot_chat_percent", &bot_chat_percent, arg1, msg, sizeof(msg), printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "bot_taunt_percent"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-
-         if ((temp < 0) || (temp > 100))
-            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_taunt_percent value!\n");
-         else
-            bot_taunt_percent = temp;
-      }
-
-      safevoid_snprintf(msg, sizeof(msg), "bot_taunt_percent is %d\n", bot_taunt_percent);
-      printfunc(PRINTFUNC_INFO, arg, msg);
-
+      set_percent_value("bot_taunt_percent", &bot_taunt_percent, arg1, msg, sizeof(msg), printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "bot_whine_percent"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-
-         if ((temp < 0) || (temp > 100))
-            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_whine_percent value!\n");
-         else
-            bot_whine_percent = temp;
-      }
-
-      safevoid_snprintf(msg, sizeof(msg), "bot_whine_percent is %d\n", bot_whine_percent);
-      printfunc(PRINTFUNC_INFO, arg, msg);
-
+      set_percent_value("bot_whine_percent", &bot_whine_percent, arg1, msg, sizeof(msg), printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "bot_endgame_percent"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-
-         if ((temp < 0) || (temp > 100))
-            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_endgame_percent value!\n");
-         else
-            bot_endgame_percent = temp;
-      }
-
-      safevoid_snprintf(msg, sizeof(msg), "bot_endgame_percent is %d\n", bot_endgame_percent);
-      printfunc(PRINTFUNC_INFO, arg, msg);
-
+      set_percent_value("bot_endgame_percent", &bot_endgame_percent, arg1, msg, sizeof(msg), printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "bot_chat_tag_percent"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-
-         if ((temp < 0) || (temp > 100))
-            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_chat_tag_percent value!\n");
-         else
-            bot_chat_tag_percent = temp;
-      }
-
-      safevoid_snprintf(msg, sizeof(msg), "bot_chat_tag_percent is %d\n", bot_chat_tag_percent);
-      printfunc(PRINTFUNC_INFO, arg, msg);
-
+      set_percent_value("bot_chat_tag_percent", &bot_chat_tag_percent, arg1, msg, sizeof(msg), printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "bot_chat_drop_percent"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-
-         if ((temp < 0) || (temp > 100))
-            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_chat_drop_percent value!\n");
-         else
-            bot_chat_drop_percent = temp;
-      }
-
-      safevoid_snprintf(msg, sizeof(msg), "bot_chat_drop_percent is %d\n", bot_chat_drop_percent);
-      printfunc(PRINTFUNC_INFO, arg, msg);
-
+      set_percent_value("bot_chat_drop_percent", &bot_chat_drop_percent, arg1, msg, sizeof(msg), printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "bot_chat_swap_percent"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-
-         if ((temp < 0) || (temp > 100))
-            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_chat_swap_percent value!\n");
-         else
-            bot_chat_swap_percent = temp;
-      }
-
-      safevoid_snprintf(msg, sizeof(msg), "bot_chat_swap_percent is %d\n", bot_chat_swap_percent);
-      printfunc(PRINTFUNC_INFO, arg, msg);
-
+      set_percent_value("bot_chat_swap_percent", &bot_chat_swap_percent, arg1, msg, sizeof(msg), printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "bot_chat_lower_percent"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-
-         if ((temp < 0) || (temp > 100))
-            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_chat_lower_percent value!\n");
-         else
-            bot_chat_lower_percent = temp;
-      }
-
-      safevoid_snprintf(msg, sizeof(msg), "bot_chat_lower_percent is %d\n", bot_chat_lower_percent);
-      printfunc(PRINTFUNC_INFO, arg, msg);
-
+      set_percent_value("bot_chat_lower_percent", &bot_chat_lower_percent, arg1, msg, sizeof(msg), printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "bot_logo_percent"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-
-         if ((temp < 0) || (temp > 100))
-            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_logo_percent value!\n");
-         else
-            bot_logo_percent = temp;
-      }
-
-      safevoid_snprintf(msg, sizeof(msg), "bot_logo_percent is %d\n", bot_logo_percent);
-      printfunc(PRINTFUNC_INFO, arg, msg);
-
+      set_percent_value("bot_logo_percent", &bot_logo_percent, arg1, msg, sizeof(msg), printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "bot_shoot_breakables"))
@@ -694,39 +777,12 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
    }
    else if (FStrEq(pcmd, "random_color"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-
-         if (temp)
-            b_random_color = TRUE;
-         else
-            b_random_color = FALSE;
-      }
-
-      if (b_random_color)
-         printfunc(PRINTFUNC_INFO, arg, "random_color ENABLED\n");
-      else
-         printfunc(PRINTFUNC_INFO, arg, "random_color DISABLED\n");
-
+      set_bool_toggle(&b_random_color, arg1, "random_color ENABLED\n", "random_color DISABLED\n", printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "botdontshoot"))
    {
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int temp = atoi(arg1);
-         if (temp)
-            b_botdontshoot = TRUE;
-         else
-            b_botdontshoot = FALSE;
-      }
-
-      if (b_botdontshoot)
-         printfunc(PRINTFUNC_INFO, arg, "botdontshoot ENABLED\n");
-      else
-         printfunc(PRINTFUNC_INFO, arg, "botdontshoot DISABLED\n");
-
+      set_bool_toggle(&b_botdontshoot, arg1, "botdontshoot ENABLED\n", "botdontshoot DISABLED\n", printfunc, arg);
       return TRUE;
    }
    else if (FStrEq(pcmd, "min_bots"))
@@ -801,193 +857,13 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
       return TRUE;
    }
    else if (FStrEq(pcmd, "botweapon"))
-   {  // this command allows editing of weapon information
-      if ((arg1 != NULL) && (*arg1 != 0))
-      {
-         int select_index = -1;
-         bot_weapon_select_t *pSelect = &weapon_select[0];
-
-         while (pSelect[++select_index].iId)
-            if (FStrEq(pSelect[select_index].weapon_name, arg1))
-               break;
-
-         if(pSelect[select_index].iId)
-         {
-            qboolean got_match = FALSE;
-
-            got_match |= check_and_set_int("primary_skill_level", &pSelect[select_index].primary_skill_level, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            got_match |= check_and_set_int("secondary_skill_level", &pSelect[select_index].secondary_skill_level, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            got_match |= check_and_set_float("aim_speed", &pSelect[select_index].aim_speed, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            got_match |= check_and_set_qboolean("avoid_this_gun", &pSelect[select_index].avoid_this_gun, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            got_match |= check_and_set_qboolean("prefer_higher_skill_attack", &pSelect[select_index].prefer_higher_skill_attack, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            got_match |= check_and_set_float("primary_min_distance", &pSelect[select_index].primary_min_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            got_match |= check_and_set_float("primary_max_distance", &pSelect[select_index].primary_max_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            got_match |= check_and_set_float("secondary_min_distance", &pSelect[select_index].secondary_min_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            got_match |= check_and_set_float("secondary_max_distance", &pSelect[select_index].secondary_max_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            got_match |= check_and_set_float("opt_distance", &pSelect[select_index].opt_distance, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            got_match |= check_and_set_int("use_percent", &pSelect[select_index].use_percent, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            got_match |= check_and_set_qboolean("can_use_underwater", &pSelect[select_index].can_use_underwater, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            got_match |= check_and_set_int("primary_fire_percent", &pSelect[select_index].primary_fire_percent, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            got_match |= check_and_set_int("low_ammo_primary", &pSelect[select_index].low_ammo_primary, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            got_match |= check_and_set_int("low_ammo_secondary", &pSelect[select_index].low_ammo_secondary, arg2, arg3, arg1, msg, sizeof(msg), printfunc, arg);
-            if(!got_match)
-            {
-               snprintf(msg, sizeof(msg), "unknown weapon setting %s.\n", arg2);
-               printfunc(PRINTFUNC_ERROR, arg, msg);
-               if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
-               {
-                  printfunc(PRINTFUNC_INFO, arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
-                  printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
-                  printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> - shows all setting values\n");
-                  printfunc(PRINTFUNC_INFO, arg, "       botweapon weapons - shows weapon-names\n");
-               }
-            }
-         }
-         else if(FStrEq("weapons", arg1))
-         {
-            printfunc(PRINTFUNC_INFO, arg, "List of available weapons:\n");
-
-            select_index = -1;
-            pSelect = &weapon_select[0];
-
-            while (pSelect[++select_index].iId)
-            {
-               safevoid_snprintf(msg, sizeof(msg), "  %s\n", pSelect[select_index].weapon_name);
-               printfunc(PRINTFUNC_INFO, arg, msg);
-            }
-         }
-         else if((arg1 != NULL) && (*arg1 != 0) && FStrEq(arg1, "reset"))
-         {
-            //weapon select init
-            InitWeaponSelect(submod_id);
-            printfunc(PRINTFUNC_INFO, arg, "Bot weapon settings reset default.\n");
-         }
-         else
-         {
-            snprintf(msg, sizeof(msg), "Could not complete request! (unknown arg1: '%s')\n", arg1);
-            printfunc(PRINTFUNC_ERROR, arg, msg);
-            if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
-            {
-               printfunc(PRINTFUNC_INFO, arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
-               printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
-               printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> - shows all setting values\n");
-               printfunc(PRINTFUNC_INFO, arg, "       botweapon weapons - shows weapon-names\n");
-               printfunc(PRINTFUNC_INFO, arg, "       botweapon reset - reset values back to defaults for all skills\n");
-            }
-         }
-      }
-      else
-      {
-          printfunc(PRINTFUNC_ERROR, arg, "Could not complete request! (arg1 not given)\n");
-         if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
-         {
-             printfunc(PRINTFUNC_INFO, arg, "Usage: botweapon <weapon-name> <setting> <value> - set value\n");
-            printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> <setting> - shows setting value\n");
-            printfunc(PRINTFUNC_INFO, arg, "       botweapon <weapon-name> - shows all setting values\n");
-            printfunc(PRINTFUNC_INFO, arg, "       botweapon weapons - shows weapon-names\n");
-            printfunc(PRINTFUNC_INFO, arg, "       botweapon reset - reset values back to defaults for all skills\n");
-         }
-      }
-
+   {
+      ProcessBotWeaponCommand(cmdtype, printfunc, arg, arg1, arg2, arg3);
       return TRUE;
    }
    else if (FStrEq(pcmd, "bot_skill_setup"))
-   {  // this command allows editing of botskill settings,
-      // bot_skill_setup <skill>, bot_skill_setup <skill> <setting>, bot_skill_setup <skill> <setting> <value>
-      if ((arg1 != NULL) && (*arg1 != 0) && atoi(arg1) >= 1 && atoi(arg1) <= 5)
-      {
-         int skill_idx = atoi(arg1)-1;
-         qboolean got_match = FALSE;
-         char skill_label[16];
-         safevoid_snprintf(skill_label, sizeof(skill_label), "skill[%d]", skill_idx+1);
-
-         got_match |= check_and_set_int("pause_frequency", &skill_settings[skill_idx].pause_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-
-         got_match |= check_and_set_float("pause_time_min", &skill_settings[skill_idx].pause_time_min, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("pause_time_max", &skill_settings[skill_idx].pause_time_max, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-
-         got_match |= check_and_set_float100("normal_strafe", &skill_settings[skill_idx].normal_strafe, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float100("battle_strafe", &skill_settings[skill_idx].battle_strafe, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-
-         got_match |= check_and_set_int("keep_optimal_dist", &skill_settings[skill_idx].keep_optimal_dist, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("shootcone_diameter", &skill_settings[skill_idx].shootcone_diameter, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("shootcone_minangle", &skill_settings[skill_idx].shootcone_minangle, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-
-         got_match |= check_and_set_float("turn_skill", &skill_settings[skill_idx].turn_skill, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("turn_slowness", &skill_settings[skill_idx].turn_slowness, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("updown_turn_ration", &skill_settings[skill_idx].updown_turn_ration, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-
-         got_match |= check_and_set_float("ping_emu_latency", &skill_settings[skill_idx].ping_emu_latency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("ping_emu_speed_varitation", &skill_settings[skill_idx].ping_emu_speed_varitation, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("ping_emu_position_varitation", &skill_settings[skill_idx].ping_emu_position_varitation, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-
-         got_match |= check_and_set_float("hearing_sensitivity", &skill_settings[skill_idx].hearing_sensitivity, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("track_sound_time_min", &skill_settings[skill_idx].track_sound_time_min, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("track_sound_time_max", &skill_settings[skill_idx].track_sound_time_max, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-
-         got_match |= check_and_set_float("respawn_react_delay", &skill_settings[skill_idx].respawn_react_delay, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("react_delay_min", &skill_settings[skill_idx].react_delay_min, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("react_delay_max", &skill_settings[skill_idx].react_delay_max, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-
-         got_match |= check_and_set_float("weaponchange_rate_min", &skill_settings[skill_idx].weaponchange_rate_min, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("weaponchange_rate_max", &skill_settings[skill_idx].weaponchange_rate_max, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-
-         got_match |= check_and_set_qboolean("can_longjump", &skill_settings[skill_idx].can_longjump, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_int("random_jump_frequency", &skill_settings[skill_idx].random_jump_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_int("random_jump_duck_frequency", &skill_settings[skill_idx].random_jump_duck_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_int("random_duck_frequency", &skill_settings[skill_idx].random_duck_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_int("random_longjump_frequency", &skill_settings[skill_idx].random_longjump_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-
-#if 0
-         got_match |= check_and_set_qboolean("can_taujump", &skill_settings[skill_idx].can_taujump, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_int("attack_taujump_frequency", &skill_settings[skill_idx].attack_taujump_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_int("flee_taujump_frequency", &skill_settings[skill_idx].flee_taujump_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("attack_taujump_distance", &skill_settings[skill_idx].attack_taujump_distance, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("flee_taujump_distance", &skill_settings[skill_idx].flee_taujump_distance, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("flee_taujump_health", &skill_settings[skill_idx].flee_taujump_health, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_float("flee_taujump_escape_distance", &skill_settings[skill_idx].flee_taujump_escape_distance, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-
-         got_match |= check_and_set_qboolean("can_shoot_through_walls", &skill_settings[skill_idx].can_shoot_through_walls, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-         got_match |= check_and_set_int("wallshoot_frequency", &skill_settings[skill_idx].wallshoot_frequency, arg2, arg3, skill_label, msg, sizeof(msg), printfunc, arg);
-#endif
-
-         if(!got_match)
-         {
-            snprintf(msg, sizeof(msg), "unknown skill setting %s.\n", arg2);
-            printfunc(PRINTFUNC_ERROR, arg, msg);
-            if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
-            {
-                printfunc(PRINTFUNC_INFO, arg, "Usage: bot_skill_setup <skill> <setting> <value> - set value\n");
-               printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> <setting> - shows setting value\n");
-               printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> - shows all setting values\n");
-               printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup reset - reset values back to defaults for all skills\n");
-            }
-         }
-      }
-      else if((arg1 != NULL) && (*arg1 != 0) && FStrEq(arg1, "reset"))
-      {
-         ResetSkillsToDefault();
-         printfunc(PRINTFUNC_INFO, arg, "Bot skill settings reset default.\n");
-      }
-      else
-      {
-         if((arg1 == NULL) || (*arg1 == 0))
-             printfunc(PRINTFUNC_ERROR, arg, "Could not complete request! (arg1 not given)\n");
-          else
-          {
-             snprintf(msg, sizeof(msg), "Could not complete request! (invalid skill %d, use 1-5)\n", atoi(arg1));
-             printfunc(PRINTFUNC_ERROR, arg, msg);
-          }
-
-         if(cmdtype == CLICMD_TYPE || cmdtype == SRVCMD_TYPE)
-         {
-             printfunc(PRINTFUNC_INFO, arg, "Usage: bot_skill_setup <skill> <setting> <value> - set value\n");
-            printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> <setting> - shows setting value\n");
-            printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup <skill> - shows all setting values\n");
-            printfunc(PRINTFUNC_INFO, arg, "       bot_skill_setup reset - reset values back to defaults for all skills\n");
-         }
-      }
-
+   {
+      ProcessBotSkillSetupCommand(cmdtype, printfunc, arg, arg1, arg2, arg3);
       return TRUE;
    }
 
@@ -1225,6 +1101,34 @@ void FakeClientCommand(edict_t *pBot, const char *arg1, const char *arg2, const 
 }
 
 
+static char * parse_next_token(char *cmd_line, int *cmd_index)
+{
+   if (cmd_line[*cmd_index] != ' ')
+      return NULL;
+   cmd_line[(*cmd_index)++] = 0;
+   char *token = &cmd_line[*cmd_index];
+   while (cmd_line[*cmd_index] != ' ' && cmd_line[*cmd_index] != 0)
+      (*cmd_index)++;
+   return token;
+}
+
+static char * cfg_trim_quotes(char *arg)
+{
+   if (!arg)
+      return arg;
+   if (!strcmp(arg, "\"\""))
+   {
+      *arg = 0;
+      return arg;
+   }
+   if (*arg == '\"')
+      arg++;
+   size_t len = strlen(arg);
+   if (len > 0 && arg[len-1] == '\"')
+      arg[len-1] = '\0';
+   return arg;
+}
+
 static void print_to_console_config(int printtype, void *, char * msg)
 {
    if(printtype == PRINTFUNC_ERROR)
@@ -1300,94 +1204,25 @@ void ProcessBotCfgFile(void)
 
    cmd_index = 0;
    cmd = cmd_line;
-   arg1 = arg2 = arg3 = arg4 = arg5 = NULL;
 
-   // skip to blank or end of string...
+   // skip command token
    while ((cmd_line[cmd_index] != ' ') && (cmd_line[cmd_index] != 0))
       cmd_index++;
 
-   if (cmd_line[cmd_index] == ' ')
-   {
-      cmd_line[cmd_index++] = 0;
-      arg1 = &cmd_line[cmd_index];
-
-      // skip to blank or end of string...
-      while ((cmd_line[cmd_index] != ' ') && (cmd_line[cmd_index] != 0))
-         cmd_index++;
-
-      if (cmd_line[cmd_index] == ' ')
-      {
-         cmd_line[cmd_index++] = 0;
-         arg2 = &cmd_line[cmd_index];
-
-         // skip to blank or end of string...
-         while ((cmd_line[cmd_index] != ' ') && (cmd_line[cmd_index] != 0))
-            cmd_index++;
-
-         if (cmd_line[cmd_index] == ' ')
-         {
-            cmd_line[cmd_index++] = 0;
-            arg3 = &cmd_line[cmd_index];
-
-            // skip to blank or end of string...
-            while ((cmd_line[cmd_index] != ' ') && (cmd_line[cmd_index] != 0))
-               cmd_index++;
-
-            if (cmd_line[cmd_index] == ' ')
-            {
-               cmd_line[cmd_index++] = 0;
-               arg4 = &cmd_line[cmd_index];
-
-               // skip to blank or end of string...
-               while ((cmd_line[cmd_index] != ' ') && (cmd_line[cmd_index] != 0))
-                  cmd_index++;
-
-               if (cmd_line[cmd_index] == ' ')
-               {
-                  cmd_line[cmd_index++] = 0;
-                  arg5 = &cmd_line[cmd_index];
-               }
-            }
-         }
-      }
-   }
+   arg1 = parse_next_token(cmd_line, &cmd_index);
+   arg2 = parse_next_token(cmd_line, &cmd_index);
+   arg3 = parse_next_token(cmd_line, &cmd_index);
+   arg4 = parse_next_token(cmd_line, &cmd_index);
+   arg5 = parse_next_token(cmd_line, &cmd_index);
 
    if ((cmd_line[0] == '#') || (cmd_line[0] == '/' && cmd_line[1] == '/') || (cmd_line[0] == 0))
       return;  // return if comment or blank line
 
-   if(arg1 && !strcmp(arg1, "\"\""))
-      *arg1=0;
-   if(arg2 && !strcmp(arg2, "\"\""))
-      *arg2=0;
-   if(arg3 && !strcmp(arg3, "\"\""))
-      *arg3=0;
-   if(arg4 && !strcmp(arg4, "\"\""))
-      *arg4=0;
-   if(arg5 && !strcmp(arg5, "\"\""))
-      *arg5=0;
-
-   // trim "s
-   if(arg1 && *arg1=='\"')
-      arg1++;
-   if(arg2 && *arg2=='\"')
-      arg2++;
-   if(arg3 && *arg3=='\"')
-      arg3++;
-   if(arg4 && *arg4=='\"')
-      arg4++;
-   if(arg5 && *arg5=='\"')
-      arg5++;
-
-   if(arg1 && arg1[strlen(arg1)-1]=='\"')
-      arg1[strlen(arg1)-1]='\0';
-   if(arg2 && arg2[strlen(arg2)-1]=='\"')
-      arg2[strlen(arg2)-1]='\0';
-   if(arg3 && arg3[strlen(arg3)-1]=='\"')
-      arg3[strlen(arg3)-1]='\0';
-   if(arg4 && arg4[strlen(arg4)-1]=='\"')
-      arg4[strlen(arg4)-1]='\0';
-   if(arg5 && arg5[strlen(arg5)-1]=='\"')
-      arg5[strlen(arg5)-1]='\0';
+   arg1 = cfg_trim_quotes(arg1);
+   arg2 = cfg_trim_quotes(arg2);
+   arg3 = cfg_trim_quotes(arg3);
+   arg4 = cfg_trim_quotes(arg4);
+   arg5 = cfg_trim_quotes(arg5);
 
    if(ProcessCommand(CFGCMD_TYPE, print_to_console_config, NULL, cmd, arg1, arg2, arg3, arg4, arg5))
       return;
