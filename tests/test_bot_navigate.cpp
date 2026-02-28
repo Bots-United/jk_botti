@@ -764,6 +764,28 @@ static int test_can_duck_under_one_side_blocked(void)
    return 0;
 }
 
+static int test_can_duck_under_partial_ceiling(void)
+{
+   TEST("BotCanDuckUnder: partial ceiling (center+right hit, left clear) -> FALSE");
+   mock_reset();
+   reset_navigate_mocks();
+
+   edict_t *pEdict = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, pEdict);
+
+   // Calls 0-2: horizontal clearance -> all clear (don't block)
+   // Calls 3-5: vertical ceiling traces -> block center(3) and right(4), but NOT left(5)
+   g_jump_trace_call = 0;
+   g_jump_block_mask = (1 << 3) | (1 << 4);
+   mock_trace_hull_fn = trace_jump_selective;
+
+   qboolean result = BotCanDuckUnder(bot);
+   ASSERT_INT(result, FALSE);
+   PASS();
+   return 0;
+}
+
 // ============================================================
 // 5. BotCantMoveForward tests
 // ============================================================
@@ -4838,6 +4860,7 @@ int main(void)
    failures += test_can_duck_under_blocked_horizontal();
    failures += test_can_duck_under_no_ceiling();
    failures += test_can_duck_under_one_side_blocked();
+   failures += test_can_duck_under_partial_ceiling();
 
    printf("=== BotCantMoveForward tests ===\n");
    failures += test_cant_move_forward_clear();
