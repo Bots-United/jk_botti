@@ -111,6 +111,15 @@ static int CheckSubMod(void)
 {
    int submod = 0;
 
+   // Check game directory first for mods that share description strings
+   char game_dir[256];
+   GetGameDir(game_dir);
+
+   if(stricmp(game_dir, "arena") == 0)
+      submod = SUBMOD_ARENA;
+   else
+   {
+
    // Check if Severians, XDM or Bubblemod
    const char * desc = MDLL_GetGameDescription();
 
@@ -134,8 +143,13 @@ static int CheckSubMod(void)
    else
       submod = SUBMOD_HLDM;
 
+   } // end game_dir else
+
    switch(submod)
    {
+   case SUBMOD_ARENA:
+      UTIL_ConsolePrintf("Half-Life Arena MOD detected.");
+      break;
    case SUBMOD_OP4:
       UTIL_ConsolePrintf("Opposing Force DM detected.");
       break;

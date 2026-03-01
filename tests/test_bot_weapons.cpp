@@ -158,11 +158,12 @@ static int test_SubmodToSubmodWeaponFlag(void)
    ASSERT_INT(SubmodToSubmodWeaponFlag(SUBMOD_HLDM), WEAPON_SUBMOD_HLDM);
    PASS();
 
-   TEST("all 5 submods map correctly");
+   TEST("all 6 submods map correctly");
    ASSERT_INT(SubmodToSubmodWeaponFlag(SUBMOD_SEVS), WEAPON_SUBMOD_SEVS);
    ASSERT_INT(SubmodToSubmodWeaponFlag(SUBMOD_BUBBLEMOD), WEAPON_SUBMOD_BUBBLEMOD);
    ASSERT_INT(SubmodToSubmodWeaponFlag(SUBMOD_XDM), WEAPON_SUBMOD_XDM);
    ASSERT_INT(SubmodToSubmodWeaponFlag(SUBMOD_OP4), WEAPON_SUBMOD_OP4);
+   ASSERT_INT(SubmodToSubmodWeaponFlag(SUBMOD_ARENA), WEAPON_SUBMOD_ARENA);
    PASS();
 
    TEST("unknown submod defaults to HLDM");
@@ -1106,6 +1107,117 @@ static int test_MP5_launch_angle(void)
 }
 
 // ============================================================
+// 14. Arena submod weapon tests
+// ============================================================
+
+static int test_arena_weapons(void)
+{
+   printf("Arena submod weapons:\n");
+
+   mock_reset();
+
+   TEST("arena weapons valid in ARENA submod");
+   submod_id = SUBMOD_ARENA;
+   submod_weaponflag = WEAPON_SUBMOD_ARENA;
+   InitWeaponSelect(SUBMOD_ARENA);
+
+   edict_t *pe = mock_alloc_edict();
+   bot_t bot;
+   setup_bot(bot, pe);
+
+   bot_weapon_select_t *silenced = GetWeaponSelect(ARENA_WEAPON_9MMSILENCED);
+   ASSERT_PTR_NOT_NULL(silenced);
+   ASSERT_INT(IsValidWeaponChoose(bot, *silenced), TRUE);
+
+   bot_weapon_select_t *autoshotgun = GetWeaponSelect(ARENA_WEAPON_AUTOSHOTGUN);
+   ASSERT_PTR_NOT_NULL(autoshotgun);
+   ASSERT_INT(IsValidWeaponChoose(bot, *autoshotgun), TRUE);
+
+   bot_weapon_select_t *burstrifle = GetWeaponSelect(ARENA_WEAPON_BURSTRIFLE);
+   ASSERT_PTR_NOT_NULL(burstrifle);
+   ASSERT_INT(IsValidWeaponChoose(bot, *burstrifle), TRUE);
+   PASS();
+
+   TEST("arena weapons excluded in HLDM submod");
+   submod_id = SUBMOD_HLDM;
+   submod_weaponflag = WEAPON_SUBMOD_HLDM;
+   InitWeaponSelect(SUBMOD_HLDM);
+
+   silenced = GetWeaponSelect(ARENA_WEAPON_9MMSILENCED);
+   ASSERT_PTR_NOT_NULL(silenced);
+   ASSERT_INT(IsValidWeaponChoose(bot, *silenced), FALSE);
+
+   autoshotgun = GetWeaponSelect(ARENA_WEAPON_AUTOSHOTGUN);
+   ASSERT_PTR_NOT_NULL(autoshotgun);
+   ASSERT_INT(IsValidWeaponChoose(bot, *autoshotgun), FALSE);
+
+   burstrifle = GetWeaponSelect(ARENA_WEAPON_BURSTRIFLE);
+   ASSERT_PTR_NOT_NULL(burstrifle);
+   ASSERT_INT(IsValidWeaponChoose(bot, *burstrifle), FALSE);
+   PASS();
+
+   TEST("arena weapons excluded in OP4 submod");
+   submod_id = SUBMOD_OP4;
+   submod_weaponflag = WEAPON_SUBMOD_OP4;
+   InitWeaponSelect(SUBMOD_OP4);
+
+   silenced = GetWeaponSelect(ARENA_WEAPON_9MMSILENCED);
+   ASSERT_PTR_NOT_NULL(silenced);
+   ASSERT_INT(IsValidWeaponChoose(bot, *silenced), FALSE);
+   PASS();
+
+   TEST("7 OP4 weapons valid in ARENA submod");
+   submod_id = SUBMOD_ARENA;
+   submod_weaponflag = WEAPON_SUBMOD_ARENA;
+   InitWeaponSelect(SUBMOD_ARENA);
+
+   bot_weapon_select_t *eagle = GetWeaponSelect(GEARBOX_WEAPON_EAGLE);
+   ASSERT_PTR_NOT_NULL(eagle);
+   ASSERT_INT(IsValidWeaponChoose(bot, *eagle), TRUE);
+
+   bot_weapon_select_t *pipewrench = GetWeaponSelect(GEARBOX_WEAPON_PIPEWRENCH);
+   ASSERT_PTR_NOT_NULL(pipewrench);
+   ASSERT_INT(IsValidWeaponChoose(bot, *pipewrench), TRUE);
+
+   bot_weapon_select_t *m249 = GetWeaponSelect(GEARBOX_WEAPON_M249);
+   ASSERT_PTR_NOT_NULL(m249);
+   ASSERT_INT(IsValidWeaponChoose(bot, *m249), TRUE);
+
+   bot_weapon_select_t *displacer = GetWeaponSelect(GEARBOX_WEAPON_DISPLACER);
+   ASSERT_PTR_NOT_NULL(displacer);
+   ASSERT_INT(IsValidWeaponChoose(bot, *displacer), TRUE);
+
+   bot_weapon_select_t *sporelauncher = GetWeaponSelect(GEARBOX_WEAPON_SPORELAUNCHER);
+   ASSERT_PTR_NOT_NULL(sporelauncher);
+   ASSERT_INT(IsValidWeaponChoose(bot, *sporelauncher), TRUE);
+
+   bot_weapon_select_t *sniperrifle = GetWeaponSelect(GEARBOX_WEAPON_SNIPERRIFLE);
+   ASSERT_PTR_NOT_NULL(sniperrifle);
+   ASSERT_INT(IsValidWeaponChoose(bot, *sniperrifle), TRUE);
+
+   bot_weapon_select_t *knife = GetWeaponSelect(GEARBOX_WEAPON_KNIFE);
+   ASSERT_PTR_NOT_NULL(knife);
+   ASSERT_INT(IsValidWeaponChoose(bot, *knife), TRUE);
+   PASS();
+
+   TEST("grapple and shockrifle excluded in ARENA submod");
+   bot_weapon_select_t *grapple = GetWeaponSelect(GEARBOX_WEAPON_GRAPPLE);
+   ASSERT_PTR_NOT_NULL(grapple);
+   ASSERT_INT(IsValidWeaponChoose(bot, *grapple), FALSE);
+
+   bot_weapon_select_t *shockrifle = GetWeaponSelect(GEARBOX_WEAPON_SHOCKRIFLE);
+   ASSERT_PTR_NOT_NULL(shockrifle);
+   ASSERT_INT(IsValidWeaponChoose(bot, *shockrifle), FALSE);
+   PASS();
+
+   // Reset
+   submod_id = SUBMOD_HLDM;
+   submod_weaponflag = WEAPON_SUBMOD_HLDM;
+
+   return 0;
+}
+
+// ============================================================
 // Main
 // ============================================================
 
@@ -1148,6 +1260,8 @@ int main(void)
    rc |= test_BotGetBetterWeaponChoice();
    printf("\n");
    rc |= test_MP5_launch_angle();
+   printf("\n");
+   rc |= test_arena_weapons();
 
    printf("\n%d/%d tests passed.\n", tests_passed, tests_run);
 
