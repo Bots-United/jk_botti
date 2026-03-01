@@ -326,23 +326,15 @@ static Vector TracePredictedMovement(bot_t &pBot, edict_t *pPlayer, const Vector
 // used instead of using pBotEnemy->v.origin in aim code.
 //  if bot's aim lags behind moving target increase value of AHEAD_MULTIPLIER.
 #define AHEAD_MULTIPLIER 1.5
-static Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean without_velocity = FALSE)
+
+static int GetPredictedPlayerPosition_FindTimeSlots(bot_t &pBot, edict_t *pPlayer, float time, posdata_t *&newer, posdata_t *&older, Vector &exact_result, qboolean without_velocity)
 {
-   posdata_t * newer;
-   posdata_t * older;
-   float time;
-   int idx;
-   posdata_t newertmp;
-
    if(FNullEnt(pPlayer))
-      return(Vector(0,0,0));
+      return -1;
 
-   idx = ENTINDEX(pPlayer) - 1;
+   int idx = ENTINDEX(pPlayer) - 1;
    if(idx < 0 || idx >= gpGlobals->maxClients || !players[idx].position_latest || !players[idx].position_oldest)
-      return(UTIL_GetOrigin(pPlayer));
-
-   // get prediction time based on bot skill
-   time = gpGlobals->time - skill_settings[pBot.bot_skill].ping_emu_latency;
+      return 0;
 
    // find position data slots that are around 'time'
    newer = players[idx].position_latest;
@@ -360,7 +352,8 @@ static Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolea
       }
       if(newer->time == time)
       {
-         return(TracePredictedMovement(pBot, pPlayer, newer->origin, newer->velocity, fabs(gpGlobals->time - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity));
+         exact_result = TracePredictedMovement(pBot, pPlayer, newer->origin, newer->velocity, fabs(gpGlobals->time - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity);
+         return 1;
       }
 
       //this time is older than previous..
@@ -369,9 +362,17 @@ static Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolea
       break;
    }
 
+   return 2;
+}
+
+static qboolean GetPredictedPlayerPosition_HandleMissingData(bot_t &pBot, edict_t *pPlayer, float time, posdata_t *&newer, posdata_t *&older, posdata_t &newertmp, Vector &result, qboolean without_velocity)
+{
+   int idx = ENTINDEX(pPlayer) - 1;
+
    if(!older)
    {
-      return(TracePredictedMovement(pBot, pPlayer, players[idx].position_oldest->origin, players[idx].position_oldest->velocity, fabs(gpGlobals->time - players[idx].position_oldest->time) * AHEAD_MULTIPLIER, players[idx].position_oldest->ducking, without_velocity));
+      result = TracePredictedMovement(pBot, pPlayer, players[idx].position_oldest->origin, players[idx].position_oldest->velocity, fabs(gpGlobals->time - players[idx].position_oldest->time) * AHEAD_MULTIPLIER, players[idx].position_oldest->ducking, without_velocity);
+      return TRUE;
    }
 
    if(!newer)
@@ -393,13 +394,20 @@ static Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolea
    // locations -- a respawned target is effectively a new entity.
    if(!newer->was_alive && older->was_alive)
    {
-      return(TracePredictedMovement(pBot, pPlayer, newer->origin, newer->velocity, fabs(gpGlobals->time - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity));
+      result = TracePredictedMovement(pBot, pPlayer, newer->origin, newer->velocity, fabs(gpGlobals->time - newer->time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity);
+      return TRUE;
    }
    if(!older->was_alive && newer->was_alive)
    {
-      return(TracePredictedMovement(pBot, pPlayer, older->origin, older->velocity, fabs(gpGlobals->time - older->time) * AHEAD_MULTIPLIER, older->ducking, without_velocity));
+      result = TracePredictedMovement(pBot, pPlayer, older->origin, older->velocity, fabs(gpGlobals->time - older->time) * AHEAD_MULTIPLIER, older->ducking, without_velocity);
+      return TRUE;
    }
 
+   return FALSE;
+}
+
+static Vector GetPredictedPlayerPosition_Interpolate(bot_t &pBot, edict_t *pPlayer, posdata_t *newer, posdata_t *older, float time, qboolean without_velocity)
+{
    float newer_diff = fabs(newer->time - time);
    float older_diff = fabs(older->time - time);
    float total_diff = newer_diff + older_diff;
@@ -419,6 +427,30 @@ static Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolea
 
    // use old origin and use old velocity to predict current position
    return(TracePredictedMovement(pBot, pPlayer, pred_origin, pred_velocity, fabs(gpGlobals->time - time) * AHEAD_MULTIPLIER, newer->ducking, without_velocity));
+}
+
+static Vector GetPredictedPlayerPosition(bot_t &pBot, edict_t * pPlayer, qboolean without_velocity = FALSE)
+{
+   posdata_t * newer;
+   posdata_t * older;
+   posdata_t newertmp;
+   Vector result;
+
+   // get prediction time based on bot skill
+   float time = gpGlobals->time - skill_settings[pBot.bot_skill].ping_emu_latency;
+
+   int slot_result = GetPredictedPlayerPosition_FindTimeSlots(pBot, pPlayer, time, newer, older, result, without_velocity);
+   if(slot_result == -1)
+      return(Vector(0,0,0));
+   if(slot_result == 0)
+      return(UTIL_GetOrigin(pPlayer));
+   if(slot_result == 1)
+      return(result);
+
+   if(GetPredictedPlayerPosition_HandleMissingData(pBot, pPlayer, time, newer, older, newertmp, result, without_velocity))
+      return(result);
+
+   return(GetPredictedPlayerPosition_Interpolate(pBot, pPlayer, newer, older, time, without_velocity));
 }
 
 
@@ -752,13 +784,8 @@ static qboolean BotFindEnemyCheckDontShoot(bot_t &pBot)
 }
 
 
-// Validate existing enemy (dead/chat-protected, sticky breakable mode, visibility tracking).
-// Returns TRUE if enemy still valid (caller returns)
-static qboolean BotFindEnemyMaintainCurrent(bot_t &pBot)
+static qboolean BotFindEnemyMaintainCurrent_CheckValidity(bot_t &pBot)
 {
-   if (pBot.pBotEnemy == NULL)
-      return FALSE;
-
    edict_t *pEdict = pBot.pEdict;
 
    // if the enemy is dead?
@@ -780,12 +807,16 @@ static qboolean BotFindEnemyMaintainCurrent(bot_t &pBot)
       return FALSE;
    }
 
-   // enemy is still alive
+   return TRUE;
+}
 
+static int BotFindEnemyMaintainCurrent_StickyBreakable(bot_t &pBot)
+{
    // mode 2: sticky breakable targeting — keep targeting a path-blocking
    // breakable as long as bot hasn't moved too far away from it
    if (bot_shoot_breakables == 2 && UTIL_LookupBreakable(pBot.pBotEnemy))
    {
+      edict_t *pEdict = pBot.pEdict;
       Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBot.pBotEnemy);
       float dist = (pEdict->v.origin - v_origin).Length();
 
@@ -803,15 +834,22 @@ static qboolean BotFindEnemyMaintainCurrent(bot_t &pBot)
          pBot.f_bot_see_enemy_time = gpGlobals->time;
          pBot.v_bot_see_enemy_origin = v_origin;
 
-         return TRUE; // keep targeting this breakable
+         return 1; // keep targeting this breakable
       }
 
       // too far or not visible, drop it
       BotRemoveEnemy(pBot, FALSE);
       pEdict->v.idealpitch = 0;
 
-      return FALSE;
+      return -1;
    }
+
+   return 0;
+}
+
+static qboolean BotFindEnemyMaintainCurrent_TrackVisibility(bot_t &pBot)
+{
+   edict_t *pEdict = pBot.pEdict;
 
    // non-breakable enemy visibility tracking
    Vector vecPredEnemy = UTIL_AdjustOriginWithExtent(pBot, GetPredictedPlayerPosition(pBot, pBot.pBotEnemy), pBot.pBotEnemy);
@@ -850,6 +888,85 @@ static qboolean BotFindEnemyMaintainCurrent(bot_t &pBot)
    return FALSE;
 }
 
+// Validate existing enemy (dead/chat-protected, sticky breakable mode, visibility tracking).
+// Returns TRUE if enemy still valid (caller returns)
+static qboolean BotFindEnemyMaintainCurrent(bot_t &pBot)
+{
+   if (pBot.pBotEnemy == NULL)
+      return FALSE;
+
+   // enemy is still alive
+   if (!BotFindEnemyMaintainCurrent_CheckValidity(pBot))
+      return FALSE;
+
+   int breakable_result = BotFindEnemyMaintainCurrent_StickyBreakable(pBot);
+   if (breakable_result == 1)
+      return TRUE;
+   if (breakable_result == -1)
+      return FALSE;
+
+   return BotFindEnemyMaintainCurrent_TrackVisibility(pBot);
+}
+
+
+static qboolean BotFindEnemySearchBreakables_IsValidCandidate(bot_t &pBot, breakable_list_t *pBreakable, float nearestdistance, float &distance, Vector &v_origin)
+{
+   // removed? null?
+   if(FNullEnt (pBreakable->pEdict))
+      return FALSE;
+
+   // cannot take damage
+   if((int)pBreakable->pEdict->v.takedamage == DAMAGE_NO ||
+      pBreakable->pEdict->v.solid == SOLID_NOT ||
+      pBreakable->pEdict->v.deadflag == DEAD_DEAD ||
+      !pBreakable->material_breakable ||
+      pBreakable->pEdict->v.health <= 0)
+      return FALSE;
+
+   if (pBreakable->pEdict->v.health > 8000)
+      return FALSE; // skip breakables with large health
+
+   v_origin = UTIL_GetOriginWithExtent(pBot, pBreakable->pEdict);
+
+   // 0,0,0 is considered invalid
+   if(v_origin.is_zero_vector())
+      return FALSE;
+
+   edict_t *pEdict = pBot.pEdict;
+   distance = GetModifiedEnemyDistance(pBot, v_origin - pEdict->v.origin).Length();
+   if (distance >= nearestdistance)
+      return FALSE;
+
+   // see if bot can't see ...
+   if (!(FInViewCone( v_origin, pEdict ) && FVisible( v_origin, pEdict, pBreakable->pEdict )))
+      return FALSE;
+
+   return TRUE;
+}
+
+static void BotFindEnemySearchBreakables_CheckAndUpdate(bot_t &pBot, breakable_list_t *pBreakable, float distance, const Vector &v_origin, edict_t *&pNewEnemy, Vector &v_newenemy, float &nearestdistance)
+{
+   nearestdistance = distance;
+   pNewEnemy = pBreakable->pEdict;
+   v_newenemy = v_origin;
+
+#if DEBUG_ENEMY_SELECT
+   g_debug_enemy_type = "breakable";
+   snprintf(g_debug_enemy_info, sizeof(g_debug_enemy_info), "%s[or:e-%.1f:%.1f:%.1f, or:o-%.1f:%.1f:%.1f, mins-%.1f:%.1f:%.1f, maxs-%.1f:%.1f:%.1f, absmin-%.1f:%.1f:%.1f, size-%.1f:%.1f:%.1f, td-%.0f, s-%d, df-%d, h-%.0f]",
+       g_debug_enemy_type, v_origin.x, v_origin.y, v_origin.z,
+       UTIL_GetOrigin(pBreakable->pEdict).x, UTIL_GetOrigin(pBreakable->pEdict).y, UTIL_GetOrigin(pBreakable->pEdict).z,
+       pBreakable->pEdict->v.mins.x, pBreakable->pEdict->v.mins.y, pBreakable->pEdict->v.mins.z,
+       pBreakable->pEdict->v.maxs.x, pBreakable->pEdict->v.maxs.y, pBreakable->pEdict->v.maxs.z,
+            pBreakable->pEdict->v.absmin.x, pBreakable->pEdict->v.absmin.y, pBreakable->pEdict->v.absmin.z,
+       pBreakable->pEdict->v.size.x, pBreakable->pEdict->v.size.y, pBreakable->pEdict->v.size.z,
+       pBreakable->pEdict->v.takedamage,
+       pBreakable->pEdict->v.solid,
+       pBreakable->pEdict->v.deadflag,
+       pBreakable->pEdict->v.health
+     );
+   g_debug_enemy_type = g_debug_enemy_info;
+#endif
+}
 
 // Mode 1: iterate func_breakables, update pNewEnemy/v_newenemy/nearestdistance
 static void BotFindEnemySearchBreakables(bot_t &pBot, edict_t *&pNewEnemy, Vector &v_newenemy, float &nearestdistance)
@@ -857,61 +974,17 @@ static void BotFindEnemySearchBreakables(bot_t &pBot, edict_t *&pNewEnemy, Vecto
    if (bot_shoot_breakables != 1)
       return;
 
-   edict_t *pEdict = pBot.pEdict;
-
    // search func_breakables that we collected at map start (We need to collect in order to get the material value)
    breakable_list_t *pBreakable = NULL;
    while((pBreakable = UTIL_FindBreakable(pBreakable)) != NULL)
    {
-      // removed? null?
-      if(FNullEnt (pBreakable->pEdict))
+      float distance;
+      Vector v_origin;
+
+      if (!BotFindEnemySearchBreakables_IsValidCandidate(pBot, pBreakable, nearestdistance, distance, v_origin))
          continue;
 
-      // cannot take damage
-      if((int)pBreakable->pEdict->v.takedamage == DAMAGE_NO ||
-         pBreakable->pEdict->v.solid == SOLID_NOT ||
-         pBreakable->pEdict->v.deadflag == DEAD_DEAD ||
-         !pBreakable->material_breakable ||
-         pBreakable->pEdict->v.health <= 0)
-         continue;
-
-      if (pBreakable->pEdict->v.health > 8000)
-         continue; // skip breakables with large health
-
-      Vector v_origin = UTIL_GetOriginWithExtent(pBot, pBreakable->pEdict);
-
-      // 0,0,0 is considered invalid
-      if(v_origin.is_zero_vector())
-         continue;
-
-      float distance = GetModifiedEnemyDistance(pBot, v_origin - pEdict->v.origin).Length();
-      if (distance >= nearestdistance)
-         continue;
-
-      // see if bot can't see ...
-      if (!(FInViewCone( v_origin, pEdict ) && FVisible( v_origin, pEdict, pBreakable->pEdict )))
-         continue;
-
-      nearestdistance = distance;
-      pNewEnemy = pBreakable->pEdict;
-      v_newenemy = v_origin;
-
-#if DEBUG_ENEMY_SELECT
-      g_debug_enemy_type = "breakable";
-      snprintf(g_debug_enemy_info, sizeof(g_debug_enemy_info), "%s[or:e-%.1f:%.1f:%.1f, or:o-%.1f:%.1f:%.1f, mins-%.1f:%.1f:%.1f, maxs-%.1f:%.1f:%.1f, absmin-%.1f:%.1f:%.1f, size-%.1f:%.1f:%.1f, td-%.0f, s-%d, df-%d, h-%.0f]",
-          g_debug_enemy_type, v_origin.x, v_origin.y, v_origin.z,
-          UTIL_GetOrigin(pBreakable->pEdict).x, UTIL_GetOrigin(pBreakable->pEdict).y, UTIL_GetOrigin(pBreakable->pEdict).z,
-          pBreakable->pEdict->v.mins.x, pBreakable->pEdict->v.mins.y, pBreakable->pEdict->v.mins.z,
-          pBreakable->pEdict->v.maxs.x, pBreakable->pEdict->v.maxs.y, pBreakable->pEdict->v.maxs.z,
-               pBreakable->pEdict->v.absmin.x, pBreakable->pEdict->v.absmin.y, pBreakable->pEdict->v.absmin.z,
-          pBreakable->pEdict->v.size.x, pBreakable->pEdict->v.size.y, pBreakable->pEdict->v.size.z,
-          pBreakable->pEdict->v.takedamage,
-          pBreakable->pEdict->v.solid,
-          pBreakable->pEdict->v.deadflag,
-          pBreakable->pEdict->v.health
-        );
-      g_debug_enemy_type = g_debug_enemy_info;
-#endif
+      BotFindEnemySearchBreakables_CheckAndUpdate(pBot, pBreakable, distance, v_origin, pNewEnemy, v_newenemy, nearestdistance);
    }
 }
 
@@ -976,76 +1049,90 @@ static void BotFindEnemySearchMonsters(bot_t &pBot, edict_t *&pNewEnemy, Vector 
 }
 
 
-// Search all clients for enemy players
-static void BotFindEnemySearchPlayers(bot_t &pBot, edict_t *&pNewEnemy, Vector &v_newenemy, float &nearestdistance)
+static qboolean BotFindEnemySearchPlayers_IsValidCandidate(bot_t &pBot, edict_t *pPlayer, float nearestdistance, float &distance)
 {
    edict_t *pEdict = pBot.pEdict;
 
+   // skip invalid players and skip self (i.e. this bot)
+   if (!(pPlayer) || (pPlayer->free) || (pPlayer == pEdict) || FBitSet(pPlayer->v.flags, FL_PROXY))
+      return FALSE;
+
+   if ((b_observer_mode) && !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
+      return FALSE;
+
+   // 0,0,0 is considered invalid
+   if(pPlayer->v.origin.is_zero_vector())
+      return FALSE;
+
+   // skip this player if not alive (i.e. dead or dying)
+   if (!IsAlive(pPlayer))
+      return FALSE;
+
+   // skip this player if facing wall
+   if(IsPlayerChatProtected(pPlayer))
+      return FALSE;
+
+   // don't target teammates
+   if(AreTeamMates(pPlayer, pEdict))
+      return FALSE;
+
+   distance = GetModifiedEnemyDistance(pBot, UTIL_GetOriginWithExtent(pBot, pPlayer) - pEdict->v.origin).Length();
+   if (distance >= nearestdistance)
+      return FALSE;
+
+   // skip this player if respawned lately
+   float time_since_respawn = UTIL_GetTimeSinceRespawn(pPlayer);
+   if(time_since_respawn != -1.0 && time_since_respawn < skill_settings[pBot.bot_skill].respawn_react_delay)
+      return FALSE;
+
+   Vector vecEnd = GetGunPosition(pPlayer);
+
+   // see if bot can't see the player...
+   if (!(FInViewCone( vecEnd, pEdict ) && FVisibleEnemy( vecEnd, pEdict, pPlayer )))
+      return FALSE;
+
+   return TRUE;
+}
+
+static void BotFindEnemySearchPlayers_UpdateBest(bot_t &pBot, edict_t *pPlayer, float distance, edict_t *&pNewEnemy, Vector &v_newenemy, float &nearestdistance)
+{
+   nearestdistance = distance;
+   pNewEnemy = pPlayer;
+   v_newenemy = pPlayer->v.origin;
+
+#if DEBUG_ENEMY_SELECT
+   g_debug_enemy_type = "player";
+   snprintf(g_debug_enemy_info, sizeof(g_debug_enemy_info), "%s[or:o-%.1f:%.1f:%.1f, or:g-%.1f:%.1f:%.1f, mins-%.1f:%.1f:%.1f, maxs-%.1f:%.1f:%.1f, absmin-%.1f:%.1f:%.1f, size-%.1f:%.1f:%.1f, td-%.0f(%f), df-%d, h-%.0f, f-%d, s-%d]",
+    g_debug_enemy_type,
+    pPlayer->v.origin.x, pPlayer->v.origin.y, pPlayer->v.origin.z,
+    UTIL_GetOrigin(pPlayer).x, UTIL_GetOrigin(pPlayer).y, UTIL_GetOrigin(pPlayer).z,
+    pPlayer->v.mins.x, pPlayer->v.mins.y, pPlayer->v.mins.z,
+    pPlayer->v.maxs.x, pPlayer->v.maxs.y, pPlayer->v.maxs.z,
+         pPlayer->v.absmin.x, pPlayer->v.absmin.y, pPlayer->v.absmin.z,
+    pPlayer->v.size.x, pPlayer->v.size.y, pPlayer->v.size.z,
+    pPlayer->v.takedamage, pPlayer->v.takedamage - (long long)pPlayer->v.takedamage,
+    pPlayer->v.deadflag,
+    pPlayer->v.health,
+    pPlayer->v.flags,
+    pPlayer->v.solid
+  );
+   g_debug_enemy_type = g_debug_enemy_info;
+#endif
+}
+
+// Search all clients for enemy players
+static void BotFindEnemySearchPlayers(bot_t &pBot, edict_t *&pNewEnemy, Vector &v_newenemy, float &nearestdistance)
+{
    // search the world for players...
    for (int i = 1; i <= gpGlobals->maxClients; i++)
    {
       edict_t *pPlayer = INDEXENT(i);
+      float distance;
 
-      // skip invalid players and skip self (i.e. this bot)
-      if ((pPlayer) && (!pPlayer->free) && (pPlayer != pEdict) && !FBitSet(pPlayer->v.flags, FL_PROXY))
-      {
-         if ((b_observer_mode) && !(FBitSet(pPlayer->v.flags, FL_FAKECLIENT) || FBitSet(pPlayer->v.flags, FL_THIRDPARTYBOT)))
-            continue;
+      if (!BotFindEnemySearchPlayers_IsValidCandidate(pBot, pPlayer, nearestdistance, distance))
+         continue;
 
-         // 0,0,0 is considered invalid
-         if(pPlayer->v.origin.is_zero_vector())
-            continue;
-
-         // skip this player if not alive (i.e. dead or dying)
-         if (!IsAlive(pPlayer))
-            continue;
-
-         // skip this player if facing wall
-         if(IsPlayerChatProtected(pPlayer))
-            continue;
-
-         // don't target teammates
-         if(AreTeamMates(pPlayer, pEdict))
-            continue;
-
-         float distance = GetModifiedEnemyDistance(pBot, UTIL_GetOriginWithExtent(pBot, pPlayer) - pEdict->v.origin).Length();
-         if (distance >= nearestdistance)
-            continue;
-
-         // skip this player if respawned lately
-         float time_since_respawn = UTIL_GetTimeSinceRespawn(pPlayer);
-         if(time_since_respawn != -1.0 && time_since_respawn < skill_settings[pBot.bot_skill].respawn_react_delay)
-            continue;
-
-         Vector vecEnd = GetGunPosition(pPlayer);
-
-         // see if bot can't see the player...
-         if (!(FInViewCone( vecEnd, pEdict ) && FVisibleEnemy( vecEnd, pEdict, pPlayer )))
-            continue;
-
-         nearestdistance = distance;
-         pNewEnemy = pPlayer;
-         v_newenemy = pPlayer->v.origin;
-
-#if DEBUG_ENEMY_SELECT
-         g_debug_enemy_type = "player";
-         snprintf(g_debug_enemy_info, sizeof(g_debug_enemy_info), "%s[or:o-%.1f:%.1f:%.1f, or:g-%.1f:%.1f:%.1f, mins-%.1f:%.1f:%.1f, maxs-%.1f:%.1f:%.1f, absmin-%.1f:%.1f:%.1f, size-%.1f:%.1f:%.1f, td-%.0f(%f), df-%d, h-%.0f, f-%d, s-%d]",
-          g_debug_enemy_type,
-          pPlayer->v.origin.x, pPlayer->v.origin.y, pPlayer->v.origin.z,
-          UTIL_GetOrigin(pPlayer).x, UTIL_GetOrigin(pPlayer).y, UTIL_GetOrigin(pPlayer).z,
-          pPlayer->v.mins.x, pPlayer->v.mins.y, pPlayer->v.mins.z,
-          pPlayer->v.maxs.x, pPlayer->v.maxs.y, pPlayer->v.maxs.z,
-               pPlayer->v.absmin.x, pPlayer->v.absmin.y, pPlayer->v.absmin.z,
-          pPlayer->v.size.x, pPlayer->v.size.y, pPlayer->v.size.z,
-          pPlayer->v.takedamage, pPlayer->v.takedamage - (long long)pPlayer->v.takedamage,
-          pPlayer->v.deadflag,
-          pPlayer->v.health,
-          pPlayer->v.flags,
-          pPlayer->v.solid
-        );
-         g_debug_enemy_type = g_debug_enemy_info;
-#endif
-      }
+      BotFindEnemySearchPlayers_UpdateBest(pBot, pPlayer, distance, pNewEnemy, v_newenemy, nearestdistance);
    }
 }
 
@@ -1526,14 +1613,13 @@ static int BotFireWeaponTryReuseCurrent(bot_t &pBot, const bot_weapon_select_t *
 }
 
 
-// Build alloca linked list of available weapons and randomly select one by percentage
-static qboolean BotFireWeaponChooseFromAvailable(bot_t &pBot, const bot_weapon_select_t *pSelect, const bot_fire_delay_t *pDelay, float distance, float height, int weapon_choice)
+static void BotFireWeaponChooseFromAvailable_BuildList(bot_t &pBot, const bot_weapon_select_t *pSelect, float distance, float height, int weapon_choice, select_list_t *pool, select_list_t *&tmp_select_list, int &total_percent)
 {
    //
    // 1. check which weapons are available and with which percents
    //
-   int total_percent = 0;
-   select_list_t *tmp_select_list = NULL;
+   int pool_count = 0;
+   select_list_t *tail = NULL;
 
    // loop through all the weapons until terminator is found...
    int select_index = -1;
@@ -1565,7 +1651,7 @@ static qboolean BotFireWeaponChooseFromAvailable(bot_t &pBot, const bot_weapon_s
          continue;
 
       // New code, collect weapon percents to linked list
-      select_list_t *next = (select_list_t *)alloca(sizeof(select_list_t));
+      select_list_t *next = &pool[pool_count++];
       next->next = NULL;
 
       // fill data
@@ -1580,21 +1666,16 @@ static qboolean BotFireWeaponChooseFromAvailable(bot_t &pBot, const bot_weapon_s
       total_percent += pSelect[select_index].use_percent;
 
       // add to end of linked list
-      select_list_t *prev = tmp_select_list;
-      if(prev)
-      {
-         do {
-            if(!prev->next)
-            {
-               prev->next = next;
-               break;
-            }
-         } while((prev = prev->next) != NULL);
-      }
+      if(tail)
+         tail->next = next;
       else
          tmp_select_list = next;
+      tail = next;
    }
+}
 
+static qboolean BotFireWeaponChooseFromAvailable_RandomSelect(bot_t &pBot, const bot_weapon_select_t *pSelect, const bot_fire_delay_t *pDelay, select_list_t *tmp_select_list, int total_percent)
+{
    //
    // 2. Choose weapon
    //
@@ -1614,7 +1695,7 @@ static qboolean BotFireWeaponChooseFromAvailable(bot_t &pBot, const bot_weapon_s
          }
 
          // this is our random choosed weapon!
-         select_index = next->select_index;
+         int select_index = next->select_index;
 
          //UTIL_ConsolePrintf("choose: %d [%s]", choose, pSelect[select_index].weapon_name);
 
@@ -1628,23 +1709,21 @@ static qboolean BotFireWeaponChooseFromAvailable(bot_t &pBot, const bot_weapon_s
    return FALSE;
 }
 
-
-// Search for highest-skill non-avoided weapon, then best avoidable as last resort
-static qboolean BotFireWeaponFallbackSearch(bot_t &pBot, const bot_weapon_select_t *pSelect, const bot_fire_delay_t *pDelay, float distance, float height, int weapon_choice)
+// Build alloca linked list of available weapons and randomly select one by percentage
+static qboolean BotFireWeaponChooseFromAvailable(bot_t &pBot, const bot_weapon_select_t *pSelect, const bot_fire_delay_t *pDelay, float distance, float height, int weapon_choice)
 {
-   // AT THIS POINT:
-   // We didn't find good weapon, now try find least skilled weapon that bot has, but avoid avoidable weapons
-   // Also get best avoidable weapon bot can use
-   int min_index = -1;
-   int min_skill = -1;
-   qboolean min_use_primary = FALSE;
-   qboolean min_use_secondary = FALSE;
+   int total_percent = 0;
+   select_list_t *tmp_select_list = NULL;
+   select_list_t pool[MAX_WEAPONS];
 
-   int avoid_index = -1;
-   int avoid_skill = 6;
-   qboolean avoid_use_primary = FALSE;
-   qboolean avoid_use_secondary = FALSE;
+   BotFireWeaponChooseFromAvailable_BuildList(pBot, pSelect, distance, height, weapon_choice, pool, tmp_select_list, total_percent);
 
+   return BotFireWeaponChooseFromAvailable_RandomSelect(pBot, pSelect, pDelay, tmp_select_list, total_percent);
+}
+
+
+static void BotFireWeaponFallbackSearch_ScanWeapons(bot_t &pBot, const bot_weapon_select_t *pSelect, float distance, float height, int weapon_choice, int &min_index, int &min_skill, qboolean &min_use_primary, qboolean &min_use_secondary, int &avoid_index, int &avoid_skill, qboolean &avoid_use_primary, qboolean &avoid_use_secondary)
+{
    int select_index = -1;
    while (pSelect[++select_index].iId)
    {
@@ -1690,44 +1769,67 @@ static qboolean BotFireWeaponFallbackSearch(bot_t &pBot, const bot_weapon_select
          }
       }
    }
+}
 
-   if(min_index > -1 && min_skill > -1)
+static void BotFireWeaponFallbackSearch_SelectAttackType(bot_t &pBot, const bot_weapon_select_t &pWeapon, qboolean &use_primary, qboolean &use_secondary, qboolean is_avoid_weapon)
+{
+   if(is_avoid_weapon)
    {
-      select_index = min_index;
-      qboolean use_primary = min_use_primary;
-      qboolean use_secondary = min_use_secondary;
-
-      if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
-         return FALSE; //error
-
+      // check if bot has enough skill for attack
+      if(use_primary && !BotSkilledEnoughForPrimaryAttack(pBot, pWeapon))
+         use_primary = FALSE;
+      if(use_secondary && !BotSkilledEnoughForSecondaryAttack(pBot, pWeapon))
+         use_secondary = FALSE;
+   }
+   else
+   {
       if(use_primary && use_secondary)
       {
          //use least skilled
-         if(pSelect[select_index].primary_skill_level < pSelect[select_index].secondary_skill_level)
+         if(pWeapon.primary_skill_level < pWeapon.secondary_skill_level)
             use_primary = FALSE;
-         else if(pSelect[select_index].primary_skill_level > pSelect[select_index].secondary_skill_level)
+         else if(pWeapon.primary_skill_level > pWeapon.secondary_skill_level)
             use_secondary = FALSE;
       }
+   }
+}
 
-      return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], use_primary, use_secondary));
+static qboolean BotFireWeaponFallbackSearch_TryFireWeapon(bot_t &pBot, const bot_weapon_select_t *pSelect, const bot_fire_delay_t *pDelay, int select_index, qboolean use_primary, qboolean use_secondary)
+{
+   if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
+      return FALSE; //error
+
+   return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], use_primary, use_secondary));
+}
+
+// Search for highest-skill non-avoided weapon, then best avoidable as last resort
+static qboolean BotFireWeaponFallbackSearch(bot_t &pBot, const bot_weapon_select_t *pSelect, const bot_fire_delay_t *pDelay, float distance, float height, int weapon_choice)
+{
+   // AT THIS POINT:
+   // We didn't find good weapon, now try find least skilled weapon that bot has, but avoid avoidable weapons
+   // Also get best avoidable weapon bot can use
+   int min_index = -1;
+   int min_skill = -1;
+   qboolean min_use_primary = FALSE;
+   qboolean min_use_secondary = FALSE;
+
+   int avoid_index = -1;
+   int avoid_skill = 6;
+   qboolean avoid_use_primary = FALSE;
+   qboolean avoid_use_secondary = FALSE;
+
+   BotFireWeaponFallbackSearch_ScanWeapons(pBot, pSelect, distance, height, weapon_choice, min_index, min_skill, min_use_primary, min_use_secondary, avoid_index, avoid_skill, avoid_use_primary, avoid_use_secondary);
+
+   if(min_index > -1 && min_skill > -1)
+   {
+      BotFireWeaponFallbackSearch_SelectAttackType(pBot, pSelect[min_index], min_use_primary, min_use_secondary, FALSE);
+      return BotFireWeaponFallbackSearch_TryFireWeapon(pBot, pSelect, pDelay, min_index, min_use_primary, min_use_secondary);
    }
 
    if(avoid_index > -1 && avoid_skill < 6)
    {
-      select_index = avoid_index;
-      qboolean use_primary = avoid_use_primary;
-      qboolean use_secondary = avoid_use_secondary;
-
-      if(!TrySelectWeapon(pBot, select_index, pSelect[select_index], pDelay[select_index]))
-         return FALSE; //error
-
-      // check if bot has enough skill for attack
-      if(use_primary && !BotSkilledEnoughForPrimaryAttack(pBot, pSelect[select_index]))
-         use_primary = FALSE;
-      if(use_secondary && !BotSkilledEnoughForSecondaryAttack(pBot, pSelect[select_index]))
-         use_secondary = FALSE;
-
-      return(BotFireSelectedWeapon(pBot, pSelect[select_index], pDelay[select_index], use_primary, use_secondary));
+      BotFireWeaponFallbackSearch_SelectAttackType(pBot, pSelect[avoid_index], avoid_use_primary, avoid_use_secondary, TRUE);
+      return BotFireWeaponFallbackSearch_TryFireWeapon(pBot, pSelect, pDelay, avoid_index, avoid_use_primary, avoid_use_secondary);
    }
 
    // didn't have any available weapons or ammo, return FALSE
@@ -1954,33 +2056,31 @@ static qboolean BotShouldDetonateSatchel(bot_t &pBot)
 }
 
 
-// Called from BotThink - handles full detonation flow
-qboolean BotDetonateSatchel(bot_t &pBot)
+static qboolean BotDetonateSatchel_HandleDetonating(bot_t &pBot)
 {
-   if (pBot.f_satchel_detonate_time <= 0)
-      return FALSE;
-
    edict_t *pEdict = pBot.pEdict;
 
    // Phase 2: already committed to detonation, just waiting for weapon switch
-   if (pBot.b_satchel_detonating)
+   if (pBot.current_weapon.iId == VALVE_WEAPON_SATCHEL)
    {
-      if (pBot.current_weapon.iId == VALVE_WEAPON_SATCHEL)
-      {
-         pEdict->v.button |= IN_ATTACK;     // detonate (primary when m_chargeReady==1)
-         pBot.f_satchel_detonate_time = 0;
-         pBot.b_satchel_detonating = FALSE;
-         pBot.f_shoot_time = gpGlobals->time + 0.5;
-         pBot.current_weapon_index = -1;
-      }
-      else
-      {
-         UTIL_SelectItem(pEdict, "weapon_satchel");  // retry select
-         // Keep normal firing suppressed until the satchel switch completes
-         pBot.f_shoot_time = gpGlobals->time + 0.3;
-      }
-      return TRUE;
+      pEdict->v.button |= IN_ATTACK;     // detonate (primary when m_chargeReady==1)
+      pBot.f_satchel_detonate_time = 0;
+      pBot.b_satchel_detonating = FALSE;
+      pBot.f_shoot_time = gpGlobals->time + 0.5;
+      pBot.current_weapon_index = -1;
    }
+   else
+   {
+      UTIL_SelectItem(pEdict, "weapon_satchel");  // retry select
+      // Keep normal firing suppressed until the satchel switch completes
+      pBot.f_shoot_time = gpGlobals->time + 0.3;
+   }
+   return TRUE;
+}
+
+static qboolean BotDetonateSatchel_CheckAndCommit(bot_t &pBot)
+{
+   edict_t *pEdict = pBot.pEdict;
 
    // Phase 1: decide whether to detonate
    qboolean should_detonate = FALSE;
@@ -2018,6 +2118,18 @@ qboolean BotDetonateSatchel(bot_t &pBot)
    }
 
    return TRUE;
+}
+
+// Called from BotThink - handles full detonation flow
+qboolean BotDetonateSatchel(bot_t &pBot)
+{
+   if (pBot.f_satchel_detonate_time <= 0)
+      return FALSE;
+
+   if (pBot.b_satchel_detonating)
+      return BotDetonateSatchel_HandleDetonating(pBot);
+
+   return BotDetonateSatchel_CheckAndCommit(pBot);
 }
 
 

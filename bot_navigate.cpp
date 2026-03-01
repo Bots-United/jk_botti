@@ -177,20 +177,13 @@ float BotChangeYaw( bot_t &pBot, float speed )
 }
 
 
-static qboolean BotFindWaypoint( bot_t &pBot )
+static void BotFindWaypoint_RankByDistance( bot_t &pBot, float *min_distance, int *min_index )
 {
-   int index, select_index;
+   int index;
    int path_index = -1;
-   float distance, min_distance[3];
-   int min_index[3];
+   float distance;
 
    edict_t *pEdict = pBot.pEdict;
-
-   for (index=0; index < 3; index++)
-   {
-      min_distance[index] = 99999.0;
-      min_index[index] = -1;
-   }
 
    index = WaypointFindPath(path_index, pBot.curr_waypoint_index);
 
@@ -236,8 +229,13 @@ static qboolean BotFindWaypoint( bot_t &pBot )
       // find the next path to a waypoint
       index = WaypointFindPath(path_index, pBot.curr_waypoint_index);
    }
+}
 
-   select_index = -1;
+
+static int BotFindWaypoint_SelectFromRanked( bot_t &pBot, const float *min_distance, const int *min_index )
+{
+   int index;
+   int select_index = -1;
 
    // about 20% of the time choose a waypoint at random
    // (don't do this any more often than every 10 seconds)
@@ -254,7 +252,7 @@ static qboolean BotFindWaypoint( bot_t &pBot )
       else if (min_index[0] != -1)
          index = 0;
       else
-         return FALSE;  // no waypoints found!
+         return -1;  // no waypoints found!
 
       select_index = min_index[index];
    }
@@ -264,18 +262,44 @@ static qboolean BotFindWaypoint( bot_t &pBot )
       select_index = min_index[0];
    }
 
+   return select_index;
+}
+
+
+static void BotFindWaypoint_UpdateBotState( bot_t &pBot, int select_index )
+{
+   pBot.prev_waypoint_index[4] = pBot.prev_waypoint_index[3];
+   pBot.prev_waypoint_index[3] = pBot.prev_waypoint_index[2];
+   pBot.prev_waypoint_index[2] = pBot.prev_waypoint_index[1];
+   pBot.prev_waypoint_index[1] = pBot.prev_waypoint_index[0];
+   pBot.prev_waypoint_index[0] = pBot.curr_waypoint_index;
+
+   pBot.curr_waypoint_index = select_index;
+   pBot.waypoint_origin = waypoints[select_index].origin;
+
+   pBot.f_waypoint_time = gpGlobals->time;
+}
+
+
+static qboolean BotFindWaypoint( bot_t &pBot )
+{
+   int select_index;
+   float min_distance[3];
+   int min_index[3];
+
+   for (int index=0; index < 3; index++)
+   {
+      min_distance[index] = 99999.0;
+      min_index[index] = -1;
+   }
+
+   BotFindWaypoint_RankByDistance(pBot, min_distance, min_index);
+
+   select_index = BotFindWaypoint_SelectFromRanked(pBot, min_distance, min_index);
+
    if (select_index != -1)  // was a waypoint found?
    {
-      pBot.prev_waypoint_index[4] = pBot.prev_waypoint_index[3];
-      pBot.prev_waypoint_index[3] = pBot.prev_waypoint_index[2];
-      pBot.prev_waypoint_index[2] = pBot.prev_waypoint_index[1];
-      pBot.prev_waypoint_index[1] = pBot.prev_waypoint_index[0];
-      pBot.prev_waypoint_index[0] = pBot.curr_waypoint_index;
-
-      pBot.curr_waypoint_index = select_index;
-      pBot.waypoint_origin = waypoints[select_index].origin;
-
-      pBot.f_waypoint_time = gpGlobals->time;
+      BotFindWaypoint_UpdateBotState(pBot, select_index);
 
       return TRUE;
    }
@@ -1044,10 +1068,8 @@ static qboolean BotHeadTowardWaypointFindNextRoute(bot_t &pBot, qboolean waypoin
 }
 
 
-qboolean BotHeadTowardWaypoint( bot_t &pBot )
+static void BotHeadTowardWaypoint_CheckTimeout( bot_t &pBot )
 {
-   edict_t *pEdict = pBot.pEdict;
-
    // check if the bot has been trying to get to this waypoint for a while...
    if ((pBot.f_waypoint_time + 5.0) < gpGlobals->time)
    {
@@ -1059,6 +1081,89 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
    if ((pBot.waypoint_goal == -1) && (pBot.f_waypoint_goal_time > gpGlobals->time + 2) &&
        (pBot.f_waypoint_goal_time != 0.0))
       pBot.f_waypoint_goal_time = 0.0;
+}
+
+
+static qboolean BotHeadTowardWaypoint_HandleTouchpoint( bot_t &pBot )
+{
+   edict_t *pEdict = pBot.pEdict;
+   qboolean waypoint_found = FALSE;
+
+   pBot.prev_waypoint_distance = 0.0;
+
+   // reeval our goal
+   BotEvaluateGoal( pBot );
+
+   // check if the waypoint is a door waypoint
+   if (waypoints[pBot.curr_waypoint_index].flags & W_FL_DOOR)
+   {
+      pBot.f_dont_avoid_wall_time = gpGlobals->time + 5.0;
+   }
+
+   // check if the next waypoint is a jump waypoint...
+   if (waypoints[pBot.curr_waypoint_index].flags & W_FL_JUMP)
+   {
+      pEdict->v.button |= IN_JUMP;  // jump here
+   }
+
+   BotHeadTowardWaypointHandleGoalReached(pBot);
+
+   if (BotHeadTowardWaypointCheckUnderwaterExit(pBot))
+      waypoint_found = TRUE;
+
+   if (!BotHeadTowardWaypointFindNextRoute(pBot, waypoint_found))
+      return FALSE;
+
+   return TRUE;
+}
+
+
+static void BotHeadTowardWaypoint_DetectLadder( bot_t &pBot )
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   // check if the next waypoint is on a ladder AND
+   // the bot it not currently on a ladder...
+   if ((waypoints[pBot.curr_waypoint_index].flags & W_FL_LADDER) && !pBot.b_on_ladder)
+   {
+      // if it's origin is lower than the bot...
+      if (waypoints[pBot.curr_waypoint_index].origin.z < pEdict->v.origin.z)
+      {
+         pBot.waypoint_top_of_ladder = TRUE;
+      }
+   }
+   else
+   {
+      pBot.waypoint_top_of_ladder = FALSE;
+   }
+}
+
+
+static void BotHeadTowardWaypoint_UpdateViewAngles( bot_t &pBot )
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   // keep turning towards the waypoint...
+
+   Vector v_direction = pBot.waypoint_origin - pEdict->v.origin;
+
+   Vector v_angles = UTIL_VecToAngles(v_direction);
+
+   // if the bot is NOT on a ladder, change the yaw...
+   if (!pBot.b_on_ladder)
+   {
+      pEdict->v.idealpitch = -v_angles.x;
+      BotFixIdealPitch(pEdict);
+
+      pEdict->v.ideal_yaw = v_angles.y;
+      BotFixIdealYaw(pEdict);
+   }
+}
+
+
+qboolean BotHeadTowardWaypoint( bot_t &pBot )
+{
+   BotHeadTowardWaypoint_CheckTimeout(pBot);
 
    // find new waypoint for sound we are tracking
    if(pBot.wpt_goal_type == WPT_GOAL_TRACK_SOUND)
@@ -1084,76 +1189,83 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
 
    if (touching)
    {
-      qboolean waypoint_found = FALSE;
-
-      pBot.prev_waypoint_distance = 0.0;
-
-      // reeval our goal
-      BotEvaluateGoal( pBot );
-
-      // check if the waypoint is a door waypoint
-      if (waypoints[pBot.curr_waypoint_index].flags & W_FL_DOOR)
-      {
-         pBot.f_dont_avoid_wall_time = gpGlobals->time + 5.0;
-      }
-
-      // check if the next waypoint is a jump waypoint...
-      if (waypoints[pBot.curr_waypoint_index].flags & W_FL_JUMP)
-      {
-         pEdict->v.button |= IN_JUMP;  // jump here
-      }
-
-      BotHeadTowardWaypointHandleGoalReached(pBot);
-
-      if (BotHeadTowardWaypointCheckUnderwaterExit(pBot))
-         waypoint_found = TRUE;
-
-      if (!BotHeadTowardWaypointFindNextRoute(pBot, waypoint_found))
+      if (!BotHeadTowardWaypoint_HandleTouchpoint(pBot))
          return FALSE;
    }
 
-   // check if the next waypoint is on a ladder AND
-   // the bot it not currently on a ladder...
-   if ((waypoints[pBot.curr_waypoint_index].flags & W_FL_LADDER) && !pBot.b_on_ladder)
-   {
-      // if it's origin is lower than the bot...
-      if (waypoints[pBot.curr_waypoint_index].origin.z < pEdict->v.origin.z)
-      {
-         pBot.waypoint_top_of_ladder = TRUE;
-      }
-   }
-   else
-   {
-      pBot.waypoint_top_of_ladder = FALSE;
-   }
+   BotHeadTowardWaypoint_DetectLadder(pBot);
 
-   // keep turning towards the waypoint...
-
-   Vector v_direction = pBot.waypoint_origin - pEdict->v.origin;
-
-   Vector v_angles = UTIL_VecToAngles(v_direction);
-
-   // if the bot is NOT on a ladder, change the yaw...
-   if (!pBot.b_on_ladder)
-   {
-      pEdict->v.idealpitch = -v_angles.x;
-      BotFixIdealPitch(pEdict);
-
-      pEdict->v.ideal_yaw = v_angles.y;
-      BotFixIdealYaw(pEdict);
-   }
+   BotHeadTowardWaypoint_UpdateViewAngles(pBot);
 
    return TRUE;
+}
+
+
+static void BotOnLadderFindWall_InitializeAngles( edict_t *pEdict, int curr_waypoint_index, float *search_angles, float &search_dir, int &start_index )
+{
+   start_index = 0;
+   search_dir = RANDOM_LONG2(0, 1) ? 1.0f : -1.0f;
+   search_angles[0] = 0.0f;
+
+   // add special case to angles, check towards next waypoint
+   if(curr_waypoint_index != -1)
+   {
+      Vector v_dir = waypoints[curr_waypoint_index].origin - pEdict->v.origin;
+      Vector v_to_wp = UTIL_VecToAngles(v_dir);
+
+      search_angles[0] = v_to_wp.y * search_dir;
+   }
+
+   if(search_angles[0] == 0.0f)
+      start_index++;
+}
+
+
+static qboolean BotOnLadderFindWall_TryWallDirection( edict_t *pEdict, float angle )
+{
+   Vector v_src, v_dest, view_angles;
+   TraceResult tr;
+
+   view_angles.x = pEdict->v.v_angle.x;
+   view_angles.y = UTIL_WrapAngle(pEdict->v.v_angle.y + angle);
+   view_angles.z = 0;
+
+   v_src = pEdict->v.origin + pEdict->v.view_ofs;
+   v_dest = v_src + UTIL_AnglesToForward(view_angles) * 30;
+
+   UTIL_TraceMove( v_src, v_dest, dont_ignore_monsters,
+                   pEdict->v.pContainingEntity, &tr);
+
+   if (tr.flFraction < 1.0f)  // hit something?
+   {
+      //if (FIsClassname("func_wall", tr.pHit))
+      if (!FNullEnt(tr.pHit) && tr.pHit->v.solid == SOLID_BSP)
+      {
+         // square up to the wall...
+         view_angles = UTIL_VecToAngles(tr.vecPlaneNormal);
+
+         // Normal comes OUT from wall, so flip it around...
+         view_angles.y += 180;
+
+         if (view_angles.y > 180)
+            view_angles.y -= 360;
+
+         pEdict->v.ideal_yaw = view_angles.y;
+
+         BotFixIdealYaw(pEdict);
+
+         return TRUE;
+      }
+   }
+
+   return FALSE;
 }
 
 
 static void BotOnLadderFindWall(bot_t &pBot)
 {
    static float search_angles[] = { 0.0f, 0.0f, 90.0f, -90.0f, 45.0f, -45.0f, 60.0f, -30.0f, 30.0f, -60.0f, 10.0f, -10.0f, 20.0f, -20.0f, 40.0f, -40.0f, 50.0f, -50.0f, 70.0f, -70.0f, 80.0f, -80.0f, 9999.9f };
-   Vector v_src, v_dest, view_angles;
-   TraceResult tr;
-   float angle, search_dir;
-   qboolean done = FALSE;
+   float search_dir;
    int i;
 
    edict_t *pEdict = pBot.pEdict;
@@ -1162,94 +1274,21 @@ static void BotOnLadderFindWall(bot_t &pBot)
    if (pBot.ladder_dir != LADDER_UNKNOWN)
       return;
 
-   i = 0;
-   search_dir = RANDOM_LONG2(0, 1) ? 1.0f : -1.0f;
-   search_angles[0] = 0.0f;
-
-   // add special case to angles, check towards next waypoint
-   if(pBot.curr_waypoint_index != -1)
-   {
-      Vector v_dir = waypoints[pBot.curr_waypoint_index].origin - pEdict->v.origin;
-      Vector v_to_wp = UTIL_VecToAngles(v_dir);
-
-      search_angles[0] = v_to_wp.y * search_dir;
-   }
-
-   if(search_angles[0] == 0.0f)
-      i++;
+   BotOnLadderFindWall_InitializeAngles(pEdict, pBot.curr_waypoint_index, search_angles, search_dir, i);
 
    // try to square up the bot on the ladder...
+   qboolean done = FALSE;
+
    while ((!done) && (search_angles[i] <= 90.0f))
    {
-      angle = search_angles[i] * search_dir;
+      float angle = search_angles[i] * search_dir;
 
       // try looking in one direction (forward + angle)
-      view_angles.x = pEdict->v.v_angle.x;
-      view_angles.y = UTIL_WrapAngle(pEdict->v.v_angle.y + angle);
-      view_angles.z = 0;
-
-      v_src = pEdict->v.origin + pEdict->v.view_ofs;
-      v_dest = v_src + UTIL_AnglesToForward(view_angles) * 30;
-
-      UTIL_TraceMove( v_src, v_dest, dont_ignore_monsters,
-                      pEdict->v.pContainingEntity, &tr);
-
-      if (tr.flFraction < 1.0f)  // hit something?
-      {
-         //if (FIsClassname("func_wall", tr.pHit))
-         if (!FNullEnt(tr.pHit) && tr.pHit->v.solid == SOLID_BSP)
-         {
-            // square up to the wall...
-            view_angles = UTIL_VecToAngles(tr.vecPlaneNormal);
-
-            // Normal comes OUT from wall, so flip it around...
-            view_angles.y += 180;
-
-            if (view_angles.y > 180)
-               view_angles.y -= 360;
-
-            pEdict->v.ideal_yaw = view_angles.y;
-
-            BotFixIdealYaw(pEdict);
-
-            done = TRUE;
-         }
-      }
-      else
-      {
-         // try looking in the other direction (forward - angle)
-         view_angles.x = pEdict->v.v_angle.x;
-         view_angles.y = UTIL_WrapAngle(pEdict->v.v_angle.y - angle);
-         view_angles.z = 0;
-
-         v_src = pEdict->v.origin + pEdict->v.view_ofs;
-         v_dest = v_src + UTIL_AnglesToForward(view_angles) * 30;
-
-         UTIL_TraceMove( v_src, v_dest, dont_ignore_monsters,
-                         pEdict->v.pContainingEntity, &tr);
-
-         if (tr.flFraction < 1.0f)  // hit something?
-         {
-            //if (FIsClassname("func_wall", tr.pHit))
-            if (!FNullEnt(tr.pHit) && tr.pHit->v.solid == SOLID_BSP)
-            {
-               // square up to the wall...
-               view_angles = UTIL_VecToAngles(tr.vecPlaneNormal);
-
-               // Normal comes OUT from wall, so flip it around...
-               view_angles.y += 180;
-
-               if (view_angles.y > 180)
-                  view_angles.y -= 360;
-
-               pEdict->v.ideal_yaw = view_angles.y;
-
-               BotFixIdealYaw(pEdict);
-
-               done = TRUE;
-            }
-         }
-      }
+      if (BotOnLadderFindWall_TryWallDirection(pEdict, angle))
+         done = TRUE;
+      // try looking in the other direction (forward - angle)
+      else if (BotOnLadderFindWall_TryWallDirection(pEdict, -angle))
+         done = TRUE;
 
       i++;
    }
@@ -1316,11 +1355,73 @@ void BotOnLadder( bot_t &pBot, float moved_distance )
 }
 
 
+static void BotUnderWater_EscapeWater( bot_t &pBot )
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   // handle movements under water.  right now, just try to keep from
+   // drowning by swimming up towards the surface and look to see if
+   // there is a surface the bot can jump up onto to get out of the
+   // water.  bots DON'T like water!
+
+   Vector v_src, v_forward;
+   TraceResult tr;
+   int contents;
+
+   // swim up towards the surface
+   pEdict->v.v_angle.x = -60;  // look upwards
+
+   // move forward (i.e. in the direction the bot is looking, up or down)
+   pEdict->v.button |= IN_FORWARD;
+
+   // look from eye position straight forward (remember: the bot is looking
+   // upwards at a 60 degree angle so TraceLine will go out and up...
+
+   v_src = pEdict->v.origin + pEdict->v.view_ofs;  // EyePosition()
+   v_forward = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * 90;
+
+   // trace from the bot's eyes straight forward...
+   UTIL_TraceMove( v_src, v_forward, dont_ignore_monsters,
+                   pEdict->v.pContainingEntity, &tr);
+
+   // check if the trace didn't hit anything (i.e. nothing in the way)...
+   if (tr.flFraction > 0.999999f)
+   {
+      // find out what the contents is of the end of the trace...
+      contents = POINT_CONTENTS( tr.vecEndPos );
+
+      // check if the trace endpoint is in open space...
+      if (contents == CONTENTS_EMPTY)
+      {
+         // ok so far, we are at the surface of the water, continue...
+
+         v_src = tr.vecEndPos;
+         v_forward = v_src;
+         v_forward.z -= 90;
+
+         // trace from the previous end point straight down...
+         UTIL_TraceMove( v_src, v_forward, dont_ignore_monsters,
+                         pEdict->v.pContainingEntity, &tr);
+
+         // check if the trace hit something...
+         if (tr.flFraction < 1.0f)
+         {
+            contents = POINT_CONTENTS( tr.vecEndPos );
+
+            // if contents isn't water then assume it's land, jump!
+            if (contents != CONTENTS_WATER)
+            {
+               pEdict->v.button |= IN_JUMP;
+            }
+         }
+      }
+   }
+}
+
+
 void BotUnderWater( bot_t &pBot )
 {
    qboolean found_waypoint = FALSE;
-
-   edict_t *pEdict = pBot.pEdict;
 
    // are there waypoints in this level (and not trying to exit water)?
    if (num_waypoints > 0 && pBot.f_exit_water_time < gpGlobals->time)
@@ -1331,63 +1432,7 @@ void BotUnderWater( bot_t &pBot )
 
    if (found_waypoint == FALSE)
    {
-      // handle movements under water.  right now, just try to keep from
-      // drowning by swimming up towards the surface and look to see if
-      // there is a surface the bot can jump up onto to get out of the
-      // water.  bots DON'T like water!
-
-      Vector v_src, v_forward;
-      TraceResult tr;
-      int contents;
-
-      // swim up towards the surface
-      pEdict->v.v_angle.x = -60;  // look upwards
-
-      // move forward (i.e. in the direction the bot is looking, up or down)
-      pEdict->v.button |= IN_FORWARD;
-
-      // look from eye position straight forward (remember: the bot is looking
-      // upwards at a 60 degree angle so TraceLine will go out and up...
-
-      v_src = pEdict->v.origin + pEdict->v.view_ofs;  // EyePosition()
-      v_forward = v_src + UTIL_AnglesToForward(pEdict->v.v_angle) * 90;
-
-      // trace from the bot's eyes straight forward...
-      UTIL_TraceMove( v_src, v_forward, dont_ignore_monsters,
-                      pEdict->v.pContainingEntity, &tr);
-
-      // check if the trace didn't hit anything (i.e. nothing in the way)...
-      if (tr.flFraction > 0.999999f)
-      {
-         // find out what the contents is of the end of the trace...
-         contents = POINT_CONTENTS( tr.vecEndPos );
-
-         // check if the trace endpoint is in open space...
-         if (contents == CONTENTS_EMPTY)
-         {
-            // ok so far, we are at the surface of the water, continue...
-
-            v_src = tr.vecEndPos;
-            v_forward = v_src;
-            v_forward.z -= 90;
-
-            // trace from the previous end point straight down...
-            UTIL_TraceMove( v_src, v_forward, dont_ignore_monsters,
-                            pEdict->v.pContainingEntity, &tr);
-
-            // check if the trace hit something...
-            if (tr.flFraction < 1.0f)
-            {
-               contents = POINT_CONTENTS( tr.vecEndPos );
-
-               // if contents isn't water then assume it's land, jump!
-               if (contents != CONTENTS_WATER)
-               {
-                  pEdict->v.button |= IN_JUMP;
-               }
-            }
-         }
-      }
+      BotUnderWater_EscapeWater(pBot);
    }
 }
 
@@ -1454,12 +1499,10 @@ static void BotUseLiftPressButton(bot_t &pBot)
 }
 
 
-static void BotUseLiftFindExit(bot_t &pBot)
+static void BotUseLiftFindExit_InitializeVectors( bot_t &pBot, Vector &v_src, Vector &v_forward, Vector &v_right, Vector &v_left, Vector &v_forward_down, Vector &v_right_down, Vector &v_left_down )
 {
    edict_t *pEdict = pBot.pEdict;
-   TraceResult tr1, tr2;
-   Vector v_src, v_forward, v_right, v_left;
-   Vector v_down, v_forward_down, v_right_down, v_left_down;
+   Vector v_down;
    Vector angle_v_forward, angle_v_right, angle_v_left;
 
    pBot.b_use_button = FALSE;
@@ -1486,33 +1529,42 @@ static void BotUseLiftFindExit(bot_t &pBot)
    v_forward_down = v_src + angle_v_forward * 100;
    v_right_down = v_src + angle_v_right * 100;
    v_left_down = v_src + angle_v_right * -100;
+}
 
-   // try tracing forward first...
-   UTIL_TraceMove( v_src, v_forward, dont_ignore_monsters,
+
+static qboolean BotUseLiftFindExit_TestDirection( edict_t *pEdict, const Vector &v_src, const Vector &v_horiz, const Vector &v_down )
+{
+   TraceResult tr1, tr2;
+
+   UTIL_TraceMove( v_src, v_horiz, dont_ignore_monsters,
                    pEdict->v.pContainingEntity, &tr1);
-   UTIL_TraceMove( v_src, v_forward_down, dont_ignore_monsters,
+   UTIL_TraceMove( v_src, v_down, dont_ignore_monsters,
                    pEdict->v.pContainingEntity, &tr2);
 
    // check if we hit a wall or didn't find a floor...
    if ((tr1.flFraction < 1.0f) || (tr2.flFraction >= 1.0f))
+      return FALSE;
+
+   return TRUE;
+}
+
+
+static void BotUseLiftFindExit(bot_t &pBot)
+{
+   edict_t *pEdict = pBot.pEdict;
+   Vector v_src, v_forward, v_right, v_left;
+   Vector v_forward_down, v_right_down, v_left_down;
+
+   BotUseLiftFindExit_InitializeVectors(pBot, v_src, v_forward, v_right, v_left, v_forward_down, v_right_down, v_left_down);
+
+   // try tracing forward first...
+   if (!BotUseLiftFindExit_TestDirection(pEdict, v_src, v_forward, v_forward_down))
    {
       // try tracing to the RIGHT side next...
-      UTIL_TraceMove( v_src, v_right, dont_ignore_monsters,
-                      pEdict->v.pContainingEntity, &tr1);
-      UTIL_TraceMove( v_src, v_right_down, dont_ignore_monsters,
-                      pEdict->v.pContainingEntity, &tr2);
-
-      // check if we hit a wall or didn't find a floor...
-      if ((tr1.flFraction < 1.0f) || (tr2.flFraction >= 1.0f))
+      if (!BotUseLiftFindExit_TestDirection(pEdict, v_src, v_right, v_right_down))
       {
          // try tracing to the LEFT side next...
-         UTIL_TraceMove( v_src, v_left, dont_ignore_monsters,
-                         pEdict->v.pContainingEntity, &tr1);
-         UTIL_TraceMove( v_src, v_left_down, dont_ignore_monsters,
-                         pEdict->v.pContainingEntity, &tr2);
-
-         // check if we hit a wall or didn't find a floor...
-         if ((tr1.flFraction < 1.0f) || (tr2.flFraction >= 1.0f))
+         if (!BotUseLiftFindExit_TestDirection(pEdict, v_src, v_left, v_left_down))
          {
             // only thing to do is turn around...
             pEdict->v.ideal_yaw += 180;  // turn all the way around
@@ -1589,37 +1641,8 @@ qboolean BotStuckInCorner( bot_t &pBot )
 }
 
 
-void BotTurnAtWall( bot_t &pBot, TraceResult *tr, qboolean negative )
+static void BotTurnAtWall_CalcParallelAngles( float normal_y, float &Y1, float &Y2 )
 {
-   edict_t *pEdict = pBot.pEdict;
-   Vector Normal;
-   float Y, Y1, Y2, D1, D2, Z;
-
-   // Find the normal vector from the trace result.  The normal vector will
-   // be a vector that is perpendicular to the surface from the TraceResult.
-
-   Normal = UTIL_VecToAngles(tr->vecPlaneNormal);
-
-   // Since the bot keeps it's view angle in -180 < x < 180 degrees format,
-   // and since TraceResults are 0 < x < 360, we convert the bot's view
-   // angle (yaw) to the same format at TraceResult.
-
-   Y = pEdict->v.v_angle.y;
-   Y = Y + 180;
-   if (Y > 359) Y -= 360;
-
-   if (negative)
-   {
-      // Turn the normal vector around 180 degrees (i.e. make it point towards
-      // the wall not away from it.  That makes finding the angles that the
-      // bot needs to turn a little easier.
-
-      Normal.y = Normal.y - 180;
-   }
-
-   if (Normal.y < 0)
-      Normal.y += 360;
-
    // Here we compare the bots view angle (Y) to the Normal - 90 degrees (Y1)
    // and the Normal + 90 degrees (Y2).  These two angles (Y1 & Y2) represent
    // angles that are parallel to the wall surface, but heading in opposite
@@ -1627,19 +1650,25 @@ void BotTurnAtWall( bot_t &pBot, TraceResult *tr, qboolean negative )
    // least amount of turning (saves time) and have the bot head off in that
    // direction.
 
-   Y1 = Normal.y - 90;
+   Y1 = normal_y - 90;
    if (RANDOM_LONG2(1, 100) <= 50)
    {
       Y1 = Y1 - RANDOM_FLOAT2(5.0, 20.0);
    }
    if (Y1 < 0) Y1 += 360;
 
-   Y2 = Normal.y + 90;
+   Y2 = normal_y + 90;
    if (RANDOM_LONG2(1, 100) <= 50)
    {
       Y2 = Y2 + RANDOM_FLOAT2(5.0, 20.0);
    }
    if (Y2 > 359) Y2 -= 360;
+}
+
+
+static float BotTurnAtWall_ChooseClosestAngle( float Y, float Y1, float Y2 )
+{
+   float D1, D2, Z;
 
    // D1 and D2 are the difference (in degrees) between the bot's current
    // angle and Y1 or Y2 (respectively).
@@ -1666,8 +1695,45 @@ void BotTurnAtWall( bot_t &pBot, TraceResult *tr, qboolean negative )
    if (Z > 180)
       Z -= 360;
 
+   return Z;
+}
+
+
+void BotTurnAtWall( bot_t &pBot, TraceResult *tr, qboolean negative )
+{
+   edict_t *pEdict = pBot.pEdict;
+   Vector Normal;
+   float Y, Y1, Y2;
+
+   // Find the normal vector from the trace result.  The normal vector will
+   // be a vector that is perpendicular to the surface from the TraceResult.
+
+   Normal = UTIL_VecToAngles(tr->vecPlaneNormal);
+
+   // Since the bot keeps it's view angle in -180 < x < 180 degrees format,
+   // and since TraceResults are 0 < x < 360, we convert the bot's view
+   // angle (yaw) to the same format at TraceResult.
+
+   Y = pEdict->v.v_angle.y;
+   Y = Y + 180;
+   if (Y > 359) Y -= 360;
+
+   if (negative)
+   {
+      // Turn the normal vector around 180 degrees (i.e. make it point towards
+      // the wall not away from it.  That makes finding the angles that the
+      // bot needs to turn a little easier.
+
+      Normal.y = Normal.y - 180;
+   }
+
+   if (Normal.y < 0)
+      Normal.y += 360;
+
+   BotTurnAtWall_CalcParallelAngles(Normal.y, Y1, Y2);
+
    // set the direction to head off into...
-   pEdict->v.ideal_yaw = Z;
+   pEdict->v.ideal_yaw = BotTurnAtWall_ChooseClosestAngle(Y, Y1, Y2);
 
    BotFixIdealYaw(pEdict);
 }
@@ -2193,23 +2259,11 @@ static qboolean BotLookForDropCheckAhead(bot_t &pBot, float scale)
 }
 
 
-static void BotLookForDropTurnAway(bot_t &pBot, float scale)
+static qboolean BotLookForDropTurnAway_CheckForwardDrop( bot_t &pBot, float scale )
 {
    edict_t *pEdict = pBot.pEdict;
    Vector v_src, v_dest;
    TraceResult tr;
-
-   // if we have an enemy, stop heading towards enemy...
-   if (pBot.pBotEnemy)
-   {
-      BotRemoveEnemy(pBot, TRUE);
-
-      // level look
-      pEdict->v.idealpitch = 0;
-   }
-
-   // don't look for items for a while...
-   pBot.f_find_item = gpGlobals->time + 1.0;
 
    // change the bot's ideal yaw by finding surface normal
    // slightly below where the bot is standing
@@ -2238,55 +2292,86 @@ static void BotLookForDropTurnAway(bot_t &pBot, float scale)
    {
       // hit something the bot is standing on...
       BotTurnAtWall( pBot, &tr, FALSE );
+      return TRUE;
    }
+
+   return FALSE;
+}
+
+
+static void BotLookForDropTurnAway_TurningLoop( bot_t &pBot, float scale )
+{
+   edict_t *pEdict = pBot.pEdict;
+   Vector v_src, v_dest;
+   TraceResult tr;
+   float direction;
+
+   // pick a random direction to turn...
+   if (RANDOM_LONG2(1, 100) <= 50)
+      direction = 1.0f;
    else
+      direction = -1.0f;
+
+   // turn 30 degrees at a time until bot is on solid ground
+   Vector v_ahead = pEdict->v.v_angle;
+   v_ahead.x = 0;  // set pitch to level horizontally
+
+   qboolean done = FALSE;
+   int turn_count = 0;
+
+   while (!done)
    {
-      float direction;
+      v_ahead.y = UTIL_WrapAngle(v_ahead.y + 30.0 * direction);
 
-      // pick a random direction to turn...
-      if (RANDOM_LONG2(1, 100) <= 50)
-         direction = 1.0f;
-      else
-         direction = -1.0f;
+      v_src = pEdict->v.origin;
+      v_dest = v_src + UTIL_AnglesToForward(v_ahead) * scale;
 
-      // turn 30 degrees at a time until bot is on solid ground
-      v_ahead = pEdict->v.v_angle;
-      v_ahead.x = 0;  // set pitch to level horizontally
+      UTIL_TraceMove( v_src, v_dest, ignore_monsters,
+                      pEdict->v.pContainingEntity, &tr );
 
-      qboolean done = FALSE;
-      int turn_count = 0;
-
-      while (!done)
+      // check if area in front of bot was clear...
+      if (tr.flFraction > 0.999999f)
       {
-         v_ahead.y = UTIL_WrapAngle(v_ahead.y + 30.0 * direction);
-
-         v_src = pEdict->v.origin;
-         v_dest = v_src + UTIL_AnglesToForward(v_ahead) * scale;
+         v_src = v_dest;  // start downward trace from endpoint of open trace
+         v_dest.z = v_dest.z - max_drop_height;
 
          UTIL_TraceMove( v_src, v_dest, ignore_monsters,
                          pEdict->v.pContainingEntity, &tr );
 
-         // check if area in front of bot was clear...
-         if (tr.flFraction > 0.999999f)
-         {
-            v_src = v_dest;  // start downward trace from endpoint of open trace
-            v_dest.z = v_dest.z - max_drop_height;
-
-            UTIL_TraceMove( v_src, v_dest, ignore_monsters,
-                            pEdict->v.pContainingEntity, &tr );
-
-            // if trace hit something then drop is NOT TOO FAR...
-            if (tr.flFraction < 0.999999f)
-               done = TRUE;
-         }
-
-         turn_count++;
-         if (turn_count == 6)  // 180 degrees? (30 * 6 = 180)
+         // if trace hit something then drop is NOT TOO FAR...
+         if (tr.flFraction < 0.999999f)
             done = TRUE;
       }
 
-      pBot.pEdict->v.ideal_yaw = v_ahead.y;
-      BotFixIdealYaw(pEdict);
+      turn_count++;
+      if (turn_count == 6)  // 180 degrees? (30 * 6 = 180)
+         done = TRUE;
+   }
+
+   pBot.pEdict->v.ideal_yaw = v_ahead.y;
+   BotFixIdealYaw(pEdict);
+}
+
+
+static void BotLookForDropTurnAway(bot_t &pBot, float scale)
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   // if we have an enemy, stop heading towards enemy...
+   if (pBot.pBotEnemy)
+   {
+      BotRemoveEnemy(pBot, TRUE);
+
+      // level look
+      pEdict->v.idealpitch = 0;
+   }
+
+   // don't look for items for a while...
+   pBot.f_find_item = gpGlobals->time + 1.0;
+
+   if (!BotLookForDropTurnAway_CheckForwardDrop(pBot, scale))
+   {
+      BotLookForDropTurnAway_TurningLoop(pBot, scale);
    }
 }
 
