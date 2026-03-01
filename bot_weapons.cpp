@@ -782,48 +782,43 @@ mp5_grenades_angles_t mp5_grenade_angles[] = {
    { -9999, {{   -99,  -99, -99,    -99,   -99,   -99, -99 }}}, //null term(null?)
 };
 
-// neg height means downwards and positive upwards
-float ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(float distance, float height)
+// Find the height bracket index in mp5_grenade_angles[].
+// Returns index, or 0 on failure.
+static int MP5FindHeightIndex(float height)
 {
-   int i, height_idx, dis_idx;
-   float * distances = &mp5_grenade_angles[0].distance.angles[0];
-
-   // get index in which between out height is
-   height_idx = 0;
-   for(i = 1; mp5_grenade_angles[i].height > -9999.0; i++)
+   for(int i = 1; mp5_grenade_angles[i].height > -9999.0; i++)
    {
       if(height > mp5_grenade_angles[i].height && i == 1)
-         return(-99); // too much height
+         return(0); // too much height
 
       // not first index and now we get greater height --> found our candidate (yay)
       if(height > mp5_grenade_angles[i].height)
-      {
-         height_idx = i;
-         break;
-      }
+         return(i);
    }
 
-   if(height_idx == 0)
-      return(-99); // didn't find match
+   return(0); // didn't find match
+}
 
-   // get index in which between out distance is
-   dis_idx = -1;
-   for(i = 0; i < 7; i++)
+// Find the distance bracket index.
+// Returns index, or -1 on failure.
+static int MP5FindDistanceIndex(float distance, const float *distances)
+{
+   for(int i = 0; i < 7; i++)
    {
       if(distance < distances[i] && i == 0)
-         return(-99); // too close
+         return(-1); // too close
 
-      // not first index and now we get greater height --> found our candidate (yay)
+      // not first index and now we get greater distance --> found our candidate (yay)
       if(distance < distances[i])
-      {
-         dis_idx = i;
-         break;
-      }
+         return(i);
    }
 
-   if(dis_idx == -1)
-      return(-99); // too far
+   return(-1); // too far
+}
 
+// Bilinear interpolation of launch angle from the height and distance brackets.
+static float MP5InterpolateLaunchAngle(int height_idx, int dis_idx, float distance, float height, const float *distances)
+{
    // get weighted medium of both distance, dis_idx - 1, dis_idx
    float dis1_diff = fabs(distances[dis_idx - 1] - distance);
    float dis2_diff = fabs(distances[dis_idx] - distance);
@@ -841,7 +836,21 @@ float ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(float distance, float
    float height2_diff = fabs(mp5_grenade_angles[height_idx].height - height);
    total_diff = height1_diff + height2_diff;
 
-   float launch_angle = (height2_diff/total_diff) * angle_1 + (height1_diff/total_diff) * angle_2;
+   return((height2_diff/total_diff) * angle_1 + (height1_diff/total_diff) * angle_2);
+}
 
-   return(launch_angle);
+// neg height means downwards and positive upwards
+float ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(float distance, float height)
+{
+   float * distances = &mp5_grenade_angles[0].distance.angles[0];
+
+   int height_idx = MP5FindHeightIndex(height);
+   if(height_idx == 0)
+      return(-99);
+
+   int dis_idx = MP5FindDistanceIndex(distance, distances);
+   if(dis_idx == -1)
+      return(-99);
+
+   return(MP5InterpolateLaunchAngle(height_idx, dis_idx, distance, height, distances));
 }

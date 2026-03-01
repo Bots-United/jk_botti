@@ -1078,6 +1078,30 @@ static int test_MP5_launch_angle(void)
    ASSERT_TRUE(angle < -90.0);
    PASS();
 
+   TEST("height interpolation (height=50, distance=500) -> -14.75");
+   // height=50 is between height=100 (index 5) and height=0 (index 6)
+   // distance=500 is exact at table column -> pure height interpolation
+   angle = ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(500.0, 50.0);
+   ASSERT_FLOAT_NEAR(angle, -14.75f, 0.01f);
+   PASS();
+
+   TEST("simultaneous height+distance interpolation (50, 600) -> -16.0");
+   // height=50 between 100 and 0, distance=600 between 500 and 700
+   angle = ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(600.0, 50.0);
+   ASSERT_FLOAT_NEAR(angle, -16.0f, 0.01f);
+   PASS();
+
+   TEST("exact min boundary distance (300, height=0) -> -5.0");
+   angle = ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(300.0, 0.0);
+   ASSERT_FLOAT_NEAR(angle, -5.0f, 0.01f);
+   PASS();
+
+   TEST("exact max boundary distance (2000, height=0) -> -99");
+   // distance=2000 is not < 2000, so loop exhausts -> too far
+   angle = ValveWeaponMP5_GetBestLaunchAngleByDistanceAndHeight(2000.0, 0.0);
+   ASSERT_TRUE(angle < -90.0);
+   PASS();
+
    return 0;
 }
 
