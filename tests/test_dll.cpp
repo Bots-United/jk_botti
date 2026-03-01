@@ -207,6 +207,17 @@ static const char *mock_pfnGetGameDescription(void)
 }
 
 // ============================================================
+// Mock for GetGameDir
+// ============================================================
+
+static const char *mock_game_dir = "valve";
+
+static void mock_pfnGetGameDir(char *szGetGameDir)
+{
+   strcpy(szGetGameDir, mock_game_dir);
+}
+
+// ============================================================
 // Mock for CVAR_GET_POINTER
 // ============================================================
 
@@ -364,6 +375,7 @@ static void reset_test_state(void)
    gpGamedllFuncs->dllapi_table->pfnGetGameDescription = mock_pfnGetGameDescription;
 
    // Set up engine function pointers
+   g_engfuncs.pfnGetGameDir = mock_pfnGetGameDir;
    g_engfuncs.pfnCVarGetPointer = mock_pfnCVarGetPointer;
    g_engfuncs.pfnPrecacheSound = mock_pfnPrecacheSound;
    g_engfuncs.pfnPrecacheModel = mock_pfnPrecacheModel;
@@ -387,6 +399,7 @@ static void reset_test_state(void)
 
    // Reset mock state
    mock_game_description = "Half-Life";
+   mock_game_dir = "valve";
    mock_cvar_bm_ver_exists = 0;
    mock_cvar_mp_giveweapons_exists = 0;
    mock_cvar_mp_giveammo_exists = 0;
@@ -626,6 +639,38 @@ static int test_checksubmod_hl_teamplay_hldm(void)
 
    api_table.pfnGameInit();
    ASSERT_INT(submod_id, SUBMOD_HLDM);
+
+   PASS();
+   return 0;
+}
+
+static int test_checksubmod_arena(void)
+{
+   TEST("CheckSubMod: game_dir 'arena' -> SUBMOD_ARENA");
+
+   reset_test_state();
+   mock_game_dir = "arena";
+   mock_game_description = "Half-Life";
+   submod_id = SUBMOD_HLDM;
+
+   api_table.pfnGameInit();
+   ASSERT_INT(submod_id, SUBMOD_ARENA);
+
+   PASS();
+   return 0;
+}
+
+static int test_checksubmod_arena_overrides_desc(void)
+{
+   TEST("CheckSubMod: game_dir 'arena' overrides desc check");
+
+   reset_test_state();
+   mock_game_dir = "arena";
+   mock_game_description = "Opposing Force";
+   submod_id = SUBMOD_HLDM;
+
+   api_table.pfnGameInit();
+   ASSERT_INT(submod_id, SUBMOD_ARENA);
 
    PASS();
    return 0;
@@ -2652,6 +2697,8 @@ int main(void)
    fail |= test_checksubmod_default_hldm();
    fail |= test_checksubmod_hl_teamplay_sevs();
    fail |= test_checksubmod_hl_teamplay_hldm();
+   fail |= test_checksubmod_arena();
+   fail |= test_checksubmod_arena_overrides_desc();
 
    printf("=== GameDLLInit tests ===\n");
    fail |= test_gamedllinit_sets_submod_weaponflag();
