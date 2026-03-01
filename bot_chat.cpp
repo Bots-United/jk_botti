@@ -46,6 +46,27 @@ extern int bot_chat_swap_percent;
 extern int bot_chat_lower_percent;
 
 
+static void LoadBotChatAddMessage(bot_chat_t *array, int *count, const char *buffer, int length)
+{
+   if ((length > 0) && !(buffer[0] == '!' && length == 1) &&
+       (*count < MAX_BOT_CHAT))
+   {
+      if (buffer[0] == '!')
+      {
+         safe_strcopy(array[*count].text, sizeof(array[*count].text), &buffer[1]);
+         array[*count].can_modify = FALSE;
+      }
+      else
+      {
+         safe_strcopy(array[*count].text, sizeof(array[*count].text), buffer);
+         array[*count].can_modify = TRUE;
+      }
+
+      (*count)++;
+   }
+}
+
+
 //
 void LoadBotChat(void)
 {
@@ -121,73 +142,14 @@ void LoadBotChat(void)
          continue;
       }
 
-      if ((length > 0) && !(buffer[0] == '!' && length==1) && (section == 0) &&  // bot chat
-          (bot_chat_count < MAX_BOT_CHAT))
-      {
-         if (buffer[0] == '!')
-         {
-            safe_strcopy(bot_chat[bot_chat_count].text, sizeof(bot_chat[bot_chat_count].text), &buffer[1]);
-            bot_chat[bot_chat_count].can_modify = FALSE;
-         }
-         else
-         {
-            safe_strcopy(bot_chat[bot_chat_count].text, sizeof(bot_chat[bot_chat_count].text), buffer);
-            bot_chat[bot_chat_count].can_modify = TRUE;
-         }
-
-         bot_chat_count++;
-      }
-
-      if ((length > 0) && !(buffer[0] == '!' && length==1) && (section == 1) &&  // bot taunt
-          (bot_taunt_count < MAX_BOT_CHAT))
-      {
-         if (buffer[0] == '!')
-         {
-            safe_strcopy(bot_taunt[bot_taunt_count].text, sizeof(bot_taunt[bot_taunt_count].text), &buffer[1]);
-            bot_taunt[bot_taunt_count].can_modify = FALSE;
-         }
-         else
-         {
-            safe_strcopy(bot_taunt[bot_taunt_count].text, sizeof(bot_taunt[bot_taunt_count].text), buffer);
-            bot_taunt[bot_taunt_count].can_modify = TRUE;
-         }
-
-         bot_taunt_count++;
-      }
-
-      if ((length > 0) && !(buffer[0] == '!' && length==1) && (section == 2) &&  // bot whine
-          (bot_whine_count < MAX_BOT_CHAT))
-      {
-         if (buffer[0] == '!')
-         {
-            safe_strcopy(bot_whine[bot_whine_count].text, sizeof(bot_whine[bot_whine_count].text), &buffer[1]);
-            bot_whine[bot_whine_count].can_modify = FALSE;
-         }
-         else
-         {
-            safe_strcopy(bot_whine[bot_whine_count].text, sizeof(bot_whine[bot_whine_count].text), buffer);
-            bot_whine[bot_whine_count].can_modify = TRUE;
-         }
-
-         bot_whine_count++;
-      }
-
-      if ((length > 0) && !(buffer[0] == '!' && length==1) && (section == 3) &&  // bot endgame
-          (bot_endgame_count < MAX_BOT_CHAT))
-      {
-         if (buffer[0] == '!')
-         {
-            safe_strcopy(bot_endgame[bot_endgame_count].text, sizeof(bot_endgame[bot_endgame_count].text), &buffer[1]);
-            bot_endgame[bot_endgame_count].can_modify = FALSE;
-         }
-         else
-         {
-            safe_strcopy(bot_endgame[bot_endgame_count].text, sizeof(bot_endgame[bot_endgame_count].text), buffer);
-            bot_endgame[bot_endgame_count].can_modify = TRUE;
-         }
-
-         bot_endgame_count++;
-      }
+      if (section == 0)
+         LoadBotChatAddMessage(bot_chat, &bot_chat_count, buffer, length);
+      else if (section == 1)
+         LoadBotChatAddMessage(bot_taunt, &bot_taunt_count, buffer, length);
+      else if (section == 2)
+         LoadBotChatAddMessage(bot_whine, &bot_whine_count, buffer, length);
+      else if (section == 3)
+         LoadBotChatAddMessage(bot_endgame, &bot_endgame_count, buffer, length);
    }
 }
 
@@ -540,6 +502,47 @@ static void BotChatFillInName(char *bot_say_msg, int sizeof_msg, const char *cha
 }
 
 
+static int BotChatPickRandom(int msg_count, int *recent)
+{
+   int index;
+   int recent_count = 0;
+
+   while (recent_count < 5)
+   {
+      index = RANDOM_LONG2(0, msg_count-1);
+
+      qboolean used = FALSE;
+
+      for (int i = 0; i < 5; i++)
+      {
+         if (recent[i] == index)
+            used = TRUE;
+      }
+
+      if (used)
+         recent_count++;
+      else
+         break;
+   }
+
+   for (int i = 4; i > 0; i--)
+      recent[i] = recent[i-1];
+
+   recent[0] = index;
+
+   return index;
+}
+
+
+static void BotChatGetText(const bot_chat_t *msg, char *chat_text, int sizeof_chat_text)
+{
+   if (msg->can_modify)
+      BotChatText(msg->text, chat_text, sizeof_chat_text);
+   else
+      safe_strcopy(chat_text, sizeof_chat_text, msg->text);
+}
+
+
 // taunt on killed player
 void BotChatTaunt(bot_t &pBot, edict_t *victim_edict)
 {
@@ -555,39 +558,9 @@ void BotChatTaunt(bot_t &pBot, edict_t *victim_edict)
    if ((bot_taunt_count > 0) &&
        (RANDOM_LONG2(1,100) <= pBot.taunt_percent))
    {
-      int taunt_index;
-      qboolean used;
-      int i, recent_count;
+      int taunt_index = BotChatPickRandom(bot_taunt_count, recent_bot_taunt);
 
-      recent_count = 0;
-
-      while (recent_count < 5)
-      {
-         taunt_index = RANDOM_LONG2(0, bot_taunt_count-1);
-
-         used = FALSE;
-
-         for (i=0; i < 5; i++)
-         {
-            if (recent_bot_taunt[i] == taunt_index)
-               used = TRUE;
-         }
-
-         if (used)
-            recent_count++;
-         else
-            break;
-      }
-
-      for (i=4; i > 0; i--)
-         recent_bot_taunt[i] = recent_bot_taunt[i-1];
-
-      recent_bot_taunt[0] = taunt_index;
-
-      if (bot_taunt[taunt_index].can_modify)
-         BotChatText(bot_taunt[taunt_index].text, chat_text, sizeof(chat_text));
-      else
-         safe_strcopy(chat_text, sizeof(chat_text), bot_taunt[taunt_index].text);
+      BotChatGetText(&bot_taunt[taunt_index], chat_text, sizeof(chat_text));
 
       if (victim_edict->v.netname)
       {
@@ -626,41 +599,11 @@ void BotChatWhine(bot_t &pBot)
    if ((pBot.killer_edict != NULL) && (bot_whine_count > 0) &&
        ((pBot.f_bot_spawn_time + 15.0) <= gpGlobals->time))
    {
-      int whine_index;
-      qboolean used;
-      int i, recent_count;
-
       if ((RANDOM_LONG2(1,100) <= pBot.whine_percent))
       {
-         recent_count = 0;
+         int whine_index = BotChatPickRandom(bot_whine_count, recent_bot_whine);
 
-         while (recent_count < 5)
-         {
-            whine_index = RANDOM_LONG2(0, bot_whine_count-1);
-
-            used = FALSE;
-
-            for (i=0; i < 5; i++)
-            {
-               if (recent_bot_whine[i] == whine_index)
-                  used = TRUE;
-            }
-
-            if (used)
-               recent_count++;
-            else
-               break;
-         }
-
-         for (i=4; i > 0; i--)
-            recent_bot_whine[i] = recent_bot_whine[i-1];
-
-         recent_bot_whine[0] = whine_index;
-
-         if (bot_whine[whine_index].can_modify)
-            BotChatText(bot_whine[whine_index].text, chat_text, sizeof(chat_text));
-         else
-            safe_strcopy(chat_text, sizeof(chat_text), bot_whine[whine_index].text);
+         BotChatGetText(&bot_whine[whine_index], chat_text, sizeof(chat_text));
 
          if (pBot.killer_edict->v.netname)
          {
@@ -700,39 +643,10 @@ void BotChatTalk(bot_t &pBot)
       if (RANDOM_LONG2(1,100) <= pBot.chat_percent)
       {
          pBot.f_bot_chat_time = gpGlobals->time + 30.0;
-         int chat_index;
-         qboolean used;
-         int i, recent_count;
 
-         recent_count = 0;
+         int chat_index = BotChatPickRandom(bot_chat_count, recent_bot_chat);
 
-         while (recent_count < 5)
-         {
-            chat_index = RANDOM_LONG2(0, bot_chat_count-1);
-
-            used = FALSE;
-
-            for (i=0; i < 5; i++)
-            {
-               if (recent_bot_chat[i] == chat_index)
-                  used = TRUE;
-            }
-
-            if (used)
-               recent_count++;
-            else
-               break;
-         }
-
-         for (i=4; i > 0; i--)
-            recent_bot_chat[i] = recent_bot_chat[i-1];
-
-         recent_bot_chat[0] = chat_index;
-
-         if (bot_chat[chat_index].can_modify)
-            BotChatText(bot_chat[chat_index].text, chat_text, sizeof(chat_text));
-         else
-            safe_strcopy(chat_text, sizeof(chat_text), bot_chat[chat_index].text);
+         BotChatGetText(&bot_chat[chat_index], chat_text, sizeof(chat_text));
 
          safe_strcopy(chat_name, sizeof(chat_name), STRING(pBot.pEdict->v.netname));
 
@@ -759,39 +673,9 @@ void BotChatEndGame(bot_t &pBot)
 
    if ((bot_endgame_count > 0) && RANDOM_LONG2(1,100) <= pBot.endgame_percent)
    {
-      int endgame_index;
-      qboolean used;
-      int i, recent_count;
+      int endgame_index = BotChatPickRandom(bot_endgame_count, recent_bot_endgame);
 
-      recent_count = 0;
-
-      while (recent_count < 5)
-      {
-         endgame_index = RANDOM_LONG2(0, bot_endgame_count-1);
-
-         used = FALSE;
-
-         for (i=0; i < 5; i++)
-         {
-            if (recent_bot_endgame[i] == endgame_index)
-               used = TRUE;
-         }
-
-         if (used)
-            recent_count++;
-         else
-            break;
-      }
-
-      for (i=4; i > 0; i--)
-         recent_bot_endgame[i] = recent_bot_endgame[i-1];
-
-      recent_bot_endgame[0] = endgame_index;
-
-      if (bot_endgame[endgame_index].can_modify)
-         BotChatText(bot_endgame[endgame_index].text, chat_text, sizeof(chat_text));
-      else
-         safe_strcopy(chat_text, sizeof(chat_text), bot_endgame[endgame_index].text);
+      BotChatGetText(&bot_endgame[endgame_index], chat_text, sizeof(chat_text));
 
       safe_strcopy(chat_name, sizeof(chat_name), STRING(pBot.pEdict->v.netname));
 
