@@ -160,6 +160,7 @@ typedef struct
    qboolean b_in_water;
    qboolean b_ducking;
    qboolean b_has_enough_ammo_for_good_weapon;
+   qboolean b_only_has_weak_weapons;
    qboolean b_low_health;
 
    int eagle_secondary_state;

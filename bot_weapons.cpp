@@ -715,6 +715,41 @@ qboolean BotWeaponCanAttack(bot_t &pBot, const qboolean GoodWeaponsOnly)
    return(FALSE);
 }
 
+qboolean BotIsWeakWeapon(int iId)
+{
+   return (iId == VALVE_WEAPON_GLOCK);
+}
+
+float BotCombatDisengageTime(const bot_t &pBot)
+{
+   return pBot.b_only_has_weak_weapons ? 1.0f : 3.0f;
+}
+
+qboolean BotHasOnlyWeakWeapons(bot_t &pBot)
+{
+   // Check all carried fire weapons (including fire+zoom, fire+at_feet).
+   // Returns TRUE if every usable fire weapon is weak, or if none exist.
+   bot_weapon_select_t *pSelect = &weapon_select[0];
+   int select_index = -1;
+   while (pSelect[++select_index].iId)
+   {
+      if(!BotIsCarryingWeapon(pBot, pSelect[select_index].iId))
+         continue;
+      if(!IsValidWeaponChoose(pBot, pSelect[select_index]))
+         continue;
+      if(pSelect[select_index].avoid_this_gun ||
+         (pSelect[select_index].type & WEAPON_FIRE) != WEAPON_FIRE)
+         continue;
+      if(!IsValidSecondaryAttack(pBot, pSelect[select_index], 0.0, 0.0, TRUE) &&
+         !IsValidPrimaryAttack(pBot, pSelect[select_index], 0.0, 0.0, TRUE))
+         continue;
+      // Found a usable fire weapon -- is it strong?
+      if(!BotIsWeakWeapon(pSelect[select_index].iId))
+         return FALSE;
+   }
+   return TRUE;
+}
+
 // Check if want to change to better weapon
 int BotGetBetterWeaponChoice(bot_t &pBot, const bot_weapon_select_t &current, const bot_weapon_select_t *pSelect, const float distance, const float height, qboolean *use_primary, qboolean *use_secondary) {
    int select_index;

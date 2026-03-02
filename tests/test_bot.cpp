@@ -5140,6 +5140,141 @@ static int test_BotThink_low_health_attacked_seeks(void)
 }
 
 // ============================================================
+// Phase 6c: BotThink weak weapon behavior
+// ============================================================
+
+// Set up weapon_defs for Glock and Shotgun (needed by weak weapon tests)
+static void setup_weapon_defs_for_weak_weapon_tests(void)
+{
+   // Glock: primary=9mm(slot 1)
+   weapon_defs[VALVE_WEAPON_GLOCK].iId = VALVE_WEAPON_GLOCK;
+   weapon_defs[VALVE_WEAPON_GLOCK].iAmmo1 = 1;
+   weapon_defs[VALVE_WEAPON_GLOCK].iAmmo1Max = 250;
+   weapon_defs[VALVE_WEAPON_GLOCK].iAmmo2 = -1;
+
+   // Shotgun: primary=buckshot(slot 3)
+   weapon_defs[VALVE_WEAPON_SHOTGUN].iId = VALVE_WEAPON_SHOTGUN;
+   weapon_defs[VALVE_WEAPON_SHOTGUN].iAmmo1 = 3;
+   weapon_defs[VALVE_WEAPON_SHOTGUN].iAmmo1Max = 125;
+   weapon_defs[VALVE_WEAPON_SHOTGUN].iAmmo2 = -1;
+}
+
+static int test_BotThink_weak_weapon_no_seek(void)
+{
+   TEST("BotThink: only Glock, not attacked -> no enemy seek");
+   setup_engine_funcs();
+   setup_weapon_defs_for_weak_weapon_tests();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_alive_bot(bot, e);
+
+   // Give the bot only a Glock with ammo
+   e->v.weapons = (1u << VALVE_WEAPON_GLOCK);
+   bot.m_rgAmmo[1] = 50; // 9mm ammo
+   bot.pBotEnemy = NULL;
+   bot.f_last_time_attacked = 0; // not recently attacked
+
+   BotThink(bot);
+
+   // Bot should NOT have found an enemy (engagement path skipped)
+   ASSERT_PTR_NULL(bot.pBotEnemy);
+   // b_only_has_weak_weapons should be set
+   ASSERT_INT(bot.b_only_has_weak_weapons, TRUE);
+
+   PASS();
+   return 0;
+}
+
+static int test_BotThink_weak_weapon_fights_back(void)
+{
+   TEST("BotThink: only Glock, recently attacked -> fights back");
+   setup_engine_funcs();
+   setup_weapon_defs_for_weak_weapon_tests();
+
+   edict_t *e = mock_alloc_edict();
+   edict_t *enemy = mock_alloc_edict();
+   enemy->v.origin = Vector(200, 0, 0);
+   enemy->v.flags = FL_CLIENT;
+   enemy->v.health = 100;
+   enemy->v.deadflag = DEAD_NO;
+
+   bot_t bot;
+   setup_alive_bot(bot, e);
+
+   // Give the bot only a Glock with ammo
+   e->v.weapons = (1u << VALVE_WEAPON_GLOCK);
+   bot.m_rgAmmo[1] = 50;
+   bot.pBotEnemy = enemy;
+   bot.current_weapon_index = 0;
+   bot.current_weapon.iId = VALVE_WEAPON_GLOCK;
+   bot.current_weapon.iClip = 17;
+   // Recently attacked (within 1 second weak weapon window)
+   bot.f_last_time_attacked = gpGlobals->time - 0.5f;
+
+   BotThink(bot);
+
+   // Bot should have entered combat path (f_pause_time cleared)
+   ASSERT_FLOAT(bot.f_pause_time, 0.0f);
+
+   PASS();
+   return 0;
+}
+
+static int test_BotThink_weak_weapon_disengages_after_1s(void)
+{
+   TEST("BotThink: only Glock, attacked 2s ago -> disengages (1s window)");
+   setup_engine_funcs();
+   setup_weapon_defs_for_weak_weapon_tests();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_alive_bot(bot, e);
+
+   // Give the bot only a Glock with ammo
+   e->v.weapons = (1u << VALVE_WEAPON_GLOCK);
+   bot.m_rgAmmo[1] = 50;
+   bot.pBotEnemy = NULL;
+   // Attacked 2s ago: outside 1s weak window, inside 3s strong window
+   bot.f_last_time_attacked = gpGlobals->time - 2.0f;
+
+   BotThink(bot);
+
+   // Bot should NOT have found an enemy (disengaged)
+   ASSERT_PTR_NULL(bot.pBotEnemy);
+   ASSERT_INT(bot.b_only_has_weak_weapons, TRUE);
+
+   PASS();
+   return 0;
+}
+
+static int test_BotThink_strong_weapon_seeks(void)
+{
+   TEST("BotThink: Glock + Shotgun -> seeks enemies normally");
+   setup_engine_funcs();
+   setup_weapon_defs_for_weak_weapon_tests();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_alive_bot(bot, e);
+
+   // Give the bot Glock + Shotgun with ammo
+   e->v.weapons = (1u << VALVE_WEAPON_GLOCK) | (1u << VALVE_WEAPON_SHOTGUN);
+   bot.m_rgAmmo[1] = 50; // 9mm
+   bot.m_rgAmmo[3] = 20; // buckshot
+   bot.pBotEnemy = NULL;
+   bot.f_last_time_attacked = 0;
+
+   BotThink(bot);
+
+   // b_only_has_weak_weapons should be FALSE
+   ASSERT_INT(bot.b_only_has_weak_weapons, FALSE);
+
+   PASS();
+   return 0;
+}
+
+// ============================================================
 // main
 // ============================================================
 
@@ -5383,6 +5518,12 @@ int main(void)
    // Phase 6b: f_last_time_attacked retreat logic
    fail |= test_BotThink_low_health_not_attacked_no_seek();
    fail |= test_BotThink_low_health_attacked_seeks();
+
+   // Phase 6c: BotThink weak weapon behavior
+   fail |= test_BotThink_weak_weapon_no_seek();
+   fail |= test_BotThink_weak_weapon_fights_back();
+   fail |= test_BotThink_weak_weapon_disengages_after_1s();
+   fail |= test_BotThink_strong_weapon_seeks();
 
    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
    return fail ? EXIT_FAILURE : EXIT_SUCCESS;
