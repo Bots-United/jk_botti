@@ -5066,6 +5066,80 @@ static int test_BotThink_grenade_found(void)
 }
 
 // ============================================================
+// Phase 6b: f_last_time_attacked retreat logic
+// ============================================================
+
+static int test_BotThink_low_health_not_attacked_no_seek(void)
+{
+   TEST("BotThink: low health, not attacked -> no enemy seek");
+   setup_engine_funcs();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_alive_bot(bot, e);
+
+   // Give the bot a shotgun with ammo (can attack)
+   e->v.weapons = (1u << VALVE_WEAPON_SHOTGUN);
+   bot.m_rgAmmo[weapon_defs[VALVE_WEAPON_SHOTGUN].iAmmo1] = 50;
+
+   // Low health, no armor -> b_low_health=TRUE
+   e->v.health = 20;
+   e->v.armorvalue = 0;
+
+   // NOT recently attacked (long ago)
+   bot.f_last_time_attacked = 0;
+   bot.pBotEnemy = NULL;
+
+   BotThink(bot);
+
+   // Retreat logic should prevent enemy seeking
+   ASSERT_PTR_NULL(bot.pBotEnemy);
+   ASSERT_INT(bot.b_low_health, TRUE);
+
+   PASS();
+   return 0;
+}
+
+static int test_BotThink_low_health_attacked_seeks(void)
+{
+   TEST("BotThink: low health, recently attacked -> seeks enemy");
+   setup_engine_funcs();
+
+   edict_t *e = mock_alloc_edict();
+   edict_t *enemy = mock_alloc_edict();
+   enemy->v.origin = Vector(200, 0, 0);
+   enemy->v.flags = FL_CLIENT;
+   enemy->v.health = 100;
+   enemy->v.deadflag = DEAD_NO;
+
+   bot_t bot;
+   setup_alive_bot(bot, e);
+
+   // Give the bot a shotgun with ammo + pre-set enemy
+   e->v.weapons = (1u << VALVE_WEAPON_SHOTGUN);
+   bot.m_rgAmmo[weapon_defs[VALVE_WEAPON_SHOTGUN].iAmmo1] = 50;
+   bot.pBotEnemy = enemy;
+   bot.current_weapon_index = 0;
+   bot.current_weapon.iId = VALVE_WEAPON_SHOTGUN;
+   bot.current_weapon.iClip = 8;
+
+   // Low health
+   e->v.health = 20;
+   e->v.armorvalue = 0;
+
+   // Recently attacked (within 3 seconds)
+   bot.f_last_time_attacked = gpGlobals->time - 1.0f;
+
+   BotThink(bot);
+
+   // Self-defense: should enter combat path (f_pause_time cleared)
+   ASSERT_FLOAT(bot.f_pause_time, 0.0f);
+
+   PASS();
+   return 0;
+}
+
+// ============================================================
 // main
 // ============================================================
 
@@ -5305,6 +5379,10 @@ int main(void)
    fail |= test_BotThink_enemy_eagle_spot_off();
    fail |= test_BotThink_enemy_cant_attack_runaway();
    fail |= test_BotThink_grenade_found();
+
+   // Phase 6b: f_last_time_attacked retreat logic
+   fail |= test_BotThink_low_health_not_attacked_no_seek();
+   fail |= test_BotThink_low_health_attacked_seeks();
 
    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
    return fail ? EXIT_FAILURE : EXIT_SUCCESS;

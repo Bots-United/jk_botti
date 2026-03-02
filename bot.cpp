@@ -2827,7 +2827,7 @@ static void BotThinkHandleEnemy_FindAndAim(bot_t &pBot)
    edict_t *pEdict = pBot.pEdict;
 
    if(BotWeaponCanAttack(pBot, FALSE) &&
-      ((pBot.b_has_enough_ammo_for_good_weapon && !pBot.b_low_health) || pBot.f_last_time_attacked < gpGlobals->time + 3.0f))
+      ((pBot.b_has_enough_ammo_for_good_weapon && !pBot.b_low_health) || pBot.f_last_time_attacked > gpGlobals->time - 3.0f))
    {
       // get enemy
       BotFindEnemy( pBot );
@@ -2902,7 +2902,7 @@ static qboolean BotThinkHandleEnemy(bot_t &pBot)
    // does have an enemy?
    if (pBot.pBotEnemy != NULL)
    {
-      if(BotWeaponCanAttack(pBot, FALSE) && (!pBot.b_low_health || pBot.f_last_time_attacked < gpGlobals->time + 3.0f))
+      if(BotWeaponCanAttack(pBot, FALSE) && (!pBot.b_low_health || pBot.f_last_time_attacked > gpGlobals->time - 3.0f))
       {
          BotShootAtEnemy( pBot );  // shoot at the enemy
          DidShootAtEnemy = (pBot.pBotEnemy != NULL);
