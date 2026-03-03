@@ -1374,6 +1374,29 @@ static int test_bot_find_enemy_expanded(void)
    mock_trace_line_fn = trace_nohit;
    mock_trace_hull_fn = trace_nohit;
 
+   TEST("monster: penguin skipped");
+   {
+      edict_t *pM = mock_alloc_edict();
+      mock_set_classname(pM, "monster_penguin");
+      pM->v.origin = Vector(100, 0, 0);
+      pM->v.health = 10;
+      pM->v.flags = FL_MONSTER;
+      pM->v.takedamage = DAMAGE_YES;
+      pM->v.deadflag = DEAD_NO;
+      pM->v.solid = SOLID_BBOX;
+      pM->v.view_ofs = Vector(0, 0, 5);
+      BotFindEnemy(testbot);
+      ASSERT_PTR_NULL(testbot.pBotEnemy);
+   }
+   PASS();
+
+   mock_reset();
+   setup_skill_settings();
+   pBotEdict = mock_alloc_edict();
+   setup_bot_for_test(testbot, pBotEdict);
+   mock_trace_line_fn = trace_nohit;
+   mock_trace_hull_fn = trace_nohit;
+
    TEST("monster: high health (>4000) skipped");
    {
       edict_t *pM = mock_alloc_edict();

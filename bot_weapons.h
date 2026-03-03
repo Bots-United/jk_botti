@@ -130,7 +130,7 @@ typedef struct
    char ammoName[64];
 } bot_ammo_names_t;
 
-#define NUM_OF_WEAPON_SELECTS 26
+#define NUM_OF_WEAPON_SELECTS 27
 
 extern bot_weapon_select_t weapon_select[NUM_OF_WEAPON_SELECTS];
 extern bot_fire_delay_t fire_delay[NUM_OF_WEAPON_SELECTS];
@@ -170,6 +170,7 @@ enum ammo_low_t {
 #define GEARBOX_WEAPON_SPORELAUNCHER 23
 #define GEARBOX_WEAPON_SNIPERRIFLE   24
 #define GEARBOX_WEAPON_KNIFE         25
+#define GEARBOX_WEAPON_PENGUIN       26 // OP4 only, not in HL:Arena (shares ID with ARENA_WEAPON_9MMSILENCED)
 
 // weapon ID values for extra weapons from HL:Arena
 #define ARENA_WEAPON_9MMSILENCED     26
