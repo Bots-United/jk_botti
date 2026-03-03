@@ -4825,6 +4825,83 @@ static int test_can_jump_up_downward_left_blocked(void)
 }
 
 // ============================================================
+// Weak weapon navigation tests
+// ============================================================
+
+static int test_track_sound_weak_weapons(void)
+{
+   TEST("BotUpdateTrackSoundGoal: weak weapons -> stops tracking");
+   mock_reset();
+   reset_navigate_mocks();
+
+   edict_t *pEdict = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, pEdict);
+
+   bot.wpt_goal_type = WPT_GOAL_TRACK_SOUND;
+   bot.f_track_sound_time = gpGlobals->time + 10.0f;
+   bot.b_low_health = FALSE;
+   bot.b_has_enough_ammo_for_good_weapon = TRUE;
+   bot.b_only_has_weak_weapons = TRUE;
+   bot.waypoint_goal = 5;
+
+   qboolean result = BotUpdateTrackSoundGoal(bot);
+   ASSERT_INT(result, FALSE);
+   ASSERT_INT(bot.waypoint_goal, -1);
+   ASSERT_INT(bot.wpt_goal_type, WPT_GOAL_NONE);
+   PASS();
+   return 0;
+}
+
+static int test_find_waypoint_goal_weak_weapons_no_sound(void)
+{
+   TEST("BotFindWaypointGoal: weak weapons -> skips sound track");
+   mock_reset();
+   reset_navigate_mocks();
+
+   edict_t *pEdict = mock_alloc_edict();
+   edict_t *pSoundSource = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, pEdict);
+   bots[0] = bot;
+   bots[0].pEdict = pEdict;
+
+   bots[0].pBotEnemy = NULL;
+   bots[0].b_low_health = FALSE;
+   bots[0].b_has_enough_ammo_for_good_weapon = TRUE;
+   bots[0].b_only_has_weak_weapons = TRUE;
+   bots[0].f_waypoint_goal_time = 0; // expired
+   pEdict->v.health = 100;
+   skill_settings[bots[0].bot_skill].hearing_sensitivity = 1.0f;
+
+   // Set up sound that would normally be tracked
+   pEdict->v.origin = Vector(0, 0, 0);
+   mock_sounds[0].m_vecOrigin = Vector(100, 0, 0);
+   mock_sounds[0].m_iVolume = 1000;
+   mock_sounds[0].m_iBotOwner = 99;
+   mock_sounds[0].m_pEdict = pSoundSource;
+   mock_sounds[0].m_iNext = SOUNDLIST_EMPTY;
+   mock_active_sound_list = 0;
+
+   setup_waypoint(0, Vector(100, 0, 0));
+   setup_waypoint(1, Vector(0, 0, 0));
+   mock_WaypointFindNearest_result = 0;
+   mock_WaypointDistanceFromTo_result = 100.0f;
+   bots[0].curr_waypoint_index = 1;
+
+   mock_random_float_ret = 0.0f;
+   skill_settings[bots[0].bot_skill].track_sound_time_min = 5.0f;
+   skill_settings[bots[0].bot_skill].track_sound_time_max = 10.0f;
+
+   BotFindWaypointGoal(bots[0]);
+
+   // Should NOT have started tracking sound
+   ASSERT_TRUE(bots[0].wpt_goal_type != WPT_GOAL_TRACK_SOUND);
+   PASS();
+   return 0;
+}
+
+// ============================================================
 // Main
 // ============================================================
 
@@ -5033,6 +5110,10 @@ int main(void)
 
    printf("=== Additional BotCanJumpUp tests ===\n");
    failures += test_can_jump_up_left_side_blocked();
+
+   printf("=== Weak weapon navigation tests ===\n");
+   failures += test_track_sound_weak_weapons();
+   failures += test_find_waypoint_goal_weak_weapons_no_sound();
 
    printf("=== Random-dependent path tests ===\n");
    failures += test_random_turn_180_degree();

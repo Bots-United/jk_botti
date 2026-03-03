@@ -1106,6 +1106,105 @@ static int test_MP5_launch_angle(void)
 }
 
 // ============================================================
+// 14. BotIsWeakWeapon tests
+// ============================================================
+
+static int test_BotIsWeakWeapon(void)
+{
+   printf("BotIsWeakWeapon:\n");
+
+   TEST("Glock -> TRUE");
+   ASSERT_INT(BotIsWeakWeapon(VALVE_WEAPON_GLOCK), TRUE);
+   PASS();
+
+   TEST("Shotgun -> FALSE");
+   ASSERT_INT(BotIsWeakWeapon(VALVE_WEAPON_SHOTGUN), FALSE);
+   PASS();
+
+   TEST("MP5 -> FALSE");
+   ASSERT_INT(BotIsWeakWeapon(VALVE_WEAPON_MP5), FALSE);
+   PASS();
+
+   TEST("Crowbar -> FALSE");
+   ASSERT_INT(BotIsWeakWeapon(VALVE_WEAPON_CROWBAR), FALSE);
+   PASS();
+
+   TEST("Egon -> FALSE");
+   ASSERT_INT(BotIsWeakWeapon(VALVE_WEAPON_EGON), FALSE);
+   PASS();
+
+   TEST("RPG -> FALSE");
+   ASSERT_INT(BotIsWeakWeapon(VALVE_WEAPON_RPG), FALSE);
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
+// 15. BotHasOnlyWeakWeapons tests
+// ============================================================
+
+static int test_BotHasOnlyWeakWeapons(void)
+{
+   printf("BotHasOnlyWeakWeapons:\n");
+
+   mock_reset();
+   submod_id = SUBMOD_HLDM;
+   submod_weaponflag = WEAPON_SUBMOD_HLDM;
+   InitWeaponSelect(SUBMOD_HLDM);
+   setup_weapon_defs_valve();
+
+   edict_t *pe = mock_alloc_edict();
+   bot_t bot;
+   setup_bot(bot, pe);
+
+   TEST("no weapons -> TRUE (no usable fire weapons)");
+   pe->v.weapons = 0;
+   ASSERT_INT(BotHasOnlyWeakWeapons(bot), TRUE);
+   PASS();
+
+   TEST("only Glock with ammo -> TRUE");
+   pe->v.weapons = (1u << VALVE_WEAPON_GLOCK);
+   bot.m_rgAmmo[1] = 50; // 9mm
+   ASSERT_INT(BotHasOnlyWeakWeapons(bot), TRUE);
+   PASS();
+
+   TEST("Glock + Shotgun with ammo -> FALSE");
+   pe->v.weapons = (1u << VALVE_WEAPON_GLOCK) | (1u << VALVE_WEAPON_SHOTGUN);
+   bot.m_rgAmmo[1] = 50; // 9mm
+   bot.m_rgAmmo[3] = 20; // buckshot
+   ASSERT_INT(BotHasOnlyWeakWeapons(bot), FALSE);
+   PASS();
+
+   TEST("only Shotgun with ammo -> FALSE");
+   pe->v.weapons = (1u << VALVE_WEAPON_SHOTGUN);
+   bot.m_rgAmmo[3] = 20;
+   ASSERT_INT(BotHasOnlyWeakWeapons(bot), FALSE);
+   PASS();
+
+   TEST("Glock with no ammo -> TRUE (not usable)");
+   pe->v.weapons = (1u << VALVE_WEAPON_GLOCK);
+   bot.m_rgAmmo[1] = 0;
+   ASSERT_INT(BotHasOnlyWeakWeapons(bot), TRUE);
+   PASS();
+
+   TEST("Glock + crowbar (melee skipped) -> TRUE");
+   pe->v.weapons = (1u << VALVE_WEAPON_GLOCK) | (1u << VALVE_WEAPON_CROWBAR);
+   bot.m_rgAmmo[1] = 50;
+   ASSERT_INT(BotHasOnlyWeakWeapons(bot), TRUE);
+   PASS();
+
+   TEST("Glock + handgrenade (avoided skipped) -> TRUE");
+   pe->v.weapons = (1u << VALVE_WEAPON_GLOCK) | (1u << VALVE_WEAPON_HANDGRENADE);
+   bot.m_rgAmmo[1] = 50;
+   bot.m_rgAmmo[11] = 5;
+   ASSERT_INT(BotHasOnlyWeakWeapons(bot), TRUE);
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
 // Main
 // ============================================================
 
@@ -1148,6 +1247,10 @@ int main(void)
    rc |= test_BotGetBetterWeaponChoice();
    printf("\n");
    rc |= test_MP5_launch_angle();
+   printf("\n");
+   rc |= test_BotIsWeakWeapon();
+   printf("\n");
+   rc |= test_BotHasOnlyWeakWeapons();
 
    printf("\n%d/%d tests passed.\n", tests_passed, tests_run);
 

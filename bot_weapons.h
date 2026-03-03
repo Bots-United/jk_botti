@@ -221,5 +221,8 @@ int BotGetBetterWeaponChoice(bot_t &pBot, const bot_weapon_select_t &current, co
 
 qboolean IsValidToFireAtTheMoment(bot_t &pBot, const bot_weapon_select_t &select);
 qboolean BotWeaponCanAttack(bot_t &pBot, const qboolean GoodWeaponsOnly);
+qboolean BotIsWeakWeapon(int iId);
+qboolean BotHasOnlyWeakWeapons(bot_t &pBot);
+float BotCombatDisengageTime(const bot_t &pBot);
 qboolean BotGetGoodWeaponCount(bot_t &pBot, const int stop_count);
 #endif // BOT_WEAPONS_H
