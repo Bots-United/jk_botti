@@ -66,8 +66,9 @@
 #define WEAPON_SUBMOD_BUBBLEMOD (1<<2)
 #define WEAPON_SUBMOD_XDM (1<<3)
 #define WEAPON_SUBMOD_OP4 (1<<4)
+#define WEAPON_SUBMOD_ARENA (1<<5)
 
-#define WEAPON_SUBMOD_ALL (WEAPON_SUBMOD_HLDM|WEAPON_SUBMOD_SEVS|WEAPON_SUBMOD_BUBBLEMOD|WEAPON_SUBMOD_XDM|WEAPON_SUBMOD_OP4)
+#define WEAPON_SUBMOD_ALL (WEAPON_SUBMOD_HLDM|WEAPON_SUBMOD_SEVS|WEAPON_SUBMOD_BUBBLEMOD|WEAPON_SUBMOD_XDM|WEAPON_SUBMOD_OP4|WEAPON_SUBMOD_ARENA)
 
 typedef struct
 {
@@ -129,7 +130,7 @@ typedef struct
    char ammoName[64];
 } bot_ammo_names_t;
 
-#define NUM_OF_WEAPON_SELECTS 23
+#define NUM_OF_WEAPON_SELECTS 26
 
 extern bot_weapon_select_t weapon_select[NUM_OF_WEAPON_SELECTS];
 extern bot_fire_delay_t fire_delay[NUM_OF_WEAPON_SELECTS];
@@ -169,6 +170,11 @@ enum ammo_low_t {
 #define GEARBOX_WEAPON_SPORELAUNCHER 23
 #define GEARBOX_WEAPON_SNIPERRIFLE   24
 #define GEARBOX_WEAPON_KNIFE         25
+
+// weapon ID values for extra weapons from HL:Arena
+#define ARENA_WEAPON_9MMSILENCED     26
+#define ARENA_WEAPON_AUTOSHOTGUN     27
+#define ARENA_WEAPON_BURSTRIFLE      28
 
 // in normal gravity, how far the longjump hurls us
 #define LONGJUMP_DISTANCE  540
