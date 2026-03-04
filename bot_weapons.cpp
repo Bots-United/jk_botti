@@ -151,6 +151,12 @@ bot_weapon_select_t valve_weapon_select[NUM_OF_WEAPON_SELECTS] =
     20, TRUE, 100, 0, 0, TRUE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
     W_IFL_KNIFE, 0, 0, FALSE, FALSE },
 
+   {GEARBOX_WEAPON_PENGUIN, WEAPON_SUBMOD_OP4, "weapon_penguin", WEAPON_THROW, 1.0,
+    SKILL3, NOSKILL, FALSE, FALSE,
+    128.0, 800.0, 0, 0, 300.0,
+    20, FALSE, 100, 1, 0, FALSE, FALSE, FALSE, FALSE, 0.0, 0.0, FALSE, -1, -1,
+    0, 0, 0, TRUE, FALSE },
+
    {GEARBOX_WEAPON_GRAPPLE, WEAPON_SUBMOD_OP4, "weapon_grapple", WEAPON_MELEE, 1.0,
     SKILL4, NOSKILL, TRUE, FALSE,
     0.0, 200.0, 0, 0, 100.0,
@@ -282,6 +288,9 @@ bot_fire_delay_t valve_fire_delay[NUM_OF_WEAPON_SELECTS] = {
    {GEARBOX_WEAPON_KNIFE,
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
+   {GEARBOX_WEAPON_PENGUIN,
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
+    0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
    {GEARBOX_WEAPON_GRAPPLE,
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0},
     0.0, {0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0}},
@@ -356,13 +365,21 @@ void InitWeaponSelect(int submod_id)
 bot_weapon_select_t * GetWeaponSelect(int id)
 {
    bot_weapon_select_t * pSelect = weapon_select;
+   bot_weapon_select_t * pFirst = NULL;
 
    do {
       if(pSelect->iId == id)
-         return(pSelect);
+      {
+         if(!pFirst)
+            pFirst = pSelect;
+
+         // prefer entry matching active submod
+         if(submod_weaponflag && (pSelect->supported_submods & submod_weaponflag))
+            return(pSelect);
+      }
    } while((++pSelect)->iId);
 
-   return(NULL);
+   return(pFirst);
 }
 
 
@@ -746,7 +763,11 @@ qboolean BotWeaponCanAttack(bot_t &pBot, const qboolean GoodWeaponsOnly)
 
 qboolean BotIsWeakWeapon(int iId)
 {
-   return (iId == VALVE_WEAPON_GLOCK || iId == ARENA_WEAPON_9MMSILENCED);
+   if (iId == VALVE_WEAPON_GLOCK)
+      return TRUE;
+   if (iId == ARENA_WEAPON_9MMSILENCED && (submod_weaponflag & WEAPON_SUBMOD_ARENA))
+      return TRUE;
+   return FALSE;
 }
 
 float BotCombatDisengageTime(const bot_t &pBot)

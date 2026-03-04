@@ -144,6 +144,12 @@ static void setup_weapon_defs_valve(void)
    weapon_defs[VALVE_WEAPON_SNARK].iAmmo1 = 9;
    weapon_defs[VALVE_WEAPON_SNARK].iAmmo1Max = 15;
    weapon_defs[VALVE_WEAPON_SNARK].iAmmo2 = -1;
+
+   // Penguin (OP4): primary=penguins(12), no secondary
+   weapon_defs[GEARBOX_WEAPON_PENGUIN].iId = GEARBOX_WEAPON_PENGUIN;
+   weapon_defs[GEARBOX_WEAPON_PENGUIN].iAmmo1 = 12;
+   weapon_defs[GEARBOX_WEAPON_PENGUIN].iAmmo1Max = 9;
+   weapon_defs[GEARBOX_WEAPON_PENGUIN].iAmmo2 = -1;
 }
 
 // ============================================================
@@ -1138,8 +1144,15 @@ static int test_BotIsWeakWeapon(void)
    ASSERT_INT(BotIsWeakWeapon(VALVE_WEAPON_RPG), FALSE);
    PASS();
 
-   TEST("Silenced 9mm -> TRUE");
+   TEST("Silenced 9mm in Arena -> TRUE");
+   submod_weaponflag = WEAPON_SUBMOD_ARENA;
    ASSERT_INT(BotIsWeakWeapon(ARENA_WEAPON_9MMSILENCED), TRUE);
+   PASS();
+
+   TEST("ID 26 in OP4 (penguin, not silenced) -> FALSE");
+   submod_weaponflag = WEAPON_SUBMOD_OP4;
+   ASSERT_INT(BotIsWeakWeapon(GEARBOX_WEAPON_PENGUIN), FALSE);
+   submod_weaponflag = WEAPON_SUBMOD_HLDM;
    PASS();
 
    TEST("Autoshotgun -> FALSE");
@@ -1272,9 +1285,10 @@ static int test_arena_weapons(void)
    submod_weaponflag = WEAPON_SUBMOD_OP4;
    InitWeaponSelect(SUBMOD_OP4);
 
+   // GetWeaponSelect(26) returns penguin in OP4 mode (same ID, submod-aware).
    silenced = GetWeaponSelect(ARENA_WEAPON_9MMSILENCED);
    ASSERT_PTR_NOT_NULL(silenced);
-   ASSERT_INT(IsValidWeaponChoose(bot, *silenced), FALSE);
+   ASSERT_STR(silenced->weapon_name, "weapon_penguin");
    PASS();
 
    TEST("7 OP4 weapons valid in ARENA submod");

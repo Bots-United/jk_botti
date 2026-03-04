@@ -1446,6 +1446,11 @@ static void BotFindItem_CheckSpecialEntity(bot_t &pBot, edict_t *pent,
    else if (strcmp("monster_snark", item_name) == 0)
    {
    }
+
+   // check if entity is a penguin (OP4 snark reskin)
+   else if (strcmp("monster_penguin", item_name) == 0)
+   {
+   }
 }
 
 

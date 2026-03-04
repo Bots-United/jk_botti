@@ -1014,6 +1014,9 @@ static void BotFindEnemySearchMonsters(bot_t &pBot, edict_t *&pNewEnemy, Vector 
       if (FIsClassname(pMonster, "monster_snark"))
          continue; // skip snarks
 
+      if (FIsClassname(pMonster, "monster_penguin"))
+         continue; // skip penguins
+
       if (pMonster->v.health > 4000)
          continue; // skip monsters with large health
 
