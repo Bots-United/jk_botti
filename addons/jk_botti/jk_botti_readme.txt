@@ -1,4 +1,4 @@
-jk_botti 1.45
+jk_botti 1.50
 -------------
 
 1. Intro
@@ -10,7 +10,7 @@ jk_botti 1.45
 1. Intro
 --------------------
 
-This is 1.45 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@iki.fi>
+This is 1.50 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@iki.fi>
 You are free to use code for any of your needs.
 
 jk_botti is computer gamer for multiplayer mode of Half-Life (HLDM) and has 
@@ -66,6 +66,82 @@ Credits:
 --------------------
 2. What's new
 --------------------
+1.50:
+ New features:
+ * Add HL:Arena submod support with 3 new weapons (silenced Glock, auto
+   shotgun, burst rifle) and 7 reused OP4 weapons (#77)
+ * Add Opposing Force penguin weapon support (snark reskin) (#80)
+ * Bots with only a weak weapon (Glock) now avoid combat and seek better
+   weapons, but still fight back in self-defense (#79)
+
+ Bug fixes:
+ * Fix always-true condition in retreat logic making health/ammo retreat
+   checks dead code (#78)
+ * Fix BotCanJumpUp not setting duck flag for crouch-jumps, causing bots
+   to get stuck on obstacles (#49)
+ * Fix BotSecondaryAmmoLow checking wrong ammo index (#47)
+ * Fix 3 copy-paste bugs in bot_navigate.cpp: duck-jump side check, wall
+   detection timestamps, drop detection condition (#48)
+ * Fix BotCanDuckUnder regression from refactoring (#72)
+ * Fix WaypointFindRandomGoal always overwriting first result (#44)
+ * Fix WaypointFindItem operator precedence bug (#44)
+ * Fix SaveSound owner-match bug preventing sound owner tracking (#52)
+ * Fix RANDOM_LONG2 off-by-one and fast_random_seed state corruption (#37)
+ * Fix safe_strcopy buffer underflow on zero-size destination (#38)
+ * Fix undefined behavior from left-shifting signed int (#34)
+ * Fix IsPlayerFacingWall stale vector, JKASSERT argument swap,
+   UTIL_HostSay buffer overflow, GetGameDir crash (#40)
+ * Fix BotChatFillInName crash with no players present (#41)
+ * Fix DIR handle leak in LoadBotModels (#64)
+ * Fix BotFindItem not picking up weapons bot already owns (#65)
+ * Fix AmmoPickup using assignment instead of accumulation (#65)
+ * Fix BotAllWeaponsRunningOutOfAmmo being too aggressive (#65)
+ * Fix weapon recoil check using wrong boolean operator (#65)
+ * Fix MP5 grenade interpolation weights inverted (#65)
+ * Fix uninitialized v_player position in BotFindEnemy (#65)
+ * Fix sound enemy direction not set for v_newenemy (#65)
+ * Fix BotUpdateTrackSoundGoal timeout never triggering (#65)
+ * Fix ClientSoundIndex returning bogus out-of-range values (#65)
+ * Fix GetEdictChannelSound silently dropping channel 0 sounds (#65)
+ * Fix new_PM_PlaySound wrong volume formula (#65)
+ * Fix BotDoStrafe ladder condition always-true tautology (#65)
+ * Fix BotChangePitch/BotChangeYaw returning pre-turn diff (#65)
+ * Fix FVisibleEnemy feet_offset going below bounding box (#65)
+ * Fix BotHeadTowardWaypoint identical if/else branches (#65)
+ * Fix WaypointFindRunawayPath checking wrong constant (#65)
+ * Fix WaypointFindItem parenthesization bug (#65)
+ * Fix WaypointReachable water surface detection dead code (#65)
+ * Fix BotChatTalk setting cooldown before percent check (#65)
+ * Fix BotChatFillInName comparing processed vs raw names (#65)
+ * Fix bot_whine_percent/bot_endgame_percent wrong print type (#65)
+ * Fix m_rgAmmo out-of-bounds array access (#65)
+ * Fix GetSpecificTeam only_count_bots logic inverted (#65)
+ * Fix BotPickLogo wrapping at wrong index (#65)
+ * Fix BotSwapCharacter missing bounds guard (#65)
+ * Fix ScreenFade integer truncation (#65)
+ * Fix missing botMsgFunction NULL reset (#65)
+ * Fix get_crossover_interleave off-by-one (#65)
+
+ Improvements:
+ * Improve PRNG quality: use rotates, better LCG constants (#37)
+ * Add jk_botti_mm.so symlink to release directory (#46)
+
+ Refactoring:
+ * Refactor commands.cpp: replace macros with helper functions,
+   extract sub-functions (#66)
+ * Break up large functions across 8 source files into smaller
+   sub-functions: bot.cpp, bot_combat.cpp, bot_navigate.cpp,
+   bot_weapons.cpp, bot_chat.cpp, dll.cpp, waypoint.cpp (#67-#76)
+
+ Internal:
+ * Add comprehensive unit test suite with 95% line coverage and
+   97% function coverage (#41, #44, #47, #50-#64, #68)
+ * Add gcov coverage collection for unit tests (#54)
+ * Separate linux and win32 build output directories (#45)
+ * Require tests to pass before creating release artifact (#39)
+ * Clean up whitespace, includes, and dead code (#36, #38, #42)
+ * Improve neuralnet/geneticalg experimental code (#35)
+
 1.45:
  New features:
  * Bots can now use satchel charges (issue #15)
