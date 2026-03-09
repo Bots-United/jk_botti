@@ -4,6 +4,11 @@
 // util.h
 //
 
+inline int UTIL_IsStringEmpty(const char *str)
+{
+   return str[0] == '\0';
+}
+
 void null_terminate_buffer(char *buf, const size_t maxlen);
 
 double UTIL_GetSecs(void);
