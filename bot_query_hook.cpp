@@ -268,7 +268,7 @@ Bots     byte  Number of bots on the server.
       goto out;
 
    // environment, linux or windows
-   if (*msg != 'W' && *msg != 'W' && *msg != 'L' && *msg != 'l')
+   if (*msg != 'W' && *msg != 'w' && *msg != 'L' && *msg != 'l')
       goto out;
    msg++;
    len--;
