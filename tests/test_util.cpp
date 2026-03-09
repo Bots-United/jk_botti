@@ -1185,6 +1185,34 @@ static int test_bot_inline_funcs(void)
 }
 
 // ============================================================
+// UTIL_IsStringEmpty tests
+// ============================================================
+
+static int test_is_string_empty(void)
+{
+   printf("UTIL_IsStringEmpty:\n");
+
+   TEST("empty string -> true");
+   ASSERT_TRUE(UTIL_IsStringEmpty(""));
+   PASS();
+
+   TEST("null terminator only -> true");
+   char buf[4] = {'\0', 'a', 'b', '\0'};
+   ASSERT_TRUE(UTIL_IsStringEmpty(buf));
+   PASS();
+
+   TEST("non-empty string -> false");
+   ASSERT_TRUE(!UTIL_IsStringEmpty("hello"));
+   PASS();
+
+   TEST("single char string -> false");
+   ASSERT_TRUE(!UTIL_IsStringEmpty("x"));
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
 // UTIL_VarArgs2 tests
 // ============================================================
 
@@ -1924,6 +1952,9 @@ int main(void)
 
    // bot_inline_funcs.h coverage
    fail |= test_bot_inline_funcs();
+
+   // String helper tests
+   fail |= test_is_string_empty();
 
    // New coverage tests
    fail |= test_varargs2();
