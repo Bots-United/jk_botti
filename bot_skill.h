@@ -4,6 +4,9 @@
 // bot_skill.h
 //
 
+#ifndef BOT_SKILL_H
+#define BOT_SKILL_H
+
 #define BEST_BOT_LEVEL 0
 #define WORST_BOT_LEVEL 4
 
@@ -69,3 +72,5 @@ typedef struct
 extern bot_skill_settings_t skill_settings[5];
 
 void ResetSkillsToDefault(void);
+
+#endif

@@ -4,6 +4,8 @@
 // bot_client.h
 //
 
+#ifndef BOT_CLIENT_H
+#define BOT_CLIENT_H
 
 void BotClient_Valve_WeaponList(void *p, int bot_index);
 
@@ -27,3 +29,5 @@ void BotClient_Valve_Damage(void *p, int bot_index);
 void BotClient_Valve_DeathMsg(void *p, int bot_index);
 
 void BotClient_Valve_ScreenFade(void *p, int bot_index);
+
+#endif
