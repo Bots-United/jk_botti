@@ -523,6 +523,38 @@ static int test_goldsrc_info_zeros_bot_count(void)
    return 0;
 }
 
+static int test_goldsrc_info_lowercase_env(void)
+{
+   TEST("handle_goldsrc_server_info: lowercase 'w' env accepted");
+   reset_test_state();
+   gpGlobals->maxClients = 32;
+
+   unsigned char buf[256];
+   build_header(buf, 'm');
+   size_t off = 5;
+   off = append_string(buf, off, "127.0.0.1:27015");
+   off = append_string(buf, off, "Test Server");
+   off = append_string(buf, off, "de_dust2");
+   off = append_string(buf, off, "valve");
+   off = append_string(buf, off, "Half-Life");
+   buf[off++] = 10;   // players
+   buf[off++] = 32;   // max players
+   buf[off++] = 48;   // protocol
+   buf[off++] = 'd';  // server type (lowercase)
+   buf[off++] = 'w';  // environment (lowercase windows)
+   buf[off++] = 0;    // visibility
+   buf[off++] = 0;    // is_mod
+   buf[off++] = 1;    // VAC
+   buf[off++] = 3;    // bots (should be zeroed)
+
+   ssize_t ret = handle_goldsrc_server_info_reply(0, buf, off, 0, NULL, 0);
+   ASSERT_INT((int)ret, (int)off);
+   ASSERT_INT(last_sendto_buf[off - 1], 0);  // bots zeroed
+
+   PASS();
+   return 0;
+}
+
 // ============================================================
 // main
 // ============================================================
@@ -549,6 +581,7 @@ int main(void)
    fail |= test_source_info_zeros_bot_count();
    fail |= test_source_info_maxclients_mismatch();
    fail |= test_goldsrc_info_zeros_bot_count();
+   fail |= test_goldsrc_info_lowercase_env();
 
    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
    return fail ? EXIT_FAILURE : EXIT_SUCCESS;
