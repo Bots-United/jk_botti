@@ -4,6 +4,9 @@
 // util.h
 //
 
+#ifndef UTIL_H
+#define UTIL_H
+
 inline int UTIL_IsStringEmpty(const char *str)
 {
    return str[0] == '\0';
@@ -68,3 +71,5 @@ Vector VecBModelOrigin(edict_t *pEdict);
 qboolean IsAlive(const edict_t *pEdict);
 
 qboolean FInViewCone(const Vector & Origin, edict_t *pEdict);
+
+#endif

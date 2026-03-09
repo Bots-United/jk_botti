@@ -4,6 +4,9 @@
 // bot_config_init.h
 //
 
+#ifndef BOT_CONFIG_INIT_H
+#define BOT_CONFIG_INIT_H
+
 #define MAX_BOT_NAMES 100
 #define MAX_BOT_LOGOS 100
 
@@ -15,3 +18,5 @@ extern char bot_logos[MAX_BOT_LOGOS][16];
 
 void BotLogoInit(void);
 void BotNameInit(void);
+
+#endif

@@ -1,3 +1,6 @@
+#ifndef BOT_QUERY_HOOK_H
+#define BOT_QUERY_HOOK_H
+
 #ifdef _WIN32
    #define WIN32_LEAN_AND_MEAN
    #include <windows.h>
@@ -22,3 +25,5 @@ void UTIL_ConsolePrintf( const char *fmt, ... );
 void BotReplaceConnectionTime(const char * name, float * timeslot);
 
 extern int bot_conntimes;
+
+#endif
