@@ -426,8 +426,8 @@ __attribute__((weak)) qboolean BotCheckWallOnRight(bot_t &pBot) { (void)pBot; re
 __attribute__((weak)) qboolean BotCheckWallOnForward(bot_t &pBot) { (void)pBot; return FALSE; }
 __attribute__((weak)) qboolean BotCheckWallOnBack(bot_t &pBot) { (void)pBot; return FALSE; }
 __attribute__((weak)) void BotLookForDrop(bot_t &pBot) { (void)pBot; }
-__attribute__((weak)) void BotRemoveEnemy(bot_t &pBot, qboolean b_keep_tracking)
-{ (void)pBot; (void)b_keep_tracking; }
+__attribute__((weak)) void BotRemoveEnemy(bot_t &pBot, qboolean b_keep_tracking, const char *reason)
+{ (void)pBot; (void)b_keep_tracking; (void)reason; }
 
 // bot_sound.cpp (weak: overridden by test_bot_sound.cpp which links bot_sound.o)
 __attribute__((weak)) void CSound::Clear(void) {}

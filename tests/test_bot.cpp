@@ -215,7 +215,7 @@ int WaypointFindNearest(const Vector &v_origin, const Vector &v_offset,
 static int mock_WaypointFindRunawayPath_ret = -1;
 int WaypointFindRunawayPath(int runner, int enemy) { (void)runner; (void)enemy; return mock_WaypointFindRunawayPath_ret; }
 
-void BotRemoveEnemy(bot_t &pBot, qboolean b_keep_tracking) { pBot.pBotEnemy = NULL; (void)b_keep_tracking; }
+void BotRemoveEnemy(bot_t &pBot, qboolean b_keep_tracking, const char *reason) { pBot.pBotEnemy = NULL; (void)b_keep_tracking; (void)reason; }
 
 void BotLookForDrop(bot_t &pBot) { (void)pBot; }
 float wp_display_time[MAX_WAYPOINTS];

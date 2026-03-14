@@ -7,6 +7,8 @@
 #ifndef BOT_TRACE_H
 #define BOT_TRACE_H
 
+#include "safe_snprintf.h"
+
 // Trace logging levels
 #define BOT_TRACE_OFF      0
 #define BOT_TRACE_LOG      1  // log to server log only (UTIL_LogPrintf)
@@ -27,7 +29,18 @@ void BotTraceUpdateCache(void);
 // calling the function, avoiding all call overhead when tracing is off.
 void BotTracePrintf(bot_t &pBot, const char *fmt, ...);
 
+// Convert WPT_GOAL_* constant to readable string
+const char *BotTraceGoalTypeName(int goal_type);
+
+// Build compact "weapon:ammo weapon:ammo ..." summary of bot's inventory
+void BotTraceAmmoSummary(bot_t &pBot, char *buf, size_t bufsize);
+
 #define BotTrace(pBot, fmt, ...) \
    do { if (bot_trace_level > 0) BotTracePrintf(pBot, fmt, ##__VA_ARGS__); } while(0)
+
+// Format a string only when tracing is active. Skips snprintf overhead when off.
+#define BotTraceFormat(buf, bufsize, fmt, ...) \
+   do { if (bot_trace_level > 0) safevoid_snprintf(buf, bufsize, fmt, ##__VA_ARGS__); \
+        else buf[0] = '\0'; } while(0)
 
 #endif // BOT_TRACE_H

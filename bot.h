@@ -214,6 +214,7 @@ typedef struct
    float f_waypoint_goal_time;
    float prev_waypoint_distance;
    int wpt_goal_type;
+   int trace_last_stuck_wpt;         // dedup: last wpt logged for stuck trace
    edict_t *pTrackSoundEdict;        // used when wpt_goal_type == WPT_GOAL_TRACK_SOUND
    float f_track_sound_time;         // how long we track sound?
 

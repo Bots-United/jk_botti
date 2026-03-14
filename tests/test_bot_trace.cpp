@@ -16,7 +16,11 @@
 
 #include "bot.h"
 #include "bot_func.h"
+#include "bot_weapons.h"
 #include "bot_trace.h"
+
+extern bot_weapon_t weapon_defs[MAX_WEAPONS];
+extern int submod_id;
 
 #include "engine_mock.h"
 #include "test_common.h"
@@ -403,6 +407,203 @@ static int test_macro_no_varargs(void)
 }
 
 // ============================================================
+// BotTraceGoalTypeName tests
+// ============================================================
+
+static int test_goal_type_names(void)
+{
+   TEST("BotTraceGoalTypeName: all known types");
+   ASSERT_STR(BotTraceGoalTypeName(WPT_GOAL_NONE), "none");
+   ASSERT_STR(BotTraceGoalTypeName(WPT_GOAL_HEALTH), "health");
+   ASSERT_STR(BotTraceGoalTypeName(WPT_GOAL_ARMOR), "armor");
+   ASSERT_STR(BotTraceGoalTypeName(WPT_GOAL_WEAPON), "weapon");
+   ASSERT_STR(BotTraceGoalTypeName(WPT_GOAL_AMMO), "ammo");
+   ASSERT_STR(BotTraceGoalTypeName(WPT_GOAL_ITEM), "item");
+   ASSERT_STR(BotTraceGoalTypeName(WPT_GOAL_LOCATION), "location");
+   ASSERT_STR(BotTraceGoalTypeName(WPT_GOAL_TRACK_SOUND), "track_sound");
+   ASSERT_STR(BotTraceGoalTypeName(WPT_GOAL_ENEMY), "enemy");
+   PASS();
+
+   TEST("BotTraceGoalTypeName: unknown type -> unknown");
+   ASSERT_STR(BotTraceGoalTypeName(999), "unknown");
+   ASSERT_STR(BotTraceGoalTypeName(-1), "unknown");
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
+// BotTraceAmmoSummary tests
+// ============================================================
+
+static void setup_weapon_defs_for_ammo_test(void)
+{
+   memset(weapon_defs, 0, sizeof(weapon_defs));
+
+   // glock (id=2): ammo index 0
+   weapon_defs[VALVE_WEAPON_GLOCK].iId = VALVE_WEAPON_GLOCK;
+   weapon_defs[VALVE_WEAPON_GLOCK].iAmmo1 = 0;
+
+   // shotgun (id=7): ammo index 1
+   weapon_defs[VALVE_WEAPON_SHOTGUN].iId = VALVE_WEAPON_SHOTGUN;
+   weapon_defs[VALVE_WEAPON_SHOTGUN].iAmmo1 = 1;
+
+   // crowbar (id=1): no ammo (melee)
+   weapon_defs[VALVE_WEAPON_CROWBAR].iId = VALVE_WEAPON_CROWBAR;
+   weapon_defs[VALVE_WEAPON_CROWBAR].iAmmo1 = -1;
+
+   // python (id=3): ammo index 2
+   weapon_defs[VALVE_WEAPON_PYTHON].iId = VALVE_WEAPON_PYTHON;
+   weapon_defs[VALVE_WEAPON_PYTHON].iAmmo1 = 2;
+
+   // hornetgun (id=11): no ammo
+   weapon_defs[VALVE_WEAPON_HORNETGUN].iId = VALVE_WEAPON_HORNETGUN;
+   weapon_defs[VALVE_WEAPON_HORNETGUN].iAmmo1 = -1;
+
+   InitWeaponSelect(SUBMOD_HLDM);
+}
+
+static int test_ammo_summary_basic(void)
+{
+   TEST("BotTraceAmmoSummary: basic weapons with ammo");
+   reset_trace_test();
+   setup_weapon_defs_for_ammo_test();
+
+   bot_t *pBot = setup_bot("AmmoBot");
+   ASSERT_PTR_NOT_NULL(pBot);
+
+   // Give bot glock(50) and shotgun(0)
+   pBot->pEdict->v.weapons = (1u << VALVE_WEAPON_GLOCK) | (1u << VALVE_WEAPON_SHOTGUN);
+   pBot->m_rgAmmo[0] = 50;  // glock ammo
+   pBot->m_rgAmmo[1] = 0;   // shotgun ammo
+
+   char buf[128];
+   BotTraceAmmoSummary(*pBot, buf, sizeof(buf));
+
+   ASSERT_TRUE(strstr(buf, "gl50") != NULL);
+   ASSERT_TRUE(strstr(buf, "sg0") != NULL);
+   PASS();
+   return 0;
+}
+
+static int test_ammo_summary_skips_melee(void)
+{
+   TEST("BotTraceAmmoSummary: skips melee weapons");
+   reset_trace_test();
+   setup_weapon_defs_for_ammo_test();
+
+   bot_t *pBot = setup_bot("MeleeBot");
+   ASSERT_PTR_NOT_NULL(pBot);
+
+   // Give bot crowbar + glock
+   pBot->pEdict->v.weapons = (1u << VALVE_WEAPON_CROWBAR) | (1u << VALVE_WEAPON_GLOCK);
+   pBot->m_rgAmmo[0] = 25;
+
+   char buf[128];
+   BotTraceAmmoSummary(*pBot, buf, sizeof(buf));
+
+   // crowbar should NOT appear (melee)
+   ASSERT_TRUE(strstr(buf, "cw") == NULL);
+   // glock should appear
+   ASSERT_TRUE(strstr(buf, "gl25") != NULL);
+   PASS();
+   return 0;
+}
+
+static int test_ammo_summary_skips_no_ammo_weapons(void)
+{
+   TEST("BotTraceAmmoSummary: skips weapons with no ammo type");
+   reset_trace_test();
+   setup_weapon_defs_for_ammo_test();
+
+   bot_t *pBot = setup_bot("HornetBot");
+   ASSERT_PTR_NOT_NULL(pBot);
+
+   // Give bot hornetgun + shotgun
+   pBot->pEdict->v.weapons = (1u << VALVE_WEAPON_HORNETGUN) | (1u << VALVE_WEAPON_SHOTGUN);
+   pBot->m_rgAmmo[1] = 32;
+
+   char buf[128];
+   BotTraceAmmoSummary(*pBot, buf, sizeof(buf));
+
+   // hornetgun should NOT appear (iAmmo1 == -1)
+   ASSERT_TRUE(strstr(buf, "hr") == NULL);
+   ASSERT_TRUE(strstr(buf, "sg32") != NULL);
+   PASS();
+   return 0;
+}
+
+static int test_ammo_summary_no_weapons(void)
+{
+   TEST("BotTraceAmmoSummary: no weapons -> empty string");
+   reset_trace_test();
+   setup_weapon_defs_for_ammo_test();
+
+   bot_t *pBot = setup_bot("EmptyBot");
+   ASSERT_PTR_NOT_NULL(pBot);
+
+   pBot->pEdict->v.weapons = 0;
+
+   char buf[128];
+   BotTraceAmmoSummary(*pBot, buf, sizeof(buf));
+
+   ASSERT_STR(buf, "");
+   PASS();
+   return 0;
+}
+
+static int test_ammo_summary_no_separators(void)
+{
+   TEST("BotTraceAmmoSummary: no spaces or colons between entries");
+   reset_trace_test();
+   setup_weapon_defs_for_ammo_test();
+
+   bot_t *pBot = setup_bot("FmtBot");
+   ASSERT_PTR_NOT_NULL(pBot);
+
+   pBot->pEdict->v.weapons = (1u << VALVE_WEAPON_GLOCK) | (1u << VALVE_WEAPON_SHOTGUN);
+   pBot->m_rgAmmo[0] = 50;
+   pBot->m_rgAmmo[1] = 8;
+
+   char buf[128];
+   BotTraceAmmoSummary(*pBot, buf, sizeof(buf));
+
+   // No spaces or colons
+   ASSERT_TRUE(strchr(buf, ' ') == NULL);
+   ASSERT_TRUE(strchr(buf, ':') == NULL);
+   // Should contain both weapons concatenated
+   ASSERT_TRUE(strstr(buf, "gl50") != NULL);
+   ASSERT_TRUE(strstr(buf, "sg8") != NULL);
+   PASS();
+   return 0;
+}
+
+static int test_ammo_summary_small_buffer(void)
+{
+   TEST("BotTraceAmmoSummary: truncates with small buffer");
+   reset_trace_test();
+   setup_weapon_defs_for_ammo_test();
+
+   bot_t *pBot = setup_bot("TruncBot");
+   ASSERT_PTR_NOT_NULL(pBot);
+
+   pBot->pEdict->v.weapons = (1u << VALVE_WEAPON_GLOCK) | (1u << VALVE_WEAPON_SHOTGUN) | (1u << VALVE_WEAPON_PYTHON);
+   pBot->m_rgAmmo[0] = 50;
+   pBot->m_rgAmmo[1] = 32;
+   pBot->m_rgAmmo[2] = 6;
+
+   // Buffer only big enough for ~1 weapon
+   char buf[8];
+   BotTraceAmmoSummary(*pBot, buf, sizeof(buf));
+
+   // Should have some content but not all weapons
+   ASSERT_TRUE(strlen(buf) > 0);
+   ASSERT_TRUE(strlen(buf) < 8);
+   PASS();
+   return 0;
+}
+
+// ============================================================
 // Main
 // ============================================================
 
@@ -440,6 +641,17 @@ int main(void)
 
    printf(" BotTracePrintf defensive:\n");
    fail |= test_printf_level_zero_no_output();
+
+   printf(" BotTraceGoalTypeName:\n");
+   fail |= test_goal_type_names();
+
+   printf(" BotTraceAmmoSummary:\n");
+   fail |= test_ammo_summary_basic();
+   fail |= test_ammo_summary_skips_melee();
+   fail |= test_ammo_summary_skips_no_ammo_weapons();
+   fail |= test_ammo_summary_no_weapons();
+   fail |= test_ammo_summary_no_separators();
+   fail |= test_ammo_summary_small_buffer();
 
    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
    return fail;

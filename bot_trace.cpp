@@ -13,8 +13,12 @@
 #include <meta_api.h>
 
 #include "bot.h"
+#include "bot_weapons.h"
 #include "bot_trace.h"
 #include "safe_snprintf.h"
+
+extern bot_weapon_t weapon_defs[MAX_WEAPONS];
+extern int submod_id;
 
 extern qboolean is_team_play;
 
@@ -83,6 +87,95 @@ static void BotTraceSay(bot_t &pBot, const char *message)
    safevoid_snprintf(say_msg, sizeof(say_msg), "[TRACE] %s", message);
 
    UTIL_HostSay(pBot.pEdict, 0, say_msg);
+}
+
+
+const char *BotTraceGoalTypeName(int goal_type)
+{
+   switch (goal_type)
+   {
+      case WPT_GOAL_NONE:        return "none";
+      case WPT_GOAL_HEALTH:      return "health";
+      case WPT_GOAL_ARMOR:       return "armor";
+      case WPT_GOAL_WEAPON:      return "weapon";
+      case WPT_GOAL_AMMO:        return "ammo";
+      case WPT_GOAL_ITEM:        return "item";
+      case WPT_GOAL_LOCATION:    return "location";
+      case WPT_GOAL_TRACK_SOUND: return "track_sound";
+      case WPT_GOAL_ENEMY:       return "enemy";
+      default:                   return "unknown";
+   }
+}
+
+
+static const char *BotTraceWeaponShortName(int iId)
+{
+   switch (iId)
+   {
+      case VALVE_WEAPON_CROWBAR:         return "cw";
+      case VALVE_WEAPON_GLOCK:           return "gl";
+      case VALVE_WEAPON_PYTHON:          return "py";
+      case VALVE_WEAPON_MP5:             return "mp";
+      case VALVE_WEAPON_CHAINGUN:        return "cg";
+      case VALVE_WEAPON_CROSSBOW:        return "xb";
+      case VALVE_WEAPON_SHOTGUN:         return "sg";
+      case VALVE_WEAPON_RPG:             return "rp";
+      case VALVE_WEAPON_GAUSS:           return "ga";
+      case VALVE_WEAPON_EGON:            return "eg";
+      case VALVE_WEAPON_HORNETGUN:       return "hr";
+      case VALVE_WEAPON_HANDGRENADE:     return "hg";
+      case VALVE_WEAPON_TRIPMINE:        return "tp";
+      case VALVE_WEAPON_SATCHEL:         return "sa";
+      case VALVE_WEAPON_SNARK:           return "sk";
+      case GEARBOX_WEAPON_GRAPPLE:       return "gp";
+      case GEARBOX_WEAPON_EAGLE:         return "ea";
+      case GEARBOX_WEAPON_PIPEWRENCH:    return "pw";
+      case GEARBOX_WEAPON_M249:          return "mw";
+      case GEARBOX_WEAPON_DISPLACER:     return "di";
+      case GEARBOX_WEAPON_SHOCKRIFLE:    return "sh";
+      case GEARBOX_WEAPON_SPORELAUNCHER: return "sp";
+      case GEARBOX_WEAPON_SNIPERRIFLE:   return "sn";
+      case GEARBOX_WEAPON_KNIFE:         return "kn";
+      // ID 26 shared: GEARBOX_WEAPON_PENGUIN (OP4) / ARENA_WEAPON_9MMSILENCED (Arena)
+      case GEARBOX_WEAPON_PENGUIN:       return submod_id == SUBMOD_ARENA ? "si" : "pn";
+      case ARENA_WEAPON_AUTOSHOTGUN:     return "as";
+      case ARENA_WEAPON_BURSTRIFLE:      return "br";
+      default:                           return "?";
+   }
+}
+
+
+void BotTraceAmmoSummary(bot_t &pBot, char *buf, size_t bufsize)
+{
+   size_t pos = 0;
+   buf[0] = '\0';
+
+   for (int i = 0; weapon_select[i].iId && i < NUM_OF_WEAPON_SELECTS; i++)
+   {
+      int id = weapon_select[i].iId;
+
+      // does the bot have this weapon?
+      if (!(pBot.pEdict->v.weapons & (1u << id)))
+         continue;
+
+      // skip melee weapons (always usable, not interesting for no_weapon diagnosis)
+      if (weapon_select[i].type & WEAPON_MELEE)
+         continue;
+
+      // skip weapons that don't use ammo
+      if (weapon_defs[id].iAmmo1 < 0)
+         continue;
+
+      int ammo1 = pBot.m_rgAmmo[weapon_defs[id].iAmmo1];
+      const char *name = BotTraceWeaponShortName(id);
+
+      safevoid_snprintf(buf + pos, bufsize - pos, "%s%d", name, ammo1);
+
+      size_t newpos = strlen(buf);
+      if (newpos == pos)
+         break;
+      pos = newpos;
+   }
 }
 
 
