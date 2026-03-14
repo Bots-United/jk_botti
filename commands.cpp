@@ -21,6 +21,7 @@
 #include "bot_weapons.h"
 
 #include "bot_query_hook.h"
+#include "bot_trace.h"
 
 extern char g_argv[1024*3];
 extern char g_arg1[1024];
@@ -587,6 +588,26 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
    else if (FStrEq(pcmd, "debug_minmax"))
    {
       set_bool_toggle(&debug_minmax, arg1, "debug_minmax mode ENABLED\n", "debug_minmax mode DISABLED\n", printfunc, arg);
+      return TRUE;
+   }
+   else if (FStrEq(pcmd, "bot_trace"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0))
+      {
+         int temp = atoi(arg1);
+
+         if ((temp < BOT_TRACE_OFF) || (temp > BOT_TRACE_SAY))
+            printfunc(PRINTFUNC_ERROR, arg, "invalid bot_trace value! (0=off, 1=log to server log, 2=log via bot say)\n");
+         else
+         {
+            bot_trace_level = temp;
+            CVAR_SET_FLOAT("jk_botti_trace", (float)temp);
+         }
+      }
+
+      safevoid_snprintf(msg, sizeof(msg), "bot_trace is %d (0=off, 1=server log, 2=bot say)\n", bot_trace_level);
+      printfunc(PRINTFUNC_INFO, arg, msg);
+
       return TRUE;
    }
    else if (FStrEq(pcmd, "observer"))

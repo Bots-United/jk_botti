@@ -26,6 +26,7 @@
 #include "bot_config_init.h"
 
 #include "bot_query_hook.h"
+#include "bot_trace.h"
 
 extern enginefuncs_t g_engfuncs;
 extern globalvars_t  *gpGlobals;
@@ -767,6 +768,9 @@ static void StartFrame( void )
 
    begin_time = UTIL_GetSecs();
 
+   // update trace logging cache once per frame
+   BotTraceUpdateCache();
+
    // sound system
    if (pSoundEnt->m_nextthink <= gpGlobals->time)
       pSoundEnt->Think();
@@ -952,6 +956,8 @@ C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, 
 
    CVAR_REGISTER(&jk_botti_version);
    CVAR_SET_STRING("jk_botti_version", Plugin_info.version);
+
+   BotTraceRegisterCvar();
 
    return (TRUE); // returning TRUE enables metamod to attach this plugin
 }
