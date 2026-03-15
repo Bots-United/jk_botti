@@ -120,6 +120,8 @@ static void BotSpawnInit_TimersAndPhysics( bot_t &pBot )
    pBot.waypoint_goal = -1;
    pBot.wpt_goal_type = WPT_GOAL_NONE;
    pBot.trace_last_stuck_wpt = -2;
+   pBot.b_narrow_path = FALSE;
+   pBot.v_prev_waypoint_origin = Vector(0, 0, 0);
    pBot.f_waypoint_goal_time = 0.0;
    pBot.prev_waypoint_distance = 0.0;
    pBot.f_last_item_found = 0.0;
@@ -2414,6 +2416,13 @@ static void BotDoStrafeNormal(bot_t &pBot)
 
    pBot.f_strafe_time = gpGlobals->time + RANDOM_FLOAT2(0.1, 1.0);
 
+   // suppress strafing on narrow paths to prevent falling off
+   if (pBot.b_narrow_path)
+   {
+      pBot.f_strafe_direction = 0.0;
+      return;
+   }
+
    if (RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].normal_strafe)
    {
       if (RANDOM_LONG2(1, 100) <= 50)
@@ -2610,6 +2619,7 @@ static void BotDoRandomMovement_EvaluateConditions(bot_t &pBot, float moved_dist
 
    // if in combat mode jump more
    jump = (pBot.prev_random_type != 1 && pBot.f_random_jump_time <= gpGlobals->time &&
+           (!pBot.b_narrow_path || pBot.pBotEnemy != NULL) &&
            (moved_distance >= 10.0f || pBot.pBotEnemy != NULL) && pBot.f_move_speed > 1.0f &&
             RANDOM_LONG2(1, 100) <= skill_settings[pBot.bot_skill].random_jump_frequency);
 
@@ -3068,6 +3078,13 @@ static void BotThinkAdjustSpeedForWaypoint(bot_t &pBot)
          // this might be duck-jump waypoint.. check if waypoint is at lower height than current bot origin
          if(waypoints[pBot.curr_waypoint_index].origin.z < pEdict->v.origin.z)
             pEdict->v.button |= IN_DUCK;  // duck down while moving forward
+      }
+
+      // narrow path: slow down for precision
+      if (pBot.b_narrow_path && pBot.f_move_speed > 250.0f)
+      {
+         pBot.f_move_speed = 250.0f;
+         pBot.b_not_maxspeed = TRUE;
       }
    }
 }

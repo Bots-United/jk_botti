@@ -275,6 +275,10 @@ static void BotFindWaypoint_UpdateBotState( bot_t &pBot, int select_index )
    pBot.prev_waypoint_index[1] = pBot.prev_waypoint_index[0];
    pBot.prev_waypoint_index[0] = pBot.curr_waypoint_index;
 
+   // save current waypoint origin before switching (for narrow path steering)
+   if (pBot.curr_waypoint_index >= 0)
+      pBot.v_prev_waypoint_origin = waypoints[pBot.curr_waypoint_index].origin;
+
    pBot.curr_waypoint_index = select_index;
    pBot.waypoint_origin = waypoints[select_index].origin;
 
@@ -909,6 +913,10 @@ static qboolean BotHeadTowardWaypointCalcTouching(bot_t &pBot)
    if (pBot.f_exit_water_time >= gpGlobals->time)
       min_distance = 20.0;
 
+   // narrow path: tighter touch distance to stay on the walkable surface
+   if (pBot.b_narrow_path)
+      min_distance = 30.0;
+
    qboolean touching = FALSE;
 
    // did the bot run past the waypoint? (prevent the loop-the-loop problem)
@@ -1040,6 +1048,11 @@ static qboolean BotHeadTowardWaypointFindNextRoute(bot_t &pBot, qboolean waypoin
       if (i != WAYPOINT_UNREACHABLE)  // can we get to the goal from here?
       {
          waypoint_found = TRUE;
+
+         // save current waypoint origin before switching (for narrow path steering)
+         if (pBot.curr_waypoint_index >= 0)
+            pBot.v_prev_waypoint_origin = waypoints[pBot.curr_waypoint_index].origin;
+
          pBot.curr_waypoint_index = i;
          pBot.waypoint_origin = waypoints[i].origin;
 
@@ -1152,6 +1165,84 @@ static void BotHeadTowardWaypoint_DetectLadder( bot_t &pBot )
 }
 
 
+// Check if the bot is on narrow geometry by tracing laterally for drop-offs.
+// Traces perpendicular to the path direction (toward current waypoint).
+static void BotCheckNarrowPath( bot_t &pBot )
+{
+   edict_t *pEdict = pBot.pEdict;
+
+   // skip if on ladder, in water, or no waypoint
+   if (pBot.b_on_ladder || pBot.b_in_water || pBot.curr_waypoint_index == -1)
+   {
+      pBot.b_narrow_path = FALSE;
+      return;
+   }
+
+   // path direction (2D)
+   Vector v_path = pBot.waypoint_origin - pEdict->v.origin;
+   v_path.z = 0;
+   float path_len = v_path.Length();
+   if (path_len < 1.0f)
+   {
+      pBot.b_narrow_path = FALSE;
+      return;
+   }
+   v_path = v_path * (1.0f / path_len);
+
+   // perpendicular (right vector in 2D)
+   Vector v_right = Vector(v_path.y, -v_path.x, 0);
+
+   // trace down to find ground
+   TraceResult tr;
+   Vector v_ground;
+
+   UTIL_TraceDuck(pEdict->v.origin, pEdict->v.origin - Vector(0, 0, 36),
+                  dont_ignore_monsters, pEdict->v.pContainingEntity, &tr);
+   v_ground = tr.vecEndPos;
+   v_ground.z += 1.0f;
+
+   // trace right 48 units from ground level
+   Vector v_right_pos = v_ground + v_right * 48;
+   UTIL_TraceDuck(v_ground, v_right_pos, dont_ignore_monsters,
+                  pEdict->v.pContainingEntity, &tr);
+
+   qboolean right_open = (tr.flFraction > 0.99f);
+   qboolean right_drop = FALSE;
+
+   if (right_open)
+   {
+      // check for drop-off on right
+      UTIL_TraceDuck(v_right_pos, v_right_pos - Vector(0, 0, 47),
+                     dont_ignore_monsters, pEdict->v.pContainingEntity, &tr);
+      right_drop = (tr.flFraction > 0.99f);
+   }
+
+   // trace left 48 units from ground level
+   Vector v_left_pos = v_ground - v_right * 48;
+   UTIL_TraceDuck(v_ground, v_left_pos, dont_ignore_monsters,
+                  pEdict->v.pContainingEntity, &tr);
+
+   qboolean left_open = (tr.flFraction > 0.99f);
+   qboolean left_drop = FALSE;
+
+   if (left_open)
+   {
+      // check for drop-off on left
+      UTIL_TraceDuck(v_left_pos, v_left_pos - Vector(0, 0, 47),
+                     dont_ignore_monsters, pEdict->v.pContainingEntity, &tr);
+      left_drop = (tr.flFraction > 0.99f);
+   }
+
+   qboolean was_narrow = pBot.b_narrow_path;
+   pBot.b_narrow_path = (right_drop || left_drop);
+
+   if (pBot.b_narrow_path && !was_narrow)
+      BotTrace(pBot, "narrow: enter wpt=%d", pBot.curr_waypoint_index);
+   else if (!pBot.b_narrow_path && was_narrow)
+      BotTrace(pBot, "narrow: leave wpt=%d", pBot.curr_waypoint_index);
+}
+
+
 static void BotHeadTowardWaypoint_UpdateViewAngles( bot_t &pBot )
 {
    edict_t *pEdict = pBot.pEdict;
@@ -1159,6 +1250,30 @@ static void BotHeadTowardWaypoint_UpdateViewAngles( bot_t &pBot )
    // keep turning towards the waypoint...
 
    Vector v_direction = pBot.waypoint_origin - pEdict->v.origin;
+
+   // narrow path: follow the path line (prev_wpt -> curr_wpt) instead of aiming directly
+   if (pBot.b_narrow_path && !pBot.v_prev_waypoint_origin.is_zero_vector())
+   {
+      Vector v_path = pBot.waypoint_origin - pBot.v_prev_waypoint_origin;
+      float path_len = v_path.Length();
+
+      if (path_len > 1.0f)
+      {
+         Vector v_path_dir = v_path * (1.0f / path_len);
+
+         // project bot position onto the path line
+         Vector v_bot_offset = pEdict->v.origin - pBot.v_prev_waypoint_origin;
+         float along = DotProduct(v_bot_offset, v_path_dir);
+
+         // aim at a point 64 units ahead on the path line
+         float aim_along = along + 64.0f;
+         if (aim_along > path_len)
+            aim_along = path_len;
+
+         Vector v_aim = pBot.v_prev_waypoint_origin + v_path_dir * aim_along;
+         v_direction = v_aim - pEdict->v.origin;
+      }
+   }
 
    Vector v_angles = UTIL_VecToAngles(v_direction);
 
@@ -1207,6 +1322,8 @@ qboolean BotHeadTowardWaypoint( bot_t &pBot )
    }
 
    BotHeadTowardWaypoint_DetectLadder(pBot);
+
+   BotCheckNarrowPath(pBot);
 
    BotHeadTowardWaypoint_UpdateViewAngles(pBot);
 
