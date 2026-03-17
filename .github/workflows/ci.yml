@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Update package list for i386
@@ -22,7 +22,7 @@ jobs:
         run: CXX="g++ -m32" make valgrind
 
   coverage:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Update package list for i386
@@ -54,7 +54,7 @@ jobs:
           path: tests/coverage_report
 
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Update package list for i386
@@ -70,7 +70,7 @@ jobs:
           path: jk_botti_mm_i386.so
 
   build-windows:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Install packages
@@ -83,29 +83,47 @@ jobs:
           name: windows-binary
           path: jk_botti_mm.dll
 
-  release-artifact:
-    needs: [test, build-linux, build-windows]
-    runs-on: ubuntu-latest
+  release-linux:
+    needs: [test, build-linux]
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Download Linux binary
         uses: actions/download-artifact@v4
         with:
           name: linux-binary
-          path: addons/jk_botti/dlls
+          path: staging
+      - name: Prepare release directory
+        run: |
+          rm -rf addons/jk_botti/dlls && mkdir addons/jk_botti/dlls
+          cp staging/jk_botti_mm_i386.so addons/jk_botti/dlls/
+          ln -sf jk_botti_mm_i386.so addons/jk_botti/dlls/jk_botti_mm.so
+      - name: Create release archive
+        run: tar c addons | xz > jk_botti-snapshot-linux_ubuntu2404.tar.xz
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jk_botti-snapshot-linux_ubuntu2404
+          path: jk_botti-snapshot-linux_ubuntu2404.tar.xz
+
+  release-windows:
+    needs: [test, build-windows]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
       - name: Download Windows binary
         uses: actions/download-artifact@v4
         with:
           name: windows-binary
-          path: addons/jk_botti/dlls
+          path: staging
       - name: Prepare release directory
         run: |
-          rm -f addons/jk_botti/dlls/.empty_dir
-          ln -sf jk_botti_mm_i386.so addons/jk_botti/dlls/jk_botti_mm.so
+          rm -rf addons/jk_botti/dlls && mkdir addons/jk_botti/dlls
+          cp staging/jk_botti_mm.dll addons/jk_botti/dlls/
       - name: Create release archive
-        run: tar c addons | xz > jk_botti-snapshot-release.tar.xz
+        run: tar c addons | xz > jk_botti-snapshot-win32.tar.xz
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: jk_botti-snapshot-release
-          path: jk_botti-snapshot-release.tar.xz
+          name: jk_botti-snapshot-win32
+          path: jk_botti-snapshot-win32.tar.xz
