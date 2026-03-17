@@ -1,0 +1,78 @@
+name: Package
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      create_release:
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  package-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-binary
+          path: staging
+      - name: Prepare release directory
+        run: |
+          rm -rf addons/jk_botti/dlls && mkdir addons/jk_botti/dlls
+          cp staging/jk_botti_mm_i386.so addons/jk_botti/dlls/
+          ln -sf jk_botti_mm_i386.so addons/jk_botti/dlls/jk_botti_mm.so
+      - name: Create release archive
+        run: tar c addons | xz > jk_botti-${{ inputs.version }}-linux_ubuntu2404.tar.xz
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jk_botti-${{ inputs.version }}-linux_ubuntu2404
+          path: jk_botti-${{ inputs.version }}-linux_ubuntu2404.tar.xz
+
+  package-windows:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Windows binary
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-binary
+          path: staging
+      - name: Prepare release directory
+        run: |
+          rm -rf addons/jk_botti/dlls && mkdir addons/jk_botti/dlls
+          cp staging/jk_botti_mm.dll addons/jk_botti/dlls/
+      - name: Create release archive
+        run: tar c addons | xz > jk_botti-${{ inputs.version }}-win32.tar.xz
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jk_botti-${{ inputs.version }}-win32
+          path: jk_botti-${{ inputs.version }}-win32.tar.xz
+
+  create-release:
+    if: ${{ inputs.create_release }}
+    needs: [package-linux, package-windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download Linux archive
+        uses: actions/download-artifact@v4
+        with:
+          name: jk_botti-${{ inputs.version }}-linux_ubuntu2404
+      - name: Download Windows archive
+        uses: actions/download-artifact@v4
+        with:
+          name: jk_botti-${{ inputs.version }}-win32
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            jk_botti-${{ inputs.version }}-linux_ubuntu2404.tar.xz
+            jk_botti-${{ inputs.version }}-win32.tar.xz
