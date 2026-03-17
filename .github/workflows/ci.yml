@@ -69,6 +69,21 @@ jobs:
           name: linux-binary
           path: jk_botti_mm_i386.so
 
+  build-linux-bionic:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build in Ubuntu 18.04 i386 container
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/workspace" -w /workspace \
+            lpenz/ubuntu-bionic-i386 \
+            bash -c "apt-get -y update && apt-get -y install build-essential g++ make && make -j4"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-bionic-binary
+          path: jk_botti_mm_i386.so
+
   build-windows:
     runs-on: ubuntu-24.04
     steps:
@@ -84,7 +99,7 @@ jobs:
           path: jk_botti_mm.dll
 
   package:
-    needs: [test, build-linux, build-windows]
+    needs: [test, build-linux, build-linux-bionic, build-windows]
     uses: ./.github/workflows/package.yml
     with:
       version: snapshot

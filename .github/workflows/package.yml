@@ -34,6 +34,28 @@ jobs:
           name: jk_botti-${{ inputs.version }}-linux_ubuntu2404
           path: jk_botti-${{ inputs.version }}-linux_ubuntu2404.tar.xz
 
+  package-linux-bionic:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Linux Bionic binary
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-bionic-binary
+          path: staging
+      - name: Prepare release directory
+        run: |
+          rm -rf addons/jk_botti/dlls && mkdir addons/jk_botti/dlls
+          cp staging/jk_botti_mm_i386.so addons/jk_botti/dlls/
+          ln -sf jk_botti_mm_i386.so addons/jk_botti/dlls/jk_botti_mm.so
+      - name: Create release archive
+        run: tar c addons | xz > jk_botti-${{ inputs.version }}-linux_ubuntu1804.tar.xz
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jk_botti-${{ inputs.version }}-linux_ubuntu1804
+          path: jk_botti-${{ inputs.version }}-linux_ubuntu1804.tar.xz
+
   package-windows:
     runs-on: ubuntu-24.04
     steps:
@@ -57,7 +79,7 @@ jobs:
 
   create-release:
     if: ${{ inputs.create_release }}
-    needs: [package-linux, package-windows]
+    needs: [package-linux, package-linux-bionic, package-windows]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -66,6 +88,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: jk_botti-${{ inputs.version }}-linux_ubuntu2404
+      - name: Download Linux Bionic archive
+        uses: actions/download-artifact@v4
+        with:
+          name: jk_botti-${{ inputs.version }}-linux_ubuntu1804
       - name: Download Windows archive
         uses: actions/download-artifact@v4
         with:
@@ -75,4 +101,5 @@ jobs:
         with:
           files: |
             jk_botti-${{ inputs.version }}-linux_ubuntu2404.tar.xz
+            jk_botti-${{ inputs.version }}-linux_ubuntu1804.tar.xz
             jk_botti-${{ inputs.version }}-win32.tar.xz

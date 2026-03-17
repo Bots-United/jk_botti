@@ -45,6 +45,22 @@ jobs:
           name: linux-binary
           path: jk_botti_mm_i386.so
 
+  build-linux-bionic:
+    needs: validate-tag
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build in Ubuntu 18.04 i386 container
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/workspace" -w /workspace \
+            lpenz/ubuntu-bionic-i386 \
+            bash -c "apt-get -y update && apt-get -y install build-essential g++ make && make -j4 VER_MAJOR=${{ needs.validate-tag.outputs.ver_major }} VER_MINOR=${{ needs.validate-tag.outputs.ver_minor }} VER_NOTE=${{ needs.validate-tag.outputs.ver_note }}"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-bionic-binary
+          path: jk_botti_mm_i386.so
+
   build-windows:
     needs: validate-tag
     runs-on: ubuntu-24.04
@@ -61,7 +77,7 @@ jobs:
           path: jk_botti_mm.dll
 
   package:
-    needs: [validate-tag, build-linux, build-windows]
+    needs: [validate-tag, build-linux, build-linux-bionic, build-windows]
     uses: ./.github/workflows/package.yml
     with:
       version: ${{ needs.validate-tag.outputs.version }}
