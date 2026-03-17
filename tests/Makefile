@@ -16,7 +16,7 @@ test_posdata_list: test_posdata_list.cpp ../posdata_list.h
 
 # Engine-mock based tests
 BOT_COMBAT_OBJS = engine_mock.o test_bot_combat.o \
-	bot_weapons.o bot_sound.o util.o safe_snprintf.o random_num.o
+	bot_trace.o bot_weapons.o bot_sound.o util.o safe_snprintf.o random_num.o
 
 test_bot_combat: $(BOT_COMBAT_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_COMBAT_OBJS) -lm
@@ -72,7 +72,7 @@ test_bot_weapons: $(BOT_WEAPONS_OBJS)
 
 # Bot navigate tests (bot_navigate.cpp is #included in test file, not linked separately)
 BOT_NAVIGATE_OBJS = engine_mock.o test_bot_navigate.o \
-	bot_weapons.o util.o safe_snprintf.o random_num.o
+	bot_trace.o bot_weapons.o util.o safe_snprintf.o random_num.o
 
 test_bot_navigate: $(BOT_NAVIGATE_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_NAVIGATE_OBJS) -lm
@@ -127,14 +127,14 @@ test_bot.o: test_bot.cpp ../bot.cpp
 	${CXX} ${TEST_CXXFLAGS} -c $< -o $@
 
 BOT_OBJS = engine_mock.o test_bot.o \
-	bot_config_init.o bot_weapons.o util.o safe_snprintf.o random_num.o
+	bot_trace.o bot_config_init.o bot_weapons.o util.o safe_snprintf.o random_num.o
 
 test_bot: $(BOT_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_OBJS) -lm
 
 # commands tests
 COMMANDS_OBJS = engine_mock.o test_commands.o \
-	commands.o bot_weapons.o util.o safe_snprintf.o random_num.o
+	commands.o bot_trace.o bot_weapons.o util.o safe_snprintf.o random_num.o
 
 test_commands: $(COMMANDS_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(COMMANDS_OBJS) -lm
@@ -144,7 +144,7 @@ dll.o: ../dll.cpp
 	${CXX} ${TEST_CXXFLAGS} -UVER_NOTE -DVER_NOTE='"test"' -UVER_MAJOR -DVER_MAJOR=0 -UVER_MINOR -DVER_MINOR=0 -c $< -o $@
 
 DLL_OBJS = engine_mock.o test_dll.o \
-	dll.o bot_weapons.o bot_sound.o util.o safe_snprintf.o random_num.o
+	dll.o bot_trace.o bot_weapons.o bot_sound.o util.o safe_snprintf.o random_num.o
 
 test_dll: $(DLL_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(DLL_OBJS) -lm
@@ -180,7 +180,13 @@ test_bot_query_hook_win32.o: test_bot_query_hook_win32.cpp ../bot_query_hook_win
 test_bot_query_hook_win32: test_bot_query_hook_win32.o
 	${CXX} $(COVERAGE_FLAGS) -o $@ test_bot_query_hook_win32.o
 
-ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_geneticalg test_waypoint test_bot_navigate test_bot_skill test_bot_sound test_h_export test_bot_config_init test_bot_models test_bot_client test_bot test_commands test_dll test_engine test_bot_query_hook test_bot_query_hook_linux test_bot_query_hook_win32
+BOT_TRACE_OBJS = engine_mock.o test_bot_trace.o \
+	bot_trace.o bot_weapons.o util.o safe_snprintf.o random_num.o
+
+test_bot_trace: $(BOT_TRACE_OBJS)
+	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_TRACE_OBJS) -lm
+
+ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_geneticalg test_waypoint test_bot_navigate test_bot_skill test_bot_sound test_h_export test_bot_config_init test_bot_models test_bot_client test_bot test_commands test_dll test_engine test_bot_trace test_bot_query_hook test_bot_query_hook_linux test_bot_query_hook_win32
 
 all: $(ALL_TESTS)
 
@@ -207,6 +213,7 @@ run: $(ALL_TESTS)
 	./test_commands
 	./test_dll
 	./test_engine
+	./test_bot_trace
 	./test_bot_query_hook
 	./test_bot_query_hook_linux
 	./test_bot_query_hook_win32
@@ -236,6 +243,7 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_commands
 	$(VALGRIND) ./test_dll
 	$(VALGRIND) ./test_engine
+	$(VALGRIND) ./test_bot_trace
 	$(VALGRIND) ./test_bot_query_hook
 	$(VALGRIND) ./test_bot_query_hook_linux
 	$(VALGRIND) ./test_bot_query_hook_win32

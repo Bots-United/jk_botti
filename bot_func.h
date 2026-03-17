@@ -31,7 +31,7 @@ void free_posdata_list(int idx);
 void GatherPlayerData(edict_t * pEdict);
 qboolean FPredictedVisible(bot_t &pBot);
 void BotUpdateHearingSensitivity(bot_t &pBot);
-void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking);
+void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking, const char *reason);
 void BotFindEnemy( bot_t &pBot );
 void BotShootAtEnemy( bot_t &pBot );
 qboolean BotShootTripmine( bot_t &pBot );

@@ -18,6 +18,7 @@
 #include "bot_skill.h"
 #include "bot_weapons.h"
 #include "bot_sound.h"
+#include "bot_trace.h"
 
 
 extern WAYPOINT waypoints[MAX_WAYPOINTS];
@@ -659,6 +660,8 @@ static qboolean BotFindWaypointGoalEnemy(bot_t &pBot)
    pBot.pTrackSoundEdict = NULL;
    pBot.f_track_sound_time = -1;
 
+   BotTrace(pBot, "goal set: enemy wpt=%d", index);
+
    return TRUE;
 }
 
@@ -697,6 +700,8 @@ static void BotFindWaypointGoal( bot_t &pBot )
          pBot.wpt_goal_type = goal_type;
          pBot.waypoint_goal = index;
 
+         BotTrace(pBot, "goal set: %s wpt=%d", BotTraceGoalTypeName(goal_type), index);
+
          if(goal_type != WPT_GOAL_TRACK_SOUND)
          {
             pBot.pTrackSoundEdict = NULL;
@@ -727,6 +732,8 @@ static void BotFindWaypointGoal( bot_t &pBot )
       pBot.waypoint_goal = index;
       pBot.pTrackSoundEdict = NULL;
       pBot.f_track_sound_time = -1;
+
+      BotTrace(pBot, "goal set: random_location wpt=%d", index);
    }
 }
 
@@ -951,7 +958,7 @@ static void BotHeadTowardWaypointHandleGoalReached(bot_t &pBot)
       pBot.exclude_points[0] = pBot.waypoint_goal;
    }
 
-   //UTIL_ConsolePrintf("[%s] Reach goal: %d -> %d", pBot.name, pBot.waypoint_goal, -1);
+   BotTrace(pBot, "goal reached: %s wpt=%d", BotTraceGoalTypeName(pBot.wpt_goal_type), pBot.waypoint_goal);
 
    pBot.waypoint_goal = -1;  // forget this goal waypoint
    pBot.wpt_goal_type = WPT_GOAL_NONE;
@@ -1076,6 +1083,9 @@ static void BotHeadTowardWaypoint_CheckTimeout( bot_t &pBot )
    // check if the bot has been trying to get to this waypoint for a while...
    if ((pBot.f_waypoint_time + 5.0) < gpGlobals->time)
    {
+      if (pBot.curr_waypoint_index != -1 || pBot.waypoint_goal != -1)
+         BotTrace(pBot, "nav timeout: wpt=%d goal=%d", pBot.curr_waypoint_index, pBot.waypoint_goal);
+
       pBot.curr_waypoint_index = -1;  // forget about this waypoint
       pBot.waypoint_goal = -1;  // also forget about a goal
    }
@@ -1298,6 +1308,8 @@ static void BotOnLadderFindWall(bot_t &pBot)
 
    if (!done)  // if didn't find a wall, just reset ideal_yaw...
    {
+      BotTrace(pBot, "ladder: no wall found wpt=%d", pBot.curr_waypoint_index);
+
       // set ideal_yaw to current yaw (so bot won't keep turning)
       pEdict->v.ideal_yaw = pEdict->v.v_angle.y;
 
@@ -1325,6 +1337,7 @@ static void BotOnLadderMove(bot_t &pBot, float moved_distance)
 
          pEdict->v.v_angle.x = 60;  // look downwards
          pBot.ladder_dir = LADDER_DOWN;
+         BotTrace(pBot, "ladder: stuck, up->down wpt=%d", pBot.curr_waypoint_index);
       }
    }
    else if (pBot.ladder_dir == LADDER_DOWN)  // is the bot currently going down?
@@ -1338,6 +1351,7 @@ static void BotOnLadderMove(bot_t &pBot, float moved_distance)
 
          pEdict->v.v_angle.x = -60;  // look upwards
          pBot.ladder_dir = LADDER_UP;
+         BotTrace(pBot, "ladder: stuck, down->up wpt=%d", pBot.curr_waypoint_index);
       }
    }
    else  // the bot hasn't picked a direction yet, try going up...
@@ -2363,7 +2377,7 @@ static void BotLookForDropTurnAway(bot_t &pBot, float scale)
    // if we have an enemy, stop heading towards enemy...
    if (pBot.pBotEnemy)
    {
-      BotRemoveEnemy(pBot, TRUE);
+      BotRemoveEnemy(pBot, TRUE, "drop_ahead");
 
       // level look
       pEdict->v.idealpitch = 0;

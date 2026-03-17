@@ -1065,7 +1065,7 @@ static int test_bot_remove_enemy_tracking(void)
    mock_trace_line_fn = trace_nohit;
 
    TEST("b_keep_tracking=TRUE sets WPT_GOAL_TRACK_SOUND");
-   BotRemoveEnemy(testbot, TRUE);
+   BotRemoveEnemy(testbot, TRUE, "test");
    ASSERT_INT(testbot.wpt_goal_type, WPT_GOAL_TRACK_SOUND);
    ASSERT_PTR_EQ(testbot.pTrackSoundEdict, pEnemy);
    ASSERT_PTR_NULL(testbot.pBotEnemy); // enemy cleared
@@ -1074,7 +1074,7 @@ static int test_bot_remove_enemy_tracking(void)
    TEST("b_keep_tracking=FALSE does not set tracking");
    testbot.pBotEnemy = pEnemy;
    testbot.wpt_goal_type = WPT_GOAL_NONE;
-   BotRemoveEnemy(testbot, FALSE);
+   BotRemoveEnemy(testbot, FALSE, "test");
    ASSERT_PTR_NULL(testbot.pBotEnemy);
    ASSERT_INT(testbot.wpt_goal_type, WPT_GOAL_NONE);
    PASS();
@@ -3694,7 +3694,7 @@ static int test_bot_remove_enemy_random_track_time(void)
 
    TEST("track time uses mock random (high value)");
    mock_random_float_ret = 999.0f; // will be clamped to max
-   BotRemoveEnemy(testbot, TRUE);
+   BotRemoveEnemy(testbot, TRUE, "test");
    // f_track_sound_time = time + clamped(track_sound_time_max)
    float max_track = skill_settings[testbot.bot_skill].track_sound_time_max;
    ASSERT_FLOAT_NEAR(testbot.f_track_sound_time,
@@ -3710,7 +3710,7 @@ static int test_bot_remove_enemy_random_track_time(void)
    pEnemy = create_enemy_player(Vector(200, 0, 0));
    testbot.pBotEnemy = pEnemy;
    mock_random_float_ret = 0.0f; // will be clamped to min
-   BotRemoveEnemy(testbot, TRUE);
+   BotRemoveEnemy(testbot, TRUE, "test");
    float min_track = skill_settings[testbot.bot_skill].track_sound_time_min;
    ASSERT_FLOAT_NEAR(testbot.f_track_sound_time,
                       gpGlobals->time + min_track, 0.01f);

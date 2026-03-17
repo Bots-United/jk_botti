@@ -66,6 +66,7 @@ SRC = 	bot.cpp \
 	bot_chat.cpp \
 	bot_client.cpp \
 	bot_combat.cpp \
+	bot_trace.cpp \
 	bot_config_init.cpp \
 	bot_models.cpp \
 	bot_navigate.cpp \

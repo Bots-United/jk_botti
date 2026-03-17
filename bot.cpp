@@ -20,6 +20,7 @@
 #include "bot_skill.h"
 #include "bot_config_init.h"
 #include "bot_name_sanitize.h"
+#include "bot_trace.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -118,6 +119,7 @@ static void BotSpawnInit_TimersAndPhysics( bot_t &pBot )
    pBot.f_random_waypoint_time = gpGlobals->time;
    pBot.waypoint_goal = -1;
    pBot.wpt_goal_type = WPT_GOAL_NONE;
+   pBot.trace_last_stuck_wpt = -2;
    pBot.f_waypoint_goal_time = 0.0;
    pBot.prev_waypoint_distance = 0.0;
    pBot.f_last_item_found = 0.0;
@@ -1970,6 +1972,11 @@ static void BotWanderHandleStuck(bot_t &pBot, float moved_distance)
       qboolean bCrouchJump = FALSE;
 
       // the bot must be stuck!
+      if (pBot.trace_last_stuck_wpt != pBot.curr_waypoint_index)
+      {
+         BotTrace(pBot, "stuck: wpt=%d goal=%d", pBot.curr_waypoint_index, pBot.waypoint_goal);
+         pBot.trace_last_stuck_wpt = pBot.curr_waypoint_index;
+      }
 
       pBot.f_dont_avoid_wall_time = gpGlobals->time + 1.0;
       pBot.f_look_for_waypoint_time = gpGlobals->time + 1.0;
@@ -2035,7 +2042,12 @@ static void BotWanderFreeRoam(bot_t &pBot, float moved_distance)
    {
       // check if bot JUST got on the ladder...
       if ((pBot.f_end_use_ladder_time + 1.0) < gpGlobals->time)
+      {
+         BotTrace(pBot, "ladder: enter wpt=%d p=%.0f,%.0f,%.0f",
+            pBot.curr_waypoint_index,
+            pBot.pEdict->v.origin.x, pBot.pEdict->v.origin.y, pBot.pEdict->v.origin.z);
          pBot.f_start_use_ladder_time = gpGlobals->time;
+      }
 
       // go handle the ladder movement
       BotOnLadder( pBot, moved_distance );
@@ -2048,6 +2060,10 @@ static void BotWanderFreeRoam(bot_t &pBot, float moved_distance)
       // check if the bot JUST got off the ladder...
       if ((pBot.f_end_use_ladder_time + 1.0) > gpGlobals->time)
       {
+         if (pBot.ladder_dir != LADDER_UNKNOWN)
+            BotTrace(pBot, "ladder: leave wpt=%d p=%.0f,%.0f,%.0f",
+               pBot.curr_waypoint_index,
+               pBot.pEdict->v.origin.x, pBot.pEdict->v.origin.y, pBot.pEdict->v.origin.z);
          pBot.ladder_dir = LADDER_UNKNOWN;
       }
    }
@@ -2064,6 +2080,9 @@ static void BotWanderFreeRoam(bot_t &pBot, float moved_distance)
        ((pBot.f_start_use_ladder_time + 5.0) <= gpGlobals->time))
    {
       // bot is stuck on a ladder...
+      BotTrace(pBot, "ladder: stuck 5s wpt=%d p=%.0f,%.0f,%.0f",
+         pBot.curr_waypoint_index,
+         pBot.pEdict->v.origin.x, pBot.pEdict->v.origin.y, pBot.pEdict->v.origin.z);
       BotRandomTurn(pBot);
 
       // don't look for items for 2 seconds
@@ -2873,7 +2892,10 @@ static void BotThinkHandleEnemy_RunawayLogic(bot_t &pBot, edict_t *pAvoidEnemy)
    pBot.f_pause_time = 0;
 
    // don't have an enemy anymore so null out the pointer...
-   BotRemoveEnemy(pBot, FALSE);
+   char reason[64];
+   BotTraceFormat(reason, sizeof(reason), "runaway h=%.0f a=%.0f",
+      pEdict->v.health, pEdict->v.armorvalue);
+   BotRemoveEnemy(pBot, FALSE, reason);
 
    int enemy_waypoint = WaypointFindNearest(pAvoidEnemy, 1024);
    int self_waypoint = WaypointFindNearest(pEdict, 1024);

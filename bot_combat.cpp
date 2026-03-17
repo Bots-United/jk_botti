@@ -21,6 +21,7 @@
 #include "bot_skill.h"
 #include "waypoint.h"
 #include "bot_sound.h"
+#include "bot_trace.h"
 #include "player.h"
 
 extern bot_weapon_t weapon_defs[MAX_WEAPONS];
@@ -718,7 +719,7 @@ static edict_t *BotFindVisibleSoundEnemy( bot_t &pBot )
 
 
 //
-void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking )
+void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking, const char *reason )
 {
    edict_t *pEdict = pBot.pEdict;
 
@@ -745,6 +746,11 @@ void BotRemoveEnemy( bot_t &pBot, qboolean b_keep_tracking )
          pBot.waypoint_goal = waypoint;
       }
    }
+
+   if (b_keep_tracking)
+      BotTrace(pBot, "elost (%s) trk=%d", reason, pBot.waypoint_goal);
+   else
+      BotTrace(pBot, "elost (%s)", reason);
 
    // don't have an enemy anymore so null out the pointer...
    pBot.pBotEnemy = NULL;
@@ -778,7 +784,7 @@ static qboolean BotFindEnemyCheckDontShoot(bot_t &pBot)
 
    pEdict->v.button |= IN_RELOAD;  // press reload button
 
-   BotRemoveEnemy(pBot, FALSE);
+   BotRemoveEnemy(pBot, FALSE, "dontshoot");
 
    return TRUE;
 }
@@ -799,7 +805,7 @@ static qboolean BotFindEnemyMaintainCurrent_CheckValidity(bot_t &pBot)
          pEdict->v.button |= IN_JUMP;
 
       // don't have an enemy anymore so null out the pointer...
-      BotRemoveEnemy(pBot, FALSE);
+      BotRemoveEnemy(pBot, FALSE, chatprot ? "chat_protected" : "enemy_dead");
 
       // level look
       pEdict->v.idealpitch = 0;
@@ -838,7 +844,7 @@ static int BotFindEnemyMaintainCurrent_StickyBreakable(bot_t &pBot)
       }
 
       // too far or not visible, drop it
-      BotRemoveEnemy(pBot, FALSE);
+      BotRemoveEnemy(pBot, FALSE, "breakable_lost");
       pEdict->v.idealpitch = 0;
 
       return -1;
@@ -879,7 +885,13 @@ static qboolean BotFindEnemyMaintainCurrent_TrackVisibility(bot_t &pBot)
    if( pBot.f_bot_see_enemy_time > 0 && pBot.f_bot_see_enemy_time + 0.5 >= gpGlobals->time)
    {
       // start sound tracking
-      BotRemoveEnemy(pBot, TRUE);
+      char vis_reason[80];
+      BotTraceFormat(vis_reason, sizeof(vis_reason),
+         "oos/%s p=%.0f,%.0f,%.0f e=%.0f,%.0f,%.0f",
+         FInViewCone(vecEnd, pEdict) ? "blk" : "vcone",
+         pEdict->v.origin.x, pEdict->v.origin.y, pEdict->v.origin.z,
+         pBot.pBotEnemy->v.origin.x, pBot.pBotEnemy->v.origin.y, pBot.pBotEnemy->v.origin.z);
+      BotRemoveEnemy(pBot, TRUE, vis_reason);
 
       // level look
       pEdict->v.idealpitch = 0;
@@ -1258,6 +1270,9 @@ void BotFindEnemy( bot_t &pBot )
       UTIL_ConsolePrintf("[%s] Found enemy, type: %s", pBot.name, g_debug_enemy_type);
 #endif
 
+      BotTrace(pBot, "efound: %s d=%.0f h=%.0f a=%.0f",
+         STRING(pNewEnemy->v.netname), nearestdistance, pEdict->v.health, pEdict->v.armorvalue);
+
       // clear goal waypoint
       pBot.waypoint_goal = -1;
       pBot.wpt_goal_type = WPT_GOAL_ENEMY;
@@ -1473,6 +1488,7 @@ static qboolean TrySelectWeapon(bot_t &pBot, const int select_index, const bot_w
    if (pBot.current_weapon.iId != select.iId)
    {
       UTIL_SelectItem(pBot.pEdict, select.weapon_name);
+      BotTrace(pBot, "wsel: %s", select.weapon_name);
    }
 
    if (delay.iId != select.iId)
@@ -1950,7 +1966,18 @@ static void BotShootAtEnemyExecuteFire(bot_t &pBot, const Vector &v_enemy_aimpos
             // select the best weapon to use at this distance and fire...
             if(!BotFireWeapon(v_enemy, pBot, 0))
             {
-               BotRemoveEnemy(pBot, TRUE);
+               char no_weapon_reason[128];
+               if (bot_trace_level > 0)
+               {
+                  char ammo[96];
+                  BotTraceAmmoSummary(pBot, ammo, sizeof(ammo));
+                  safevoid_snprintf(no_weapon_reason, sizeof(no_weapon_reason),
+                     "nowpn h=%.0f a=%.0f d=%.0f [%s]",
+                     pEdict->v.health, pEdict->v.armorvalue, v_enemy.Length(), ammo);
+               }
+               else
+                  no_weapon_reason[0] = '\0';
+               BotRemoveEnemy(pBot, TRUE, no_weapon_reason);
 
                // level look
                pEdict->v.idealpitch = 0;
@@ -1980,7 +2007,12 @@ void BotShootAtEnemy( bot_t &pBot )
    // Enemy not visible?
    if(!pBot.b_combat_longjump && !FVisibleEnemy(v_enemy_aimpos, pEdict, pBot.pBotEnemy))
    {
-      BotRemoveEnemy(pBot, TRUE);
+      char vis_reason[80];
+      BotTraceFormat(vis_reason, sizeof(vis_reason),
+         "nvis/blk p=%.0f,%.0f,%.0f e=%.0f,%.0f,%.0f",
+         pEdict->v.origin.x, pEdict->v.origin.y, pEdict->v.origin.z,
+         pBot.pBotEnemy->v.origin.x, pBot.pBotEnemy->v.origin.y, pBot.pBotEnemy->v.origin.z);
+      BotRemoveEnemy(pBot, TRUE, vis_reason);
 
       return;
    }
