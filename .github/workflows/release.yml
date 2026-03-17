@@ -9,6 +9,7 @@ jobs:
   validate-tag:
     runs-on: ubuntu-24.04
     outputs:
+      version: ${{ steps.parse.outputs.VERSION }}
       ver_major: ${{ steps.parse.outputs.VER_MAJOR }}
       ver_minor: ${{ steps.parse.outputs.VER_MINOR }}
       ver_note: ${{ steps.parse.outputs.VER_NOTE }}
@@ -18,6 +19,7 @@ jobs:
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           if [[ "$TAG" =~ ^v([0-9]+)\.([0-9]+)(.*)$ ]]; then
+            echo "VERSION=$TAG" >> "$GITHUB_OUTPUT"
             echo "VER_MAJOR=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
             echo "VER_MINOR=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
             echo "VER_NOTE=${BASH_REMATCH[3]}" >> "$GITHUB_OUTPUT"
@@ -58,40 +60,11 @@ jobs:
           name: windows-binary
           path: jk_botti_mm.dll
 
-  release:
+  package:
     needs: [validate-tag, build-linux, build-windows]
-    runs-on: ubuntu-24.04
+    uses: ./.github/workflows/package.yml
+    with:
+      version: ${{ needs.validate-tag.outputs.version }}
+      create_release: true
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - name: Get version
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
-      - name: Download Linux binary
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-binary
-          path: staging/linux
-      - name: Download Windows binary
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-binary
-          path: staging/windows
-      - name: Create Linux release archive
-        run: |
-          rm -rf addons/jk_botti/dlls && mkdir addons/jk_botti/dlls
-          cp staging/linux/jk_botti_mm_i386.so addons/jk_botti/dlls/
-          ln -sf jk_botti_mm_i386.so addons/jk_botti/dlls/jk_botti_mm.so
-          tar c addons | xz > jk_botti-${{ steps.get_version.outputs.VERSION }}-linux_ubuntu2404.tar.xz
-      - name: Create Windows release archive
-        run: |
-          rm -rf addons/jk_botti/dlls && mkdir addons/jk_botti/dlls
-          cp staging/windows/jk_botti_mm.dll addons/jk_botti/dlls/
-          tar c addons | xz > jk_botti-${{ steps.get_version.outputs.VERSION }}-win32.tar.xz
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            jk_botti-${{ steps.get_version.outputs.VERSION }}-linux_ubuntu2404.tar.xz
-            jk_botti-${{ steps.get_version.outputs.VERSION }}-win32.tar.xz
