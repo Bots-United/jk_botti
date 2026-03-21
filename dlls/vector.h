@@ -15,6 +15,12 @@
 #ifndef VECTOR_H
 #define VECTOR_H
 
+// Note on (double) casts in Length/DotProduct/CrossProduct:
+// With x87 FP math, float*float intermediates are computed in 80-bit extended
+// precision on the FPU stack. With -mfpmath=sse, they stay 32-bit float,
+// losing significant precision before the final double result (sqrt, sum).
+// Explicit (double) casts ensure 64-bit intermediate precision on both paths.
+
 class Vector;
 
 //=========================================================
@@ -31,7 +37,7 @@ public:
         inline Vector2D operator*(float fl)             const   { return Vector2D(x*fl, y*fl);  }
         inline Vector2D operator/(float fl)             const   { return Vector2D(x/fl, y/fl);  }
         
-        inline double Length(void)                      const   { return sqrt(x*x + y*y );              }
+        inline double Length(void)                      const   { return sqrt((double)x*x + (double)y*y ); }
 
         inline Vector2D Normalize ( void ) const
         {
@@ -45,7 +51,7 @@ public:
         vec_t   x, y;
 };
 
-inline float DotProduct(const Vector2D& a, const Vector2D& b) { return( a.x*b.x + a.y*b.y ); }
+inline float DotProduct(const Vector2D& a, const Vector2D& b) { return( (double)a.x*b.x + (double)a.y*b.y ); }
 inline Vector2D operator*(float fl, const Vector2D& v)  { return v * fl; }
 
 //=========================================================
@@ -77,7 +83,7 @@ public:
         
         // Methods
         inline void CopyToArray(float* rgfl) const              { rgfl[0] = x; rgfl[1] = y; rgfl[2] = z; }
-        inline double Length(void) const                        { return sqrt(x*x + y*y + z*z);         }
+        inline double Length(void) const                        { return sqrt((double)x*x + (double)y*y + (double)z*z); }
         inline operator float *()                               { return &x; } // Vectors will now automatically convert to float * when needed
         inline operator Vector2D () const                       { return (*this).Make2D(); }
 
@@ -97,7 +103,7 @@ public:
         {
                 return Vector2D(x,y);
         }
-        inline double Length2D(void) const                       { return sqrt(x*x + y*y); }
+        inline double Length2D(void) const                       { return sqrt((double)x*x + (double)y*y); }
 
         inline bool is_zero_vector(void) const
         {
@@ -116,8 +122,8 @@ public:
 };
 
 inline Vector operator*(float fl, const Vector& v)      { return v * fl; }
-inline float DotProduct(const Vector& a, const Vector& b) { return(a.x*b.x+a.y*b.y+a.z*b.z); }
-inline Vector CrossProduct(const Vector& a, const Vector& b) { return Vector( a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x ); }
+inline float DotProduct(const Vector& a, const Vector& b) { return((double)a.x*b.x+(double)a.y*b.y+(double)a.z*b.z); }
+inline Vector CrossProduct(const Vector& a, const Vector& b) { return Vector( (double)a.y*b.z - (double)a.z*b.y, (double)a.z*b.x - (double)a.x*b.z, (double)a.x*b.y - (double)a.y*b.x ); }
 
 #endif
 
