@@ -4902,6 +4902,371 @@ static int test_find_waypoint_goal_weak_weapons_no_sound(void)
 }
 
 // ============================================================
+// BotCheckNarrowPath tests
+// ============================================================
+
+// Wide corridor: lateral traces hit walls on both sides -> not narrow
+static int test_narrow_path_wide_corridor(void)
+{
+   TEST("BotCheckNarrowPath: walls both sides -> not narrow");
+   mock_reset();
+   mock_trace_hull_fn = trace_all_hit; // all lateral traces hit walls
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, e);
+   e->v.origin = Vector(100, 100, 0);
+   setup_waypoint(0, Vector(200, 100, 0));
+   bot.curr_waypoint_index = 0;
+   bot.waypoint_origin = waypoints[0].origin;
+   bot.b_on_ladder = FALSE;
+   bot.b_in_water = FALSE;
+
+   BotCheckNarrowPath(bot);
+
+   ASSERT_INT(bot.b_narrow_path, FALSE);
+   PASS();
+   return 0;
+}
+
+// Narrow path trace sequence for right drop:
+// 1. trace down to find ground -> hit (fraction < 1)
+// 2. trace right 48u -> clear (fraction ~1.0)
+// 3. trace down 47u from right pos -> clear (fraction ~1.0) = DROP
+// 4. trace left 48u -> hit (fraction < 1)
+static int narrow_trace_call_count;
+static void trace_narrow_right_drop(const float *v1, const float *v2,
+                                     int fNoMonsters, int hullNumber,
+                                     edict_t *pentToSkip, TraceResult *ptr)
+{
+   (void)fNoMonsters; (void)hullNumber; (void)pentToSkip;
+   narrow_trace_call_count++;
+
+   switch (narrow_trace_call_count)
+   {
+   case 1: // trace down to ground -> hit floor
+      ptr->flFraction = 0.5f;
+      ptr->vecEndPos[0] = v1[0];
+      ptr->vecEndPos[1] = v1[1];
+      ptr->vecEndPos[2] = v1[2] - 18.0f;
+      break;
+   case 2: // trace right -> clear (open)
+      ptr->flFraction = 1.0f;
+      ptr->vecEndPos[0] = v2[0];
+      ptr->vecEndPos[1] = v2[1];
+      ptr->vecEndPos[2] = v2[2];
+      break;
+   case 3: // trace down from right -> clear (drop-off!)
+      ptr->flFraction = 1.0f;
+      ptr->vecEndPos[0] = v2[0];
+      ptr->vecEndPos[1] = v2[1];
+      ptr->vecEndPos[2] = v2[2];
+      break;
+   case 4: // trace left -> hit wall
+      ptr->flFraction = 0.3f;
+      ptr->vecEndPos[0] = (v1[0] + v2[0]) / 2;
+      ptr->vecEndPos[1] = (v1[1] + v2[1]) / 2;
+      ptr->vecEndPos[2] = (v1[2] + v2[2]) / 2;
+      break;
+   default:
+      ptr->flFraction = 0.5f;
+      ptr->vecEndPos[0] = (v1[0] + v2[0]) / 2;
+      ptr->vecEndPos[1] = (v1[1] + v2[1]) / 2;
+      ptr->vecEndPos[2] = (v1[2] + v2[2]) / 2;
+      break;
+   }
+   ptr->pHit = NULL;
+}
+
+static int test_narrow_path_drop_right(void)
+{
+   TEST("BotCheckNarrowPath: drop on right -> narrow");
+   mock_reset();
+   narrow_trace_call_count = 0;
+   mock_trace_hull_fn = trace_narrow_right_drop;
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, e);
+   e->v.origin = Vector(100, 100, 0);
+   setup_waypoint(0, Vector(200, 100, 0));
+   bot.curr_waypoint_index = 0;
+   bot.waypoint_origin = waypoints[0].origin;
+   bot.b_on_ladder = FALSE;
+   bot.b_in_water = FALSE;
+   bot.b_narrow_path = FALSE;
+
+   BotCheckNarrowPath(bot);
+
+   ASSERT_INT(bot.b_narrow_path, TRUE);
+   PASS();
+   return 0;
+}
+
+// Left drop: ground hit, right hits wall, left clear, left down clear
+static void trace_narrow_left_drop(const float *v1, const float *v2,
+                                    int fNoMonsters, int hullNumber,
+                                    edict_t *pentToSkip, TraceResult *ptr)
+{
+   (void)fNoMonsters; (void)hullNumber; (void)pentToSkip;
+   narrow_trace_call_count++;
+
+   switch (narrow_trace_call_count)
+   {
+   case 1: // ground
+      ptr->flFraction = 0.5f;
+      ptr->vecEndPos[0] = v1[0]; ptr->vecEndPos[1] = v1[1]; ptr->vecEndPos[2] = v1[2] - 18.0f;
+      break;
+   case 2: // right -> wall
+      ptr->flFraction = 0.3f;
+      ptr->vecEndPos[0] = (v1[0]+v2[0])/2; ptr->vecEndPos[1] = (v1[1]+v2[1])/2; ptr->vecEndPos[2] = (v1[2]+v2[2])/2;
+      break;
+   case 3: // left -> clear
+      ptr->flFraction = 1.0f;
+      ptr->vecEndPos[0] = v2[0]; ptr->vecEndPos[1] = v2[1]; ptr->vecEndPos[2] = v2[2];
+      break;
+   case 4: // left down -> clear (drop!)
+      ptr->flFraction = 1.0f;
+      ptr->vecEndPos[0] = v2[0]; ptr->vecEndPos[1] = v2[1]; ptr->vecEndPos[2] = v2[2];
+      break;
+   default:
+      ptr->flFraction = 0.5f;
+      ptr->vecEndPos[0] = (v1[0]+v2[0])/2; ptr->vecEndPos[1] = (v1[1]+v2[1])/2; ptr->vecEndPos[2] = (v1[2]+v2[2])/2;
+      break;
+   }
+   ptr->pHit = NULL;
+}
+
+static int test_narrow_path_drop_left(void)
+{
+   TEST("BotCheckNarrowPath: drop on left -> narrow");
+   mock_reset();
+   narrow_trace_call_count = 0;
+   mock_trace_hull_fn = trace_narrow_left_drop;
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, e);
+   e->v.origin = Vector(100, 100, 0);
+   setup_waypoint(0, Vector(200, 100, 0));
+   bot.curr_waypoint_index = 0;
+   bot.waypoint_origin = waypoints[0].origin;
+   bot.b_on_ladder = FALSE;
+   bot.b_in_water = FALSE;
+   bot.b_narrow_path = FALSE;
+
+   BotCheckNarrowPath(bot);
+
+   ASSERT_INT(bot.b_narrow_path, TRUE);
+   PASS();
+   return 0;
+}
+
+static int test_narrow_path_walls_both_sides(void)
+{
+   TEST("BotCheckNarrowPath: walls both sides, no drop -> not narrow");
+   mock_reset();
+
+   // ground hit, right hits wall, left hits wall
+   static int call;
+   call = 0;
+   mock_trace_hull_fn = [](const float *v1, const float *v2,
+                           int, int, edict_t *, TraceResult *ptr) {
+      call++;
+      if (call == 1) { // ground
+         ptr->flFraction = 0.5f;
+         ptr->vecEndPos[0] = v1[0]; ptr->vecEndPos[1] = v1[1]; ptr->vecEndPos[2] = v1[2] - 18.0f;
+      } else { // all lateral traces hit walls
+         ptr->flFraction = 0.3f;
+         ptr->vecEndPos[0] = (v1[0]+v2[0])/2; ptr->vecEndPos[1] = (v1[1]+v2[1])/2; ptr->vecEndPos[2] = (v1[2]+v2[2])/2;
+      }
+      ptr->pHit = NULL;
+   };
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, e);
+   e->v.origin = Vector(100, 100, 0);
+   setup_waypoint(0, Vector(200, 100, 0));
+   bot.curr_waypoint_index = 0;
+   bot.waypoint_origin = waypoints[0].origin;
+   bot.b_on_ladder = FALSE;
+   bot.b_in_water = FALSE;
+
+   BotCheckNarrowPath(bot);
+
+   ASSERT_INT(bot.b_narrow_path, FALSE);
+   PASS();
+   return 0;
+}
+
+static int test_narrow_path_on_ladder_skip(void)
+{
+   TEST("BotCheckNarrowPath: on ladder -> skip, not narrow");
+   mock_reset();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, e);
+   bot.b_on_ladder = TRUE;
+   bot.b_narrow_path = TRUE; // was narrow, should be cleared
+
+   BotCheckNarrowPath(bot);
+
+   ASSERT_INT(bot.b_narrow_path, FALSE);
+   PASS();
+   return 0;
+}
+
+static int test_narrow_path_no_waypoint_skip(void)
+{
+   TEST("BotCheckNarrowPath: no waypoint -> skip, not narrow");
+   mock_reset();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, e);
+   bot.curr_waypoint_index = -1;
+   bot.b_narrow_path = TRUE;
+
+   BotCheckNarrowPath(bot);
+
+   ASSERT_INT(bot.b_narrow_path, FALSE);
+   PASS();
+   return 0;
+}
+
+// ============================================================
+// Narrow path CalcTouching test
+// ============================================================
+
+static int test_narrow_path_touch_distance(void)
+{
+   TEST("CalcTouching: narrow path uses tighter distance (30)");
+   mock_reset();
+   mock_trace_hull_fn = trace_all_clear;
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, e);
+
+   setup_waypoint(0, Vector(135, 0, 0)); // 35 units away
+   bot.curr_waypoint_index = 0;
+   bot.waypoint_origin = waypoints[0].origin;
+   e->v.origin = Vector(100, 0, 0);
+   bot.prev_waypoint_distance = 40.0f;
+
+   // Not narrow: 35 < 50 -> touching
+   bot.b_narrow_path = FALSE;
+   ASSERT_INT(BotHeadTowardWaypointCalcTouching(bot), TRUE);
+
+   // Reset
+   bot.prev_waypoint_distance = 40.0f;
+
+   // Narrow: 35 > 30 -> NOT touching
+   bot.b_narrow_path = TRUE;
+   ASSERT_INT(BotHeadTowardWaypointCalcTouching(bot), FALSE);
+
+   PASS();
+   return 0;
+}
+
+// ============================================================
+// Narrow path steering tests
+// ============================================================
+
+static int test_narrow_path_steering(void)
+{
+   TEST("UpdateViewAngles: narrow path aims differently than direct");
+   mock_reset();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, e);
+
+   // Path goes along +Y axis: prev=(0,10,0) curr=(0,200,0)
+   // Bot is offset to the right at (30,50,0) - early on the path
+   setup_waypoint(0, Vector(0, 200, 0));
+   bot.curr_waypoint_index = 0;
+   bot.waypoint_origin = waypoints[0].origin;
+   bot.v_prev_waypoint_origin = Vector(0, 10, 0); // non-zero prev
+   e->v.origin = Vector(30, 50, 0);
+
+   // First get direct aim yaw (not narrow)
+   bot.b_narrow_path = FALSE;
+   BotHeadTowardWaypoint_UpdateViewAngles(bot);
+   float direct_yaw = e->v.ideal_yaw;
+
+   // Now get path-following aim yaw (narrow)
+   bot.b_narrow_path = TRUE;
+   BotHeadTowardWaypoint_UpdateViewAngles(bot);
+   float path_yaw = e->v.ideal_yaw;
+
+   // Path-following should produce a different yaw than direct aim
+   ASSERT_TRUE(fabs(path_yaw - direct_yaw) > 1.0f);
+
+   PASS();
+   return 0;
+}
+
+static int test_narrow_path_steering_no_prev(void)
+{
+   TEST("UpdateViewAngles: narrow path, no prev waypoint -> direct aim");
+   mock_reset();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, e);
+
+   setup_waypoint(0, Vector(200, 0, 0));
+   bot.curr_waypoint_index = 0;
+   bot.waypoint_origin = waypoints[0].origin;
+   bot.v_prev_waypoint_origin = Vector(0, 0, 0); // zero = no prev
+   bot.b_narrow_path = TRUE;
+   e->v.origin = Vector(100, 50, 0);
+
+   BotHeadTowardWaypoint_UpdateViewAngles(bot);
+
+   // Should fall back to direct aim since prev is zero vector
+   Vector direct = Vector(200, 0, 0) - Vector(100, 50, 0);
+   float expected_yaw = UTIL_VecToAngles(direct).y;
+   ASSERT_FLOAT_NEAR(e->v.ideal_yaw, expected_yaw, 1.0f);
+
+   PASS();
+   return 0;
+}
+
+// ============================================================
+// BotFindWaypoint_UpdateBotState prev origin tracking
+// ============================================================
+
+static int test_update_bot_state_saves_prev_origin(void)
+{
+   TEST("UpdateBotState: saves prev waypoint origin before switching");
+   mock_reset();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, e);
+
+   setup_waypoint(5, Vector(100, 200, 300));
+   setup_waypoint(10, Vector(400, 500, 600));
+
+   bot.curr_waypoint_index = 5;
+   bot.waypoint_origin = waypoints[5].origin;
+
+   BotFindWaypoint_UpdateBotState(bot, 10);
+
+   ASSERT_INT(bot.curr_waypoint_index, 10);
+   ASSERT_FLOAT(bot.v_prev_waypoint_origin.x, 100.0f);
+   ASSERT_FLOAT(bot.v_prev_waypoint_origin.y, 200.0f);
+   ASSERT_FLOAT(bot.v_prev_waypoint_origin.z, 300.0f);
+
+   PASS();
+   return 0;
+}
+
+// ============================================================
 // Main
 // ============================================================
 
@@ -5133,6 +5498,24 @@ int main(void)
    failures += test_can_jump_up_right_duck_blocked();
    failures += test_can_jump_up_downward_right_blocked();
    failures += test_can_jump_up_downward_left_blocked();
+
+   printf("=== BotCheckNarrowPath tests ===\n");
+   failures += test_narrow_path_wide_corridor();
+   failures += test_narrow_path_drop_right();
+   failures += test_narrow_path_drop_left();
+   failures += test_narrow_path_walls_both_sides();
+   failures += test_narrow_path_on_ladder_skip();
+   failures += test_narrow_path_no_waypoint_skip();
+
+   printf("=== Narrow path CalcTouching tests ===\n");
+   failures += test_narrow_path_touch_distance();
+
+   printf("=== Narrow path UpdateViewAngles tests ===\n");
+   failures += test_narrow_path_steering();
+   failures += test_narrow_path_steering_no_prev();
+
+   printf("=== BotFindWaypoint_UpdateBotState prev origin tests ===\n");
+   failures += test_update_bot_state_saves_prev_origin();
 
    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
    return failures ? 1 : 0;
