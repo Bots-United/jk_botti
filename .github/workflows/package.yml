@@ -15,9 +15,9 @@ jobs:
   package-linux:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Download Linux binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: linux-binary
           path: staging
@@ -29,7 +29,7 @@ jobs:
       - name: Create release archive
         run: tar c addons | xz > jk_botti-${{ inputs.version }}-linux_ubuntu2404.tar.xz
       - name: Upload release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jk_botti-${{ inputs.version }}-linux_ubuntu2404
           path: jk_botti-${{ inputs.version }}-linux_ubuntu2404.tar.xz
@@ -37,9 +37,9 @@ jobs:
   package-linux-bionic:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Download Linux Bionic binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: linux-bionic-binary
           path: staging
@@ -51,7 +51,7 @@ jobs:
       - name: Create release archive
         run: tar c addons | xz > jk_botti-${{ inputs.version }}-linux_ubuntu1804.tar.xz
       - name: Upload release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jk_botti-${{ inputs.version }}-linux_ubuntu1804
           path: jk_botti-${{ inputs.version }}-linux_ubuntu1804.tar.xz
@@ -59,9 +59,9 @@ jobs:
   package-windows:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Download Windows binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows-binary
           path: staging
@@ -72,7 +72,7 @@ jobs:
       - name: Create release archive
         run: tar c addons | xz > jk_botti-${{ inputs.version }}-win32.tar.xz
       - name: Upload release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jk_botti-${{ inputs.version }}-win32
           path: jk_botti-${{ inputs.version }}-win32.tar.xz
@@ -85,15 +85,15 @@ jobs:
       contents: write
     steps:
       - name: Download Linux archive
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: jk_botti-${{ inputs.version }}-linux_ubuntu2404
       - name: Download Linux Bionic archive
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: jk_botti-${{ inputs.version }}-linux_ubuntu1804
       - name: Download Windows archive
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: jk_botti-${{ inputs.version }}-win32
       - name: Create GitHub release
