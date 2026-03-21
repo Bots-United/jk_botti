@@ -653,6 +653,30 @@ static qboolean ProcessCommand(const int cmdtype, const printfunc_t printfunc, v
       return TRUE;
    }
 
+   else if (FStrEq(pcmd, "set_team"))
+   {
+      if ((arg1 != NULL) && (*arg1 != 0) && (arg2 != NULL) && (*arg2 != 0))
+      {
+         UTIL_SetTeamModelMapping(arg1, arg2);
+         safevoid_snprintf(msg, sizeof(msg), "set_team: mapped models \"%s\" to team \"%s\"\n", arg2, arg1);
+         printfunc(PRINTFUNC_INFO, arg, msg);
+      }
+      else if ((arg1 != NULL) && FStrEq(arg1, "clear"))
+      {
+         UTIL_ClearTeamModelMapping();
+         printfunc(PRINTFUNC_INFO, arg, "set_team: cleared all team model mappings\n");
+      }
+      else
+      {
+         safevoid_snprintf(msg, sizeof(msg), "set_team: %d model mappings active\n", UTIL_GetTeamModelMappingCount());
+         printfunc(PRINTFUNC_INFO, arg, msg);
+         printfunc(PRINTFUNC_INFO, arg, "usage: set_team <teamname> \"model1;model2;...\"\n");
+         printfunc(PRINTFUNC_INFO, arg, "       set_team clear\n");
+      }
+
+      return TRUE;
+   }
+
    else if (FStrEq(pcmd, "botskill"))
    {
       if ((arg1 != NULL) && (*arg1 != 0))

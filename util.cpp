@@ -24,6 +24,20 @@ extern qboolean is_team_play;
 static breakable_list_t *g_breakable_list = NULL;
 static breakable_list_t breakable_list_memarray[BREAKABLE_LIST_MAX];
 
+// Custom team model mapping: maps model names to team names.
+// Configured via "set_team <teamname> model1;model2;..." in jk_botti.cfg.
+// Models not in the table fall through to using model name as team name.
+#define MAX_TEAM_MODEL_ENTRIES 64
+
+struct team_model_entry_t
+{
+   char model[MAX_TEAMNAME_LENGTH];
+   char team[MAX_TEAMNAME_LENGTH];
+};
+
+static team_model_entry_t team_model_map[MAX_TEAM_MODEL_ENTRIES];
+static int team_model_map_count = 0;
+
 // Polynomial sincos using only SSE-friendly operations. Avoids x87/SSE
 // register transition penalty. Uses Cephes-style range reduction to
 // [-pi/4, pi/4] and minimax polynomials. Max error vs libm: < 2e-16.
@@ -934,11 +948,87 @@ edict_t *DBG_EntOfVars( const entvars_t *pev )
 }
 #endif //DEBUG
 
-// return team string 0 through 3 based what MOD uses for team numbers
+void UTIL_SetTeamModelMapping(const char *teamname, const char *model_list)
+{
+   // Parse semicolon-separated model list, add each as a mapping entry.
+   // Duplicate team+model pairs are ignored. Existing mappings for a model
+   // are overwritten.
+   int slen = strlen(model_list);
+   if (slen > 4096)
+      slen = 4096;
+   char *buf = (char *)alloca(slen + 1);
+   memcpy(buf, model_list, slen);
+   buf[slen] = '\0';
+
+   char *model = strtok(buf, ";");
+   while (model != NULL && *model)
+   {
+      // Strip leading and trailing whitespace
+      while (*model == ' ')
+         model++;
+      char *end = model + strlen(model) - 1;
+      while (end > model && *end == ' ')
+         *end-- = '\0';
+
+      if (*model)
+      {
+         // Check if this model already has a mapping, overwrite it
+         int idx = -1;
+         for (int i = 0; i < team_model_map_count; i++)
+         {
+            if (!stricmp(team_model_map[i].model, model))
+            {
+               idx = i;
+               break;
+            }
+         }
+         if (idx < 0)
+         {
+            if (team_model_map_count >= MAX_TEAM_MODEL_ENTRIES)
+            {
+               UTIL_ConsolePrintf("set_team: table full (%d entries), ignoring model \"%s\"\n",
+                  MAX_TEAM_MODEL_ENTRIES, model);
+               model = strtok(NULL, ";");
+               continue;
+            }
+            idx = team_model_map_count++;
+         }
+
+         safe_strcopy(team_model_map[idx].model, sizeof(team_model_map[idx].model), model);
+         safe_strcopy(team_model_map[idx].team, sizeof(team_model_map[idx].team), teamname);
+      }
+
+      model = strtok(NULL, ";");
+   }
+}
+
+void UTIL_ClearTeamModelMapping(void)
+{
+   team_model_map_count = 0;
+}
+
+int UTIL_GetTeamModelMappingCount(void)
+{
+   return team_model_map_count;
+}
+
+// return team string based on custom model mapping or model name (default HL1)
 char * UTIL_GetTeam(edict_t *pEntity, char *teamstr, size_t slen)
 {
-   safe_strcopy(teamstr, slen, INFOKEY_VALUE(GET_INFOKEYBUFFER(pEntity), "model"));
+   const char *model = INFOKEY_VALUE(GET_INFOKEYBUFFER(pEntity), "model");
 
+   // Look up model in custom team mapping
+   for (int i = 0; i < team_model_map_count; i++)
+   {
+      if (!stricmp(team_model_map[i].model, model))
+      {
+         safe_strcopy(teamstr, slen, team_model_map[i].team);
+         return(teamstr);
+      }
+   }
+
+   // No mapping found, use model name as team (default HL1 behavior)
+   safe_strcopy(teamstr, slen, model);
    return(teamstr);
 }
 

@@ -36,6 +36,9 @@ float RANDOM_FLOAT2(float flLow, float flHigh);
 void ClientPrint( edict_t *pEdict, int msg_dest, const char *msg_name);
 void UTIL_HostSay( edict_t *pEntity, int teamonly, char *message );
 char* UTIL_GetTeam(edict_t *pEntity, char *teamstr, size_t slen);
+void UTIL_SetTeamModelMapping(const char *teamname, const char *model_list);
+void UTIL_ClearTeamModelMapping(void);
+int UTIL_GetTeamModelMappingCount(void);
 
 qboolean FInShootCone( const Vector & Origin, edict_t *pEdict, float distance, float target_radius, float min_angle);
 qboolean FVisible( const Vector &vecOrigin, edict_t *pEdict, edict_t ** pHit);

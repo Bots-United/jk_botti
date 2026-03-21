@@ -407,6 +407,34 @@ addons/jk_botti/* - config files, readme files
 For commands 'bot_skill_setup' and 'botweapon' see below.
 For other commands see jk_botti.cfg
 
+Command - set_team
+
+Usage:
+ - set_team <teamname> "model1;model2;..."
+      Map player models to a team name. Bots will treat all players using
+      any of the listed models as members of the same team. Models not
+      listed in any set_team command use the default HL1 behavior (model
+      name = team name).
+
+ - set_team clear
+      Remove all custom team model mappings.
+
+ - set_team
+      Show number of active model mappings.
+
+Example:
+ In jk_botti.cfg:
+   set_team team1 "gign;sas;gsg9"
+   set_team team2 "arctic;terror;leet"
+
+ With this config, a bot using the "gign" model will recognize players
+ using "sas" or "gsg9" models as teammates, and treat "arctic", "terror",
+ and "leet" players as enemies. Players using models not listed (e.g.
+ "scientist") are treated as their own team.
+
+ This is useful for custom mods that assign multiple player
+ models to the same team.
+
 Command - bot_shoot_breakables
 
 Usage:
