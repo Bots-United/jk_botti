@@ -42,8 +42,9 @@ VERFLAGS = -DVER_MAJOR=$(VER_MAJOR) -DVER_MINOR=$(VER_MINOR) -DVER_NOTE=\"$(VER_
 TARGET = jk_botti_mm
 BASEFLAGS = -Wall -Wno-write-strings -Wno-class-memaccess ${VERFLAGS}
 BASEFLAGS += -fno-strict-aliasing -fno-strict-overflow
-BASEFLAGS += -fvisibility=hidden
-ARCHFLAG += -march=i686 -mtune=generic -msse -msse2 -msse3 -mincoming-stack-boundary=2
+BASEFLAGS += -fvisibility=hidden -mincoming-stack-boundary=2
+TARGETFLAGS ?= -march=i686 -mtune=generic -mavx2 -mfma -mfpmath=sse
+ARCHFLAG += $(TARGETFLAGS)
 
 ifeq ($(DBG_FLGS),1)
 	OPTFLAGS = -O0 -g
@@ -101,7 +102,12 @@ $(ZLIB_LIB): | $(OBJDIR)/zlib
 test: $(ZLIB_LIB)
 	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" ZLIB_LIB="../$(ZLIB_LIB)" run
 
-valgrind: $(ZLIB_LIB)
+VALGRIND_TARGETFLAGS ?= -march=i686 -mtune=generic -msse3 -mfpmath=sse
+valgrind:
+	$(MAKE) TARGETFLAGS="$(VALGRIND_TARGETFLAGS)" clean
+	$(MAKE) TARGETFLAGS="$(VALGRIND_TARGETFLAGS)" _valgrind
+
+_valgrind: $(ZLIB_LIB)
 	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" ZLIB_LIB="../$(ZLIB_LIB)" valgrind
 
 coverage: $(ZLIB_LIB)

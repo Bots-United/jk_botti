@@ -27,12 +27,12 @@ jobs:
           cp staging/jk_botti_mm_i386.so addons/jk_botti/dlls/
           ln -sf jk_botti_mm_i386.so addons/jk_botti/dlls/jk_botti_mm.so
       - name: Create release archive
-        run: tar c addons | xz > jk_botti-${{ inputs.version }}-linux_ubuntu2404.tar.xz
+        run: tar c addons | xz > jk_botti-${{ inputs.version }}-linux_ubuntu2404_avx2fma.tar.xz
       - name: Upload release artifact
         uses: actions/upload-artifact@v7
         with:
-          name: jk_botti-${{ inputs.version }}-linux_ubuntu2404
-          path: jk_botti-${{ inputs.version }}-linux_ubuntu2404.tar.xz
+          name: jk_botti-${{ inputs.version }}-linux_ubuntu2404_avx2fma
+          path: jk_botti-${{ inputs.version }}-linux_ubuntu2404_avx2fma.tar.xz
 
   package-linux-bionic:
     runs-on: ubuntu-24.04
@@ -49,12 +49,12 @@ jobs:
           cp staging/jk_botti_mm_i386.so addons/jk_botti/dlls/
           ln -sf jk_botti_mm_i386.so addons/jk_botti/dlls/jk_botti_mm.so
       - name: Create release archive
-        run: tar c addons | xz > jk_botti-${{ inputs.version }}-linux_ubuntu1804.tar.xz
+        run: tar c addons | xz > jk_botti-${{ inputs.version }}-linux_ubuntu1804_sse.tar.xz
       - name: Upload release artifact
         uses: actions/upload-artifact@v7
         with:
-          name: jk_botti-${{ inputs.version }}-linux_ubuntu1804
-          path: jk_botti-${{ inputs.version }}-linux_ubuntu1804.tar.xz
+          name: jk_botti-${{ inputs.version }}-linux_ubuntu1804_sse
+          path: jk_botti-${{ inputs.version }}-linux_ubuntu1804_sse.tar.xz
 
   package-windows:
     runs-on: ubuntu-24.04
@@ -70,16 +70,37 @@ jobs:
           rm -rf addons/jk_botti/dlls && mkdir addons/jk_botti/dlls
           cp staging/jk_botti_mm.dll addons/jk_botti/dlls/
       - name: Create release archive
-        run: tar c addons | xz > jk_botti-${{ inputs.version }}-win32.tar.xz
+        run: tar c addons | xz > jk_botti-${{ inputs.version }}-win32_avx2fma.tar.xz
       - name: Upload release artifact
         uses: actions/upload-artifact@v7
         with:
-          name: jk_botti-${{ inputs.version }}-win32
-          path: jk_botti-${{ inputs.version }}-win32.tar.xz
+          name: jk_botti-${{ inputs.version }}-win32_avx2fma
+          path: jk_botti-${{ inputs.version }}-win32_avx2fma.tar.xz
+
+  package-windows-sse:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Download Windows SSE binary
+        uses: actions/download-artifact@v8
+        with:
+          name: windows-sse-binary
+          path: staging
+      - name: Prepare release directory
+        run: |
+          rm -rf addons/jk_botti/dlls && mkdir addons/jk_botti/dlls
+          cp staging/jk_botti_mm.dll addons/jk_botti/dlls/
+      - name: Create release archive
+        run: tar c addons | xz > jk_botti-${{ inputs.version }}-win32_sse.tar.xz
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: jk_botti-${{ inputs.version }}-win32_sse
+          path: jk_botti-${{ inputs.version }}-win32_sse.tar.xz
 
   create-release:
     if: ${{ inputs.create_release }}
-    needs: [package-linux, package-linux-bionic, package-windows]
+    needs: [package-linux, package-linux-bionic, package-windows, package-windows-sse]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -87,19 +108,24 @@ jobs:
       - name: Download Linux archive
         uses: actions/download-artifact@v8
         with:
-          name: jk_botti-${{ inputs.version }}-linux_ubuntu2404
+          name: jk_botti-${{ inputs.version }}-linux_ubuntu2404_avx2fma
       - name: Download Linux Bionic archive
         uses: actions/download-artifact@v8
         with:
-          name: jk_botti-${{ inputs.version }}-linux_ubuntu1804
+          name: jk_botti-${{ inputs.version }}-linux_ubuntu1804_sse
       - name: Download Windows archive
         uses: actions/download-artifact@v8
         with:
-          name: jk_botti-${{ inputs.version }}-win32
+          name: jk_botti-${{ inputs.version }}-win32_avx2fma
+      - name: Download Windows SSE archive
+        uses: actions/download-artifact@v8
+        with:
+          name: jk_botti-${{ inputs.version }}-win32_sse
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            jk_botti-${{ inputs.version }}-linux_ubuntu2404.tar.xz
-            jk_botti-${{ inputs.version }}-linux_ubuntu1804.tar.xz
-            jk_botti-${{ inputs.version }}-win32.tar.xz
+            jk_botti-${{ inputs.version }}-linux_ubuntu2404_avx2fma.tar.xz
+            jk_botti-${{ inputs.version }}-linux_ubuntu1804_sse.tar.xz
+            jk_botti-${{ inputs.version }}-win32_avx2fma.tar.xz
+            jk_botti-${{ inputs.version }}-win32_sse.tar.xz
