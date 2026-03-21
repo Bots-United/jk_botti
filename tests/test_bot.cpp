@@ -5275,6 +5275,69 @@ static int test_BotThink_strong_weapon_seeks(void)
 }
 
 // ============================================================
+// Narrow path tests
+// ============================================================
+
+static int test_BotDoStrafe_narrow_path_suppresses(void)
+{
+   TEST("BotDoStrafe: narrow path, no enemy -> strafe suppressed");
+   setup_engine_funcs();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, e);
+   bot.pBotEnemy = NULL;
+   bot.b_on_ladder = 0;
+   bot.f_strafe_time = 0; // expired
+   bot.b_narrow_path = TRUE;
+
+   for (int i = 0; i < 5; i++)
+      skill_settings[i].normal_strafe = 100; // always strafe normally
+
+   BotDoStrafe(bot);
+
+   // strafe direction should be 0 (suppressed)
+   ASSERT_FLOAT(bot.f_strafe_direction, 0.0f);
+
+   PASS();
+   return 0;
+}
+
+static int test_BotDoStrafe_narrow_path_with_enemy_still_strafes(void)
+{
+   TEST("BotDoStrafe: narrow path, with enemy -> combat strafe still works");
+   setup_engine_funcs();
+
+   edict_t *e = mock_alloc_edict();
+   bot_t bot;
+   setup_bot_for_test(bot, e);
+   bot.b_on_ladder = 0;
+   bot.f_strafe_time = 0;
+   bot.b_narrow_path = TRUE;
+
+   // give bot an enemy
+   edict_t *enemy = mock_alloc_edict();
+   enemy->v.origin = Vector(200, 0, 0);
+   enemy->v.health = 100;
+   enemy->v.deadflag = DEAD_NO;
+   bot.pBotEnemy = enemy;
+
+   for (int i = 0; i < 5; i++)
+      skill_settings[i].battle_strafe = 100;
+
+   mock_random_long_ret = 50;
+
+   BotDoStrafe(bot);
+
+   // Combat strafe should still activate (not suppressed)
+   // f_strafe_time should be updated
+   ASSERT_TRUE(bot.f_strafe_time > gpGlobals->time);
+
+   PASS();
+   return 0;
+}
+
+// ============================================================
 // main
 // ============================================================
 
@@ -5524,6 +5587,10 @@ int main(void)
    fail |= test_BotThink_weak_weapon_fights_back();
    fail |= test_BotThink_weak_weapon_disengages_after_1s();
    fail |= test_BotThink_strong_weapon_seeks();
+
+   // Narrow path behavior
+   fail |= test_BotDoStrafe_narrow_path_suppresses();
+   fail |= test_BotDoStrafe_narrow_path_with_enemy_still_strafes();
 
    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
    return fail ? EXIT_FAILURE : EXIT_SUCCESS;

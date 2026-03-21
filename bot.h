@@ -215,6 +215,8 @@ typedef struct
    float prev_waypoint_distance;
    int wpt_goal_type;
    int trace_last_stuck_wpt;         // dedup: last wpt logged for stuck trace
+   qboolean b_narrow_path;           // currently on narrow geometry (ramp, bridge, cliff)
+   Vector v_prev_waypoint_origin;    // previous waypoint origin for path-following steering
    edict_t *pTrackSoundEdict;        // used when wpt_goal_type == WPT_GOAL_TRACK_SOUND
    float f_track_sound_time;         // how long we track sound?
 
