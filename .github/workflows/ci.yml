@@ -9,7 +9,7 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Update package list for i386
         run: sudo dpkg --add-architecture i386 && sudo apt-get -y update
       - name: Install packages
@@ -24,7 +24,7 @@ jobs:
   coverage:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Update package list for i386
         run: sudo dpkg --add-architecture i386 && sudo apt-get -y update
       - name: Install packages
@@ -48,7 +48,7 @@ jobs:
             echo "$branches"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: tests/coverage_report
