@@ -202,7 +202,7 @@ static edict_t *mock_pfnFindEntityInSphere(edict_t *pentStart,
       float dx = e->v.origin[0] - origin[0];
       float dy = e->v.origin[1] - origin[1];
       float dz = e->v.origin[2] - origin[2];
-      float dist = sqrtf(dx*dx + dy*dy + dz*dz);
+      float dist = sqrt((double)dx*dx + (double)dy*dy + (double)dz*dz);
 
       if (dist <= radius)
          return e;

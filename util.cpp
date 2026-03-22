@@ -391,7 +391,7 @@ Vector UTIL_VecToAngles(const Vector &forward)
    {
       // atan2 returns values in range [-pi < x < +pi]
       yaw = (fatan2(forward.y, forward.x) * 180 / M_PI);
-      tmp = sqrt(forward.x * forward.x + forward.y * forward.y);
+      tmp = sqrt((double)forward.x * forward.x + (double)forward.y * forward.y);
       pitch = (fatan2(forward.z, tmp) * 180 / M_PI);
    }
 

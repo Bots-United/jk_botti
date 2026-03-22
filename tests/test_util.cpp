@@ -18,7 +18,7 @@ static float vec_dot(const Vector &a, const Vector &b)
 
 static float vec_length(const Vector &v)
 {
-   return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+   return sqrt((double)v.x * v.x + (double)v.y * v.y + (double)v.z * v.z);
 }
 
 // Helper: set up an edict that IsAlive() returns TRUE for
@@ -116,7 +116,7 @@ static void trace_wall_ahead(const float *v1, const float *v2,
    float dx = v2[0] - v1[0];
    float dy = v2[1] - v1[1];
    float dz = v2[2] - v1[2];
-   float len = sqrt(dx*dx + dy*dy + dz*dz);
+   float len = sqrt((double)dx*dx + (double)dy*dy + (double)dz*dz);
    if (len > 0.001f)
    {
       ptr->vecPlaneNormal[0] = -dx / len;
