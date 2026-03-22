@@ -305,15 +305,16 @@ double UTIL_GetSecs(void)
 float UTIL_WrapAngle(float angle)
 {
    // this function returns an angle normalized to the range (-180, 180]
+   // Uses __builtin_floor to stay in SSE registers (avoids x87 fisttpll
+   // round-trips that the old int64_t bitmask approach required).
+   double a = angle + 180.0;
+   a -= 360.0 * __builtin_floor(a * (1.0 / 360.0));
+   a -= 180.0;
 
-   angle += 180.0;
-   const unsigned int bits = 0x80000000;
-   angle = -180.0 + ((360.0 / bits) * ((int64_t)(angle * (bits / 360.0)) & (bits-1)));
+   if (a == -180.0)
+      a = 180.0;
 
-   if (angle == -180.0f)
-      angle = 180.0;
-
-   return(angle);
+   return (float)a;
 }
 
 
