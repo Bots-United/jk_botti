@@ -51,11 +51,11 @@ BENCH_FPMATH_OBJS = engine_mock.o bench_fpmath.o safe_snprintf.o random_num.o
 bench_fpmath: $(BENCH_FPMATH_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(BENCH_FPMATH_OBJS) -lm
 
-# fsincos tests (util.cpp #included for inline access)
-FSINCOS_TEST_OBJS = engine_mock.o test_fsincos.o safe_snprintf.o random_num.o
+# SSE math function tests (util.cpp #included for inline access)
+UTIL_MATH_TEST_OBJS = engine_mock.o test_util_math.o safe_snprintf.o random_num.o
 
-test_fsincos: $(FSINCOS_TEST_OBJS)
-	${CXX} $(COVERAGE_FLAGS) -o $@ $(FSINCOS_TEST_OBJS) -lm
+test_util_math: $(UTIL_MATH_TEST_OBJS)
+	${CXX} $(COVERAGE_FLAGS) -o $@ $(UTIL_MATH_TEST_OBJS) -lm
 
 # Bot chat tests (bot_chat.cpp is #included in test file, not linked separately)
 BOT_CHAT_OBJS = engine_mock.o test_bot_chat.o util.o safe_snprintf.o random_num.o
@@ -198,7 +198,7 @@ BOT_TRACE_OBJS = engine_mock.o test_bot_trace.o \
 test_bot_trace: $(BOT_TRACE_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_TRACE_OBJS) -lm
 
-ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_fsincos test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_geneticalg test_waypoint test_bot_navigate test_bot_skill test_bot_sound test_h_export test_bot_config_init test_bot_models test_bot_client test_bot test_commands test_dll test_engine test_bot_trace test_bot_query_hook test_bot_query_hook_linux test_bot_query_hook_win32
+ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_util_math test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_geneticalg test_waypoint test_bot_navigate test_bot_skill test_bot_sound test_h_export test_bot_config_init test_bot_models test_bot_client test_bot test_commands test_dll test_engine test_bot_trace test_bot_query_hook test_bot_query_hook_linux test_bot_query_hook_win32
 
 all: $(ALL_TESTS)
 
@@ -208,7 +208,7 @@ run: $(ALL_TESTS)
 	./test_bot_combat
 	./test_bot_weapons
 	./test_util
-	./test_fsincos
+	./test_util_math
 	./test_bot_chat
 	./test_safe_snprintf
 	./test_random_num
@@ -239,7 +239,7 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_bot_combat
 	$(VALGRIND) ./test_bot_weapons
 	$(VALGRIND) ./test_util
-	$(VALGRIND) ./test_fsincos
+	$(VALGRIND) ./test_util_math
 	$(VALGRIND) ./test_bot_chat
 	$(VALGRIND) ./test_safe_snprintf
 	$(VALGRIND) ./test_random_num

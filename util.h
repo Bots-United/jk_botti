@@ -72,4 +72,20 @@ qboolean IsAlive(const edict_t *pEdict);
 
 qboolean FInViewCone(const Vector & Origin, edict_t *pEdict);
 
+// SSE-friendly cos. For compile-time constants, __builtin_cos lets the
+// compiler constant-fold. For runtime values, dispatches to fcos_sse
+// (polynomial, avoids x87/SSE transition) or libm cos.
+double fcos_runtime(double x);
+
+inline double fcos(double x)
+{
+   if (__builtin_constant_p(x))
+      return __builtin_cos(x);
+   return fcos_runtime(x);
+}
+
+// SSE-friendly atan2. Dispatches to polynomial atan2 (SSE builds)
+// or libm atan2 (non-SSE builds).
+double fatan2(double y, double x);
+
 #endif

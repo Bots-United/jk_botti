@@ -18,7 +18,7 @@ static float vec_dot(const Vector &a, const Vector &b)
 
 static float vec_length(const Vector &v)
 {
-   return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+   return sqrt((double)v.x * v.x + (double)v.y * v.y + (double)v.z * v.z);
 }
 
 // Helper: set up an edict that IsAlive() returns TRUE for
@@ -116,7 +116,7 @@ static void trace_wall_ahead(const float *v1, const float *v2,
    float dx = v2[0] - v1[0];
    float dy = v2[1] - v1[1];
    float dz = v2[2] - v1[2];
-   float len = sqrt(dx*dx + dy*dy + dz*dz);
+   float len = sqrt((double)dx*dx + (double)dy*dy + (double)dz*dz);
    if (len > 0.001f)
    {
       ptr->vecPlaneNormal[0] = -dx / len;
@@ -298,6 +298,190 @@ static int test_wrap_angle(void)
    TEST("never returns -180 for integer inputs [-3600..3600]");
    for (int i = -3600; i <= 3600; i++)
       ASSERT_TRUE(UTIL_WrapAngle((float)i) != -180.0f);
+   PASS();
+
+   return 0;
+}
+
+// Reference: mathematically correct wrap using double fmod
+static float WrapAngle_ref(float angle)
+{
+   double a = fmod((double)angle + 180.0, 360.0);
+   if (a < 0) a += 360.0;
+   a -= 180.0;
+   if (a == -180.0) a = 180.0;
+   return (float)a;
+}
+
+// Old implementation: int64 bitmask approach (replaced by __builtin_floor).
+// The bits/360 scaling introduces quantization error at ~1 ULP for some
+// inputs, e.g. WrapAngle_old(-3599) = 1.0000001192 instead of exact 1.0.
+static float WrapAngle_old(float angle)
+{
+   angle += 180.0;
+   const unsigned int bits = 0x80000000;
+   angle = -180.0 + ((360.0 / bits) * ((int64_t)(angle * (bits / 360.0)) & (bits-1)));
+   if (angle == -180.0f)
+      angle = 180.0;
+   return angle;
+}
+
+static int test_wrap_angle_comprehensive(void)
+{
+   printf("UTIL_WrapAngle comprehensive (new vs reference):\n");
+
+   TEST("integer degrees [-3600..3600] match fmod reference");
+   for (int i = -3600; i <= 3600; i++)
+   {
+      float got = UTIL_WrapAngle((float)i);
+      float expected = WrapAngle_ref((float)i);
+      if (got != expected)
+      {
+         printf("FAIL at %d: got %.10f, expected %.10f\n",
+                i, (double)got, (double)expected);
+         return 1;
+      }
+   }
+   PASS();
+
+   TEST("fractional degrees [-720..720] step 0.1 match reference");
+   for (int i = -7200; i <= 7200; i++)
+   {
+      float angle = i * 0.1f;
+      float got = UTIL_WrapAngle(angle);
+      float expected = WrapAngle_ref(angle);
+      if (got != expected)
+      {
+         printf("FAIL at %.1f: got %.10f, expected %.10f\n",
+                (double)angle, (double)got, (double)expected);
+         return 1;
+      }
+   }
+   PASS();
+
+   TEST("fine step 0.001 across [-360..360] match reference");
+   for (int i = -360000; i <= 360000; i++)
+   {
+      float angle = i * 0.001f;
+      float got = UTIL_WrapAngle(angle);
+      float expected = WrapAngle_ref(angle);
+      if (got != expected)
+      {
+         printf("FAIL at %.3f: got %.10f, expected %.10f\n",
+                (double)angle, (double)got, (double)expected);
+         return 1;
+      }
+   }
+   PASS();
+
+   // The old int64 bitmask implementation had quantization error from
+   // scaling by (2^31 / 360): the round-trip float -> int64 -> float
+   // lost ~1 ULP on some inputs. The new __builtin_floor version
+   // matches the fmod reference exactly, so where they differ, the
+   // new code is strictly more accurate.
+   TEST("new is at least as accurate as old (integer degrees)");
+   int new_better = 0, old_better = 0;
+   for (int i = -36000; i <= 36000; i++)
+   {
+      float angle = (float)i;
+      float new_r = UTIL_WrapAngle(angle);
+      float old_r = WrapAngle_old(angle);
+      float ref_r = WrapAngle_ref(angle);
+      float new_err = fabsf(new_r - ref_r);
+      float old_err = fabsf(old_r - ref_r);
+      if (new_err < old_err) new_better++;
+      if (old_err < new_err) old_better++;
+   }
+   printf("    new more accurate: %d, old more accurate: %d\n",
+          new_better, old_better);
+   ASSERT_TRUE(old_better == 0);
+   PASS();
+
+   TEST("new is at least as accurate as old (fractional degrees)");
+   new_better = 0; old_better = 0;
+   for (int i = -36000; i <= 36000; i++)
+   {
+      float angle = i * 0.1f;
+      float new_r = UTIL_WrapAngle(angle);
+      float old_r = WrapAngle_old(angle);
+      float ref_r = WrapAngle_ref(angle);
+      float new_err = fabsf(new_r - ref_r);
+      float old_err = fabsf(old_r - ref_r);
+      if (new_err < old_err) new_better++;
+      if (old_err < new_err) old_better++;
+   }
+   printf("    new more accurate: %d, old more accurate: %d\n",
+          new_better, old_better);
+   ASSERT_TRUE(old_better == 0);
+   PASS();
+
+   TEST("output always in (-180, 180] for all integer degrees");
+   for (int i = -36000; i <= 36000; i++)
+   {
+      float r = UTIL_WrapAngle((float)i);
+      if (r <= -180.0f || r > 180.0f)
+      {
+         printf("FAIL: WrapAngle(%d) = %f, out of range (-180, 180]\n", i, r);
+         return 1;
+      }
+   }
+   PASS();
+
+   TEST("output always in (-180, 180] for fractional inputs");
+   for (int i = -36000; i <= 36000; i++)
+   {
+      float r = UTIL_WrapAngle(i * 0.1f);
+      if (r <= -180.0f || r > 180.0f)
+      {
+         printf("FAIL: WrapAngle(%.1f) = %f, out of range (-180, 180]\n",
+                i * 0.1, (double)r);
+         return 1;
+      }
+   }
+   PASS();
+
+   TEST("never returns -180");
+   for (int i = -36000; i <= 36000; i++)
+   {
+      ASSERT_TRUE(UTIL_WrapAngle((float)i) != -180.0f);
+      ASSERT_TRUE(UTIL_WrapAngle(i * 0.1f) != -180.0f);
+   }
+   PASS();
+
+   TEST("idempotent: wrapping twice gives same result");
+   for (int i = -3600; i <= 3600; i++)
+   {
+      float angle = i * 0.1f;
+      float once = UTIL_WrapAngle(angle);
+      float twice = UTIL_WrapAngle(once);
+      if (once != twice)
+      {
+         printf("FAIL: WrapAngle(%.1f)=%f, WrapAngle(%f)=%f\n",
+                (double)angle, (double)once, (double)once, (double)twice);
+         return 1;
+      }
+   }
+   PASS();
+
+   TEST("boundary: just above -180");
+   ASSERT_FLOAT(UTIL_WrapAngle(-179.999f), -179.999f);
+   PASS();
+
+   TEST("boundary: just below 180");
+   ASSERT_FLOAT(UTIL_WrapAngle(179.999f), 179.999f);
+   PASS();
+
+   TEST("boundary: just above 180");
+   float r = UTIL_WrapAngle(180.001f);
+   ASSERT_TRUE(r > -180.0f && r < -179.0f);
+   PASS();
+
+   TEST("large values: 36000 degrees");
+   ASSERT_FLOAT(UTIL_WrapAngle(36000.0f), 0.0f);
+   PASS();
+
+   TEST("large values: -36000 degrees");
+   ASSERT_FLOAT(UTIL_WrapAngle(-36000.0f), 0.0f);
    PASS();
 
    return 0;
@@ -1922,6 +2106,7 @@ int main(void)
 
    // Pure math tests
    fail |= test_wrap_angle();
+   fail |= test_wrap_angle_comprehensive();
    fail |= test_wrap_angles();
    fail |= test_angles_to_forward();
    fail |= test_angles_to_right();

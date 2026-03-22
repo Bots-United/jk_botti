@@ -312,7 +312,10 @@ static void SpawnPostHandleDoor(edict_t *pent)
 
    Vector v_position1 = m_origin;
    // Subtract 2 from size because the engine expands bboxes by 1 in all directions making the size too big
-   Vector v_position2 = m_origin + (pent->v.movedir * (fabs( pent->v.movedir.x * (pent->v.size.x-2) ) + fabs( pent->v.movedir.y * (pent->v.size.y-2) ) + fabs( pent->v.movedir.z * (pent->v.size.z-2) ) - m_lip));
+   float travel = fabs( (double)pent->v.movedir.x * (pent->v.size.x-2) )
+                + fabs( (double)pent->v.movedir.y * (pent->v.size.y-2) )
+                + fabs( (double)pent->v.movedir.z * (pent->v.size.z-2) ) - m_lip;
+   Vector v_position2 = m_origin + (pent->v.movedir * travel);
 
    if ( FBitSet (pent->v.spawnflags, SF_DOOR_START_OPEN) )
    {

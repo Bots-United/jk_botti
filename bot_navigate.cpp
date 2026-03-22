@@ -793,7 +793,7 @@ static void BotHeadTowardWaypointTryLongjump(bot_t &pBot)
    if(!pBot.b_in_water && pBot.b_on_ground && !pBot.b_ducking && !pBot.b_on_ladder &&
       vecToWpt.Length() >= max_lj_distance * 0.6 &&
       pEdict->v.velocity.Length() > 50 &&
-      DotProduct(UTIL_AnglesToForward(pEdict->v.v_angle), vecToWpt.Normalize()) > cos(deg2rad(10)))
+      DotProduct(UTIL_AnglesToForward(pEdict->v.v_angle), vecToWpt.Normalize()) > fcos(deg2rad(10)))
    {
       // trace a hull toward the current waypoint the distance of a longjump (depending on gravity)
       UTIL_TraceHull(

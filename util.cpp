@@ -89,6 +89,54 @@ inline void fsincos_sse(double x, double &s, double &c)
       s = -s;
 }
 
+// Polynomial cos using only SSE-friendly operations (cos-only variant of
+// fsincos_sse). cos is even: cos(-x) = cos(x), so no sign fixup needed.
+inline double fcos_sse(double x)
+{
+   double abs_x = __builtin_fabs(x);
+
+   // Find octant: j = floor(|x| * 4/pi), round up to even
+   double y = __builtin_floor(abs_x * (4.0 / M_PI));
+   int j = (int)y;
+   int odd = j & 1;
+   j = (j + odd) & 7;
+   y += odd;
+
+   // Extended precision reduction: z = |x| - y * (pi/4)
+   // DP1+DP2+DP3 = pi/4 in triple-double precision
+   static const double DP1 = 7.85398125648498535156e-1;
+   static const double DP2 = 3.77489470793079817668e-8;
+   static const double DP3 = 2.69515142907905952645e-15;
+   double z = ((abs_x - y * DP1) - y * DP2) - y * DP3;
+   double zz = z * z;
+
+   // Only one polynomial needed per octant (Cephes double precision):
+   //   j=0: +cos_p, j=2: -sin_p, j=4: -cos_p, j=6: +sin_p
+   double p;
+   if ((j & 2) == 0)
+   {
+      // j=0,4: cos polynomial
+      p = 1.0 - 0.5 * zz + zz * zz * (4.16666666666665929218e-2 + zz *
+         (-1.38888888888730564116e-3 + zz * (2.48015872888517045348e-5 + zz *
+         (-2.75573141792967388112e-7 + zz * (2.08757008419747316778e-9 + zz *
+         (-1.13585365213876817300e-11))))));
+      if (j == 4)
+         p = -p;
+   }
+   else
+   {
+      // j=2,6: sin polynomial
+      p = z + z * zz * (-1.66666666666666307295e-1 + zz *
+         (8.33333333332211858878e-3 + zz * (-1.98412698295895385996e-4 + zz *
+         (2.75573136213857245213e-6 + zz * (-2.50507477628578072866e-8 + zz *
+         1.58962301576546568060e-10)))));
+      if (j == 2)
+         p = -p;
+   }
+
+   return p;
+}
+
 // x87 fsincos asm: ~2.4x faster than glibc sin()+cos().
 inline void fsincos_x87(double x, double &s, double &c)
 {
@@ -101,6 +149,119 @@ inline void fsincos(double x, double &s, double &c)
    fsincos_sse(x, s, c);
 #else
    fsincos_x87(x, s, c);
+#endif
+}
+
+// Non-constant cos for SSE builds. Called via fcos() in util.h when
+// __builtin_constant_p fails (runtime arguments).
+inline double fcos_runtime(double x)
+{
+#if defined(__SSE_MATH__)
+   return fcos_sse(x);
+#else
+   return cos(x);
+#endif
+}
+
+// Polynomial atan using only SSE-friendly operations. Cephes-style
+// three-interval range reduction to [0, 0.66] and rational polynomial
+// P(x^2)/Q(x^2). Max error vs libm: < 2e-16.
+inline double fatan_sse(double x)
+{
+   // Work with |x|, restore sign at end
+   double abs_x = __builtin_fabs(x);
+
+   // Range reduction:
+   //   abs_x > tan(3*pi/8) (~2.414): z = -1/abs_x, base = pi/2
+   //   abs_x > 0.66:                 z = (abs_x-1)/(abs_x+1), base = pi/4
+   //   otherwise:                    z = abs_x, base = 0
+   static const double T3P8 = 2.41421356237309504880; // tan(3*pi/8) = 1+sqrt(2)
+   static const double MOREBITS = 6.123233995736765886130e-17; // pi/2 trailing bits
+
+   double z, base, morebits_scale;
+   if (abs_x > T3P8)
+   {
+      z = -1.0 / abs_x;
+      base = M_PI_2;
+      morebits_scale = 1.0;
+   }
+   else if (abs_x > 0.66)
+   {
+      z = (abs_x - 1.0) / (abs_x + 1.0);
+      base = M_PI_4;
+      morebits_scale = 0.5;
+   }
+   else
+   {
+      z = abs_x;
+      base = 0.0;
+      morebits_scale = 0.0;
+   }
+
+   // Rational polynomial: atan(z) = z + z^3 * P(z^2) / Q(z^2)
+   // Cephes double precision coefficients, Horner form (high-to-low degree)
+   double zz = z * z;
+
+   // Numerator: zz * P(zz), where P is degree 4
+   double p = ((((-8.750608600031904122785e-1 * zz
+      - 1.615753718733365076637e1) * zz
+      - 7.500855792314704667340e1) * zz
+      - 1.228866684490136173410e2) * zz
+      - 6.485021904942025371773e1) * zz;
+
+   // Denominator: Q(zz), degree 5 with leading coeff 1.0
+   double q = ((((zz
+      + 2.485846490142306297962e1) * zz
+      + 1.650270098316988542046e2) * zz
+      + 4.328810604912902668951e2) * zz
+      + 4.853903996359136964868e2) * zz
+      + 1.945506571482613964425e2;
+
+   z = z + z * (p / q) + morebits_scale * MOREBITS + base;
+
+   // Restore sign: atan is odd
+   if (x < 0)
+      z = -z;
+
+   return z;
+}
+
+// Polynomial atan2 using only SSE-friendly operations. Computes
+// atan(y/x) with quadrant reconstruction from signs of x and y.
+inline double fatan2_sse(double y, double x)
+{
+   // y == 0: copysign preserves sign of zero through to result
+   if (y == 0.0)
+   {
+      if (x >= 0.0)
+         return y;
+      else
+         return __builtin_copysign(M_PI, y);
+   }
+   if (x == 0.0)
+      return (y > 0.0) ? M_PI_2 : -M_PI_2;
+
+   double r = fatan_sse(y / x);
+
+   // Quadrant adjustment for x < 0
+   if (x < 0.0)
+   {
+      if (y >= 0.0)
+         r += M_PI;
+      else
+         r -= M_PI;
+   }
+
+   return r;
+}
+
+// SSE/libm dispatch for atan2.
+inline double fatan2(double y, double x)
+{
+#if defined(__SSE_MATH__)
+   return fatan2_sse(y, x);
+#else
+   return atan2(y, x);
 #endif
 }
 
@@ -144,15 +305,16 @@ double UTIL_GetSecs(void)
 float UTIL_WrapAngle(float angle)
 {
    // this function returns an angle normalized to the range (-180, 180]
+   // Uses __builtin_floor to stay in SSE registers (avoids x87 fisttpll
+   // round-trips that the old int64_t bitmask approach required).
+   double a = angle + 180.0;
+   a -= 360.0 * __builtin_floor(a * (1.0 / 360.0));
+   a -= 180.0;
 
-   angle += 180.0;
-   const unsigned int bits = 0x80000000;
-   angle = -180.0 + ((360.0 / bits) * ((int64_t)(angle * (bits / 360.0)) & (bits-1)));
+   if (a == -180.0)
+      a = 180.0;
 
-   if (angle == -180.0f)
-      angle = 180.0;
-
-   return(angle);
+   return (float)a;
 }
 
 
@@ -229,9 +391,9 @@ Vector UTIL_VecToAngles(const Vector &forward)
    else
    {
       // atan2 returns values in range [-pi < x < +pi]
-      yaw = (atan2(forward.y, forward.x) * 180 / M_PI);
-      tmp = sqrt(forward.x * forward.x + forward.y * forward.y);
-      pitch = (atan2(forward.z, tmp) * 180 / M_PI);
+      yaw = (fatan2(forward.y, forward.x) * 180 / M_PI);
+      tmp = sqrt((double)forward.x * forward.x + (double)forward.y * forward.y);
+      pitch = (fatan2(forward.z, tmp) * 180 / M_PI);
    }
 
    return(Vector(pitch, yaw, 0));
@@ -897,7 +1059,7 @@ qboolean FInShootCone(const Vector & Origin, edict_t *pEdict, float distance, fl
 
    // angle between forward-view-vector and vector to player (as cos(angle))
    float flDot = DotProduct( (Origin - (pEdict->v.origin + pEdict->v.view_ofs)).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle) );
-   if (flDot > cos(deg2rad(min_angle))) // smaller angle, bigger cosine
+   if (flDot > fcos(deg2rad(min_angle))) // smaller angle, bigger cosine
       return TRUE;
 
    Vector2D triangle;
@@ -1096,5 +1258,5 @@ qboolean FInViewCone(const Vector & Origin, edict_t *pEdict)
 {
    const float fov_angle = 80;
 
-   return(DotProduct((Origin - pEdict->v.origin).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle)) > cos(deg2rad(fov_angle)));
+   return(DotProduct((Origin - pEdict->v.origin).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle)) > fcos(deg2rad(fov_angle)));
 }

@@ -1,5 +1,5 @@
 //
-// JK_Botti - unit tests for fsincos implementations
+// JK_Botti - unit tests for SSE math functions (fsincos, fcos, fatan2)
 //
 // Uses #include-the-.cpp approach to access inline functions directly.
 //
@@ -430,6 +430,370 @@ static int test_fsincos_sse_special_values(void)
 }
 
 // ============================================================
+// fcos_sse tests (verify against libm cos)
+// ============================================================
+
+static int test_fcos_sse_special_angles(void)
+{
+   printf("fcos_sse special angles:\n");
+
+   struct { const char *name; double x; } cases[] = {
+      {"0",       0.0},
+      {"pi/6",    M_PI/6},
+      {"pi/4",    M_PI/4},
+      {"pi/3",    M_PI/3},
+      {"pi/2",    M_PI/2},
+      {"pi",      M_PI},
+      {"3pi/2",   3*M_PI/2},
+      {"2pi",     2*M_PI},
+      {"-pi/4",   -M_PI/4},
+      {"-pi/2",   -M_PI/2},
+      {"-pi",     -M_PI},
+      {"-2pi",    -2*M_PI},
+   };
+   int n = sizeof(cases) / sizeof(cases[0]);
+
+   for (int i = 0; i < n; i++)
+   {
+      TEST(cases[i].name);
+      double got = fcos_sse(cases[i].x);
+      double expected = cos(cases[i].x);
+      ASSERT_DOUBLE_NEAR(got, expected, 2e-16);
+      PASS();
+   }
+
+   return 0;
+}
+
+static int test_fcos_sse_bot_angles(void)
+{
+   printf("fcos_sse bot angle range (degrees -> radians):\n");
+
+   TEST("sweep -180 to +180 degrees (1-degree steps)");
+   double max_err = 0;
+   for (int deg = -180; deg <= 180; deg++)
+   {
+      double x = deg * (M_PI / 180.0);
+      double got = fcos_sse(x);
+      double expected = cos(x);
+      double err = fabs(got - expected);
+      if (err > max_err) max_err = err;
+      ASSERT_DOUBLE_NEAR(got, expected, 2e-16);
+   }
+   printf("    max error: %.2e\n", max_err);
+   PASS();
+
+   TEST("fine sweep 0 to 2pi (0.01 radian steps)");
+   max_err = 0;
+   for (int i = 0; i <= 628; i++)
+   {
+      double x = i * 0.01;
+      double got = fcos_sse(x);
+      double expected = cos(x);
+      double err = fabs(got - expected);
+      if (err > max_err) max_err = err;
+      ASSERT_DOUBLE_NEAR(got, expected, 2e-16);
+   }
+   printf("    max error: %.2e\n", max_err);
+   PASS();
+
+   return 0;
+}
+
+static int test_fcos_sse_consistency_with_fsincos(void)
+{
+   double s, c;
+
+   printf("fcos_sse consistency with fsincos_sse:\n");
+
+   TEST("fcos_sse matches fsincos_sse cos output across full range");
+   double max_err = 0;
+   for (int deg = -360; deg <= 360; deg++)
+   {
+      double x = deg * (M_PI / 180.0);
+      double got = fcos_sse(x);
+      fsincos_sse(x, s, c);
+      double err = fabs(got - c);
+      if (err > max_err) max_err = err;
+      if (err > 0)
+      {
+         printf("FAIL at %d deg: fcos=%.15e fsincos.c=%.15e diff=%.2e\n",
+                deg, got, c, err);
+         return 1;
+      }
+   }
+   printf("    max error: %.2e (expect exact match)\n", max_err);
+   PASS();
+
+   return 0;
+}
+
+static int test_fcos_sse_special_values(void)
+{
+   printf("fcos_sse special values:\n");
+
+   TEST("x=NaN -> NaN");
+   ASSERT_TRUE(isnan(fcos_sse(__builtin_nan(""))));
+   PASS();
+
+   TEST("x=+inf -> NaN");
+   ASSERT_TRUE(isnan(fcos_sse(__builtin_inf())));
+   PASS();
+
+   TEST("x=-inf -> NaN");
+   ASSERT_TRUE(isnan(fcos_sse(-__builtin_inf())));
+   PASS();
+
+   TEST("cos is even: fcos(x) == fcos(-x)");
+   double angles[] = {0.1, 0.5, 1.0, M_PI/3, M_PI, 2*M_PI, 5.5};
+   for (int i = 0; i < (int)(sizeof(angles)/sizeof(angles[0])); i++)
+   {
+      double pos = fcos_sse(angles[i]);
+      double neg = fcos_sse(-angles[i]);
+      if (pos != neg)
+      {
+         printf("FAIL: fcos(%.3f)=%.15e != fcos(-%.3f)=%.15e\n",
+                angles[i], pos, angles[i], neg);
+         return 1;
+      }
+   }
+   PASS();
+
+   return 0;
+}
+
+static int test_fcos_runtime(void)
+{
+   printf("fcos_runtime (dispatch wrapper):\n");
+
+   TEST("matches libm cos across bot angle range");
+   double max_err = 0;
+   for (int deg = -180; deg <= 180; deg++)
+   {
+      double x = deg * (M_PI / 180.0);
+      double got = fcos_runtime(x);
+      double expected = cos(x);
+      double err = fabs(got - expected);
+      if (err > max_err) max_err = err;
+      ASSERT_DOUBLE_NEAR(got, expected, 2e-16);
+   }
+   printf("    max error: %.2e\n", max_err);
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
+// fatan_sse / fatan2_sse tests (verify against libm atan2)
+// ============================================================
+
+static int test_fatan_sse_special_values(void)
+{
+   printf("fatan_sse special values:\n");
+
+   TEST("atan(0) = 0");
+   ASSERT_DOUBLE_NEAR(fatan_sse(0.0), 0.0, 0);
+   PASS();
+
+   TEST("atan(1) = pi/4");
+   ASSERT_DOUBLE_NEAR(fatan_sse(1.0), atan(1.0), 2e-16);
+   PASS();
+
+   TEST("atan(-1) = -pi/4");
+   ASSERT_DOUBLE_NEAR(fatan_sse(-1.0), atan(-1.0), 2e-16);
+   PASS();
+
+   TEST("atan is odd: fatan(x) == -fatan(-x)");
+   double vals[] = {0.1, 0.5, 0.66, 1.0, 2.0, 2.5, 10.0, 100.0};
+   for (int i = 0; i < (int)(sizeof(vals)/sizeof(vals[0])); i++)
+   {
+      double pos = fatan_sse(vals[i]);
+      double neg = fatan_sse(-vals[i]);
+      if (fabs(pos + neg) > 2e-16)
+      {
+         printf("FAIL: fatan(%.3f)=%.15e, fatan(-%.3f)=%.15e, sum=%.2e\n",
+                vals[i], pos, vals[i], neg, fabs(pos + neg));
+         return 1;
+      }
+   }
+   PASS();
+
+   TEST("sweep across all three reduction intervals");
+   double max_err = 0;
+   // Test from -10 to +10 in fine steps
+   // Tolerance 5e-16 (~2 ULP): rational polynomial has slightly higher
+   // error than minimax polynomial at interval boundaries.
+   for (int i = -10000; i <= 10000; i++)
+   {
+      double x = i * 0.001;
+      double got = fatan_sse(x);
+      double expected = atan(x);
+      double err = fabs(got - expected);
+      if (err > max_err) max_err = err;
+      ASSERT_DOUBLE_NEAR(got, expected, 5e-16);
+   }
+   printf("    max error: %.2e\n", max_err);
+   PASS();
+
+   return 0;
+}
+
+static int test_fatan2_sse_quadrants(void)
+{
+   printf("fatan2_sse quadrants:\n");
+
+   struct { const char *name; double y; double x; } cases[] = {
+      {"Q1: (+y,+x)",   1.0,  1.0},
+      {"Q2: (+y,-x)",   1.0, -1.0},
+      {"Q3: (-y,-x)",  -1.0, -1.0},
+      {"Q4: (-y,+x)",  -1.0,  1.0},
+      {"Q1: steep",     10.0,  1.0},
+      {"Q2: steep",     10.0, -1.0},
+      {"Q3: steep",    -10.0, -1.0},
+      {"Q4: steep",    -10.0,  1.0},
+      {"Q1: shallow",   0.1,  10.0},
+      {"Q2: shallow",   0.1, -10.0},
+      {"Q3: shallow",  -0.1, -10.0},
+      {"Q4: shallow",  -0.1,  10.0},
+   };
+   int n = sizeof(cases) / sizeof(cases[0]);
+
+   for (int i = 0; i < n; i++)
+   {
+      TEST(cases[i].name);
+      double got = fatan2_sse(cases[i].y, cases[i].x);
+      double expected = atan2(cases[i].y, cases[i].x);
+      ASSERT_DOUBLE_NEAR(got, expected, 5e-16);
+      PASS();
+   }
+
+   return 0;
+}
+
+static int test_fatan2_sse_axes(void)
+{
+   printf("fatan2_sse axis cases:\n");
+
+   TEST("y=0, x>0 -> 0");
+   ASSERT_DOUBLE_NEAR(fatan2_sse(0.0, 1.0), 0.0, 0);
+   PASS();
+
+   TEST("y=0, x<0 -> pi");
+   ASSERT_DOUBLE_NEAR(fatan2_sse(0.0, -1.0), M_PI, 0);
+   PASS();
+
+   TEST("y>0, x=0 -> pi/2");
+   ASSERT_DOUBLE_NEAR(fatan2_sse(1.0, 0.0), M_PI_2, 0);
+   PASS();
+
+   TEST("y<0, x=0 -> -pi/2");
+   ASSERT_DOUBLE_NEAR(fatan2_sse(-1.0, 0.0), -M_PI_2, 0);
+   PASS();
+
+   TEST("-0, x>0 -> -0");
+   double r = fatan2_sse(-0.0, 1.0);
+   ASSERT_TRUE(r == 0.0 && __builtin_signbit(r));
+   PASS();
+
+   TEST("-0, x<0 -> -pi");
+   ASSERT_DOUBLE_NEAR(fatan2_sse(-0.0, -1.0), -M_PI, 0);
+   PASS();
+
+   return 0;
+}
+
+static int test_fatan2_sse_bot_angles(void)
+{
+   printf("fatan2_sse bot angle sweep:\n");
+
+   TEST("full circle: 360 directions at unit distance");
+   double max_err = 0;
+   for (int deg = -180; deg < 180; deg++)
+   {
+      double rad = deg * (M_PI / 180.0);
+      double y = sin(rad);
+      double x = cos(rad);
+      double got = fatan2_sse(y, x);
+      double expected = atan2(y, x);
+      double err = fabs(got - expected);
+      if (err > max_err) max_err = err;
+      ASSERT_DOUBLE_NEAR(got, expected, 5e-16);
+   }
+   printf("    max error: %.2e\n", max_err);
+   PASS();
+
+   TEST("varied distances (0.01 to 1000)");
+   max_err = 0;
+   double dists[] = {0.01, 0.1, 1.0, 10.0, 100.0, 1000.0};
+   for (int d = 0; d < (int)(sizeof(dists)/sizeof(dists[0])); d++)
+   {
+      for (int deg = -180; deg < 180; deg += 5)
+      {
+         double rad = deg * (M_PI / 180.0);
+         double y = sin(rad) * dists[d];
+         double x = cos(rad) * dists[d];
+         double got = fatan2_sse(y, x);
+         double expected = atan2(y, x);
+         double err = fabs(got - expected);
+         if (err > max_err) max_err = err;
+         ASSERT_DOUBLE_NEAR(got, expected, 5e-16);
+      }
+   }
+   printf("    max error: %.2e\n", max_err);
+   PASS();
+
+   return 0;
+}
+
+static int test_fatan2_sse_max_error(void)
+{
+   printf("fatan2_sse max error:\n");
+
+   TEST("fine sweep: 100K points across all quadrants");
+   double max_err = 0;
+   for (int i = 0; i < 100000; i++)
+   {
+      // Use golden ratio to cover (y,x) space well
+      double angle = i * 2.399963229728653; // golden angle in radians
+      double r = 0.001 + (i % 1000) * 0.1;
+      double y = sin(angle) * r;
+      double x = cos(angle) * r;
+      double got = fatan2_sse(y, x);
+      double expected = atan2(y, x);
+      double err = fabs(got - expected);
+      if (err > max_err) max_err = err;
+      ASSERT_DOUBLE_NEAR(got, expected, 5e-16);
+   }
+   printf("    max error: %.2e\n", max_err);
+   PASS();
+
+   return 0;
+}
+
+static int test_fatan2_dispatch(void)
+{
+   printf("fatan2 (dispatch wrapper):\n");
+
+   TEST("matches libm atan2 across bot angle range");
+   double max_err = 0;
+   for (int deg = -180; deg < 180; deg++)
+   {
+      double rad = deg * (M_PI / 180.0);
+      double y = sin(rad);
+      double x = cos(rad);
+      double got = fatan2(y, x);
+      double expected = atan2(y, x);
+      double err = fabs(got - expected);
+      if (err > max_err) max_err = err;
+      ASSERT_DOUBLE_NEAR(got, expected, 5e-16);
+   }
+   printf("    max error: %.2e\n", max_err);
+   PASS();
+
+   return 0;
+}
+
+// ============================================================
 // main
 // ============================================================
 
@@ -445,6 +809,19 @@ int main(void)
    fail |= test_fsincos_sse_max_error();
    fail |= test_fsincos_sse_identity();
    fail |= test_fsincos_sse_special_values();
+
+   fail |= test_fcos_sse_special_angles();
+   fail |= test_fcos_sse_bot_angles();
+   fail |= test_fcos_sse_consistency_with_fsincos();
+   fail |= test_fcos_sse_special_values();
+   fail |= test_fcos_runtime();
+
+   fail |= test_fatan_sse_special_values();
+   fail |= test_fatan2_sse_quadrants();
+   fail |= test_fatan2_sse_axes();
+   fail |= test_fatan2_sse_bot_angles();
+   fail |= test_fatan2_sse_max_error();
+   fail |= test_fatan2_dispatch();
 
    printf("\n%d/%d tests passed.\n", tests_passed, tests_run);
    if (tests_passed == tests_run)
