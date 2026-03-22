@@ -89,6 +89,54 @@ inline void fsincos_sse(double x, double &s, double &c)
       s = -s;
 }
 
+// Polynomial cos using only SSE-friendly operations (cos-only variant of
+// fsincos_sse). cos is even: cos(-x) = cos(x), so no sign fixup needed.
+inline double fcos_sse(double x)
+{
+   double abs_x = __builtin_fabs(x);
+
+   // Find octant: j = floor(|x| * 4/pi), round up to even
+   double y = __builtin_floor(abs_x * (4.0 / M_PI));
+   int j = (int)y;
+   int odd = j & 1;
+   j = (j + odd) & 7;
+   y += odd;
+
+   // Extended precision reduction: z = |x| - y * (pi/4)
+   // DP1+DP2+DP3 = pi/4 in triple-double precision
+   static const double DP1 = 7.85398125648498535156e-1;
+   static const double DP2 = 3.77489470793079817668e-8;
+   static const double DP3 = 2.69515142907905952645e-15;
+   double z = ((abs_x - y * DP1) - y * DP2) - y * DP3;
+   double zz = z * z;
+
+   // Only one polynomial needed per octant (Cephes double precision):
+   //   j=0: +cos_p, j=2: -sin_p, j=4: -cos_p, j=6: +sin_p
+   double p;
+   if ((j & 2) == 0)
+   {
+      // j=0,4: cos polynomial
+      p = 1.0 - 0.5 * zz + zz * zz * (4.16666666666665929218e-2 + zz *
+         (-1.38888888888730564116e-3 + zz * (2.48015872888517045348e-5 + zz *
+         (-2.75573141792967388112e-7 + zz * (2.08757008419747316778e-9 + zz *
+         (-1.13585365213876817300e-11))))));
+      if (j == 4)
+         p = -p;
+   }
+   else
+   {
+      // j=2,6: sin polynomial
+      p = z + z * zz * (-1.66666666666666307295e-1 + zz *
+         (8.33333333332211858878e-3 + zz * (-1.98412698295895385996e-4 + zz *
+         (2.75573136213857245213e-6 + zz * (-2.50507477628578072866e-8 + zz *
+         1.58962301576546568060e-10)))));
+      if (j == 2)
+         p = -p;
+   }
+
+   return p;
+}
+
 // x87 fsincos asm: ~2.4x faster than glibc sin()+cos().
 inline void fsincos_x87(double x, double &s, double &c)
 {
@@ -101,6 +149,17 @@ inline void fsincos(double x, double &s, double &c)
    fsincos_sse(x, s, c);
 #else
    fsincos_x87(x, s, c);
+#endif
+}
+
+// Non-constant cos for SSE builds. Called via fcos() in util.h when
+// __builtin_constant_p fails (runtime arguments).
+inline double fcos_runtime(double x)
+{
+#if defined(__SSE_MATH__)
+   return fcos_sse(x);
+#else
+   return cos(x);
 #endif
 }
 
@@ -897,7 +956,7 @@ qboolean FInShootCone(const Vector & Origin, edict_t *pEdict, float distance, fl
 
    // angle between forward-view-vector and vector to player (as cos(angle))
    float flDot = DotProduct( (Origin - (pEdict->v.origin + pEdict->v.view_ofs)).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle) );
-   if (flDot > cos(deg2rad(min_angle))) // smaller angle, bigger cosine
+   if (flDot > fcos(deg2rad(min_angle))) // smaller angle, bigger cosine
       return TRUE;
 
    Vector2D triangle;
@@ -1096,5 +1155,5 @@ qboolean FInViewCone(const Vector & Origin, edict_t *pEdict)
 {
    const float fov_angle = 80;
 
-   return(DotProduct((Origin - pEdict->v.origin).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle)) > cos(deg2rad(fov_angle)));
+   return(DotProduct((Origin - pEdict->v.origin).Normalize(), UTIL_AnglesToForward(pEdict->v.v_angle)) > fcos(deg2rad(fov_angle)));
 }

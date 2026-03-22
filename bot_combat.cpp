@@ -553,7 +553,7 @@ static qboolean FCanShootInHead(edict_t * pEdict, edict_t * pTarget, const Vecto
    triangle.x = distance;
    triangle.y = pTarget->v.view_ofs.z - neg;
 
-   if(cos(deg2rad(12.5)) < (distance / triangle.Length()))
+   if(fcos(deg2rad(12.5)) < (distance / triangle.Length()))
       return FALSE; //greater angle, smaller cosine
 
    return TRUE;
