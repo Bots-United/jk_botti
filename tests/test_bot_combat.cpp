@@ -4542,6 +4542,113 @@ static int test_bot_point_gun_no_enemy(void)
 }
 
 // ============================================================
+// Group 10: Numerical validation
+// ============================================================
+
+// Reference implementation: original exp(log(...)) formula
+static double aim_decay_explog(double speed, double frame_time)
+{
+   return exp(log(speed / 2) * frame_time * 20);
+}
+
+static int test_bot_point_gun_aim_smoothing(void)
+{
+   printf("BotPointGun aim smoothing (pow vs exp-log equivalence):\n");
+   mock_reset();
+   setup_skill_settings();
+
+   edict_t *pBotEdict = mock_alloc_edict();
+   bot_t testbot;
+   setup_bot_for_test(testbot, pBotEdict);
+
+   mock_trace_line_fn = trace_nohit;
+
+   // Test parameters covering all speed paths
+   struct {
+      const char *name;
+      float frame_time;
+      float init_yaw_speed;
+      float init_pitch_speed;
+      float idealpitch;
+      float ideal_yaw;
+      float v_angle_x, v_angle_y;
+      int waypoint_idx;
+      qboolean combat_lj;
+      edict_t *enemy;
+   } cases[] = {
+      // slow aim path (no enemy, no waypoint)
+      {"slow aim, small deviation",
+       0.01f, 0.0f, 0.0f, 5.0f, 10.0f, 0.0f, 0.0f, -1, FALSE, NULL},
+      {"slow aim, large deviation",
+       0.01f, 0.0f, 0.0f, 30.0f, 60.0f, 0.0f, 0.0f, -1, FALSE, NULL},
+      {"slow aim, existing speed",
+       0.01f, 15.0f, -8.0f, 5.0f, 10.0f, 0.0f, 0.0f, -1, FALSE, NULL},
+      {"slow aim, large frame_time",
+       0.05f, 0.0f, 0.0f, 10.0f, 20.0f, 0.0f, 0.0f, -1, FALSE, NULL},
+      // medium aim path (has waypoint)
+      {"medium aim, has waypoint",
+       0.01f, 0.0f, 0.0f, 10.0f, 20.0f, 0.0f, 0.0f, 5, FALSE, NULL},
+      // combat longjump path
+      {"combat longjump, fast aim",
+       0.01f, 0.0f, 0.0f, 15.0f, 25.0f, 0.0f, 0.0f, -1, TRUE, NULL},
+   };
+   int ncases = sizeof(cases) / sizeof(cases[0]);
+
+   for (int i = 0; i < ncases; i++)
+   {
+      TEST(cases[i].name);
+
+      // Compute expected values using old exp(log(...)) formula
+      float turn_skill = skill_settings[testbot.bot_skill].turn_skill;
+      float ft = cases[i].frame_time / skill_settings[testbot.bot_skill].turn_slowness;
+      float speed;
+      if (cases[i].combat_lj)
+         speed = 0.7 + (turn_skill - 1) / 10;
+      else if (cases[i].waypoint_idx != -1)
+         speed = 0.5 + (turn_skill - 1) / 15;
+      else
+         speed = 0.2 + (turn_skill - 1) / 20;
+
+      double decay = aim_decay_explog(speed, ft);
+      float dev_x = cases[i].idealpitch - cases[i].v_angle_x;
+      float dev_y = cases[i].ideal_yaw - cases[i].v_angle_y;
+      float exp_yaw = (cases[i].init_yaw_speed * decay
+                         + speed * dev_y * (1 - decay)) * ft * 20;
+      float exp_pitch = (cases[i].init_pitch_speed * decay
+                           + speed * dev_x * (1 - decay)) * ft * 20;
+      // Apply cross-influence
+      if (exp_pitch > 0)
+         exp_pitch += exp_yaw / (skill_settings[testbot.bot_skill].updown_turn_ration * (1 + turn_skill));
+      else
+         exp_pitch -= exp_yaw / (skill_settings[testbot.bot_skill].updown_turn_ration * (1 + turn_skill));
+      if (exp_yaw > 0)
+         exp_yaw += exp_pitch / (1 + turn_skill);
+      else
+         exp_yaw -= exp_pitch / (1 + turn_skill);
+
+      // Run through BotPointGun
+      testbot.b_combat_longjump = cases[i].combat_lj;
+      testbot.pBotEnemy = cases[i].enemy;
+      testbot.curr_waypoint_index = cases[i].waypoint_idx;
+      testbot.pBotPickupItem = NULL;
+      testbot.f_frame_time = cases[i].frame_time;
+      pBotEdict->v.yaw_speed = cases[i].init_yaw_speed;
+      pBotEdict->v.pitch_speed = cases[i].init_pitch_speed;
+      pBotEdict->v.idealpitch = cases[i].idealpitch;
+      pBotEdict->v.ideal_yaw = cases[i].ideal_yaw;
+      pBotEdict->v.v_angle = Vector(cases[i].v_angle_x, cases[i].v_angle_y, 0);
+
+      BotPointGun(testbot);
+
+      ASSERT_FLOAT_NEAR(pBotEdict->v.yaw_speed, exp_yaw, 1e-6f);
+      ASSERT_FLOAT_NEAR(pBotEdict->v.pitch_speed, exp_pitch, 1e-6f);
+      PASS();
+   }
+
+   return 0;
+}
+
+// ============================================================
 // Main
 // ============================================================
 
@@ -4701,6 +4808,10 @@ int main(void)
    rc |= test_shoot_at_enemy_fire_not_visible();
    printf("\n");
    rc |= test_bot_point_gun_no_enemy();
+   printf("\n");
+
+   // Group 10: Numerical validation
+   rc |= test_bot_point_gun_aim_smoothing();
 
    printf("\n%d/%d tests passed.\n", tests_passed, tests_run);
 

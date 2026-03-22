@@ -95,11 +95,12 @@ static void BotPointGun(bot_t &pBot)
       speed = 0.2 + (turn_skill - 1) / 20; // slow aim
 
    // thanks Tobias "Killaruna" Heimann and Johannes "@$3.1415rin" Lampel for this one
-   pEdict->v.yaw_speed = (pEdict->v.yaw_speed * exp (log (speed / 2) * frame_time * 20)
-                             + speed * v_deviation.y * (1 - exp (log (speed / 2) * frame_time * 20)))
+   double decay = pow(speed / 2, frame_time * 20);
+   pEdict->v.yaw_speed = (pEdict->v.yaw_speed * decay
+                             + speed * v_deviation.y * (1 - decay))
                             * frame_time * 20;
-   pEdict->v.pitch_speed = (pEdict->v.pitch_speed * exp (log (speed / 2) * frame_time * 20)
-                               + speed * v_deviation.x * (1 - exp (log (speed / 2) * frame_time * 20)))
+   pEdict->v.pitch_speed = (pEdict->v.pitch_speed * decay
+                               + speed * v_deviation.x * (1 - decay))
                               * frame_time * 20;
 
    // influence of y movement on x axis, based on skill (less influence than x on y since it's
