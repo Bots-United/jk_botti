@@ -162,6 +162,22 @@ static void bench_combined_navframe(int n)
    }
 }
 
+static void bench_wrap_angle(int n)
+{
+   for (int i = 0; i < n; i++) {
+      float angle = (i % 720) - 360.0f; // range [-360, 360)
+      sink_f = UTIL_WrapAngle(angle);
+   }
+}
+
+static void bench_wrap_angles(int n)
+{
+   for (int i = 0; i < n; i++) {
+      Vector angles((i % 720) - 360.0f, (i * 3 % 720) - 360.0f, (i * 7 % 720) - 360.0f);
+      sink_vec(UTIL_WrapAngles(angles));
+   }
+}
+
 int main(void)
 {
    const int N = 5000000;
@@ -181,6 +197,8 @@ int main(void)
    bench("MakeVectors() [3x fsincos]",   bench_make_vectors,      N);
    bench("VecToAngles() [atan2+sqrt]",   bench_vec_to_angles,     N);
    bench("Distance calc (sub+length)",   bench_distance_calc,     N);
+   bench("WrapAngle()",                  bench_wrap_angle,        N);
+   bench("WrapAngles() [3x WrapAngle]", bench_wrap_angles,       N);
    bench("Combined nav frame",           bench_combined_navframe, N);
 
    return 0;
