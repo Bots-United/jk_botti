@@ -650,6 +650,9 @@ static void StartFrameOpenConfigFile(void)
 
    need_to_open_cfg = FALSE;  // only do this once!!!
 
+   // Clear custom team model mapping before re-reading config
+   UTIL_ClearTeamModelMapping();
+
    // check if jk_botti_mapname.cfg file exists...
    if(stricmp(STRING(gpGlobals->mapname), "logo") == 0)
       safe_strcopy(mapname, sizeof(mapname), "_jk_botti_logo.cfg");

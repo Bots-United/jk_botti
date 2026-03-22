@@ -1545,6 +1545,112 @@ static int test_get_team(void)
    ASSERT_STR(teamstr, "");
    PASS();
 
+   // --- Custom team model mapping ---
+
+   TEST("no mapping -> model name used as team");
+   UTIL_ClearTeamModelMapping();
+   mock_team_return_val = (char *)"gign";
+   UTIL_GetTeam(p, teamstr, sizeof(teamstr));
+   ASSERT_STR(teamstr, "gign");
+   PASS();
+
+   TEST("set_team maps model to team name");
+   UTIL_ClearTeamModelMapping();
+   UTIL_SetTeamModelMapping("team1", "gign;sas");
+   mock_team_return_val = (char *)"gign";
+   UTIL_GetTeam(p, teamstr, sizeof(teamstr));
+   ASSERT_STR(teamstr, "team1");
+   PASS();
+
+   TEST("set_team second model in list");
+   mock_team_return_val = (char *)"sas";
+   UTIL_GetTeam(p, teamstr, sizeof(teamstr));
+   ASSERT_STR(teamstr, "team1");
+   PASS();
+
+   TEST("unmapped model falls through");
+   mock_team_return_val = (char *)"scientist";
+   UTIL_GetTeam(p, teamstr, sizeof(teamstr));
+   ASSERT_STR(teamstr, "scientist");
+   PASS();
+
+   TEST("multiple teams");
+   UTIL_SetTeamModelMapping("team2", "arctic;terror");
+   mock_team_return_val = (char *)"arctic";
+   UTIL_GetTeam(p, teamstr, sizeof(teamstr));
+   ASSERT_STR(teamstr, "team2");
+   PASS();
+
+   TEST("team1 still works after adding team2");
+   mock_team_return_val = (char *)"sas";
+   UTIL_GetTeam(p, teamstr, sizeof(teamstr));
+   ASSERT_STR(teamstr, "team1");
+   PASS();
+
+   TEST("case-insensitive model lookup");
+   mock_team_return_val = (char *)"GIGN";
+   UTIL_GetTeam(p, teamstr, sizeof(teamstr));
+   ASSERT_STR(teamstr, "team1");
+   PASS();
+
+   TEST("whitespace around model names is trimmed");
+   UTIL_ClearTeamModelMapping();
+   UTIL_SetTeamModelMapping("team1", " gign ; sas ");
+   mock_team_return_val = (char *)"gign";
+   UTIL_GetTeam(p, teamstr, sizeof(teamstr));
+   ASSERT_STR(teamstr, "team1");
+   mock_team_return_val = (char *)"sas";
+   UTIL_GetTeam(p, teamstr, sizeof(teamstr));
+   ASSERT_STR(teamstr, "team1");
+   PASS();
+
+   TEST("overwrite existing model mapping");
+   UTIL_SetTeamModelMapping("team2", "gign");
+   mock_team_return_val = (char *)"gign";
+   UTIL_GetTeam(p, teamstr, sizeof(teamstr));
+   ASSERT_STR(teamstr, "team2");
+   PASS();
+
+   TEST("clear removes all mappings");
+   UTIL_ClearTeamModelMapping();
+   ASSERT_INT(UTIL_GetTeamModelMappingCount(), 0);
+   mock_team_return_val = (char *)"gign";
+   UTIL_GetTeam(p, teamstr, sizeof(teamstr));
+   ASSERT_STR(teamstr, "gign");
+   PASS();
+
+   TEST("mapping count");
+   UTIL_ClearTeamModelMapping();
+   UTIL_SetTeamModelMapping("red", "gign;sas;gsg9");
+   ASSERT_INT(UTIL_GetTeamModelMappingCount(), 3);
+   UTIL_SetTeamModelMapping("blue", "arctic;terror");
+   ASSERT_INT(UTIL_GetTeamModelMappingCount(), 5);
+   PASS();
+
+   TEST("table full -> extra entries ignored");
+   UTIL_ClearTeamModelMapping();
+   {
+      char model[16];
+      for (int i = 0; i < 64; i++)
+      {
+         safevoid_snprintf(model, sizeof(model), "mdl%d", i);
+         UTIL_SetTeamModelMapping("full", model);
+      }
+      ASSERT_INT(UTIL_GetTeamModelMappingCount(), 64);
+      // 65th entry should be rejected
+      UTIL_SetTeamModelMapping("full", "overflow");
+      ASSERT_INT(UTIL_GetTeamModelMappingCount(), 64);
+      // overwriting existing entry should still work at capacity
+      UTIL_SetTeamModelMapping("replaced", "mdl0");
+      ASSERT_INT(UTIL_GetTeamModelMappingCount(), 64);
+      mock_team_return_val = (char *)"mdl0";
+      UTIL_GetTeam(p, teamstr, sizeof(teamstr));
+      ASSERT_STR(teamstr, "replaced");
+   }
+   PASS();
+
+   UTIL_ClearTeamModelMapping();
+
    return 0;
 }
 
