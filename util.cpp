@@ -163,6 +163,108 @@ inline double fcos_runtime(double x)
 #endif
 }
 
+// Polynomial atan using only SSE-friendly operations. Cephes-style
+// three-interval range reduction to [0, 0.66] and rational polynomial
+// P(x^2)/Q(x^2). Max error vs libm: < 2e-16.
+inline double fatan_sse(double x)
+{
+   // Work with |x|, restore sign at end
+   double abs_x = __builtin_fabs(x);
+
+   // Range reduction:
+   //   abs_x > tan(3*pi/8) (~2.414): z = -1/abs_x, base = pi/2
+   //   abs_x > 0.66:                 z = (abs_x-1)/(abs_x+1), base = pi/4
+   //   otherwise:                    z = abs_x, base = 0
+   static const double T3P8 = 2.41421356237309504880; // tan(3*pi/8) = 1+sqrt(2)
+   static const double MOREBITS = 6.123233995736765886130e-17; // pi/2 trailing bits
+
+   double z, base, morebits_scale;
+   if (abs_x > T3P8)
+   {
+      z = -1.0 / abs_x;
+      base = M_PI_2;
+      morebits_scale = 1.0;
+   }
+   else if (abs_x > 0.66)
+   {
+      z = (abs_x - 1.0) / (abs_x + 1.0);
+      base = M_PI_4;
+      morebits_scale = 0.5;
+   }
+   else
+   {
+      z = abs_x;
+      base = 0.0;
+      morebits_scale = 0.0;
+   }
+
+   // Rational polynomial: atan(z) = z + z^3 * P(z^2) / Q(z^2)
+   // Cephes double precision coefficients, Horner form (high-to-low degree)
+   double zz = z * z;
+
+   // Numerator: zz * P(zz), where P is degree 4
+   double p = ((((-8.750608600031904122785e-1 * zz
+      - 1.615753718733365076637e1) * zz
+      - 7.500855792314704667340e1) * zz
+      - 1.228866684490136173410e2) * zz
+      - 6.485021904942025371773e1) * zz;
+
+   // Denominator: Q(zz), degree 5 with leading coeff 1.0
+   double q = ((((zz
+      + 2.485846490142306297962e1) * zz
+      + 1.650270098316988542046e2) * zz
+      + 4.328810604912902668951e2) * zz
+      + 4.853903996359136964868e2) * zz
+      + 1.945506571482613964425e2;
+
+   z = z + z * (p / q) + morebits_scale * MOREBITS + base;
+
+   // Restore sign: atan is odd
+   if (x < 0)
+      z = -z;
+
+   return z;
+}
+
+// Polynomial atan2 using only SSE-friendly operations. Computes
+// atan(y/x) with quadrant reconstruction from signs of x and y.
+inline double fatan2_sse(double y, double x)
+{
+   // y == 0: copysign preserves sign of zero through to result
+   if (y == 0.0)
+   {
+      if (x >= 0.0)
+         return y;
+      else
+         return __builtin_copysign(M_PI, y);
+   }
+   if (x == 0.0)
+      return (y > 0.0) ? M_PI_2 : -M_PI_2;
+
+   double r = fatan_sse(y / x);
+
+   // Quadrant adjustment for x < 0
+   if (x < 0.0)
+   {
+      if (y >= 0.0)
+         r += M_PI;
+      else
+         r -= M_PI;
+   }
+
+   return r;
+}
+
+// SSE/libm dispatch for atan2.
+inline double fatan2(double y, double x)
+{
+#if defined(__SSE_MATH__)
+   return fatan2_sse(y, x);
+#else
+   return atan2(y, x);
+#endif
+}
+
 
 void null_terminate_buffer(char *buf, const size_t maxlen)
 {
@@ -288,9 +390,9 @@ Vector UTIL_VecToAngles(const Vector &forward)
    else
    {
       // atan2 returns values in range [-pi < x < +pi]
-      yaw = (atan2(forward.y, forward.x) * 180 / M_PI);
+      yaw = (fatan2(forward.y, forward.x) * 180 / M_PI);
       tmp = sqrt(forward.x * forward.x + forward.y * forward.y);
-      pitch = (atan2(forward.z, tmp) * 180 / M_PI);
+      pitch = (fatan2(forward.z, tmp) * 180 / M_PI);
    }
 
    return(Vector(pitch, yaw, 0));

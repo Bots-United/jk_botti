@@ -84,4 +84,8 @@ inline double fcos(double x)
    return fcos_runtime(x);
 }
 
+// SSE-friendly atan2. Dispatches to polynomial atan2 (SSE builds)
+// or libm atan2 (non-SSE builds).
+double fatan2(double y, double x);
+
 #endif
