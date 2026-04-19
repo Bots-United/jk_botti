@@ -28,6 +28,7 @@ FARPROC GetProcAddress(HMODULE module, const char *name);
 BOOL VirtualProtect(void *addr, size_t size, DWORD newprotect, DWORD *oldprotect);
 DWORD GetLastError(void);
 HMODULE LoadLibraryA(const char *name);
+BOOL FreeLibrary(HMODULE module);
 void OutputDebugStringA(const char *msg);
 
 #endif // MOCK_WINDOWS_H

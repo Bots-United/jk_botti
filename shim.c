@@ -133,6 +133,15 @@ static void *dl_sym(dl_handle_t h, const char *name)
 #endif
 }
 
+static void dl_close(dl_handle_t h)
+{
+#ifdef _WIN32
+   FreeLibrary(h);
+#else
+   dlclose(h);
+#endif
+}
+
 /* ---- forward-declaration of variant entry points ----------------------- */
 
 typedef void (WINAPI_ *pfn_GiveFnptrsToDll)(void *, void *);
@@ -269,8 +278,13 @@ static int load_variant(const char *dir, const char *leaf)
    }
 
    for (size_t i = 0; i < sizeof(table) / sizeof(table[0]); ++i) {
-      if (!resolve_symbol(g_variant, &table[i], path, errbuf, sizeof(errbuf)))
+      if (!resolve_symbol(g_variant, &table[i], path, errbuf, sizeof(errbuf))) {
+         dl_close(g_variant);
+         g_variant = NULL;
+         for (size_t j = 0; j < sizeof(table) / sizeof(table[0]); ++j)
+            *table[j].slot = NULL;
          return 0;
+      }
    }
 
 #ifndef SHIM_TEST
