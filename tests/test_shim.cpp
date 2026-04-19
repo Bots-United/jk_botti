@@ -31,6 +31,7 @@ struct MockLib {
 
 static std::map<std::string, MockLib> mock_libs;
 static std::vector<std::string>       load_attempts;
+static std::vector<MockLib *>         free_attempts;
 static int mock_has_avx2_fma_val = 0;
 static int mock_has_sse3_val     = 0;
 static std::string mock_self_dir = "/mock/";
@@ -75,6 +76,12 @@ FARPROC GetProcAddress(HMODULE module, const char *name)
    return reinterpret_cast<FARPROC>(&fake);
 }
 
+BOOL FreeLibrary(HMODULE module)
+{
+   free_attempts.push_back(reinterpret_cast<MockLib *>(module));
+   return 1;
+}
+
 DWORD GetLastError(void) { return 0; }
 void OutputDebugStringA(const char *msg) { (void)msg; }
 
@@ -87,6 +94,7 @@ static void reset_all(void)
    shim_test_reset();
    mock_libs.clear();
    load_attempts.clear();
+   free_attempts.clear();
    mock_has_avx2_fma_val = 0;
    mock_has_sse3_val     = 0;
    mock_self_dir         = "/mock/";
@@ -259,6 +267,44 @@ static int test_load_variant_direct_missing_sym(void)
    return 0;
 }
 
+static int test_load_variant_closes_handle_on_sym_failure(void)
+{
+   TEST("load_variant closes module handle when symbol resolution fails");
+   reset_all();
+   add_lib("jk_botti_mm_sse3.dll", true, false);
+
+   ASSERT_INT(shim_test_load_variant("/mock/", "jk_botti_mm_sse3.dll"), 0);
+   ASSERT_INT((int)free_attempts.size(), 1);
+   MockLib *loaded = &mock_libs["/mock/jk_botti_mm_sse3.dll"];
+   if (free_attempts[0] != loaded) {
+      printf("  FreeLibrary called on wrong handle\n");
+      return 1;
+   }
+   PASS();
+   return 0;
+}
+
+static int test_fallback_frees_handle_on_sym_failure(void)
+{
+   TEST("fallback path frees handle from variant with missing symbols");
+   reset_all();
+   add_lib("jk_botti_mm_avx2fma.dll", true,  false);  // loads, no syms
+   add_lib("jk_botti_mm_sse3.dll",    true,  true);
+   add_lib("jk_botti_mm_x87.dll",     true,  true);
+   mock_has_avx2_fma_val = 1;
+   mock_has_sse3_val     = 1;
+
+   ASSERT_INT(shim_test_ensure_loaded(), 1);
+   ASSERT_INT((int)free_attempts.size(), 1);
+   MockLib *avx = &mock_libs["/mock/jk_botti_mm_avx2fma.dll"];
+   if (free_attempts[0] != avx) {
+      printf("  expected avx2fma handle to be freed\n");
+      return 1;
+   }
+   PASS();
+   return 0;
+}
+
 // ============================================================
 // main
 // ============================================================
@@ -278,6 +324,8 @@ int main(void)
    fail |= test_init_is_sticky();
    fail |= test_load_variant_direct_ok();
    fail |= test_load_variant_direct_missing_sym();
+   fail |= test_load_variant_closes_handle_on_sym_failure();
+   fail |= test_fallback_frees_handle_on_sym_failure();
 
    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
    return fail ? EXIT_FAILURE : EXIT_SUCCESS;
