@@ -1,4 +1,4 @@
-jk_botti 1.50
+jk_botti 1.60
 -------------
 
 1. Intro
@@ -10,7 +10,7 @@ jk_botti 1.50
 1. Intro
 --------------------
 
-This is 1.50 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@iki.fi>
+This is 1.60 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@iki.fi>
 You are free to use code for any of your needs.
 
 jk_botti is computer gamer for multiplayer mode of Half-Life (HLDM) and has 
@@ -66,6 +66,41 @@ Credits:
 --------------------
 2. What's new
 --------------------
+1.60:
+ New features:
+ * Add bot decision trace logging via jk_botti_trace cvar with two levels
+   (1=server log, 2=bot say) for debugging combat, navigation, and stuck
+   decisions (#93)
+ * Add narrow path detection and precision navigation: bots detect narrow
+   ramps/bridges/cliff edges, path-follow along waypoint lines, suppress
+   strafing and random jumping, and tighten touch distance to avoid falling
+   (#104)
+ * Add set_team command to map player model names to team names, fixing
+   bots attacking teammates on mods with multiple models per team (#103)
+ * Add waypoint + BSP visualization tools (2D SVG and interactive 3D HTML)
+   under tools/experimental (#95)
+
+ Bug fixes:
+ * Fix duplicate 'W' case check in GoldSrc query hook environment field
+   parsing (#86)
+
+ Improvements:
+ * Switch floating-point math from x87 FPU to SSE/AVX2+FMA: ship AVX2+FMA
+   builds for modern CPUs and SSE3 builds for older hardware; combined
+   navigation frame 2.2-3.3x faster (#102)
+ * Add CPUID-dispatching shim that selects the optimal variant at load
+   time (AVX2+FMA -> SSE3 -> x87 fallback chain); active variant visible
+   via meta list (#107)
+ * Add SSE polynomial fcos (2.9x), fatan2 (3.0x), VecToAngles (5.9x), and
+   WrapAngle (1.9x) replacing libm and x87 equivalents (#105)
+ * Add UTIL_IsStringEmpty helper replacing strlen()==0 pattern (#85)
+ * Add missing include guards to 5 root header files (#87)
+
+ Internal:
+ * Split release packages into separate Linux and Windows archives (#98)
+ * Add Docker-based Ubuntu 18.04 i386 build for older Linux servers (#99)
+ * Update GitHub Actions to Node.js 24 compatible versions (#101)
+
 1.50:
  New features:
  * Add HL:Arena submod support with 3 new weapons (silenced Glock, auto
