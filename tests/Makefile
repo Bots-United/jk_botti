@@ -153,7 +153,7 @@ test_commands: $(COMMANDS_OBJS)
 
 # dll tests (dll.cpp needs VER_NOTE as a proper C string literal)
 dll.o: ../dll.cpp
-	${CXX} ${TEST_CXXFLAGS} -UVER_NOTE -DVER_NOTE='"test"' -UVER_MAJOR -DVER_MAJOR=0 -UVER_MINOR -DVER_MINOR=0 -c $< -o $@
+	${CXX} ${TEST_CXXFLAGS} -UVER_NOTE -DVER_NOTE='"test"' -UVER_MAJOR -DVER_MAJOR=0 -UVER_MINOR -DVER_MINOR=0 -UVARIANT_VERSION_SUFFIX -c $< -o $@
 
 DLL_OBJS = engine_mock.o test_dll.o \
 	dll.o bot_trace.o bot_weapons.o bot_sound.o util.o safe_snprintf.o random_num.o
@@ -192,13 +192,20 @@ test_bot_query_hook_win32.o: test_bot_query_hook_win32.cpp ../bot_query_hook_win
 test_bot_query_hook_win32: test_bot_query_hook_win32.o
 	${CXX} $(COVERAGE_FLAGS) -o $@ test_bot_query_hook_win32.o
 
+# shim tests (shim.c #included with -D_WIN32 -DSHIM_TEST, mock Win32 headers)
+test_shim.o: test_shim.cpp ../shim.c windows.h
+	${CXX} -Wall -D_WIN32 -DSHIM_TEST -I. -I".." $(COVERAGE_FLAGS) -c $< -o $@
+
+test_shim: test_shim.o
+	${CXX} $(COVERAGE_FLAGS) -o $@ test_shim.o
+
 BOT_TRACE_OBJS = engine_mock.o test_bot_trace.o \
 	bot_trace.o bot_weapons.o util.o safe_snprintf.o random_num.o
 
 test_bot_trace: $(BOT_TRACE_OBJS)
 	${CXX} $(COVERAGE_FLAGS) -o $@ $(BOT_TRACE_OBJS) -lm
 
-ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_util_math test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_geneticalg test_waypoint test_bot_navigate test_bot_skill test_bot_sound test_h_export test_bot_config_init test_bot_models test_bot_client test_bot test_commands test_dll test_engine test_bot_trace test_bot_query_hook test_bot_query_hook_linux test_bot_query_hook_win32
+ALL_TESTS = test_name_sanitize test_posdata_list test_bot_combat test_bot_weapons test_util test_util_math test_bot_chat test_safe_snprintf test_random_num test_neuralnet test_geneticalg test_waypoint test_bot_navigate test_bot_skill test_bot_sound test_h_export test_bot_config_init test_bot_models test_bot_client test_bot test_commands test_dll test_engine test_bot_trace test_bot_query_hook test_bot_query_hook_linux test_bot_query_hook_win32 test_shim
 
 all: $(ALL_TESTS)
 
@@ -230,6 +237,7 @@ run: $(ALL_TESTS)
 	./test_bot_query_hook
 	./test_bot_query_hook_linux
 	./test_bot_query_hook_win32
+	./test_shim
 
 VALGRIND = valgrind --leak-check=full --error-exitcode=1
 
@@ -261,6 +269,7 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_bot_query_hook
 	$(VALGRIND) ./test_bot_query_hook_linux
 	$(VALGRIND) ./test_bot_query_hook_win32
+	$(VALGRIND) ./test_shim
 
 coverage:
 	$(MAKE) clean
