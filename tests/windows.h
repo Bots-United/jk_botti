@@ -1,10 +1,11 @@
-// Mock windows.h for testing bot_query_hook_win32.cpp on Linux
+// Mock windows.h for testing Win32 code paths on Linux
 #ifndef MOCK_WINDOWS_H
 #define MOCK_WINDOWS_H
 
 #include <stddef.h>
 
 #define PASCAL
+#define WINAPI
 #define PAGE_READWRITE 0x04
 
 #ifndef _MOCK_DWORD_DEFINED
@@ -26,5 +27,7 @@ HMODULE GetModuleHandle(const char *name);
 FARPROC GetProcAddress(HMODULE module, const char *name);
 BOOL VirtualProtect(void *addr, size_t size, DWORD newprotect, DWORD *oldprotect);
 DWORD GetLastError(void);
+HMODULE LoadLibraryA(const char *name);
+void OutputDebugStringA(const char *msg);
 
 #endif // MOCK_WINDOWS_H
