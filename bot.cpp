@@ -99,9 +99,6 @@ void BotKick(bot_t &pBot)
 //
 static void BotSpawnInit_TimersAndPhysics( bot_t &pBot )
 {
-   pBot.bot_think_time = -1.0;
-   pBot.f_last_think_time = gpGlobals->time - 0.1;
-
    pBot.f_recoil = 0;
 
    pBot.v_prev_origin = Vector(9999.0, 9999.0, 9999.0);
@@ -138,6 +135,8 @@ static void BotSpawnInit_TimersAndPhysics( bot_t &pBot )
    pBot.b_has_enough_ammo_for_good_weapon = 0;
    pBot.b_only_has_weak_weapons = 0;
    pBot.b_low_health = 0;
+
+   pBot.f_frame_accumulator = bot_think_spf;
 }
 
 
@@ -2781,60 +2780,36 @@ static void BotRunPlayerMove(bot_t &pBot, const float *viewangles, float forward
 
 static void BotThinkUpdateFrameTiming(bot_t &pBot)
 {
-   // New code, BotThink is not run on every StartFrame anymore.
-   pBot.f_frame_time = gpGlobals->time - pBot.f_last_think_time;
-   pBot.f_last_think_time = gpGlobals->time;
+   float frame_time = bot_think_spf;
+   float msec = frame_time * 1000.0f;
 
-   pBot.msecval = (int)(pBot.f_frame_time * 1000.0);
-
-   // count up difference that integer conversion caused
-   pBot.msecdel += pBot.f_frame_time * 1000.0 - pBot.msecval;
-
-   // remove effect of integer conversion and lost msecs on previous frames
-   if(pBot.msecdel > 1.625f)
+   if (msec < 1.0f)
    {
-      float diff = 1.625f;
-
-      if(pBot.msecdel > 60.0f)
-         diff = 60.0f;
-      else if(pBot.msecdel > 30.0f)
-         diff = 30.0f;
-      else if(pBot.msecdel > 15.0f)
-         diff = 15.0f;
-      else if(pBot.msecdel > 7.5f)
-         diff = 7.5f;
-      else if(pBot.msecdel > 3.25f)
-         diff = 3.25f;
-
-      pBot.msecval += diff - 0.5f;
-      pBot.msecdel -= diff - 0.5f;
+      // msec too small for the engine, simulate 1ms, putting us ahead.
+      pBot.f_frame_time = 0.001f; // 0.001s/frame = 1000 fps
+      pBot.msecval = 1.0f;
+      pBot.f_frame_accumulator += bot_think_spf - pBot.f_frame_time;
+      return;
    }
 
-   if (pBot.msecval < 1)    // don't allow msec to be less than 1...
+   if (msec > 100.0f)
    {
-      // adjust msecdel so we can correct lost msecs on following frames
-      pBot.msecdel += pBot.msecval - 1;
-      pBot.msecval = 1;
-   }
-   else if (pBot.msecval > 100)  // ...or greater than 100
-   {
-      // adjust msecdel so we can correct lost msecs on following frames
-      pBot.msecdel += pBot.msecval - 100;
-      pBot.msecval = 100;
+      // msec too large for the engine, simulate 100ms, putting us less-behind.
+      pBot.f_frame_time = 0.1f; // 0.1s/frame == 10fps
+      pBot.msecval = 100.0f;
+      pBot.f_frame_accumulator += bot_think_spf - pBot.f_frame_time;
+      return;
    }
 
-   pBot.total_msecval += pBot.msecval / 1000.0;
-   pBot.total_frame_time += pBot.f_frame_time;
+   // msec is just right for the engine, simulate trunc(msec), putting us where we should be.
+   float ms_whole = truncf(msec);
+   float ms_frac = msec - ms_whole;
 
-#if _DEBUG
-   if(&pBot==&bots[0] && pBot.total_counter++ > 10)
-   {
-      UTIL_ConsolePrintf("total msecval count   : %9.4f", pBot.total_msecval);
-      UTIL_ConsolePrintf("total frame time count: %9.4f", pBot.total_frame_time);
-      UTIL_ConsolePrintf("total difference      : %9.4f", pBot.total_frame_time - pBot.total_msecval);
-      pBot.total_counter=1;
-   }
-#endif
+   pBot.f_frame_time = frame_time;
+   pBot.msecval = ms_whole;
+
+   // Add any sub-millisecond time back to the accumulator so we don't lose it.
+   pBot.f_frame_accumulator += ms_frac / 1000.0f;
 }
 
 
