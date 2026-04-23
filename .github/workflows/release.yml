@@ -8,6 +8,7 @@ on:
 jobs:
   validate-tag:
     runs-on: ubuntu-24.04
+    timeout-minutes: 2
     outputs:
       version: ${{ steps.parse.outputs.VERSION }}
       ver_major: ${{ steps.parse.outputs.VER_MAJOR }}

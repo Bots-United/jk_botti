@@ -14,6 +14,7 @@ on:
 jobs:
   package-linux:
     runs-on: ubuntu-24.04
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v6
       - name: Download Linux binaries
@@ -39,6 +40,7 @@ jobs:
 
   package-linux-bionic:
     runs-on: ubuntu-24.04
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v6
       - name: Download Linux Bionic binaries
@@ -64,6 +66,7 @@ jobs:
 
   package-windows:
     runs-on: ubuntu-24.04
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v6
       - name: Download Windows binaries
@@ -90,6 +93,7 @@ jobs:
     if: ${{ inputs.create_release }}
     needs: [package-linux, package-linux-bionic, package-windows]
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       contents: write
     steps:

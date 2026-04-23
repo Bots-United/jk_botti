@@ -8,6 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - name: Update package list for i386
@@ -23,6 +24,7 @@ jobs:
 
   coverage:
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
       - name: Update package list for i386
