@@ -171,10 +171,8 @@ typedef struct
    float idle_angle_time;
    float blinded_time;
 
-   float bot_think_time;
-   float f_last_think_time;
+   float f_frame_accumulator;
 
-   float msecdel;
    float msecval;
 
    float f_max_speed;
@@ -306,11 +304,6 @@ typedef struct
 
    bot_current_weapon_t current_weapon;  // one current weapon for each bot
    int m_rgAmmo[MAX_AMMO_SLOTS];  // total ammo amounts (1 array for each bot)
-
-// for counting msec effency
-   float total_frame_time;
-   float total_msecval;
-   int total_counter;
 } bot_t;
 
 #define MAX_TEAMS 32

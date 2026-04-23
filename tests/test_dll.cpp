@@ -1746,8 +1746,11 @@ static int test_startframe_bot_stop_no_thinking(void)
 
    bots[0].is_used = TRUE;
    bots[0].pEdict = mock_alloc_edict();
-   bots[0].bot_think_time = 0.0;
 
+   bots[0].f_frame_accumulator = 0.0f;
+   api_table.pfnStartFrame();
+
+   bots[0].f_frame_accumulator = 10000.0f; // many, many frames
    api_table.pfnStartFrame();
 
    ASSERT_INT(bot_think_called, 0);
@@ -1774,7 +1777,7 @@ static int test_startframe_normal_with_bot(void)
    edict_t *pBot = mock_alloc_edict();
    bots[0].is_used = TRUE;
    bots[0].pEdict = pBot;
-   bots[0].bot_think_time = 0.0;
+   bots[0].f_frame_accumulator = 1.0f / 30.0f;
 
    gpGlobals->time = 10.0;
 
@@ -1803,10 +1806,12 @@ static int test_startframe_bot_think_time_not_reached(void)
    edict_t *pBot = mock_alloc_edict();
    bots[0].is_used = TRUE;
    bots[0].pEdict = pBot;
-   bots[0].bot_think_time = 999.0;
+   bots[0].f_frame_accumulator = 0;
 
-   gpGlobals->time = 10.0;
+   gpGlobals->time = 0;
+   api_table.pfnStartFrame();
 
+   gpGlobals->time = 0.0166;
    api_table.pfnStartFrame();
 
    ASSERT_INT(bot_think_called, 0);
@@ -1902,7 +1907,7 @@ static int test_startframe_num_bots_tracks_count(void)
    {
       bots[i].is_used = TRUE;
       bots[i].pEdict = mock_alloc_edict();
-      bots[i].bot_think_time = 0.0;
+      bots[i].f_frame_accumulator = 1.0f / 30.0f;
    }
 
    gpGlobals->time = 10.0;
@@ -2581,7 +2586,7 @@ static int test_startframe_bot_remove(void)
 
       bots[i].is_used = TRUE;
       bots[i].pEdict = e;
-      bots[i].bot_think_time = 999.0; // not due yet
+      bots[i].f_frame_accumulator = 0.0f; // not due yet
    }
 
    bot_kick_called = 0;
@@ -2619,7 +2624,7 @@ static int test_startframe_bot_no_add_no_remove(void)
 
       bots[i].is_used = TRUE;
       bots[i].pEdict = e;
-      bots[i].bot_think_time = 999.0;
+      bots[i].f_frame_accumulator = 0.0f;
    }
 
    // client_count=2, bot_count=2

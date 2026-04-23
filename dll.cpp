@@ -587,18 +587,70 @@ static void PM_Move(struct playermove_s *ppmove, qboolean server)
 
 static void StartFrameUpdateBots(void)
 {
+   static float last_frame_time = 0.0;
+   static qboolean first_frame = TRUE;
+
+   float frame_delta = 0.0;
+
+   if (first_frame)
+   {
+      first_frame = FALSE;
+      last_frame_time = gpGlobals->time;
+   }
+
+   frame_delta = gpGlobals->time - last_frame_time;
+
+   // Prevent it going negative (in case gpGlobals->time is non-monotonic).
+   frame_delta = fmaxf(frame_delta, 0.0f);
+
+   // Never let it run at < 4fps. Prevents stalls if frame_delta gets large.
+   // This could also be done by limiting the inner BotThink() loop and letting
+   // the time accumulate, but this is realistically rare, so choose the simpler
+   // option.
+   frame_delta = fminf(frame_delta, 0.25f);
+
+   last_frame_time = gpGlobals->time;
+
    int count = 0;
+
+
+#define BOT_DEBUG_TICK 0
+
+#if BOT_DEBUG_TICK
+   if(gpGlobals->maxClients > 0) {
+      UTIL_ConsolePrintf("----StartFrameUpdateBots----\n");
+      UTIL_ConsolePrintf("  frame_delta     = %f\n", frame_delta);
+      UTIL_ConsolePrintf("  gpGlobals->time = %f\n", gpGlobals->time);
+   }
+#endif
 
    for (int bot_index = 0; bot_index < gpGlobals->maxClients; bot_index++)
    {
-      if (bots[bot_index].is_used)   // is this slot used
-      {
-         if (gpGlobals->time >= bots[bot_index].bot_think_time)
-         {
-            BotThink(bots[bot_index]);
+      bot_t& bot = bots[bot_index];
 
+      if (bot.is_used)
+      {
+         qboolean did_tick = FALSE;
+
+         bot.f_frame_accumulator += frame_delta;
+
+         while (bot.f_frame_accumulator >= bot_think_spf)
+         {
+#if BOT_DEBUG_TICK
+            //if (bot_index == 0)
+            {
+               UTIL_ConsolePrintf("  tick bot %d, accumulator = %f, msecval = %f\n", bot_index, bot.f_frame_accumulator, bot.msecval);
+            }
+#endif
+            BotThink(bot);
+            bot.f_frame_accumulator -= bot_think_spf;
+            did_tick = TRUE;
+         }
+
+         if (did_tick)
+         {
             // randomness prevents all bots to run on same frame -> less laggy server
-            bots[bot_index].bot_think_time = gpGlobals->time + bot_think_spf * RANDOM_FLOAT2(0.95, 1.05);
+            bot.f_frame_accumulator -= bot_think_spf * RANDOM_FLOAT2(-0.05f, 0.05f);
          }
 
          count++;

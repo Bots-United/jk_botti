@@ -440,7 +440,7 @@ static void setup_bot_for_test(bot_t &pBot, edict_t *pEdict)
    pBot.v_bot_see_enemy_origin = Vector(-99999, -99999, -99999);
    pBot.f_frame_time = 0.01f;
    pBot.f_max_speed = 320.0f;
-   pBot.f_last_think_time = gpGlobals->time - 0.033f;
+   pBot.f_frame_accumulator = 0.033;
    pBot.f_move_direction = 1.0f;
    pBot.userid = 1;
    strcpy(pBot.name, "TestBot");
@@ -636,7 +636,7 @@ static int test_BotSpawnInit_resets_fields(void)
 
    BotSpawnInit(bot);
 
-   ASSERT_TRUE(bot.bot_think_time < 0);
+   ASSERT_FLOAT(bot.f_frame_accumulator, 1.0f / 30.0f);
    ASSERT_PTR_NULL(bot.pBotEnemy);
    ASSERT_FLOAT(bot.f_pause_time, 0.0f);
    ASSERT_TRUE(bot.b_see_tripmine == FALSE);
@@ -2028,68 +2028,83 @@ static int test_BotThink_userid_fill(void)
    return 0;
 }
 
-static int test_BotThink_msec_calculation(void)
+static int test_BotThink_restores_sub_ms_to_accumulator(void)
 {
-   TEST("BotThink: msecval calculated from frame time");
+   TEST("BotThink: restores sub-ms to accumulator");
    setup_engine_funcs();
 
    edict_t *e = mock_alloc_edict();
    bot_t bot;
    setup_bot_for_test(bot, e);
-   bot.f_last_think_time = gpGlobals->time - 0.050f; // 50ms frame
-   bot.msecdel = 0;
+   bot.f_frame_accumulator = 0.050f; // 50ms accumulated time
    e->v.health = 0;
    e->v.deadflag = DEAD_DEAD;
    bot.need_to_initialize = FALSE;
 
    BotThink(bot);
 
-   // msecval should be approximately 50
-   ASSERT_TRUE(bot.msecval >= 49 && bot.msecval <= 51);
+   // Valid for the engine.
+   // Thinks 33ms, restores sub-ms to the accumulator.
+   ASSERT_FLOAT(bot.msecval, 33.0f);
+   ASSERT_FLOAT(bot.f_frame_accumulator, 0.0503333);
 
    PASS();
    return 0;
 }
 
-static int test_BotThink_msec_clamped_min(void)
+static int test_BotThink_handle_extremely_fast_ticks(void)
 {
-   TEST("BotThink: msecval clamped to minimum 1");
+   TEST("BotThink: handles extremely fast ticks");
    setup_engine_funcs();
 
    edict_t *e = mock_alloc_edict();
    bot_t bot;
    setup_bot_for_test(bot, e);
-   bot.f_last_think_time = gpGlobals->time - 0.0001f; // very small frame
-   bot.msecdel = 0;
+   bot.f_frame_accumulator = 0.0f;
    e->v.health = 0;
    e->v.deadflag = DEAD_DEAD;
    bot.need_to_initialize = FALSE;
 
+   float old_spf = bot_think_spf;
+   bot_think_spf = 1 / 2000.0f; // 0.0005s, 2000fps
+
    BotThink(bot);
 
-   ASSERT_TRUE(bot.msecval >= 1);
+   bot_think_spf = old_spf;
+
+   // Too fast for the engine.
+   // Thinks 1ms, taking more time than we have. Accumulator should go negative.
+   ASSERT_FLOAT(bot.msecval, 1.0f);
+   ASSERT_FLOAT(bot.f_frame_accumulator, -0.0005f);
 
    PASS();
    return 0;
 }
 
-static int test_BotThink_msec_clamped_max(void)
+static int test_BotThink_handle_extremely_slow_ticks(void)
 {
-   TEST("BotThink: msecval clamped to maximum 100");
+   TEST("BotThink: handles extremely slow ticks");
    setup_engine_funcs();
 
    edict_t *e = mock_alloc_edict();
    bot_t bot;
    setup_bot_for_test(bot, e);
-   bot.f_last_think_time = gpGlobals->time - 0.500f; // 500ms frame
-   bot.msecdel = 0;
+   bot.f_frame_accumulator = 0.0f;
    e->v.health = 0;
    e->v.deadflag = DEAD_DEAD;
    bot.need_to_initialize = FALSE;
 
+   float old_spf = bot_think_spf;
+   bot_think_spf = 1000.0f; /* 0.001 fps */
+
    BotThink(bot);
 
-   ASSERT_TRUE(bot.msecval <= 100);
+   bot_think_spf = old_spf;
+
+   // Too slow for the engine.
+   // Thinks 100ms, can't consume enough. Accumulator should be added to.
+   ASSERT_FLOAT(bot.msecval, 100.0f);
+   ASSERT_FLOAT(bot.f_frame_accumulator, 999.9);
 
    PASS();
    return 0;
@@ -3586,40 +3601,6 @@ static int test_BotDoRandom_duck_start(void)
 // BotThink branches
 // ============================================================
 
-static int test_BotThink_msecdel_correction(void)
-{
-   TEST("BotThink: msecdel > 1.625 -> correction applied");
-   setup_engine_funcs();
-
-   edict_t *e = mock_alloc_edict();
-   bot_t bot;
-   setup_bot_for_test(bot, e);
-   bot.need_to_initialize = FALSE;
-   bot.msecdel = 5.0f; // > 3.25
-   bot.f_speed_check_time = gpGlobals->time + 10.0f;
-   bot.v_prev_origin = e->v.origin;
-
-   // Pause to simplify
-   bot.f_pause_time = gpGlobals->time + 5.0f;
-
-   for (int i = 0; i < 5; i++)
-   {
-      skill_settings[i].pause_frequency = 0;
-      skill_settings[i].normal_strafe = 0;
-      skill_settings[i].random_jump_frequency = 0;
-      skill_settings[i].random_duck_frequency = 0;
-      skill_settings[i].random_longjump_frequency = 0;
-   }
-
-   BotThink(bot);
-
-   // msecdel should have been reduced by the correction
-   ASSERT_TRUE(bot.msecdel < 5.0f);
-
-   PASS();
-   return 0;
-}
-
 static int test_BotThink_recently_attacked_resets_pause(void)
 {
    TEST("BotThink: recently attacked -> resets pause");
@@ -3874,26 +3855,6 @@ static int test_BotThink_duck_time_active(void)
    BotThink(bot);
 
    ASSERT_TRUE(FBitSet(e->v.button, IN_DUCK));
-
-   PASS();
-   return 0;
-}
-
-static int test_BotThink_msecdel_large_values(void)
-{
-   TEST("BotThink: msecdel=65 -> correction chain applied");
-   setup_engine_funcs();
-
-   edict_t *e = mock_alloc_edict();
-   bot_t bot;
-   setup_alive_bot(bot, e);
-   bot.msecdel = 65.0f; // > 60
-   bot.f_pause_time = gpGlobals->time + 5.0f;
-
-   BotThink(bot);
-
-   // msecdel should have been reduced significantly
-   ASSERT_TRUE(bot.msecdel < 65.0f);
 
    PASS();
    return 0;
@@ -5475,9 +5436,9 @@ int main(void)
    fail |= test_BotThink_alive_basic();
    fail |= test_BotThink_name_fill();
    fail |= test_BotThink_userid_fill();
-   fail |= test_BotThink_msec_calculation();
-   fail |= test_BotThink_msec_clamped_min();
-   fail |= test_BotThink_msec_clamped_max();
+   fail |= test_BotThink_restores_sub_ms_to_accumulator();
+   fail |= test_BotThink_handle_extremely_fast_ticks();
+   fail |= test_BotThink_handle_extremely_slow_ticks();
    fail |= test_BotThink_detects_ground();
    fail |= test_BotThink_detects_ladder();
    fail |= test_BotThink_detects_water();
@@ -5488,7 +5449,6 @@ int main(void)
    fail |= test_BotThink_grenade_reverse();
    fail |= test_BotThink_door_waypoint_slows();
    fail |= test_BotThink_crouch_waypoint();
-   fail |= test_BotThink_msecdel_correction();
    fail |= test_BotThink_recently_attacked_resets_pause();
    fail |= test_BotThink_lift_end_waypoint();
    fail |= test_BotThink_pause_look_idealpitch();
@@ -5526,7 +5486,6 @@ int main(void)
    fail |= test_BotCreate_max_bots_reached();
    fail |= test_BotInFieldOfView_negative_angle();
    fail |= test_BotThink_duck_time_active();
-   fail |= test_BotThink_msecdel_large_values();
    fail |= test_BotCheckLogoSpraying_left_wall();
    fail |= test_BotCheckLogoSpraying_behind();
 
