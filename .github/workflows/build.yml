@@ -19,6 +19,7 @@ on:
 jobs:
   build-linux:
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
       - name: Update package list for i386
@@ -44,6 +45,7 @@ jobs:
 
   build-linux-bionic:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - name: Build variants in Ubuntu 18.04 i386 container
@@ -67,6 +69,7 @@ jobs:
 
   build-windows:
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
       - name: Install packages
