@@ -174,7 +174,7 @@ static int CheckSubMod(void)
 }
 
 
-static void GameDLLInit( void )
+static FORCE_STACK_ALIGN void GameDLLInit( void )
 {
    //before anything else detect submod
    submod_id = CheckSubMod();
@@ -263,7 +263,7 @@ static void SpawnInitWorld(void)
 }
 
 
-static int Spawn( edict_t *pent )
+static FORCE_STACK_ALIGN int Spawn( edict_t *pent )
 {
    if (gpGlobals->deathmatch)
    {
@@ -331,7 +331,7 @@ static void SpawnPostHandleDoor(edict_t *pent)
 }
 
 
-static int Spawn_Post( edict_t *pent )
+static FORCE_STACK_ALIGN int Spawn_Post( edict_t *pent )
 {
    if(!gpGlobals->deathmatch)
       RETURN_META_VALUE (MRES_IGNORED, 0);
@@ -359,7 +359,7 @@ static int Spawn_Post( edict_t *pent )
 }
 
 
-static void DispatchKeyValue_Post( edict_t *pentKeyvalue, KeyValueData *pkvd )
+static FORCE_STACK_ALIGN void DispatchKeyValue_Post( edict_t *pentKeyvalue, KeyValueData *pkvd )
 {
    if(!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
@@ -390,7 +390,7 @@ static void DispatchKeyValue_Post( edict_t *pentKeyvalue, KeyValueData *pkvd )
 }
 
 
-BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ] )
+FORCE_STACK_ALIGN BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ] )
 {
    if (!gpGlobals->deathmatch)
       RETURN_META_VALUE (MRES_IGNORED, 0);
@@ -416,7 +416,7 @@ BOOL jkbotti_ClientConnect( edict_t *pEntity, const char *pszName, const char *p
 }
 
 
-void jkbotti_ClientPutInServer( edict_t *pEntity )
+FORCE_STACK_ALIGN void jkbotti_ClientPutInServer( edict_t *pEntity )
 {
    if (!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
@@ -435,7 +435,7 @@ void jkbotti_ClientPutInServer( edict_t *pEntity )
 }
 
 
-static void CmdStart( const edict_t *player, const struct usercmd_s *cmd, unsigned int random_seed )
+static FORCE_STACK_ALIGN void CmdStart( const edict_t *player, const struct usercmd_s *cmd, unsigned int random_seed )
 {
    // check if is our bot
    int bot_index = UTIL_GetBotIndex(player);
@@ -474,7 +474,7 @@ static void CmdStart( const edict_t *player, const struct usercmd_s *cmd, unsign
 }
 
 
-static void ClientDisconnect( edict_t *pEntity )
+static FORCE_STACK_ALIGN void ClientDisconnect( edict_t *pEntity )
 {
    if (gpGlobals->deathmatch)
    {
@@ -503,7 +503,7 @@ static void ClientDisconnect( edict_t *pEntity )
 }
 
 
-static void ServerDeactivate(void)
+static FORCE_STACK_ALIGN void ServerDeactivate(void)
 {
    if(!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
@@ -523,7 +523,7 @@ static void ServerDeactivate(void)
 }
 
 
-static void PlayerPostThink_Post( edict_t *pEdict )
+static FORCE_STACK_ALIGN void PlayerPostThink_Post( edict_t *pEdict )
 {
    if (!gpGlobals->deathmatch)
       RETURN_META(MRES_IGNORED);
@@ -541,7 +541,7 @@ static void PlayerPostThink_Post( edict_t *pEdict )
 }
 
 
-void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch)
+FORCE_STACK_ALIGN void new_PM_PlaySound(int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch)
 {
    if (gpGlobals->deathmatch)
    {
@@ -565,7 +565,7 @@ void new_PM_PlaySound(int channel, const char *sample, float volume, float atten
    (*old_PM_PlaySound)(channel, sample, volume, attenuation, fFlags, pitch);
 }
 
-static void PM_Move(struct playermove_s *ppmove, qboolean server)
+static FORCE_STACK_ALIGN void PM_Move(struct playermove_s *ppmove, qboolean server)
 {
    if (!gpGlobals->deathmatch)
       RETURN_META(MRES_IGNORED);
@@ -816,7 +816,7 @@ static void StartFrameManageBotCount(void)
 }
 
 
-static void StartFrame( void )
+static FORCE_STACK_ALIGN void StartFrame( void )
 {
    double begin_time;
    int count;
@@ -875,7 +875,7 @@ static void StartFrame( void )
 }
 
 
-C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion)
+C_DLLEXPORT FORCE_STACK_ALIGN int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion)
 {
    memset(pFunctionTable, 0, sizeof (DLL_FUNCTIONS));
 
@@ -893,7 +893,7 @@ C_DLLEXPORT int GetEntityAPI2 (DLL_FUNCTIONS *pFunctionTable, int *interfaceVers
    return (TRUE);
 }
 
-C_DLLEXPORT int GetEntityAPI2_POST (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion)
+C_DLLEXPORT FORCE_STACK_ALIGN int GetEntityAPI2_POST (DLL_FUNCTIONS *pFunctionTable, int *interfaceVersion)
 {
    memset(pFunctionTable, 0, sizeof (DLL_FUNCTIONS));
 
@@ -938,7 +938,7 @@ plugin_info_t Plugin_info = {
 };
 
 
-C_DLLEXPORT int Meta_Query (char *ifvers, plugin_info_t **pPlugInfo, mutil_funcs_t *pMetaUtilFuncs)
+C_DLLEXPORT FORCE_STACK_ALIGN int Meta_Query (char *ifvers, plugin_info_t **pPlugInfo, mutil_funcs_t *pMetaUtilFuncs)
 {
    // this function is the first function ever called by metamod in the plugin DLL. Its purpose
    // is for metamod to retrieve basic information about the plugin, such as its meta-interface
@@ -987,7 +987,7 @@ C_DLLEXPORT int Meta_Query (char *ifvers, plugin_info_t **pPlugInfo, mutil_funcs
 }
 
 
-C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, meta_globals_t *pMGlobals, gamedll_funcs_t *pGamedllFuncs)
+C_DLLEXPORT FORCE_STACK_ALIGN int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, meta_globals_t *pMGlobals, gamedll_funcs_t *pGamedllFuncs)
 {
    // this function is called when metamod attempts to load the plugin. Since it's the place
    // where we can tell if the plugin will be allowed to run or not, we wait until here to make
@@ -1025,7 +1025,7 @@ C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, 
 }
 
 
-C_DLLEXPORT int Meta_Detach (PLUG_LOADTIME now, PL_UNLOAD_REASON reason)
+C_DLLEXPORT FORCE_STACK_ALIGN int Meta_Detach (PLUG_LOADTIME now, PL_UNLOAD_REASON reason)
 {
    // this function is called when metamod unloads the plugin. A basic check is made in order
    // to prevent unloading the plugin if its processing should not be interrupted.

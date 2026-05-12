@@ -77,7 +77,7 @@ inline void reset_sendto_hook(void)
 }
 
 // Replacement sendto function
-static ssize_t __replacement_sendto(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
+static ssize_t FORCE_STACK_ALIGN __replacement_sendto(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len)
 {
    return sendto_hook(socket, message, length, flags, dest_addr, dest_len);
 }

@@ -83,7 +83,7 @@ event_info_t g_event_info[] = {
 
 
 //
-static unsigned short pfnPrecacheEvent_Post(int type, const char* psz)
+static FORCE_STACK_ALIGN unsigned short pfnPrecacheEvent_Post(int type, const char* psz)
 {
    if (!gpGlobals->deathmatch)
       RETURN_META_VALUE (MRES_IGNORED, 0);
@@ -112,7 +112,7 @@ static unsigned short pfnPrecacheEvent_Post(int type, const char* psz)
 
 
 //
-static void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 )
+static FORCE_STACK_ALIGN void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short eventindex, float delay, float *origin, float *angles, float fparam1, float fparam2, int iparam1, int iparam2, int bparam1, int bparam2 )
 {
    if (!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
@@ -156,7 +156,7 @@ static void pfnPlaybackEvent( int flags, const edict_t *pInvoker, unsigned short
    RETURN_META (MRES_IGNORED);
 }
 
-static void pfnEmitSound(edict_t *entity, int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch)
+static FORCE_STACK_ALIGN void pfnEmitSound(edict_t *entity, int channel, const char *sample, float volume, float attenuation, int fFlags, int pitch)
 {
    if (gpGlobals->deathmatch && !FNullEnt(entity))
    {
@@ -181,7 +181,7 @@ static void pfnEmitSound(edict_t *entity, int channel, const char *sample, float
    RETURN_META (MRES_IGNORED);
 }
 
-static void pfnChangeLevel(char* s1, char* s2)
+static FORCE_STACK_ALIGN void pfnChangeLevel(char* s1, char* s2)
 {
    if (!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
@@ -195,7 +195,7 @@ static void pfnChangeLevel(char* s1, char* s2)
 }
 
 
-static void pfnClientCommand(edict_t* pEdict, char* szFmt, ...)
+static FORCE_STACK_ALIGN void pfnClientCommand(edict_t* pEdict, char* szFmt, ...)
 {
    if (!FNullEnt(pEdict) && (FBitSet(pEdict->v.flags, FL_FAKECLIENT) || FBitSet(pEdict->v.flags, FL_THIRDPARTYBOT)))
       RETURN_META (MRES_SUPERCEDE);
@@ -208,7 +208,7 @@ static int FAST_GET_USER_MSG_ID(plid_t plindex, int & value, const char * name, 
    return(value ? value : (value = GET_USER_MSG_ID(plindex, name, size)));
 }
 
-static void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, edict_t *ed)
+static FORCE_STACK_ALIGN void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, edict_t *ed)
 {
    if (gpGlobals->deathmatch)
    {
@@ -302,7 +302,7 @@ static void pfnMessageBegin(int msg_dest, int msg_type, const float *pOrigin, ed
 }
 
 
-static void pfnMessageEnd(void)
+static FORCE_STACK_ALIGN void pfnMessageEnd(void)
 {
    if (gpGlobals->deathmatch)
    {
@@ -318,7 +318,7 @@ static void pfnMessageEnd(void)
 }
 
 
-static void pfnWriteByte(int iValue)
+static FORCE_STACK_ALIGN void pfnWriteByte(int iValue)
 {
    if (gpGlobals->deathmatch)
    {
@@ -331,7 +331,7 @@ static void pfnWriteByte(int iValue)
 }
 
 
-static void pfnWriteChar(int iValue)
+static FORCE_STACK_ALIGN void pfnWriteChar(int iValue)
 {
    if (gpGlobals->deathmatch)
    {
@@ -344,7 +344,7 @@ static void pfnWriteChar(int iValue)
 }
 
 
-static void pfnWriteShort(int iValue)
+static FORCE_STACK_ALIGN void pfnWriteShort(int iValue)
 {
    if (gpGlobals->deathmatch)
    {
@@ -357,7 +357,7 @@ static void pfnWriteShort(int iValue)
 }
 
 
-static void pfnWriteLong(int iValue)
+static FORCE_STACK_ALIGN void pfnWriteLong(int iValue)
 {
    if (gpGlobals->deathmatch)
    {
@@ -370,7 +370,7 @@ static void pfnWriteLong(int iValue)
 }
 
 
-static void pfnWriteAngle(float flValue)
+static FORCE_STACK_ALIGN void pfnWriteAngle(float flValue)
 {
    if (gpGlobals->deathmatch)
    {
@@ -383,7 +383,7 @@ static void pfnWriteAngle(float flValue)
 }
 
 
-static void pfnWriteCoord(float flValue)
+static FORCE_STACK_ALIGN void pfnWriteCoord(float flValue)
 {
    if (gpGlobals->deathmatch)
    {
@@ -396,7 +396,7 @@ static void pfnWriteCoord(float flValue)
 }
 
 
-static void pfnWriteString(const char *sz)
+static FORCE_STACK_ALIGN void pfnWriteString(const char *sz)
 {
    if (gpGlobals->deathmatch)
    {
@@ -409,7 +409,7 @@ static void pfnWriteString(const char *sz)
 }
 
 
-static void pfnWriteEntity(int iValue)
+static FORCE_STACK_ALIGN void pfnWriteEntity(int iValue)
 {
    if (gpGlobals->deathmatch)
    {
@@ -422,7 +422,7 @@ static void pfnWriteEntity(int iValue)
 }
 
 
-static void pfnClientPrintf( edict_t* pEdict, PRINT_TYPE ptype, const char *szMsg )
+static FORCE_STACK_ALIGN void pfnClientPrintf( edict_t* pEdict, PRINT_TYPE ptype, const char *szMsg )
 {
    if (!FNullEnt(pEdict) && (FBitSet(pEdict->v.flags, FL_FAKECLIENT) || FBitSet(pEdict->v.flags, FL_THIRDPARTYBOT)))
       RETURN_META (MRES_SUPERCEDE);
@@ -431,7 +431,7 @@ static void pfnClientPrintf( edict_t* pEdict, PRINT_TYPE ptype, const char *szMs
 }
 
 
-static const char *pfnCmd_Args( void )
+static FORCE_STACK_ALIGN const char *pfnCmd_Args( void )
 {
    if (isFakeClientCommand)
       RETURN_META_VALUE (MRES_SUPERCEDE, &g_argv[0]);
@@ -440,7 +440,7 @@ static const char *pfnCmd_Args( void )
 }
 
 
-static const char *pfnCmd_Argv( int argc )
+static FORCE_STACK_ALIGN const char *pfnCmd_Argv( int argc )
 {
    if (isFakeClientCommand)
    {
@@ -458,7 +458,7 @@ static const char *pfnCmd_Argv( int argc )
 }
 
 
-static int pfnCmd_Argc( void )
+static FORCE_STACK_ALIGN int pfnCmd_Argc( void )
 {
    if (isFakeClientCommand)
       RETURN_META_VALUE (MRES_SUPERCEDE, fake_arg_count);
@@ -467,7 +467,7 @@ static int pfnCmd_Argc( void )
 }
 
 
-static void pfnSetClientMaxspeed(const edict_t *pEdict, float fNewMaxspeed)
+static FORCE_STACK_ALIGN void pfnSetClientMaxspeed(const edict_t *pEdict, float fNewMaxspeed)
 {
    if (!gpGlobals->deathmatch)
       RETURN_META (MRES_IGNORED);
@@ -484,7 +484,7 @@ static void pfnSetClientMaxspeed(const edict_t *pEdict, float fNewMaxspeed)
 }
 
 
-static int pfnGetPlayerUserId(edict_t *e )
+static FORCE_STACK_ALIGN int pfnGetPlayerUserId(edict_t *e )
 {
    if (gpGlobals->deathmatch)
    {
@@ -500,7 +500,7 @@ static int pfnGetPlayerUserId(edict_t *e )
 }
 
 
-C_DLLEXPORT int GetEngineFunctions (enginefuncs_t *pengfuncsFromEngine, int *interfaceVersion)
+C_DLLEXPORT FORCE_STACK_ALIGN int GetEngineFunctions (enginefuncs_t *pengfuncsFromEngine, int *interfaceVersion)
 {
    memset(pengfuncsFromEngine, 0, sizeof(enginefuncs_t));
 
@@ -529,7 +529,7 @@ C_DLLEXPORT int GetEngineFunctions (enginefuncs_t *pengfuncsFromEngine, int *int
 }
 
 
-C_DLLEXPORT int GetEngineFunctions_POST (enginefuncs_t *pengfuncsFromEngine, int *interfaceVersion)
+C_DLLEXPORT FORCE_STACK_ALIGN int GetEngineFunctions_POST (enginefuncs_t *pengfuncsFromEngine, int *interfaceVersion)
 {
    memset(pengfuncsFromEngine, 0, sizeof(enginefuncs_t));
 

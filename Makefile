@@ -164,7 +164,7 @@ BASEFLAGS  = -Wall -Wno-write-strings $(VERFLAGS)
 BASEFLAGS += -fno-strict-aliasing -fno-strict-overflow
 BASEFLAGS += -fvisibility=hidden
 ifneq ($(COMPILER_IS_CLANG),1)
-BASEFLAGS += -Wno-class-memaccess -mincoming-stack-boundary=2
+BASEFLAGS += -Wno-class-memaccess
 endif
 ARCHFLAG  += $(TARGETFLAGS)
 

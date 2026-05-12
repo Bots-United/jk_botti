@@ -922,7 +922,7 @@ static void print_to_client(int, void *arg, char *msg)
 }
 #endif
 
-void ClientCommand( edict_t *pEntity )
+FORCE_STACK_ALIGN void ClientCommand( edict_t *pEntity )
 {
    // only allow custom commands if deathmatch mode and NOT dedicated server and
    // client sending command is the listen server client...
@@ -1285,7 +1285,7 @@ static void print_to_server_output(int, void *, char * msg)
 }
 
 
-void jk_botti_ServerCommand (void)
+FORCE_STACK_ALIGN void jk_botti_ServerCommand (void)
 {
    if(FStrEq(CMD_ARGV(1), "kickall"))
    {
