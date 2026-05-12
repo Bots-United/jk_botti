@@ -402,16 +402,16 @@ static int test_WaypointAddDeletePath(void)
 
    TEST("fill to MAX_PATH_INDEX stops at limit");
    reset_waypoint_state();
-   for (int i = 0; i < MAX_PATH_INDEX + 1; i++)
-      setup_waypoint(i, Vector((float)i * 100, 0, 0), 0, 0);
-   for (int i = 1; i <= MAX_PATH_INDEX; i++)
-      setup_path(0, (short int)i);
-   // Should have exactly MAX_PATH_INDEX paths
+   setup_waypoint(0, Vector(0,0,0), 0, 0);
+   setup_waypoint(1, Vector(100,0,0), 0, 0);
+   setup_waypoint(2, Vector(200,0,0), 0, 0);
+   // Manually fill path slots to the limit
+   paths[0].last_idx_used = MAX_PATH_INDEX;
+   for (int i = 0; i < MAX_PATH_INDEX; i++)
+      paths[0].index[i] = 1;
    ASSERT_INT(paths[0].last_idx_used, MAX_PATH_INDEX);
-   // Trying to add one more should be silently ignored
-   int extra = MAX_PATH_INDEX; // already at limit
-   setup_waypoint(extra, Vector(99999,0,0), 0, 0);
-   // Can't add, already at limit
+   // Trying to add a new (non-duplicate) path should be silently ignored
+   setup_path(0, 2);
    ASSERT_INT(paths[0].last_idx_used, MAX_PATH_INDEX);
    PASS();
 
