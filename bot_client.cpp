@@ -128,8 +128,10 @@ void BotClient_Valve_CurrentWeapon(void *p, int bot_index)
             bots[bot_index].current_weapon.iClip = iClip;
 
             // update the ammo counts for this weapon...
-            bots[bot_index].current_weapon.iAmmo1 = bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo1];
-            bots[bot_index].current_weapon.iAmmo2 = bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo2];
+            bots[bot_index].current_weapon.iAmmo1 =
+               weapon_defs[iId].iAmmo1 >= 0 ? bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo1] : 0;
+            bots[bot_index].current_weapon.iAmmo2 =
+               weapon_defs[iId].iAmmo2 >= 0 ? bots[bot_index].m_rgAmmo[weapon_defs[iId].iAmmo2] : 0;
 
             pSelect = &weapon_select[0];
 
@@ -213,9 +215,9 @@ void BotClient_Valve_AmmoX(void *p, int bot_index)
 
       // update the ammo counts for this weapon...
       bots[bot_index].current_weapon.iAmmo1 =
-         bots[bot_index].m_rgAmmo[weapon_defs[ammo_index].iAmmo1];
+         weapon_defs[ammo_index].iAmmo1 >= 0 ? bots[bot_index].m_rgAmmo[weapon_defs[ammo_index].iAmmo1] : 0;
       bots[bot_index].current_weapon.iAmmo2 =
-         bots[bot_index].m_rgAmmo[weapon_defs[ammo_index].iAmmo2];
+         weapon_defs[ammo_index].iAmmo2 >= 0 ? bots[bot_index].m_rgAmmo[weapon_defs[ammo_index].iAmmo2] : 0;
    }
 }
 
@@ -248,9 +250,9 @@ void BotClient_Valve_AmmoPickup(void *p, int bot_index)
 
       // update the ammo counts for this weapon...
       bots[bot_index].current_weapon.iAmmo1 =
-         bots[bot_index].m_rgAmmo[weapon_defs[ammo_index].iAmmo1];
+         weapon_defs[ammo_index].iAmmo1 >= 0 ? bots[bot_index].m_rgAmmo[weapon_defs[ammo_index].iAmmo1] : 0;
       bots[bot_index].current_weapon.iAmmo2 =
-         bots[bot_index].m_rgAmmo[weapon_defs[ammo_index].iAmmo2];
+         weapon_defs[ammo_index].iAmmo2 >= 0 ? bots[bot_index].m_rgAmmo[weapon_defs[ammo_index].iAmmo2] : 0;
    }
 }
 
