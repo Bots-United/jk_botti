@@ -102,7 +102,10 @@ ssize_t PASCAL handle_player_reply(int socket, const void *message, size_t lengt
 
       offset = (size_t)msg - (size_t)message;
 
-      BotReplaceConnectionTime(pname, (float*)&newmsg[offset]);
+      float timeval;
+      memcpy(&timeval, &newmsg[offset], sizeof(float));
+      BotReplaceConnectionTime(pname, &timeval);
+      memcpy(&newmsg[offset], &timeval, sizeof(float));
 
       msg+=4;
       len-=4;
