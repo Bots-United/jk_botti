@@ -20,19 +20,22 @@ jobs:
   build-linux:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    env:
+      CXX: i686-linux-gnu-g++
+      CC: i686-linux-gnu-gcc
+      AR: "i686-linux-gnu-ar rc"
+      RANLIB: i686-linux-gnu-ranlib
     steps:
       - uses: actions/checkout@v6
-      - name: Update package list for i386
-        run: sudo dpkg --add-architecture i386 && sudo apt-get -y update
       - name: Install packages
-        run: sudo apt-get -y install build-essential g++-multilib
+        run: sudo apt-get -y update && sudo apt-get -y install build-essential g++-i686-linux-gnu
       - name: Build variants (shim + x87 + SSE3 + AVX2FMA)
         run: |
           VERFLAGS=""
           if [ -n "${{ inputs.ver_major }}" ]; then
             VERFLAGS="VER_MAJOR=${{ inputs.ver_major }} VER_MINOR=${{ inputs.ver_minor }} VER_NOTE=${{ inputs.ver_note }}"
           fi
-          CC="gcc -m32" CXX="g++ -m32" AR="ar rc" RANLIB="ranlib" make -j4 variants $VERFLAGS
+          make -j4 variants $VERFLAGS
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
