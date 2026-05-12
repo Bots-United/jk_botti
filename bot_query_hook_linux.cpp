@@ -57,8 +57,9 @@ static pthread_mutex_t mutex_replacement_sendto = PTHREAD_RECURSIVE_MUTEX_INITIA
 //constructs new jmp forwarder
 static void construct_jmp_instruction(void *x, void *place, void *target)
 {
+   unsigned long offset = ((unsigned long)target) - (((unsigned long)place) + 5);
    ((unsigned char *)x)[0] = 0xe9;
-   *(unsigned long *)((char *)x + 1) = ((unsigned long)target) - (((unsigned long)place) + 5);
+   memcpy((char *)x + 1, &offset, sizeof(unsigned long));
 }
 
 //restores old sendto
