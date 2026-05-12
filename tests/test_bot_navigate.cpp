@@ -52,7 +52,7 @@ float mock_RANDOM_FLOAT2(float low, float high)
 // Controllable return values for waypoint functions
 static int mock_WaypointFindNearest_result = -1;
 static int mock_WaypointFindReachable_result = -1;
-static int mock_WaypointRouteFromTo_result = -1;
+static int mock_WaypointRouteFromTo_result = WAYPOINT_UNREACHABLE;
 static float mock_WaypointDistanceFromTo_result = 99999.0f;
 
 // WaypointFindPath: returns waypoint indices from a list, one per call
@@ -213,7 +213,7 @@ static void reset_navigate_mocks(void)
 {
    mock_WaypointFindNearest_result = -1;
    mock_WaypointFindReachable_result = -1;
-   mock_WaypointRouteFromTo_result = -1;
+   mock_WaypointRouteFromTo_result = WAYPOINT_UNREACHABLE;
    mock_WaypointDistanceFromTo_result = 99999.0f;
    mock_WaypointFindPath_count = 0;
    mock_WaypointFindPath_call = 0;

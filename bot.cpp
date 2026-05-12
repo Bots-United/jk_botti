@@ -2215,7 +2215,8 @@ static void BotJustWanderAround(bot_t &pBot, float moved_distance)
 static void BotDoStrafeCombat_SelectDirection(bot_t &pBot)
 {
    edict_t *pEdict = pBot.pEdict;
-   bool isMelee = (weapon_select[pBot.current_weapon_index].type & WEAPON_MELEE);
+   bool isMelee = pBot.current_weapon_index >= 0 &&
+                  (weapon_select[pBot.current_weapon_index].type & WEAPON_MELEE);
 
    // don't go too close to enemy
    // strafe instead

@@ -28,8 +28,9 @@
 
 //constructs new jmp forwarder
 #define construct_jmp_instruction(x, place, target) { \
+   unsigned long _jmp_offset = ((unsigned long)(target)) - (((unsigned long)(place)) + 5); \
    ((unsigned char *)(x))[0] = 0xe9; \
-   *(unsigned long *)((char *)(x) + 1) = ((unsigned long)(target)) - (((unsigned long)(place)) + 5); \
+   memcpy((char *)(x) + 1, &_jmp_offset, sizeof(unsigned long)); \
 }
 
 //opcode + sizeof pointer
