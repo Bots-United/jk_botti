@@ -59,7 +59,8 @@ static int test_construct_jmp_basic(void)
    ASSERT_INT(buf[0], 0xE9);
 
    // Check relative offset
-   unsigned long offset = *(unsigned long *)(buf + 1);
+   unsigned long offset;
+   memcpy(&offset, buf + 1, sizeof(offset));
    unsigned long expected = (unsigned long)target - ((unsigned long)place + 5);
    ASSERT_TRUE(offset == expected);
 
@@ -81,7 +82,8 @@ static int test_construct_jmp_backward(void)
 
    ASSERT_INT(buf[0], 0xE9);
 
-   unsigned long offset = *(unsigned long *)(buf + 1);
+   unsigned long offset;
+   memcpy(&offset, buf + 1, sizeof(offset));
    unsigned long expected = (unsigned long)target - ((unsigned long)place + 5);
    ASSERT_TRUE(offset == expected);
 

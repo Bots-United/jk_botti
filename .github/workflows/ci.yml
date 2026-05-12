@@ -82,11 +82,45 @@ jobs:
           name: coverage-report
           path: tests/coverage_report
 
+  test-clang:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CXX: "clang++ --target=i686-linux-gnu"
+      CC: "clang --target=i686-linux-gnu"
+      AR: "i686-linux-gnu-ar rc"
+      RANLIB: i686-linux-gnu-ranlib
+    steps:
+      - uses: actions/checkout@v6
+      - name: Update package list for i386
+        run: sudo dpkg --add-architecture i386 && sudo apt-get -y update
+      - name: Install packages
+        run: sudo apt-get -y install build-essential clang g++-i686-linux-gnu libc6:i386 libstdc++6:i386
+      - name: Run tests
+        run: make test
+
+  sanitize-clang:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CXX: "clang++ --target=i686-linux-gnu"
+      CC: "clang --target=i686-linux-gnu"
+      AR: "i686-linux-gnu-ar rc"
+      RANLIB: i686-linux-gnu-ranlib
+    steps:
+      - uses: actions/checkout@v6
+      - name: Update package list for i386
+        run: sudo dpkg --add-architecture i386 && sudo apt-get -y update
+      - name: Install packages
+        run: sudo apt-get -y install build-essential clang g++-i686-linux-gnu libc6:i386 libstdc++6:i386
+      - name: Run tests with ASAN and UBSAN
+        run: make sanitize
+
   build:
     uses: ./.github/workflows/build.yml
 
   package:
-    needs: [test, sanitize, build]
+    needs: [test, sanitize, test-clang, sanitize-clang, build]
     uses: ./.github/workflows/package.yml
     with:
       version: snapshot

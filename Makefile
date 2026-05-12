@@ -50,10 +50,19 @@ endif
 
 TARGET = jk_botti_mm
 
+ifneq ($(findstring clang,$(shell $(firstword $(CXX)) --version 2>/dev/null)),)
+COMPILER_IS_CLANG := 1
+endif
+
 SHIM_TARGETFLAGS    ?= -march=i686 -mtune=generic
 X87_TARGETFLAGS     ?= -march=i686 -mtune=generic
+ifeq ($(COMPILER_IS_CLANG),1)
+SSE3_TARGETFLAGS    ?= -march=i686 -mtune=generic -msse3
+AVX2FMA_TARGETFLAGS ?= -march=i686 -mtune=generic -mavx2 -mfma
+else
 SSE3_TARGETFLAGS    ?= -march=i686 -mtune=generic -msse3 -mfpmath=sse
 AVX2FMA_TARGETFLAGS ?= -march=i686 -mtune=generic -mavx2 -mfma -mfpmath=sse
+endif
 VALGRIND_TARGETFLAGS ?= $(SSE3_TARGETFLAGS)
 
 SHIM_OUT := $(TARGET)$(DLLEND)
@@ -151,9 +160,12 @@ VER_MINOR ?= 0
 VER_NOTE  ?= git$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 VERFLAGS   = -DVER_MAJOR=$(VER_MAJOR) -DVER_MINOR=$(VER_MINOR) -DVER_NOTE=\"$(VER_NOTE)\" $(VERFLAGS_EXTRA)
 
-BASEFLAGS  = -Wall -Wno-write-strings -Wno-class-memaccess $(VERFLAGS)
+BASEFLAGS  = -Wall -Wno-write-strings $(VERFLAGS)
 BASEFLAGS += -fno-strict-aliasing -fno-strict-overflow
-BASEFLAGS += -fvisibility=hidden -mincoming-stack-boundary=2
+BASEFLAGS += -fvisibility=hidden
+ifneq ($(COMPILER_IS_CLANG),1)
+BASEFLAGS += -Wno-class-memaccess -mincoming-stack-boundary=2
+endif
 ARCHFLAG  += $(TARGETFLAGS)
 
 ifeq ($(DBG_FLGS),1)

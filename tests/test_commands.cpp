@@ -134,7 +134,7 @@ static int mock_Cmd_Argc(void)
 static char mock_server_cmd_buf[256];
 static int mock_server_execute_count;
 
-static void mock_pfnServerCommand(const char *str)
+static void mock_pfnServerCommand(char *str)
 {
    if (str)
       safe_strcopy(mock_server_cmd_buf, sizeof(mock_server_cmd_buf), str);
@@ -251,7 +251,7 @@ static void reset_test_state(void)
    g_engfuncs.pfnCmd_Argv = mock_Cmd_Argv;
    g_engfuncs.pfnCmd_Args = mock_Cmd_Args;
    g_engfuncs.pfnCmd_Argc = mock_Cmd_Argc;
-   g_engfuncs.pfnServerCommand = (void (*)(char *))mock_pfnServerCommand;
+   g_engfuncs.pfnServerCommand = mock_pfnServerCommand;
    g_engfuncs.pfnServerExecute = mock_pfnServerExecute;
    g_engfuncs.pfnIsDedicatedServer = mock_pfnIsDedicatedServer;
 

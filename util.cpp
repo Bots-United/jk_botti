@@ -43,6 +43,11 @@ static int team_model_map_count = 0;
 // [-pi/4, pi/4] and minimax polynomials. Max error vs libm: < 2e-16.
 inline void fsincos_sse(double x, double &s, double &c)
 {
+   if (__builtin_expect(!__builtin_isfinite(x), 0)) {
+      s = c = __builtin_nan("");
+      return;
+   }
+
    double abs_x = __builtin_fabs(x);
 
    // Find octant: j = floor(|x| * 4/pi), round up to even
@@ -107,6 +112,9 @@ inline void fsincos_sse(double x, double &s, double &c)
 // fsincos_sse). cos is even: cos(-x) = cos(x), so no sign fixup needed.
 inline double fcos_sse(double x)
 {
+   if (__builtin_expect(!__builtin_isfinite(x), 0))
+      return __builtin_nan("");
+
    double abs_x = __builtin_fabs(x);
 
    // Find octant: j = floor(|x| * 4/pi), round up to even
@@ -154,7 +162,7 @@ inline double fcos_sse(double x)
 // x87 fsincos asm: ~2.4x faster than glibc sin()+cos().
 inline void fsincos_x87(double x, double &s, double &c)
 {
-   __asm__ ("fsincos;" : "=t" (c), "=u" (s) : "0" (x) : "st(7)");
+   __asm__ ("fsincos;" : "=t" (c), "=u" (s) : "0" (x));
 }
 
 inline void fsincos(double x, double &s, double &c)
