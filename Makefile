@@ -66,7 +66,7 @@ ifeq ($(VARIANT),)
 # Top-level: dispatch variant builds via recursive make.
 # ============================================================================
 
-.PHONY: all variants shim x87 sse3 avx2fma test valgrind coverage clean distclean depend
+.PHONY: all variants shim x87 sse3 avx2fma test valgrind sanitize coverage clean distclean depend
 
 all: variants
 
@@ -90,6 +90,9 @@ test:
 valgrind:
 	$(MAKE) -C tests clean
 	+$(MAKE) VARIANT=sse3 TARGETFLAGS_OVERRIDE="$(VALGRIND_TARGETFLAGS)" _valgrind
+
+sanitize:
+	+$(MAKE) VARIANT=avx2fma _sanitize
 
 coverage:
 	+$(MAKE) VARIANT=avx2fma _coverage
@@ -170,7 +173,7 @@ CFLAGS    = $(BASEFLAGS) $(OPTFLAGS) $(ARCHFLAG) $(INCLUDES)
 CXXFLAGS  = -fno-rtti -fno-exceptions
 CXXFLAGS += $(CFLAGS)
 
-.PHONY: _build _test _valgrind _coverage _depend
+.PHONY: _build _test _valgrind _sanitize _coverage _depend
 
 # ----------------------------------------------------------------------------
 # Shim variant: single-file forwarder, no zlib, no HL SDK headers.
@@ -239,6 +242,9 @@ _test: $(ZLIB_LIB)
 
 _valgrind: $(ZLIB_LIB)
 	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" ZLIB_LIB="../$(ZLIB_LIB)" valgrind
+
+_sanitize: $(ZLIB_LIB)
+	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" ZLIB_LIB="../$(ZLIB_LIB)" sanitize
 
 _coverage: $(ZLIB_LIB)
 	$(MAKE) -C tests CXXFLAGS="$(CXXFLAGS)" ZLIB_LIB="../$(ZLIB_LIB)" coverage

@@ -22,6 +22,18 @@ jobs:
       - name: Run valgrind
         run: CXX="g++ -m32" make valgrind
 
+  sanitize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Update package list for i386
+        run: sudo dpkg --add-architecture i386 && sudo apt-get -y update
+      - name: Install packages
+        run: sudo apt-get -y install build-essential g++-multilib
+      - name: Run tests with ASAN and UBSAN
+        run: CXX="g++ -m32" make sanitize
+
   coverage:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -59,7 +71,7 @@ jobs:
     uses: ./.github/workflows/build.yml
 
   package:
-    needs: [test, build]
+    needs: [test, sanitize, build]
     uses: ./.github/workflows/package.yml
     with:
       version: snapshot

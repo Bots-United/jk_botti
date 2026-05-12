@@ -271,6 +271,12 @@ valgrind: $(ALL_TESTS)
 	$(VALGRIND) ./test_bot_query_hook_win32
 	$(VALGRIND) ./test_shim
 
+SANITIZE_FLAGS = -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer
+
+sanitize:
+	$(MAKE) clean
+	$(MAKE) COVERAGE_FLAGS="$(SANITIZE_FLAGS)" run
+
 coverage:
 	$(MAKE) clean
 	rm -f *.gcda *.gcno coverage.info
