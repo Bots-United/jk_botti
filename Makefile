@@ -188,16 +188,14 @@ CXXFLAGS += $(CFLAGS)
 .PHONY: _build _test _valgrind _sanitize _coverage _depend
 
 # ----------------------------------------------------------------------------
-# Shim variant: single-file forwarder, no zlib, no HL SDK headers.
+# Shim variant: single-file forwarder, no zlib.
 # ----------------------------------------------------------------------------
 ifeq ($(VARIANT),shim)
 
-SHIM_CFLAGS = -Wall -Wextra -Wno-unused-parameter $(OPTFLAGS) $(ARCHFLAG) -std=gnu99
-
 _build: $(OUTPUT)
 
-$(OUTPUT): shim.c | $(OBJDIR)
-	$(CC) $(SHIM_CFLAGS) -o $@ $< $(LINKFLAGS)
+$(OUTPUT): shim.cpp | $(OBJDIR)
+	$(CXX) $(CXXFLAGS) -o $@ $< $(LINKFLAGS)
 	mkdir -p addons/jk_botti/dlls
 	cp $@ addons/jk_botti/dlls/
 ifneq ($(OSTYPE),win32)
