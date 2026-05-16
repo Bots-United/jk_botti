@@ -192,12 +192,14 @@ test_bot_query_hook_win32.o: test_bot_query_hook_win32.cpp ../bot_query_hook_win
 test_bot_query_hook_win32: test_bot_query_hook_win32.o
 	${CXX} $(COVERAGE_FLAGS) -o $@ test_bot_query_hook_win32.o
 
-# shim tests (shim.c #included with -D_WIN32 -DSHIM_TEST, mock Win32 headers)
-test_shim.o: test_shim.cpp ../shim.c windows.h
-	${CXX} -Wall -D_WIN32 -DSHIM_TEST -I. -I".." $(COVERAGE_FLAGS) -c $< -o $@
+# shim tests (shim.cpp #included with -DSHIM_TEST)
+test_shim.o: test_shim.cpp ../shim.cpp
+	${CXX} ${TEST_CXXFLAGS} -DSHIM_TEST -c $< -o $@
 
-test_shim: test_shim.o
-	${CXX} $(COVERAGE_FLAGS) -o $@ test_shim.o
+SHIM_OBJS = engine_mock.o test_shim.o util.o safe_snprintf.o random_num.o
+
+test_shim: $(SHIM_OBJS)
+	${CXX} $(COVERAGE_FLAGS) -o $@ $(SHIM_OBJS) -lm
 
 BOT_TRACE_OBJS = engine_mock.o test_bot_trace.o \
 	bot_trace.o bot_weapons.o util.o safe_snprintf.o random_num.o

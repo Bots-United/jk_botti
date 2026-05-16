@@ -9,33 +9,16 @@
  * runs before we have proven the CPU supports those instruction sets.
  */
 
-#ifndef _WIN32
-#  define _GNU_SOURCE  /* Dl_info, dladdr */
-#endif
-
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #ifndef SHIM_TEST
-#  include <cpuid.h>
+#include <cpuid.h>
 #endif
 
-#ifdef _WIN32
-#  define WIN32_LEAN_AND_MEAN
-#  include <windows.h>
-#  ifdef SHIM_TEST
-#     define DLLEXPORT
-#     define WINAPI_
-#  else
-#     define DLLEXPORT __declspec(dllexport)
-#     define WINAPI_   __stdcall
-#  endif
-#else
-#  include <dlfcn.h>
-#  define DLLEXPORT __attribute__((visibility("default")))
-#  define WINAPI_
-#endif
+#include <extdll.h>
+#include <dllapi.h>
+#include <h_export.h>
+#include <meta_api.h>
 
 /* ---- variant filenames (siblings in the shim's own directory) ---------- */
 
@@ -100,11 +83,9 @@ int has_sse3(void);
 
 /* ---- dlopen / LoadLibrary abstraction ---------------------------------- */
 
-#ifdef _WIN32
-typedef HMODULE dl_handle_t;
-#else
-typedef void   *dl_handle_t;
-#endif
+typedef void *dl_handle_t;
+
+#ifndef SHIM_TEST
 
 static dl_handle_t dl_open(const char *path, char *errbuf, size_t errcap)
 {
@@ -113,7 +94,7 @@ static dl_handle_t dl_open(const char *path, char *errbuf, size_t errcap)
    if (!h)
       snprintf(errbuf, errcap, "LoadLibrary(%s) failed, GetLastError=%lu",
                path, (unsigned long)GetLastError());
-   return h;
+   return (dl_handle_t)h;
 #else
    void *h = dlopen(path, RTLD_NOW | RTLD_LOCAL);
    if (!h) {
@@ -127,7 +108,7 @@ static dl_handle_t dl_open(const char *path, char *errbuf, size_t errcap)
 static void *dl_sym(dl_handle_t h, const char *name)
 {
 #ifdef _WIN32
-   return (void *)GetProcAddress(h, name);
+   return (void *)GetProcAddress((HMODULE)h, name);
 #else
    return dlsym(h, name);
 #endif
@@ -136,30 +117,93 @@ static void *dl_sym(dl_handle_t h, const char *name)
 static void dl_close(dl_handle_t h)
 {
 #ifdef _WIN32
-   FreeLibrary(h);
+   FreeLibrary((HMODULE)h);
 #else
    dlclose(h);
 #endif
 }
 
+#else /* SHIM_TEST: provided by test harness */
+
+dl_handle_t dl_open(const char *path, char *errbuf, size_t errcap);
+void *dl_sym(dl_handle_t h, const char *name);
+void dl_close(dl_handle_t h);
+
+#endif
+
+/* ---- Metamod plugin ownership proxy ----------------------------------- */
+/*
+ * Metamod identifies which plugin owns a cvar/command by calling dladdr()
+ * on the cvar_t pointer or command-handler function pointer.  Since the
+ * shim loads the variant with dlopen(), those addresses resolve to the
+ * variant .so, not the shim .so that metamod actually loaded.  The fix:
+ * intercept pfnCVarRegister and pfnAddServerCommand in the engine function
+ * table, copying data into shim-local storage so dladdr() resolves to us.
+ */
+
+typedef __typeof__(((enginefuncs_t*)NULL)->pfnCVarRegister) pfn_CVarRegister_t;
+typedef __typeof__(((enginefuncs_t*)NULL)->pfnAddServerCommand) pfn_AddServerCommand_t;
+
+#define MAX_PROXY_CVARS 8
+static cvar_t g_proxy_cvars[MAX_PROXY_CVARS];
+static int g_proxy_cvar_count;
+static pfn_CVarRegister_t g_real_CVarRegister;
+
+#define MAX_PROXY_CMDS 4
+static void (*g_proxy_cmd_targets[MAX_PROXY_CMDS])(void);
+
+static void FORCE_STACK_ALIGN proxy_cmd_handler_0(void) { if (g_proxy_cmd_targets[0]) g_proxy_cmd_targets[0](); }
+static void FORCE_STACK_ALIGN proxy_cmd_handler_1(void) { if (g_proxy_cmd_targets[1]) g_proxy_cmd_targets[1](); }
+static void FORCE_STACK_ALIGN proxy_cmd_handler_2(void) { if (g_proxy_cmd_targets[2]) g_proxy_cmd_targets[2](); }
+static void FORCE_STACK_ALIGN proxy_cmd_handler_3(void) { if (g_proxy_cmd_targets[3]) g_proxy_cmd_targets[3](); }
+
+typedef void (*pfn_void_void)(void);
+static const pfn_void_void g_proxy_cmd_handlers[MAX_PROXY_CMDS] = {
+   proxy_cmd_handler_0, proxy_cmd_handler_1,
+   proxy_cmd_handler_2, proxy_cmd_handler_3,
+};
+static int g_proxy_cmd_count;
+static pfn_AddServerCommand_t g_real_AddServerCommand;
+
+static void FORCE_STACK_ALIGN shim_CVarRegister(cvar_t *pCvar)
+{
+   if (!g_real_CVarRegister)
+      return;
+   if (g_proxy_cvar_count < MAX_PROXY_CVARS) {
+      cvar_t *local = &g_proxy_cvars[g_proxy_cvar_count++];
+      *local = *pCvar;
+      g_real_CVarRegister(local);
+   } else {
+      g_real_CVarRegister(pCvar);
+   }
+}
+
+static void FORCE_STACK_ALIGN shim_AddServerCommand(char *cmd_name, void (*function)(void))
+{
+   if (!g_real_AddServerCommand)
+      return;
+   if (g_proxy_cmd_count < MAX_PROXY_CMDS) {
+      int idx = g_proxy_cmd_count++;
+      g_proxy_cmd_targets[idx] = function;
+      g_real_AddServerCommand(cmd_name, g_proxy_cmd_handlers[idx]);
+   } else {
+      g_real_AddServerCommand(cmd_name, function);
+   }
+}
+
+static enginefuncs_t g_engfuncs_copy;
+
 /* ---- forward-declaration of variant entry points ----------------------- */
 
-typedef void (WINAPI_ *pfn_GiveFnptrsToDll)(void *, void *);
-typedef int  (*pfn_Meta_Query)(char *, void **, void *);
-typedef int  (*pfn_Meta_Attach)(int, void *, void *, void *);
-typedef int  (*pfn_Meta_Detach)(int, int);
-typedef int  (*pfn_EntityAPI)(void *, int *);
-typedef int  (*pfn_EngineAPI)(void *, int *);
-
-static dl_handle_t          g_variant;
-static pfn_GiveFnptrsToDll  p_GiveFnptrsToDll;
-static pfn_Meta_Query       p_Meta_Query;
-static pfn_Meta_Attach      p_Meta_Attach;
-static pfn_Meta_Detach      p_Meta_Detach;
-static pfn_EntityAPI        p_GetEntityAPI2;
-static pfn_EntityAPI        p_GetEntityAPI2_POST;
-static pfn_EngineAPI        p_GetEngineFunctions;
-static pfn_EngineAPI        p_GetEngineFunctions_POST;
+static dl_handle_t              g_variant;
+static GIVE_ENGINE_FUNCTIONS_FN p_GiveFnptrsToDll;
+static META_QUERY_FN            p_Meta_Query;
+static META_ATTACH_FN           p_Meta_Attach;
+static META_DETACH_FN           p_Meta_Detach;
+static GETENTITYAPI2_FN         p_GetEntityAPI2;
+static GETENTITYAPI2_FN         p_GetEntityAPI2_POST;
+static GET_ENGINE_FUNCTIONS_FN  p_GetEngineFunctions;
+static GET_ENGINE_FUNCTIONS_FN  p_GetEngineFunctions_POST;
 
 /* ---- self path resolution ---------------------------------------------- */
 
@@ -329,61 +373,77 @@ static int ensure_loaded(void)
 
 /* ---- exported Metamod entry points ------------------------------------- */
 
-DLLEXPORT void WINAPI_ GiveFnptrsToDll(void *pengfuncsFromEngine,
-                                       void *pGlobals)
+C_DLLEXPORT FORCE_STACK_ALIGN void WINAPI GiveFnptrsToDll(enginefuncs_t *pengfuncsFromEngine,
+							  globalvars_t *pGlobals)
 {
    if (!ensure_loaded())
       return;
-   p_GiveFnptrsToDll(pengfuncsFromEngine, pGlobals);
+
+   g_engfuncs_copy = *pengfuncsFromEngine;
+
+   g_real_CVarRegister = (pfn_CVarRegister_t)g_engfuncs_copy.pfnCVarRegister;
+   g_engfuncs_copy.pfnCVarRegister = shim_CVarRegister;
+   g_engfuncs_copy.pfnCvar_RegisterVariable = shim_CVarRegister;
+
+   g_real_AddServerCommand = (pfn_AddServerCommand_t)g_engfuncs_copy.pfnAddServerCommand;
+   g_engfuncs_copy.pfnAddServerCommand = shim_AddServerCommand;
+
+   p_GiveFnptrsToDll(&g_engfuncs_copy, pGlobals);
 }
 
-DLLEXPORT int Meta_Query(char *ifvers, void **pPlugInfo,
-                         void *pMetaUtilFuncs)
+C_DLLEXPORT FORCE_STACK_ALIGN int Meta_Query(char *interfaceVersion,
+					     plugin_info_t **plinfo,
+					     mutil_funcs_t *pMetaUtilFuncs)
 {
    if (!ensure_loaded())
       return 0;
-   return p_Meta_Query(ifvers, pPlugInfo, pMetaUtilFuncs);
+   return p_Meta_Query(interfaceVersion, plinfo, pMetaUtilFuncs);
 }
 
-DLLEXPORT int Meta_Attach(int now, void *pFunctionTable,
-                          void *pMGlobals, void *pGamedllFuncs)
+C_DLLEXPORT FORCE_STACK_ALIGN int Meta_Attach(PLUG_LOADTIME now,
+					      META_FUNCTIONS *pFunctionTable,
+					      meta_globals_t *pMGlobals,
+					      gamedll_funcs_t *pGamedllFuncs)
 {
    if (!ensure_loaded())
       return 0;
    return p_Meta_Attach(now, pFunctionTable, pMGlobals, pGamedllFuncs);
 }
 
-DLLEXPORT int Meta_Detach(int now, int reason)
+C_DLLEXPORT FORCE_STACK_ALIGN int Meta_Detach(PLUG_LOADTIME now,
+					      PL_UNLOAD_REASON reason)
 {
    if (!g_init_ok)
       return 1;
    return p_Meta_Detach(now, reason);
 }
 
-DLLEXPORT int GetEntityAPI2(void *pFunctionTable, int *interfaceVersion)
+C_DLLEXPORT FORCE_STACK_ALIGN int GetEntityAPI2(DLL_FUNCTIONS *pFunctionTable,
+						int *interfaceVersion)
 {
    if (!ensure_loaded())
       return 0;
    return p_GetEntityAPI2(pFunctionTable, interfaceVersion);
 }
 
-DLLEXPORT int GetEntityAPI2_POST(void *pFunctionTable, int *interfaceVersion)
+C_DLLEXPORT FORCE_STACK_ALIGN int GetEntityAPI2_POST(DLL_FUNCTIONS *pFunctionTable,
+						     int *interfaceVersion)
 {
    if (!ensure_loaded())
       return 0;
    return p_GetEntityAPI2_POST(pFunctionTable, interfaceVersion);
 }
 
-DLLEXPORT int GetEngineFunctions(void *pengfuncsFromEngine,
-                                 int *interfaceVersion)
+C_DLLEXPORT FORCE_STACK_ALIGN int GetEngineFunctions(enginefuncs_t *pengfuncsFromEngine,
+						     int *interfaceVersion)
 {
    if (!ensure_loaded())
       return 0;
    return p_GetEngineFunctions(pengfuncsFromEngine, interfaceVersion);
 }
 
-DLLEXPORT int GetEngineFunctions_POST(void *pengfuncsFromEngine,
-                                      int *interfaceVersion)
+C_DLLEXPORT FORCE_STACK_ALIGN int GetEngineFunctions_POST(enginefuncs_t *pengfuncsFromEngine,
+							  int *interfaceVersion)
 {
    if (!ensure_loaded())
       return 0;
@@ -391,7 +451,7 @@ DLLEXPORT int GetEngineFunctions_POST(void *pengfuncsFromEngine,
 }
 
 #if defined(_WIN32) && !defined(SHIM_TEST)
-BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID reserved)
+FORCE_STACK_ALIGN BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID reserved)
 {
    (void)hinst; (void)reason; (void)reserved;
    return TRUE;
@@ -413,9 +473,27 @@ void shim_test_reset(void)
    p_GetEntityAPI2_POST = NULL;
    p_GetEngineFunctions = NULL;
    p_GetEngineFunctions_POST = NULL;
+   g_real_CVarRegister = NULL;
+   g_real_AddServerCommand = NULL;
+   g_proxy_cvar_count = 0;
+   g_proxy_cmd_count = 0;
+   memset(g_proxy_cvars, 0, sizeof(g_proxy_cvars));
+   memset(g_proxy_cmd_targets, 0, sizeof(g_proxy_cmd_targets));
+   memset(&g_engfuncs_copy, 0, sizeof(g_engfuncs_copy));
 }
 
 int shim_test_ensure_loaded(void)             { return ensure_loaded(); }
 int shim_test_load_variant(const char *dir,
                            const char *leaf)  { return load_variant(dir, leaf); }
+
+/* Proxy test accessors */
+cvar_t *shim_test_get_proxy_cvar(int idx)     { return &g_proxy_cvars[idx]; }
+int shim_test_get_proxy_cvar_count(void)      { return g_proxy_cvar_count; }
+int shim_test_get_proxy_cmd_count(void)       { return g_proxy_cmd_count; }
+pfn_void_void shim_test_get_proxy_cmd_handler(int idx) { return g_proxy_cmd_handlers[idx]; }
+void shim_test_call_CVarRegister(cvar_t *cv)  { shim_CVarRegister(cv); }
+void shim_test_call_AddServerCommand(char *name, void (*fn)(void)) { shim_AddServerCommand(name, fn); }
+void shim_test_set_real_CVarRegister(pfn_CVarRegister_t fn) { g_real_CVarRegister = fn; }
+void shim_test_set_real_AddServerCommand(pfn_AddServerCommand_t fn) { g_real_AddServerCommand = fn; }
+enginefuncs_t *shim_test_get_engfuncs_copy(void) { return &g_engfuncs_copy; }
 #endif
