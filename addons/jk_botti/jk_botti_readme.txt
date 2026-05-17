@@ -1,4 +1,4 @@
-jk_botti 1.60
+jk_botti 1.61
 -------------
 
 1. Intro
@@ -10,7 +10,7 @@ jk_botti 1.60
 1. Intro
 --------------------
 
-This is 1.60 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@iki.fi>
+This is 1.61 release of jk_botti, by Jussi Kivilinna <jussi.kivilinna@iki.fi>
 You are free to use code for any of your needs.
 
 jk_botti is computer gamer for multiplayer mode of Half-Life (HLDM) and has 
@@ -66,6 +66,28 @@ Credits:
 --------------------
 2. What's new
 --------------------
+1.61:
+ Bug fixes:
+ * Fix sendto hook trampoline crash on CPUs with CET/IBT by adding endbr32
+   prefix to indirect branch target (#116)
+ * Fix metamod "meta cvars" showing (unknown) for shim plugin variant (#115)
+ * Fix unaligned memory writes in query hook JMP instruction construction
+   and connection time float replacement (#112)
+ * Fix weapon_select out-of-bounds access when current_weapon_index is -1
+ * Fix m_rgAmmo out-of-bounds access when weapon has no ammo type
+ * Fix shim leaking module handle when variant symbol resolution fails (#109)
+
+ Improvements:
+ * Rework timing code for more accurate bot frame timing (vs49688, #110)
+ * Replace global -mincoming-stack-boundary=2 with per-function
+   FORCE_STACK_ALIGN attribute for better code generation (#114)
+
+ Internal:
+ * Add ASAN+UBSAN sanitizer test job to CI (#112)
+ * Add clang compilation and sanitizer CI jobs (#113)
+ * Switch CI from g++ -m32 to i686-linux-gnu cross-compiler toolchain (#113)
+ * Add timeout-minutes to all CI workflow jobs (#111)
+
 1.60:
  New features:
  * Add bot decision trace logging via jk_botti_trace cvar with two levels
