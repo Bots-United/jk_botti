@@ -43,7 +43,7 @@ ssize_t sendto_hook(int socket, const void *message, size_t length, int flags,
 
 static int test_construct_jmp_basic(void)
 {
-   TEST("construct_jmp_instruction: endbr32 + jmp forward");
+   TEST("construct_jmp_instruction: jmp forward");
 
    unsigned char buf[BYTES_SIZE];
    memset(buf, 0, sizeof(buf));
@@ -53,17 +53,12 @@ static int test_construct_jmp_basic(void)
 
    construct_jmp_instruction(buf, place, target);
 
-   // endbr32: f3 0f 1e fb
-   ASSERT_INT(buf[0], 0xf3);
-   ASSERT_INT(buf[1], 0x0f);
-   ASSERT_INT(buf[2], 0x1e);
-   ASSERT_INT(buf[3], 0xfb);
    // jmp opcode
-   ASSERT_INT(buf[4], 0xE9);
+   ASSERT_INT(buf[0], 0xE9);
 
-   // Check relative offset (relative to end of the jmp instruction = place + 9)
+   // Check relative offset (relative to end of the jmp instruction = place + 5)
    unsigned long offset;
-   memcpy(&offset, buf + 5, sizeof(offset));
+   memcpy(&offset, buf + 1, sizeof(offset));
    unsigned long expected = (unsigned long)target - ((unsigned long)place + BYTES_SIZE);
    ASSERT_TRUE(offset == expected);
 
@@ -83,16 +78,27 @@ static int test_construct_jmp_backward(void)
 
    construct_jmp_instruction(buf, place, target);
 
-   // endbr32
-   ASSERT_INT(buf[0], 0xf3);
-   ASSERT_INT(buf[3], 0xfb);
    // jmp opcode
-   ASSERT_INT(buf[4], 0xE9);
+   ASSERT_INT(buf[0], 0xE9);
 
    unsigned long offset;
-   memcpy(&offset, buf + 5, sizeof(offset));
+   memcpy(&offset, buf + 1, sizeof(offset));
    unsigned long expected = (unsigned long)target - ((unsigned long)place + BYTES_SIZE);
    ASSERT_TRUE(offset == expected);
+
+   PASS();
+   return 0;
+}
+
+static int test_has_endbr32(void)
+{
+   TEST("has_endbr32: detects landing pad");
+
+   unsigned char with[]    = { 0xf3, 0x0f, 0x1e, 0xfb, 0x55 };
+   unsigned char without[] = { 0x55, 0x89, 0xe5, 0x00, 0x00 };
+
+   ASSERT_TRUE(has_endbr32(with) == true);
+   ASSERT_TRUE(has_endbr32(without) == false);
 
    PASS();
    return 0;
@@ -130,9 +136,9 @@ static int test_hook_sendto(void)
    // sendto_original should be non-null (resolved &sendto)
    ASSERT_TRUE(sendto_original != NULL);
 
-   // The first 4 bytes of sendto should now be endbr32, then 0xE9 (JMP)
-   ASSERT_INT(((unsigned char *)sendto_original)[0], 0xf3);
-   ASSERT_INT(((unsigned char *)sendto_original)[4], 0xE9);
+   // sendto_original is the patch site (past endbr32 if present); it now holds
+   // our 5-byte JMP forwarder.
+   ASSERT_INT(((unsigned char *)sendto_original)[0], 0xE9);
 
    // The old bytes should have been saved
    // We can verify by unhooking and checking restoration
@@ -194,6 +200,7 @@ int main(void)
 
    fail |= test_construct_jmp_basic();
    fail |= test_construct_jmp_backward();
+   fail |= test_has_endbr32();
    fail |= test_unhook_when_not_hooked();
    fail |= test_hook_sendto();
    fail |= test_hook_already_hooked();
