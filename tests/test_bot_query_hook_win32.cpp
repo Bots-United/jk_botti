@@ -24,12 +24,27 @@
 // Mock state
 // ============================================================
 
-static unsigned char mock_sendto_target[16];
+// Distinct backing buffers for each DLL's "sendto". 8-byte aligned so the
+// locked cmpxchg8b publish stays within one cache line (no split lock).
+static unsigned char mock_ws2_target[16] __attribute__((aligned(8)));
+static unsigned char mock_wsock_target[16] __attribute__((aligned(8)));
+
+// Per-DLL knobs: whether the module is loaded, and what address its "sendto"
+// resolves to (NULL == GetProcAddress fails). Default mirrors wine: both DLLs
+// loaded, wsock32's export forwarding to the same address as ws2_32.
+static bool mock_ws2_loaded = true;
+static bool mock_wsock_loaded = true;
+static void *mock_ws2_sendto = mock_ws2_target;
+static void *mock_wsock_sendto = mock_ws2_target;
+
 static BOOL mock_virtualprotect_result = 1;
 static int mock_wsasendto_result = 0;
 static DWORD mock_wsasendto_sent = 0;
 static int mock_wsa_last_error = 0;
 static DWORD mock_last_error_val = 0;
+
+#define MOCK_H_WS2   ((HMODULE)0x2001)
+#define MOCK_H_WSOCK ((HMODULE)0x2002)
 
 // ============================================================
 // Mock Win32 API implementations
@@ -41,10 +56,23 @@ void LeaveCriticalSection(CRITICAL_SECTION *cs) { (void)cs; }
 void DeleteCriticalSection(CRITICAL_SECTION *cs) { (void)cs; }
 
 HMODULE GetModuleHandle(const char *name)
-{ (void)name; return (HMODULE)1; }
+{
+   if (name && strcmp(name, "ws2_32.dll") == 0)
+      return mock_ws2_loaded ? MOCK_H_WS2 : (HMODULE)NULL;
+   if (name && strcmp(name, "wsock32.dll") == 0)
+      return mock_wsock_loaded ? MOCK_H_WSOCK : (HMODULE)NULL;
+   return (HMODULE)NULL;
+}
 
 FARPROC GetProcAddress(HMODULE module, const char *name)
-{ (void)module; (void)name; return (FARPROC)(void *)mock_sendto_target; }
+{
+   (void)name;
+   if (module == MOCK_H_WS2)
+      return (FARPROC)mock_ws2_sendto;
+   if (module == MOCK_H_WSOCK)
+      return (FARPROC)mock_wsock_sendto;
+   return (FARPROC)NULL;
+}
 
 BOOL VirtualProtect(void *addr, size_t size, DWORD newprotect, DWORD *oldprotect)
 {
@@ -95,11 +123,16 @@ ssize_t PASCAL sendto_hook(int socket, const void *message, size_t length,
 static void reset_hook_state(void)
 {
    is_sendto_hook_setup = false;
-   sendto_original = NULL;
-   memset(sendto_new_bytes, 0, sizeof(sendto_new_bytes));
-   memset(sendto_old_bytes, 0, sizeof(sendto_old_bytes));
+   num_sendto_hooks = 0;
+   memset(sendto_hooks, 0, sizeof(sendto_hooks));
    memset(&mutex_replacement_sendto, 0, sizeof(mutex_replacement_sendto));
-   memset(mock_sendto_target, 0xCC, sizeof(mock_sendto_target));
+   memset(mock_ws2_target, 0xCC, sizeof(mock_ws2_target));
+   memset(mock_wsock_target, 0xCC, sizeof(mock_wsock_target));
+   // Default: both DLLs loaded, wsock32 forwards to ws2_32 (wine-like) -> dedup.
+   mock_ws2_loaded = true;
+   mock_wsock_loaded = true;
+   mock_ws2_sendto = mock_ws2_target;
+   mock_wsock_sendto = mock_ws2_target;
    mock_virtualprotect_result = 1;
    mock_wsasendto_result = 0;
    mock_wsasendto_sent = 0;
@@ -125,24 +158,111 @@ static int test_unhook_when_not_hooked(void)
 
 static int test_hook_success(void)
 {
-   TEST("hook_sendto_function success");
+   TEST("hook_sendto_function success (shared addr -> 1 hook)");
    reset_hook_state();
 
    // Save original bytes to compare after unhook
    unsigned char original_bytes[16];
-   memcpy(original_bytes, mock_sendto_target, sizeof(original_bytes));
+   memcpy(original_bytes, mock_ws2_target, sizeof(original_bytes));
 
    ASSERT_TRUE(hook_sendto_function() == true);
    ASSERT_TRUE(is_sendto_hook_setup == true);
 
-   // sendto_original should point to our mock buffer
-   ASSERT_TRUE((void *)sendto_original == (void *)mock_sendto_target);
+   // wsock32 forwards to ws2_32 -> deduped to a single hook site
+   ASSERT_INT(num_sendto_hooks, 1);
+   ASSERT_TRUE((void *)sendto_hooks[0].original == (void *)mock_ws2_target);
 
    // Old bytes should contain the original 0xCC pattern
-   ASSERT_INT(memcmp(sendto_old_bytes, original_bytes, BYTES_SIZE), 0);
+   ASSERT_INT(memcmp(sendto_hooks[0].old_bytes, original_bytes, BYTES_SIZE), 0);
 
-   // mock_sendto_target should now have JMP opcode
-   ASSERT_INT(mock_sendto_target[0], 0xe9);
+   // target should now have JMP opcode
+   ASSERT_INT(mock_ws2_target[0], 0xe9);
+
+   PASS();
+   return 0;
+}
+
+static int test_hook_distinct_addrs(void)
+{
+   TEST("hook both when ws2_32/wsock32 differ -> 2 hooks");
+   reset_hook_state();
+   // wsock32's sendto is a distinct implementation (real Windows)
+   mock_wsock_sendto = mock_wsock_target;
+
+   ASSERT_TRUE(hook_sendto_function() == true);
+   ASSERT_INT(num_sendto_hooks, 2);
+
+   // Both patch sites written with JMP
+   ASSERT_INT(mock_ws2_target[0], 0xe9);
+   ASSERT_INT(mock_wsock_target[0], 0xe9);
+
+   // Both restored on unhook
+   ASSERT_TRUE(unhook_sendto_function() == true);
+   ASSERT_INT(mock_ws2_target[0], 0xCC);
+   ASSERT_INT(mock_wsock_target[0], 0xCC);
+
+   PASS();
+   return 0;
+}
+
+static int test_hook_only_ws2(void)
+{
+   TEST("hook when only ws2_32 loaded -> 1 hook on ws2_32");
+   reset_hook_state();
+   mock_wsock_loaded = false;
+
+   ASSERT_TRUE(hook_sendto_function() == true);
+   ASSERT_INT(num_sendto_hooks, 1);
+   ASSERT_TRUE((void *)sendto_hooks[0].original == (void *)mock_ws2_target);
+   ASSERT_INT(mock_ws2_target[0], 0xe9);
+
+   PASS();
+   return 0;
+}
+
+static int test_hook_only_wsock(void)
+{
+   TEST("hook when only wsock32 loaded -> 1 hook on wsock32");
+   reset_hook_state();
+   mock_ws2_loaded = false;
+   mock_wsock_sendto = mock_wsock_target;
+
+   ASSERT_TRUE(hook_sendto_function() == true);
+   ASSERT_INT(num_sendto_hooks, 1);
+   ASSERT_TRUE((void *)sendto_hooks[0].original == (void *)mock_wsock_target);
+   ASSERT_INT(mock_wsock_target[0], 0xe9);
+
+   PASS();
+   return 0;
+}
+
+// Reproduces issue #126: neither DLL exposes sendto -> must fail, not crash.
+static int test_hook_none_loaded(void)
+{
+   TEST("hook when no sendto found -> false, no crash");
+   reset_hook_state();
+   mock_ws2_loaded = false;
+   mock_wsock_loaded = false;
+
+   ASSERT_TRUE(hook_sendto_function() == false);
+   ASSERT_TRUE(is_sendto_hook_setup == false);
+   ASSERT_INT(num_sendto_hooks, 0);
+
+   PASS();
+   return 0;
+}
+
+static int test_hook_getprocaddress_null(void)
+{
+   TEST("hook when GetProcAddress returns NULL -> false, no crash");
+   reset_hook_state();
+   // Both modules loaded but neither exports sendto
+   mock_ws2_sendto = NULL;
+   mock_wsock_sendto = NULL;
+
+   ASSERT_TRUE(hook_sendto_function() == false);
+   ASSERT_TRUE(is_sendto_hook_setup == false);
+   ASSERT_INT(num_sendto_hooks, 0);
 
    PASS();
    return 0;
@@ -183,17 +303,17 @@ static int test_unhook_restores_bytes(void)
    reset_hook_state();
 
    unsigned char original_bytes[16];
-   memcpy(original_bytes, mock_sendto_target, sizeof(original_bytes));
+   memcpy(original_bytes, mock_ws2_target, sizeof(original_bytes));
 
    ASSERT_TRUE(hook_sendto_function() == true);
-   // mock_sendto_target should now be patched with JMP
-   ASSERT_INT(mock_sendto_target[0], 0xe9);
+   // target should now be patched with JMP
+   ASSERT_INT(mock_ws2_target[0], 0xe9);
 
    ASSERT_TRUE(unhook_sendto_function() == true);
    ASSERT_TRUE(is_sendto_hook_setup == false);
 
    // Bytes should be restored to original 0xCC pattern
-   ASSERT_INT(memcmp(mock_sendto_target, original_bytes, BYTES_SIZE), 0);
+   ASSERT_INT(memcmp(mock_ws2_target, original_bytes, BYTES_SIZE), 0);
 
    PASS();
    return 0;
@@ -241,6 +361,11 @@ int main(void)
    printf("test_bot_query_hook_win32:\n");
    fail |= test_unhook_when_not_hooked();
    fail |= test_hook_success();
+   fail |= test_hook_distinct_addrs();
+   fail |= test_hook_only_ws2();
+   fail |= test_hook_only_wsock();
+   fail |= test_hook_none_loaded();
+   fail |= test_hook_getprocaddress_null();
    fail |= test_hook_already_setup();
    fail |= test_hook_virtualprotect_fails();
    fail |= test_unhook_restores_bytes();
